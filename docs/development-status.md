@@ -36,7 +36,7 @@ Executed checkpoint checks:
 | Independent Python Decimal fixtures | Single loan: 58.98 interest, 1,058.98 paid, 11 months; two debts: snowball 43.10 interest/643.10 paid, avalanche 35.35 interest/635.35 paid, both 7 months |
 | Native desktop build and workflow | Passed on the initial complete compiled bundle: visible two-debt editing, independent strategy totals/allocations, budget coexistence, client isolation, lock/wrong password, and full process restart |
 | Final Rust format, Clippy (all targets, warnings denied), backend and native checks | Passed on final source after the allocation-warning improvement |
-| Windows 0.3.0 build/installer | Pending; the 0.2.0 download does not include debt payoff |
+| Windows 0.3.0 build/installer | Passed run 38485910521: 25 frontend/32 Windows backend tests, release build, silent install, responsive x64 native window, uninstall, and isolated cleanup |
 | Clean Windows 11 offline/full installed debt workflow | Not run |
 
 Final native artifacts are at `/workspace/shared/desktop-smoke-debt-final`; the
@@ -47,6 +47,38 @@ minimum formulas, or nonmonthly contractual payments. Source/account-detail
 expansion, actual due-date cash flow, savings goals, recovery, and independent
 review remain open. The 0.3.0 upgrade prevents older 0.1.0/0.2.0 apps from opening
 schema 4; keep using the newer version and preserve the local data folder.
+
+### Verified 0.3.0 Windows download
+
+[Download the debt-planning development installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521/artifacts/11859772481).
+[Run 38485910521](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521)
+succeeded from source commit `631719ba5811c869b4190603c8eddcef53d82b41`.
+The package is `Eisenbart Counseling Suite_0.3.0_x64-setup.exe`; its artifact
+expires October 27, 2026 and may require GitHub sign-in with repository access.
+
+The actual downloaded ZIP matched GitHub's digest and passed ZIP integrity. The
+installer matched `SHA256SUMS.txt`; its README matched the source commit, version,
+debt features, and schema-upgrade notice. Downloaded logs confirmed 25 frontend
+and 32 backend tests passed, including the real Windows lock-quota regression.
+The separate package log confirmed installation, responsive x64 native window,
+uninstall, file removal, and removal of only test-created application data.
+Archive inspection also verified the bundled WebView2 offline runtime payload.
+
+Installer SHA-256:
+`3965d9f9af6a425b1afa0b0ba39cb93ec776da95fd520e194755184bc8745914`.
+Installer size: 220,951,701 bytes. ZIP size: 221,001,487 bytes.
+Installer artifact: `11859772481`; validation artifact: `11859682545`.
+Verified local downloads/logs: `/workspace/shared/windows-downloads/run-38485910521`.
+Recoverable source checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-debt-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-debt.bundle`; these are source/history
+archives, not backups of client workspaces.
+
+The installer is unsigned and for fictional accounts only. Windows CI launched
+the installed native window but entered no client/budget/debt workflow and used a
+runner with preinstalled WebView2. Linux native workflow evidence and Windows
+backend/package checks do not establish clean Windows 11 offline or full
+installed debt-workflow acceptance. Those checks remain open.
 
 ## Stage 3A: exact client budgets — 0.2.0
 
@@ -322,8 +354,8 @@ clone.
 
 ## Next development priority
 
-Validate and deliver the debt checkpoint's 0.3.0 Windows development package.
-The next application milestone is emergency savings coverage and sinking-fund
+The debt checkpoint and its verified 0.3.0 Windows development package are
+complete. The next application milestone is emergency savings coverage and sinking-fund
 goals, with exact contributions/targets and explicit budget/debt allocation
 coordination. Keep development scoped to fictional records. Clean Windows 11
 offline acceptance and encrypted backup/restore remain prerequisites for real

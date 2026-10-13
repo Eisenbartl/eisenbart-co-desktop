@@ -2,9 +2,9 @@
 
 ## What is available now
 
-The verified **0.2.0 Windows x64 development installer is available**, including saved client budgets, from [build 38482971562](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38482971562). Its 18 frontend and 21 backend tests, installation, responsive native-window launch, uninstall, and isolated cleanup passed on a disposable Windows Server 2025 runner. See [development-status.md](development-status.md) for evidence and remaining acceptance work.
+The verified **0.3.0 Windows x64 development installer is available**, including client budgets and fixed-monthly debt payoff comparisons, from [build 38485910521](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521). Its 25 frontend and 32 backend tests, installation, responsive native-window launch, uninstall, and isolated cleanup passed on a disposable Windows Server 2025 runner. See [development-status.md](development-status.md) for evidence and remaining acceptance work.
 
-[Download windows-installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38482971562/artifacts/11857823874), sign in to GitHub if prompted, and choose **Extract All** for the ZIP. Read `README.txt` and run `Eisenbart Counseling Suite_0.2.0_x64-setup.exe`. Open **Eisenbart Counseling Suite** from the Start menu afterward. The download expires October 27, 2026. The [evaluation guide](user-guide.md) explains setup, fictional clients, budgets, notes, locking, and troubleshooting. Version 0.2.0 upgrades the database to schema 3; do not switch back to 0.1.0 afterward.
+[Download windows-installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521/artifacts/11859772481), sign in to GitHub if prompted, and choose **Extract All** for the ZIP. Read `README.txt` and run `Eisenbart Counseling Suite_0.3.0_x64-setup.exe`. Open **Eisenbart Counseling Suite** from the Start menu afterward. The download expires October 27, 2026. The [evaluation guide](user-guide.md) explains setup, fictional clients, budgets, debt plans, notes, locking, and troubleshooting. Version 0.3.0 upgrades the database to schema 4; do not switch back to older versions afterward.
 
 The first target is Windows 11 x64. This is a development application for fictional data, not a production financial-record system. There is no password recovery or tested backup/restore yet.
 
@@ -30,7 +30,7 @@ These checks exercise the actual NSIS package and installed executable. They do 
 
 ## Install and evaluate
 
-The verified 0.2.0 package includes Microsoft's WebView2 runtime installer: archive inspection found the 214,090,448-byte `MicrosoftEdgeWebView2RuntimeInstaller.exe` payload and passed the installer archive integrity check. A build downloads that redistributable in advance. A fresh-machine offline test must still confirm it installs and works without preinstalled WebView2.
+The verified 0.3.0 package includes Microsoft's WebView2 runtime installer: archive inspection found the 214,090,448-byte `MicrosoftEdgeWebView2RuntimeInstaller.exe` payload and passed the installer archive integrity check. A build downloads that redistributable in advance. A fresh-machine offline test must still confirm it installs and works without preinstalled WebView2.
 
 On a Windows 11 x64 evaluation computer:
 
@@ -41,11 +41,12 @@ On a Windows 11 x64 evaluation computer:
 5. Lock the app and unlock with the password. Verify a wrong password does not unlock it.
 6. Close and reopen the program, sign in, and confirm the client and note persist.
 7. Open a saved client's **Monthly budget**. Reproduce the [documented household example](budget-calculations.md), save, and verify the 716.67 USD unallocated result. Check a second client's budget remains separate.
-8. Disconnect internet access and repeat sign-in, client editing, notes, budgeting, and reopening. Include an upgrade from a fictional 0.1.0 workspace and verify existing clients and notes survive.
+8. Open **Debt payoff planning** and reproduce the two-debt example in [debt-calculations.md](debt-calculations.md). Verify 43.10 USD snowball interest and 35.35 USD avalanche interest, inspect both monthly schedules, and check isolation after locking/reopening.
+9. Disconnect internet access and repeat sign-in, client editing, notes, budgets, debt plans, and reopening. Include an upgrade from a fictional 0.2.0 workspace and verify existing clients, notes, and budgets survive.
 
 The development installer is unsigned until a signing certificate is obtained and configured. Windows may display an unknown-publisher or SmartScreen prompt. Verify the download came from the expected repository build; signing and clean-machine testing are prerequisites for public distribution.
 
-Do not import real client information for this evaluation. Future financial calculators, statement imports, reports, and recovery features are not part of this milestone.
+Do not import real client information for this evaluation. Daily/variable/promotional interest, savings goals, dated cash-flow calendars, statement imports, reports, and recovery features are not part of this milestone.
 
 ## Where local records live
 
