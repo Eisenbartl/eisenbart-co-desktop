@@ -217,7 +217,24 @@ try {
             if ($applicationData -ne $expectedDataPath) {
                 throw 'Application-data cleanup safety check failed.'
             }
-            Remove-Item -LiteralPath $applicationData -Recurse -Force
+            # WebView2 can release its profile lock shortly after the owning
+            # native window exits. Retry only I/O failures in our guarded,
+            # test-owned directory; never kill unrelated browser processes.
+            $deadline = [DateTime]::UtcNow.AddSeconds(45)
+            do {
+                try {
+                    Remove-Item -LiteralPath $applicationData -Recurse -Force -ErrorAction Stop
+                    break
+                } catch {
+                    if ($_.Exception -isnot [IO.IOException] -or [DateTime]::UtcNow -ge $deadline) {
+                        throw
+                    }
+                    Start-Sleep -Milliseconds 250
+                }
+            } while (Test-Path -LiteralPath $applicationData)
+            if (Test-Path -LiteralPath $applicationData) {
+                throw 'Test-owned application data remained after cleanup.'
+            }
             Write-Validation 'PASS removed only application data created by this disposable test'
         }
         if ((Test-Path -LiteralPath $installDirectory) -and

@@ -32,7 +32,7 @@ Executed validation for this checkpoint:
 | Rust format and Clippy (`--all-targets`, warnings denied) | Passed |
 | Native desktop build | Passed with bundled production frontend |
 | Native desktop workflow | Passed: visible budget editing, exact six-line example, encrypted saving, client isolation, locking, wrong-password rejection, and complete process restart with persisted budget |
-| Windows 0.2.0 installer | Pending CI build and installer verification; the existing 0.1.0 download does not include budgets |
+| Windows 0.2.0 installer | First CI run passed 18 frontend/21 backend tests, installer build, install, native-window launch, and uninstall; temporary WebView2 data cleanup encountered a lingering file lock. Bounded I/O-only cleanup wait added; full rerun pending |
 | Clean Windows 11 offline/full installed budgeting workflow | Not run |
 
 Native artifacts: `/workspace/shared/desktop-smoke-budget-final`. An initial
@@ -46,6 +46,14 @@ that newer schema; switching back is unsupported. The development build remains
 for fictional records only, with no supported backup/restore or password recovery.
 This is not the full Stage 3 financial engine: optional budget methods, debt
 payoff schedules, savings targets, cash-flow dates, and scenarios remain open.
+
+Windows run [38482182798](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38482182798)
+finished application validation but failed test-data cleanup when WebView2 still
+held `EBWebView/lockfile`. No installer download was uploaded from that run.
+Cleanup retains both known-folder ownership checks and the disposable-runner
+restriction, waits at most 45 seconds for I/O failures, fails immediately for
+other errors, and still requires the test-created directory to be removed.
+It does not kill unrelated browser processes or skip the cleanup check.
 
 ## Windows development installer milestone — October 13, 2026
 
