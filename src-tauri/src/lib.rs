@@ -1,3 +1,4 @@
+mod budget;
 mod models;
 mod storage;
 
@@ -106,6 +107,25 @@ fn list_client_notes(
     access(&state, |workspace| workspace.list_client_notes(&client_id))
 }
 
+#[tauri::command]
+fn get_client_budget(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<budget::ClientBudget, String> {
+    access(&state, |workspace| workspace.get_client_budget(&client_id))
+}
+
+#[tauri::command]
+fn save_client_budget(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: budget::BudgetInput,
+) -> Result<budget::ClientBudget, String> {
+    access(&state, |workspace| {
+        workspace.save_client_budget(&client_id, input)
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -136,7 +156,9 @@ pub fn run() {
             get_client,
             save_client,
             add_client_note,
-            list_client_notes
+            list_client_notes,
+            get_client_budget,
+            save_client_budget
         ])
         .run(tauri::generate_context!())
         .expect("Desktop application could not start");

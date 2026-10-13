@@ -1,8 +1,8 @@
 # Windows evaluation guide
 
 This development build provides a local workspace, client profiles, counseling
-statuses, and dated session notes. Use fictional records only. Financial
-calculations, statement imports, debt and savings plans, PDF reports, and
+statuses, dated session notes, and client budgets. Use fictional records only. Advanced financial
+calculations, statement imports, debt payoff and savings goal plans, PDF reports, and
 commercial licensing are still being developed. Password recovery and tested
 backup/restore are not available.
 
@@ -55,6 +55,36 @@ Save profile edits and session notes separately before switching records,
 closing, or locking. If a prompt warns about unsaved changes, cancel it to return
 and save your work. Saved notes remain in the history; add another note to record
 a correction or update.
+
+## Create a client budget
+
+Open a saved client in **Clients** and scroll to **Monthly budget**.
+
+1. Choose **Add income**, **Add expense**, or **Add allocation**.
+2. Enter a **Category or source** name, choose the **Type**, and enter an
+   **Amount (USD)** and **Frequency**. Use take-home income. Enter amounts such
+   as `1500.50`, without dollar signs or commas. **Every two weeks** and
+   **Twice a month** are different frequencies.
+3. Leave an unknown amount blank; enter `0` for a known zero. Mark uncertain
+   amounts as **Estimated amount**. For irregular income, enter your estimate
+   of the monthly total; the application marks it estimated automatically.
+4. Put planned savings and debt payments in their allocation types. Avoid
+   entering the same debt payment again as an expense.
+5. Choose **Save budget and calculate**. Review the monthly totals and warnings.
+   A deficit means spending and allocations exceed the entered income.
+
+Use **Remove** to delete a planning line, then save. Profile edits, notes, and
+budgets have separate save buttons. Totals disappear while a budget has unsaved
+changes; save to recalculate them. The monthly averages do not predict actual
+paycheck or bill dates. Debt payoff schedules are not available yet.
+
+If another window saved a newer budget, close and reopen that client's record
+before editing again. If loading fails, use **Retry loading budget**. Do not
+replace the data folder to work around an error.
+
+Version 0.2.0 upgrades the local database. The older 0.1.0 application cannot open
+it afterward, so keep using the newer version. Read
+[budget-calculations.md](budget-calculations.md) for calculation rules and examples.
 
 ## Lock and return
 

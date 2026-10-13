@@ -71,7 +71,7 @@ class WebDriver:
             except (ValueError, OSError):
                 raise DriverFailure("http error", f"WebDriver returned HTTP {error.code}") from None
         except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as error:
-            raise DriverFailure("connection error", self.safe(f"WebDriver unavailable: {error}")) from None
+            raise DriverFailure("connection error", self.safe(f"WebDriver unavailable during {method} {path}: {error}")) from None
         value = result.get("value", result)
         if isinstance(value, dict) and "error" in value:
             code = str(value["error"])
@@ -311,11 +311,39 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click_button("Save session note")
     driver.wait_text(".notes-history", note, "saved counseling note")
     driver.wait_text(".session-note .note-meta strong", counselor, "saved note author")
+    driver.wait_text(".budget-panel", "No saved budget yet", "first client's empty budget")
+
+    def budget_line(index: int, button: str, label: str, amount: str, frequency: str = "Monthly", kind: str | None = None) -> None:
+        driver.click_button(button)
+        driver.fill(f"#budget-label-{index}", label)
+        driver.fill(f"#budget-amount-{index}", amount)
+        driver.select(f"#budget-frequency-{index}", frequency)
+        if kind:
+            driver.select(f"#budget-kind-{index}", kind)
+
+    budget_line(0, "Add income", "Alex synthetic wages", "1500", "Every two weeks")
+    budget_line(1, "Add expense", "Synthetic rent", "1200")
+    budget_line(2, "Add expense", "Synthetic groceries", "100", "Weekly")
+    budget_line(3, "Add expense", "Synthetic recreation", "200", kind="Discretionary expense")
+    budget_line(4, "Add allocation", "Synthetic savings", "300")
+    budget_line(5, "Add allocation", "Synthetic debt payment", "400", kind="Debt payment allocation")
+    driver.click_button("Save budget and calculate")
+    driver.wait_text(".budget-panel", "Budget saved and calculated.", "saved budget")
+    driver.wait_value("#budget-amount-0", "1500.00", "canonical stored income")
+    for total in ["$3,250.00", "$1,633.33", "$1,833.33", "$1,416.67", "$1,116.67", "$716.67"]:
+        driver.wait_text(".budget-totals", total, f"independently checked monthly plan total {total}")
+    driver.script("document.querySelector('.budget-results').scrollIntoView({block: 'center'})")
+    driver.screenshot(artifacts / "native-budget.png")
+    status("exact client budget calculation, encrypted save, and allocations")
+
     create_client(second_name, second_last, "Create a fictional spending plan")
     driver.wait_text(".notes-history", "No session notes yet.", "second client's empty note history")
     if note in driver.text(".notes-history"):
         raise SmokeFailure("The first client's note appeared in another client's record")
-    status("two clients and isolated counseling notes")
+    driver.wait_text(".budget-panel", "No saved budget yet", "second client's empty budget")
+    if driver.visible("#budget-label-0"):
+        raise SmokeFailure("The first client's budget appeared in the second client's record")
+    status("two clients with isolated counseling notes and budgets")
 
     driver.open_client("Alex Fictional")
     driver.wait_text(".notes-history", note, "first client's note after selection")
@@ -330,7 +358,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click_button("Lock workspace")
     driver.element("#password")
     private_values = [f"{first_name} {first_last}", f"{second_name} {second_last}",
-                      first_goal, edited_goal, note, organization, counselor]
+                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages"]
 
     def assert_locked() -> None:
         markup = str(driver.script("return document.documentElement.outerHTML"))
@@ -351,6 +379,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_content(".workspace-label strong", organization, "unlocked organization profile")
     driver.open_client("Alex Fictional")
     driver.wait_text(".notes-history", note, "note after unlocking")
+    driver.wait_value("#budget-label-0", "Alex synthetic wages", "budget after unlocking")
+    driver.wait_text(".budget-totals", "$716.67", "correct budget totals after unlocking")
     status("manual lock clears private data; incorrect password rejected; correct unlock")
 
     # Verify the application is responsive before a deliberate process stop.
@@ -372,12 +402,18 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_value("#household-size", "2", "persisted household size")
     driver.wait_value("#goals", edited_goal, "persisted edited goal")
     driver.wait_text(".editor-panel .status-tag", "Planning", "persisted edited status")
+    driver.wait_value("#budget-label-0", "Alex synthetic wages", "persisted budget source")
+    driver.wait_value("#budget-amount-0", "1500.00", "persisted original biweekly amount")
+    driver.wait_text(".budget-totals", "$716.67", "persisted calculated budget")
     driver.open_client("Robin Synthetic")
     driver.wait_text(".editor-panel", "Robin Synthetic", "persisted second client")
     driver.wait_text(".notes-history", "No session notes yet.", "persisted second client's empty note history")
     if note in driver.text(".notes-history"):
         raise SmokeFailure("Persisted notes crossed client boundaries after relaunch")
-    status("full app relaunch preserves profiles, clients, edits and isolated notes")
+    driver.wait_text(".budget-panel", "No saved budget yet", "persisted second client's empty budget")
+    if driver.visible("#budget-label-0"):
+        raise SmokeFailure("Persisted budgets crossed client boundaries after relaunch")
+    status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets")
 
 
 def main() -> int:

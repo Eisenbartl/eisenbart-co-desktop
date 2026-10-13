@@ -1,6 +1,6 @@
 # Eisenbart & Co. Financial Counseling Suite
 
-A Windows desktop application for offline financial counseling, built in tested stages. The first milestone establishes the desktop shell, local counselor sign-in, encrypted local storage, and client records. Financial planning, document processing, and reports follow after the foundation is verified.
+A Windows desktop application for offline financial counseling, built in tested stages. The first milestone establishes the desktop shell, local counselor sign-in, encrypted local storage, and client records. Version 0.2.0 adds persistent client budgets and exact monthly income/expense calculations; broader financial planning, document processing, and reports follow in later checkpoints.
 
 **Development build: use fictional data only.** Recovery, encrypted backups, clean Windows 11 offline acceptance, and independent security review are required before real client use or commercial distribution. Losing the counselor password can make the current local database permanently inaccessible.
 
@@ -8,7 +8,7 @@ A Windows desktop application for offline financial counseling, built in tested 
 
 The source specification is preserved in [docs/product-specification.md](docs/product-specification.md). [Development status](docs/development-status.md) records the checks actually executed and the milestone checkpoint. The Windows development installer was built and passed automated installation, native-window launch, and uninstall checks on Windows Server 2025. Full Windows 11 offline acceptance remains pending.
 
-[Download the verified Windows development installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912/artifacts/11842130980). GitHub sign-in with repository access may be required. Extract the ZIP, read `README.txt`, and run the installer. This download expires October 27, 2026; follow the [Windows guide](docs/windows.md) for later builds and the [evaluation guide](docs/user-guide.md) for first use.
+[Download the verified 0.1.0 foundation installer (without budgets)](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912/artifacts/11842130980). GitHub sign-in with repository access may be required. Extract the ZIP, read `README.txt`, and run the installer. The updated 0.2.0 source includes budgets; its Windows package is being validated. The 0.1.0 download expires October 27, 2026; follow the [Windows guide](docs/windows.md) for later builds and the [evaluation guide](docs/user-guide.md) for first use.
 
 The original Google Sheets workbook and supporting documents were not available for inspection. No spreadsheet behavior or financial formula is treated as verified. No real client records are included.
 
@@ -25,7 +25,7 @@ The foundation is scoped to:
 
 One organization and one counselor are supported per local installation initially. The schema retains organization and counselor identifiers to support future accounts and permissions. Shared access to a SQLite file over a network is unsupported.
 
-The application does not yet provide financial calculations, statement imports, transaction approvals, charts of financial results, PDF reports, backup/restore, password recovery, or commercial licensing. These are tracked in [the roadmap](docs/roadmap.md); the first screen does not present unfinished financial tools as usable features.
+Client budgets now calculate income, expenses, savings/debt allocations, and signed surplus/deficit using exact cents. The application does not yet provide debt payoff or savings goal engines, statement imports, transaction approvals, charts of financial results, PDF reports, backup/restore, password recovery, or commercial licensing. These are tracked in [the roadmap](docs/roadmap.md); the first screen does not present unfinished financial tools as usable features.
 
 ## Run from source
 
@@ -47,6 +47,7 @@ On Ubuntu/Debian development hosts, Tauri also requires the platform packages li
 
 ## Documentation
 
+- [Client budget calculation rules](docs/budget-calculations.md)
 - [Architecture and development](docs/architecture.md)
 - [Security, data storage, and recovery limitations](docs/security.md)
 - [Windows installation and build instructions](docs/windows.md)

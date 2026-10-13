@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   setupStatus: vi.fn(), setupWorkspace: vi.fn(), unlockWorkspace: vi.fn(),
   lockWorkspace: vi.fn(), workspaceInfo: vi.fn(), listClients: vi.fn(),
   getClient: vi.fn(), saveClient: vi.fn(), addClientNote: vi.fn(), listClientNotes: vi.fn(),
-  resetApiSession: vi.fn(),
+  resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(),
 }));
 
 vi.mock('./api', () => ({
@@ -48,6 +48,7 @@ beforeEach(() => {
   mocks.listClients.mockResolvedValue([alice, bob]);
   mocks.getClient.mockImplementation(async (id: string) => id === alice.id ? alice : bob);
   mocks.listClientNotes.mockResolvedValue([]);
+  mocks.getClientBudget.mockImplementation(async (clientId: string) => ({ clientId, revision: 0, updatedAt: null, lines: [], summary: { monthlyIncome: '0.00', necessaryExpenses: '0.00', discretionaryExpenses: '0.00', totalSpending: '0.00', surplusBeforeAllocations: '0.00', proposedSavings: '0.00', availableForDebt: '0.00', plannedDebtPayments: '0.00', unallocated: '0.00', monthlyAmounts: [], missingCount: 0, estimatedCount: 0, warnings: ['No income amount entered; this plan is incomplete.'] } }));
   mocks.saveClient.mockImplementation(async input => ({ ...alice, ...input, id: input.id ?? 'client-new' }));
   mocks.addClientNote.mockImplementation(async (clientId: string, body: string) => ({ ...aliceNote, clientId, body }));
   vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -68,6 +69,33 @@ async function selectClient(name: string) {
 }
 
 describe('desktop workspace', () => {
+  it('guards unsaved budget edits when changing clients and clears them on a lock event', async () => {
+    render(<App />); await unlock(); await selectClient('Alice Able');
+    await screen.findByText('No saved budget yet');
+    fireEvent.click(screen.getByRole('button', { name: 'Add income' }));
+    fireEvent.change(screen.getByLabelText('Category or source'), { target: { value: 'Alice private wage estimate' } });
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    expect(window.confirm).toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Alice Able' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Category or source')).toHaveValue('Alice private wage estimate');
+    await act(async () => mocks.lockHandler?.());
+    expect(screen.queryByLabelText('Category or source')).not.toBeInTheDocument();
+    expect(document.documentElement.outerHTML).not.toContain('Alice private wage estimate');
+    expect(mocks.saveClientBudget).not.toHaveBeenCalled();
+  });
+  it('does not display a delayed budget response in another client record', async () => {
+    const delayed = deferred<Awaited<ReturnType<typeof mocks.getClientBudget>>>();
+    mocks.getClientBudget.mockImplementationOnce(() => delayed.promise);
+    render(<App />); await unlock(); await selectClient('Alice Able');
+    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    await screen.findByRole('heading', { name: 'Bob Baker' });
+    await screen.findByText('No saved budget yet');
+    await act(async () => delayed.resolve({ clientId: alice.id, lines: [{ label: 'Alice hidden financial detail' }] }));
+    expect(screen.queryByDisplayValue('Alice hidden financial detail')).not.toBeInTheDocument();
+    expect(document.documentElement.outerHTML).not.toContain('Alice hidden financial detail');
+  });
+
   it('requires the desktop bridge and does not create fake browser data', () => {
     mocks.desktop = false;
     render(<App />);
@@ -141,7 +169,7 @@ describe('desktop workspace', () => {
     await screen.findByRole('heading', { name: 'Alice Updated' });
     expect(mocks.saveClient).toHaveBeenCalledWith(expect.objectContaining({ id: alice.id, lastName: 'Updated', status: 'Follow-Up' }));
     expect(mocks.saveClient.mock.calls[0][0]).not.toHaveProperty('organizationId');
-    expect(screen.getByRole('status')).toHaveTextContent('Client saved');
+    expect(screen.getByText('Client saved')).toHaveAttribute('role', 'status');
   });
 
   it('does not show a late note response from the previous client', async () => {

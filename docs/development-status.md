@@ -1,5 +1,52 @@
 # Development status
 
+## Stage 3A: exact client budgets — 0.2.0
+
+Implemented the first financial-core checkpoint: one persistent USD budget per
+client, custom category/source lines, take-home income frequency normalization,
+necessary/discretionary spending, proposed savings, planned debt payment
+allocations, and signed surplus/deficit results. Amounts and calculations use
+integer cents in Rust; the interface receives exact decimal strings. Weekly,
+biweekly, semimonthly, monthly, annual, and irregular monthly-estimate inputs are
+supported. Missing amounts and estimates are visibly flagged. Original planning
+amounts/frequencies remain stored, and no historical transactions are changed.
+See [budget-calculations.md](budget-calculations.md) for rounding, formulas,
+limits, and independently checked examples.
+
+Budget saving is authenticated and scoped to the current firm/counselor's client.
+Encrypted schema 3 adds budgets and preserves earlier clients, notes, and audit
+history. Saves and content-free audit events are atomic, with rollback on failure.
+Revision checking prevents another desktop window's older plan from overwriting
+a newer one. Failed loads cannot become empty writable replacements. Unsaved
+edits participate in leave-record prompts; editing hides outdated totals; locking
+clears budget state; delayed responses cannot populate another client's editor.
+
+Executed validation for this checkpoint:
+
+| Check | Result |
+|---|---|
+| Locked setup and production frontend build | Passed |
+| Frontend tests | 18 passed; includes exact input payloads, native result display, missing/zero distinction, estimated irregular income, failed loads, private-state clearing, and stale responses |
+| Linux Rust tests | 20 passed; includes independent rounding/totals/deficit examples, invalid/large inputs, encrypted persistence, scope, competing connections, atomic rollback, and schema 1/2 upgrades |
+| Independent Python Decimal calculation | Matched the documented household example: 3,250.00 income, 1,633.33 necessary expenses, 716.67 unallocated |
+| Rust format and Clippy (`--all-targets`, warnings denied) | Passed |
+| Native desktop build | Passed with bundled production frontend |
+| Native desktop workflow | Passed: visible budget editing, exact six-line example, encrypted saving, client isolation, locking, wrong-password rejection, and complete process restart with persisted budget |
+| Windows 0.2.0 installer | Pending CI build and installer verification; the existing 0.1.0 download does not include budgets |
+| Clean Windows 11 offline/full installed budgeting workflow | Not run |
+
+Native artifacts: `/workspace/shared/desktop-smoke-budget-final`. An initial
+cloud native-driver attempt lost a connection while typing intake; the app
+remained responsive for a failure screenshot. The harness now identifies the
+failed method/endpoint without printing input payloads. A fresh final build/run
+completed all workflow assertions without retrying commands or weakening checks.
+
+Version 0.2.0 upgrades the local database to schema 3. Version 0.1.0 will refuse
+that newer schema; switching back is unsupported. The development build remains
+for fictional records only, with no supported backup/restore or password recovery.
+This is not the full Stage 3 financial engine: optional budget methods, debt
+payoff schedules, savings targets, cash-flow dates, and scenarios remain open.
+
 ## Windows development installer milestone — October 13, 2026
 
 **Download available:** [windows-installer ZIP](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912/artifacts/11842130980).
@@ -186,16 +233,15 @@ clone.
 
 ## Next development priority
 
-The Windows development installer checkpoint is complete and available for
-evaluation. The next application milestone is the first slice of Stage 3: exact
-money types, documented income-frequency normalization, and a persistent
-client-specific budget workflow with independently checked totals. Keep it
-scoped to fictional records. Clean Windows 11 offline setup/client/note/lock/
-restart acceptance and encrypted backup/restore remain prerequisites for
-real client use.
+Validate and deliver the 0.2.0 Windows package for the budget checkpoint. The
+next application milestone is exact debt payoff schedules, followed by comparable
+snowball/avalanche plans with documented interest/rounding/payment assumptions and
+independently checked examples. Keep development scoped to fictional records.
+Clean Windows 11 offline acceptance and encrypted backup/restore remain
+prerequisites for real client use.
 
 Encrypted backup/restore and a tested recovery procedure must be implemented
-before using actual client records. Financial calculations, document import and
+before using actual client records. Broader financial calculations, document import and
 review, debt/savings/cash-flow planning, scenarios, PDFs, multiple accounts/roles,
 password change/recovery, exports, licensing, installer signing, and commercial
 readiness remain incomplete. See [roadmap.md](roadmap.md) for staged criteria and
@@ -209,7 +255,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 
 | Specification stage | Remaining work |
 |---|---|
-| 3: Financial core | Budget, debt, savings, paycheck cash flow, and scenario engines and interfaces |
+| 3: Financial core | Exact client budget checkpoint implemented; optional budget methods, debt, savings goals, paycheck cash flow, and scenario engines remain |
 | 4: Document processing | Local CSV/text-PDF imports, extraction, provenance, reconciliation, review and approval |
 | 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
 | 6: Security/commercial | Backup/restore, password safeguards, accounts/roles, branding, licensing and independent review |
