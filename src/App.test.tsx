@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   setupStatus: vi.fn(), setupWorkspace: vi.fn(), unlockWorkspace: vi.fn(),
   lockWorkspace: vi.fn(), workspaceInfo: vi.fn(), listClients: vi.fn(),
   getClient: vi.fn(), saveClient: vi.fn(), addClientNote: vi.fn(), listClientNotes: vi.fn(),
-  resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(),
+  resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(),
 }));
 
 vi.mock('./api', () => ({
@@ -48,6 +48,7 @@ beforeEach(() => {
   mocks.listClients.mockResolvedValue([alice, bob]);
   mocks.getClient.mockImplementation(async (id: string) => id === alice.id ? alice : bob);
   mocks.listClientNotes.mockResolvedValue([]);
+  mocks.getClientDebtPlan.mockImplementation(async (clientId: string) => ({ clientId, revision: 0, updatedAt: null, data: null, comparison: null, budgetContext: {revision:0, monthlyCapacity:'0.00', plannedDebtPayments:'0.00', warnings:[]} }));
   mocks.getClientBudget.mockImplementation(async (clientId: string) => ({ clientId, revision: 0, updatedAt: null, lines: [], summary: { monthlyIncome: '0.00', necessaryExpenses: '0.00', discretionaryExpenses: '0.00', totalSpending: '0.00', surplusBeforeAllocations: '0.00', proposedSavings: '0.00', availableForDebt: '0.00', plannedDebtPayments: '0.00', unallocated: '0.00', monthlyAmounts: [], missingCount: 0, estimatedCount: 0, warnings: ['No income amount entered; this plan is incomplete.'] } }));
   mocks.saveClient.mockImplementation(async input => ({ ...alice, ...input, id: input.id ?? 'client-new' }));
   mocks.addClientNote.mockImplementation(async (clientId: string, body: string) => ({ ...aliceNote, clientId, body }));
@@ -69,6 +70,20 @@ async function selectClient(name: string) {
 }
 
 describe('desktop workspace', () => {
+  it('guards unsaved debt edits and clears them when the workspace locks', async () => {
+    render(<App />); await unlock(); await selectClient('Alice Able');
+    await screen.findByText('No saved debt plan yet');
+    fireEvent.click(screen.getByRole('button', {name:'Add debt'}));
+    fireEvent.change(screen.getByLabelText('Debt name'), {target:{value:'Private Alice loan'}});
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    expect(window.confirm).toHaveBeenCalled();
+    expect(screen.getByLabelText('Debt name')).toHaveValue('Private Alice loan');
+    await act(async () => mocks.lockHandler?.());
+    expect(document.documentElement.outerHTML).not.toContain('Private Alice loan');
+    expect(mocks.saveClientDebtPlan).not.toHaveBeenCalled();
+  });
+
   it('guards unsaved budget edits when changing clients and clears them on a lock event', async () => {
     render(<App />); await unlock(); await selectClient('Alice Able');
     await screen.findByText('No saved budget yet');

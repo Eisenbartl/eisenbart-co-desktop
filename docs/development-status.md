@@ -1,5 +1,53 @@
 # Development status
 
+## Stage 3B: monthly debt payoff planning — 0.3.0
+
+Implemented saved client debt accounts and exact fixed-monthly APR payoff
+projections, with comparable snowball/avalanche strategies. Each month reserves
+entered minimums, allocates extra money by strategy, caps payments at the amount
+owed, and rolls excess to the next account. Plans support known monthly fees,
+one-time extra payments, and future changes to the total monthly payment budget.
+The interface exposes estimated payoff months, interest/fee/payment totals,
+remaining balances, and an interactive per-account monthly schedule.
+
+Money uses exact cents; APR uses exact 0.0001-percentage-point units and 128-bit
+intermediate multiplication. No money calculation occurs in React. Missing
+active terms or unmodeled interest methods block payoff projections while still
+allowing incomplete accounts to be saved. Shortfalls stop before unaffordable
+payments; growing balances, horizon/safety limits, unverified terms, and saved
+budget-capacity/allocation conflicts are flagged. Partial totals cover only
+simulated months, with no invented debt-free date. Both strategies share all
+payment events and assumptions. See [debt-calculations.md](debt-calculations.md).
+
+Debt inputs are encrypted in schema 4 with firm/counselor/client scope, optimistic
+revisions, atomic writes/audit, and rollback on failure. The migration preserves
+clients, notes, budgets, and immutable audit history. Calculated projections are
+recomputed and do not overwrite budgets or historical transactions. Private
+editor state clears on lock; failed loads and delayed client/session responses
+cannot become replacement plans. Unsaved debt edits participate in leave prompts.
+
+Executed checkpoint checks:
+
+| Check | Result |
+|---|---|
+| Locked setup and production frontend build | Passed |
+| Frontend tests | 25 passed: input strings/revisions, supported/unknown terms, schedule inspection, events, failed loads/saves, stale responses, unsaved prompts, and lock privacy |
+| Linux Rust tests | 31 passed: independent amortization/comparison/final-payment examples, zero interest, fees/events, minimum shortfall, negative amortization, horizon/model limits, rate/date validation, ties, budget context, scope, competing windows, failed writes, and schema 1/2/3 upgrades |
+| Independent Python Decimal fixtures | Single loan: 58.98 interest, 1,058.98 paid, 11 months; two debts: snowball 43.10 interest/643.10 paid, avalanche 35.35 interest/635.35 paid, both 7 months |
+| Native desktop build and workflow | Passed on the initial complete compiled bundle: visible two-debt editing, independent strategy totals/allocations, budget coexistence, client isolation, lock/wrong password, and full process restart |
+| Final Rust format, Clippy (all targets, warnings denied), backend and native checks | Passed on final source after the allocation-warning improvement |
+| Windows 0.3.0 build/installer | Pending; the 0.2.0 download does not include debt payoff |
+| Clean Windows 11 offline/full installed debt workflow | Not run |
+
+Final native artifacts are at `/workspace/shared/desktop-smoke-debt-final`; the
+initial run is retained at `/workspace/shared/desktop-smoke-debt`.
+This is a development milestone for fictional accounts. It implements fixed
+monthly estimates, not daily accrual, variable/promotional APRs, changing lender
+minimum formulas, or nonmonthly contractual payments. Source/account-detail
+expansion, actual due-date cash flow, savings goals, recovery, and independent
+review remain open. The 0.3.0 upgrade prevents older 0.1.0/0.2.0 apps from opening
+schema 4; keep using the newer version and preserve the local data folder.
+
 ## Stage 3A: exact client budgets — 0.2.0
 
 Implemented the first financial-core checkpoint: one persistent USD budget per
@@ -274,16 +322,16 @@ clone.
 
 ## Next development priority
 
-The budget checkpoint and its verified 0.2.0 Windows development package are
-complete. The next application milestone is exact debt payoff schedules and comparable
-snowball/avalanche plans with documented interest/rounding/payment assumptions and
-independently checked examples. Keep development scoped to fictional records.
-Clean Windows 11 offline acceptance and encrypted backup/restore remain
-prerequisites for real client use.
+Validate and deliver the debt checkpoint's 0.3.0 Windows development package.
+The next application milestone is emergency savings coverage and sinking-fund
+goals, with exact contributions/targets and explicit budget/debt allocation
+coordination. Keep development scoped to fictional records. Clean Windows 11
+offline acceptance and encrypted backup/restore remain prerequisites for real
+client use.
 
 Encrypted backup/restore and a tested recovery procedure must be implemented
 before using actual client records. Broader financial calculations, document import and
-review, debt/savings/cash-flow planning, scenarios, PDFs, multiple accounts/roles,
+review, advanced debt models, savings/cash-flow planning, scenarios, PDFs, multiple accounts/roles,
 password change/recovery, exports, licensing, installer signing, and commercial
 readiness remain incomplete. See [roadmap.md](roadmap.md) for staged criteria and
 [windows.md](windows.md) for Windows build and manual acceptance instructions.
@@ -296,7 +344,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 
 | Specification stage | Remaining work |
 |---|---|
-| 3: Financial core | Exact client budget checkpoint implemented; optional budget methods, debt, savings goals, paycheck cash flow, and scenario engines remain |
+| 3: Financial core | Exact budgets and fixed-monthly debt schedules implemented; optional budget methods, advanced debt terms, savings goals, paycheck cash flow, and scenario engines remain |
 | 4: Document processing | Local CSV/text-PDF imports, extraction, provenance, reconciliation, review and approval |
 | 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
 | 6: Security/commercial | Backup/restore, password safeguards, accounts/roles, branding, licensing and independent review |

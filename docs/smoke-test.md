@@ -7,7 +7,8 @@ Selenium and a development web server are not needed.
 The test creates a temporary workspace containing fictional clients. It verifies
 first-run organization and counselor setup, client creation and editing, session
 notes and saved budgets belonging to the correct client, independently checked
-monthly budget totals and allocations, workspace locking, rejection of an
+monthly budget totals and allocations, snowball/avalanche interest totals and
+account payment schedules, saved debt isolation, workspace locking, rejection of an
 incorrect password, unlocking, and persistence after stopping and relaunching the
 application and its native driver. It confirms the app responds before stopping
 its entire private process group, verifies no live process remains in that group,

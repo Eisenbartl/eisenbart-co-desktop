@@ -336,6 +336,35 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.screenshot(artifacts / "native-budget.png")
     status("exact client budget calculation, encrypted save, and allocations")
 
+    driver.wait_text(".debt-panel", "No saved debt plan yet", "first client's empty debt plan")
+    driver.fill("#debt-start-month", "2026-11")
+    driver.fill("#debt-monthly-payment", "100")
+
+    def debt_account(index: int, label: str, balance: str, apr: str, minimum: str) -> None:
+        driver.click_button("Add debt")
+        driver.fill(f"#debt-label-{index}", label)
+        driver.fill(f"#debt-balance-{index}", balance)
+        driver.fill(f"#debt-apr-{index}", apr)
+        driver.fill(f"#debt-minimumPayment-{index}", minimum)
+        driver.fill(f"#debt-monthlyFee-{index}", "0")
+        driver.select(f"#debt-model-{index}", "Fixed monthly APR estimate")
+        driver.click(f"#debt-verified-{index}")
+
+    debt_account(0, "Alex synthetic small debt", "100", "0", "10")
+    debt_account(1, "Alex synthetic high APR debt", "500", "24", "20")
+    driver.click_button("Save debt plan and compare")
+    driver.wait_text(".debt-panel", "Debt plan saved and compared.", "saved debt comparison")
+    driver.wait_value("#debt-balance-0", "100.00", "canonical debt balance")
+    for expected in ["$43.10", "$35.35", "$643.10", "$635.35", "2027-05"]:
+        driver.wait_text(".debt-comparison", expected, f"independent debt comparison {expected}")
+    driver.wait_text(".debt-month-table", "$80.00", "snowball first-month target payment")
+    driver.select("#debt-strategy", "Avalanche")
+    driver.wait_text(".debt-month-table", "$90.00", "avalanche first-month target payment")
+    driver.wait_text(".debt-month-table", "$420.00", "avalanche first-month closing balance")
+    driver.script("document.querySelector('.debt-results').scrollIntoView({block: 'start'})")
+    driver.screenshot(artifacts / "native-debt-comparison.png")
+    status("saved debt strategies and monthly account schedules match independent examples")
+
     create_client(second_name, second_last, "Create a fictional spending plan")
     driver.wait_text(".notes-history", "No session notes yet.", "second client's empty note history")
     if note in driver.text(".notes-history"):
@@ -343,7 +372,10 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".budget-panel", "No saved budget yet", "second client's empty budget")
     if driver.visible("#budget-label-0"):
         raise SmokeFailure("The first client's budget appeared in the second client's record")
-    status("two clients with isolated counseling notes and budgets")
+    driver.wait_text(".debt-panel", "No saved debt plan yet", "second client's empty debt plan")
+    if driver.visible("#debt-label-0"):
+        raise SmokeFailure("The first client's debt plan appeared in the second client's record")
+    status("two clients with isolated notes, budgets, and debts")
 
     driver.open_client("Alex Fictional")
     driver.wait_text(".notes-history", note, "first client's note after selection")
@@ -358,7 +390,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click_button("Lock workspace")
     driver.element("#password")
     private_values = [f"{first_name} {first_last}", f"{second_name} {second_last}",
-                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages"]
+                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt"]
 
     def assert_locked() -> None:
         markup = str(driver.script("return document.documentElement.outerHTML"))
@@ -381,6 +413,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".notes-history", note, "note after unlocking")
     driver.wait_value("#budget-label-0", "Alex synthetic wages", "budget after unlocking")
     driver.wait_text(".budget-totals", "$716.67", "correct budget totals after unlocking")
+    driver.wait_value("#debt-label-0", "Alex synthetic small debt", "debt plan after unlocking")
+    driver.wait_text(".debt-comparison", "$35.35", "debt comparison after unlocking")
     status("manual lock clears private data; incorrect password rejected; correct unlock")
 
     # Verify the application is responsive before a deliberate process stop.
@@ -405,6 +439,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_value("#budget-label-0", "Alex synthetic wages", "persisted budget source")
     driver.wait_value("#budget-amount-0", "1500.00", "persisted original biweekly amount")
     driver.wait_text(".budget-totals", "$716.67", "persisted calculated budget")
+    driver.wait_value("#debt-label-0", "Alex synthetic small debt", "persisted debt account")
+    driver.wait_text(".debt-comparison", "$35.35", "persisted exact debt comparison")
     driver.open_client("Robin Synthetic")
     driver.wait_text(".editor-panel", "Robin Synthetic", "persisted second client")
     driver.wait_text(".notes-history", "No session notes yet.", "persisted second client's empty note history")
@@ -413,7 +449,10 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".budget-panel", "No saved budget yet", "persisted second client's empty budget")
     if driver.visible("#budget-label-0"):
         raise SmokeFailure("Persisted budgets crossed client boundaries after relaunch")
-    status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets")
+    driver.wait_text(".debt-panel", "No saved debt plan yet", "persisted second client's empty debt plan")
+    if driver.visible("#debt-label-0"):
+        raise SmokeFailure("Persisted debts crossed client boundaries after relaunch")
+    status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets/debts")
 
 
 def main() -> int:

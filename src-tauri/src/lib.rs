@@ -1,4 +1,5 @@
 mod budget;
+mod debt;
 mod models;
 mod storage;
 
@@ -126,6 +127,26 @@ fn save_client_budget(
     })
 }
 
+#[tauri::command]
+fn get_client_debt_plan(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<debt::ClientDebtPlan, String> {
+    access(&state, |workspace| {
+        workspace.get_client_debt_plan(&client_id)
+    })
+}
+#[tauri::command]
+fn save_client_debt_plan(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: debt::PlanInput,
+) -> Result<debt::ClientDebtPlan, String> {
+    access(&state, |workspace| {
+        workspace.save_client_debt_plan(&client_id, input)
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -158,7 +179,9 @@ pub fn run() {
             add_client_note,
             list_client_notes,
             get_client_budget,
-            save_client_budget
+            save_client_budget,
+            get_client_debt_plan,
+            save_client_debt_plan
         ])
         .run(tauri::generate_context!())
         .expect("Desktop application could not start");

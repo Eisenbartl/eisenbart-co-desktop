@@ -79,7 +79,7 @@ pub fn money(cents: i64) -> String {
     )
 }
 
-fn parse_money(value: &str) -> Result<i64, String> {
+pub(crate) fn parse_money(value: &str) -> Result<i64, String> {
     let invalid = || {
         "Enter a nonnegative USD amount with at most two decimal places (for example, 1250.50); no commas or currency symbols.".to_owned()
     };
@@ -108,7 +108,7 @@ fn parse_money(value: &str) -> Result<i64, String> {
         .and_then(|n| n.checked_add(minor))
         .ok_or_else(invalid)?;
     if cents > MAX_CENTS {
-        return Err("Each budget amount must be at most 1000000000.00 USD.".to_owned());
+        return Err("Each amount must be at most 1000000000.00 USD.".to_owned());
     }
     Ok(cents)
 }

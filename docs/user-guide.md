@@ -1,8 +1,8 @@
 # Windows evaluation guide
 
 This development build provides a local workspace, client profiles, counseling
-statuses, dated session notes, and client budgets. Use fictional records only. Advanced financial
-calculations, statement imports, debt payoff and savings goal plans, PDF reports, and
+statuses, dated session notes, client budgets, and debt payoff comparisons. Use fictional records only. Advanced financial
+calculations, statement imports, savings goal plans, PDF reports, and
 commercial licensing are still being developed. Password recovery and tested
 backup/restore are not available.
 
@@ -76,15 +76,58 @@ Open a saved client in **Clients** and scroll to **Monthly budget**.
 Use **Remove** to delete a planning line, then save. Profile edits, notes, and
 budgets have separate save buttons. Totals disappear while a budget has unsaved
 changes; save to recalculate them. The monthly averages do not predict actual
-paycheck or bill dates. Debt payoff schedules are not available yet.
+paycheck or bill dates. The debt planning section below provides separate
+fixed-monthly APR payoff estimates.
 
 If another window saved a newer budget, close and reopen that client's record
 before editing again. If loading fails, use **Retry loading budget**. Do not
 replace the data folder to work around an error.
 
-Version 0.2.0 upgrades the local database. The older 0.1.0 application cannot open
-it afterward, so keep using the newer version. Read
+The current 0.3.0 version upgrades the database to schema 4. Older application
+versions cannot open it afterward, so keep using the newer version. Read
 [budget-calculations.md](budget-calculations.md) for calculation rules and examples.
+
+## Compare debt repayment plans
+
+Open a saved client and scroll to **Debt payoff planning**.
+
+1. Enter **First planning month** as `YYYY-MM` (for example, `2026-11`). Enter
+   **Total monthly debt payment (USD)**, including all minimum payments.
+2. Choose **Add debt**. Enter a **Debt name**, type, outstanding balance, APR
+   percentage, monthly minimum, and known monthly fee. Enter `0` for a known
+   zero APR or fee. Leave unavailable terms blank; the app will save them and
+   explain why it cannot yet calculate a complete comparison.
+3. Choose the interest model. **Fixed monthly APR estimate** is supported.
+   Daily, variable, promotional, and unknown models cannot be calculated yet.
+   Check lender terms and retain any useful source notes. **Terms checked by
+   counselor** records your own review; it does not verify information for you.
+4. Add the other debts, then choose **Save debt plan and compare**.
+5. Review **Strategy comparison**, its assumptions, and any warnings. Choose a
+   **Schedule strategy** and **Schedule month** to inspect account payments,
+   interest, fees, closing balances, and estimated payoff months.
+
+**Extra payments and future payment changes** opens optional controls. An extra
+payment adds money once in its month; a payment change replaces the entire monthly
+payment budget from its month onward. Verify funding for those plans. Both
+strategies use the same events and entered minimums.
+
+A minimum-payment shortfall stops the schedule. A growing balance means some
+payments did not cover interest and fees. An unfinished projection has no global
+debt-free date, and its totals cover only the simulated months. Estimated monthly
+payoff results do not replace lender statements or a dated cash-flow plan.
+
+The budget reference shows the version last checked. Saving the debt plan checks
+the latest saved budget and warns if payments exceed its monthly capacity after
+savings. It does not change the budget. Keep the budget's debt allocations and
+this plan consistent yourself for now.
+
+Use the separate save buttons for profile details, notes, budgets, and debt plans.
+If another window changed a saved debt plan, close and reopen the client before
+editing again. Use **Retry loading debt plan** if loading fails. See
+[debt-calculations.md](debt-calculations.md) for exact assumptions and examples.
+
+Version 0.3.0 upgrades the database to schema 4. The older 0.1.0 and 0.2.0 apps
+cannot open it afterward; keep using the newer version.
 
 ## Lock and return
 

@@ -337,3 +337,20 @@ textarea { resize: vertical; min-height: 100px; }
 .budget-warnings h4 { margin: 0 0 8px; }
 .budget-warnings ul { margin: 0; padding-left: 18px; line-height: 1.7; }
 @media (max-width: 700px) { .budget-panel { padding: 20px; } .budget-totals > div { flex-wrap: wrap; gap: 6px; } }
+
+.debt-budget-reference { background: #f3f6f8; border-radius: 8px; padding: 14px; font-size: 12px; line-height: 1.7; }
+.debt-events { margin: 20px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; }
+.debt-events summary { cursor: pointer; font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+.debt-events > div { margin: 18px 0; }
+.debt-event { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 12px; margin-bottom: 14px; }
+.debt-event .text-button { padding: 12px 0; }
+.debt-results { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 20px; }
+.debt-table-scroll { overflow-x: auto; margin: 16px 0; }
+.debt-table-scroll table { border-collapse: collapse; width: 100%; font-size: 12px; text-align: left; }
+.debt-table-scroll th, .debt-table-scroll td { padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.debt-table-scroll thead { background: #f3f6f8; }
+.debt-table-scroll td { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.debt-table-scroll tbody th { font-weight: 500; min-width: 120px; }
+.debt-schedule { margin-top: 28px; }
+.debt-month-table th span { display: block; font-size: 10px; }
+@media (max-width: 700px) { .debt-event { grid-template-columns: 1fr; } }

@@ -92,3 +92,33 @@ export interface BudgetInput {
   expectedRevision: number;
   lines: BudgetLine[];
 }
+
+export type DebtType = 'creditCard' | 'autoLoan' | 'studentLoan' | 'personalLoan' | 'mortgage' | 'other' | 'custom';
+export type InterestModel = 'unknown' | 'fixedMonthly' | 'daily' | 'variable' | 'promotional';
+export interface DebtAccount {
+  label: string; debtType: DebtType; balance: string | null; apr: string | null;
+  minimumPayment: string | null; monthlyFee: string | null; interestModel: InterestModel;
+  verified: boolean; termsNote: string;
+}
+export interface DatedAmount { month: string; amount: string }
+export interface DebtPlanData {
+  startMonth: string; monthlyPayment: string | null; accounts: DebtAccount[];
+  extras: DatedAmount[]; paymentChanges: DatedAmount[];
+}
+export interface DebtPlanInput { expectedRevision: number; data: DebtPlanData }
+export interface DebtMonth {
+  month: string; availablePayment: string; payments: string[]; interest: string[];
+  fees: string[]; balances: string[]; totalPayment: string; remainingBalance: string;
+}
+export interface DebtProjection {
+  status: 'paidOff' | 'insufficientBudget' | 'horizonReached' | 'modelLimit';
+  payoffMonth: string | null; accountPayoffMonths: (string | null)[];
+  totalInterest: string; totalFees: string; totalPaid: string; remainingBalance: string;
+  negativeAmortizationAccounts: number[]; warnings: string[]; schedule: DebtMonth[];
+}
+export interface DebtComparison { warnings: string[]; snowball: DebtProjection | null; avalanche: DebtProjection | null }
+export interface DebtBudgetContext { revision: number; monthlyCapacity: string; plannedDebtPayments: string; warnings: string[] }
+export interface ClientDebtPlan {
+  clientId: string; revision: number; updatedAt: string | null; data: DebtPlanData | null;
+  comparison: DebtComparison | null; budgetContext: DebtBudgetContext;
+}
