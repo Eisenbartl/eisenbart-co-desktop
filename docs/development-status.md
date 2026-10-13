@@ -1,5 +1,49 @@
 # Development status
 
+## Windows packaging — in progress
+
+The source foundation was uploaded to GitHub as commit `8a5430b` on `main`.
+The first actual Windows run is
+[38445920011](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38445920011).
+Its frontend build and 11 frontend tests passed. Rust compilation succeeded, but
+the test process aborted with a Windows stack overflow before installer creation;
+no installer artifact was produced by that run.
+
+The error log and locked SQLCipher 4.14.0 source identified recursive native
+logging: the Windows stderr formatter allocates through SQLite; a failed
+`VirtualLock` allocation logs a memory warning, causing another allocation and
+the same warning. The Windows-only fix configures native log sources once before
+memory security activates, excluding MEMORY while retaining CORE, PROVIDER, and
+MUTEX diagnostics. Encryption, Argon2id, memory wiping, memory-lock attempts,
+integrity checks, and application errors are preserved. Memory locking remains
+best effort; native memory-lock failure warnings are omitted on Windows.
+
+A Windows-only subprocess regression forces a real lock-quota failure and checks
+encrypted allocation, integrity, persistence, incorrect-password rejection,
+unchanged files, and successful reopening. Its full Windows execution is pending.
+The existing 11 backend tests passed again on Linux after this change.
+The standalone Linux desktop was rebuilt and its full native setup/client/note/
+lock/restart smoke test passed again. Artifacts are retained at
+`/workspace/shared/desktop-smoke-windows-fix`.
+
+The packaging workflow has been prepared with explicit x64 MSVC prerequisites,
+locked builds, and install/launch/uninstall checks. New PowerShell scripts verify
+the executable architecture, guard existing installations/data, test a package
+only on a disposable Windows runner, and generate a download README and SHA-256
+checksum. PowerShell 7.6.6 parsing and synthetic safety/header/checksum fixture
+checks passed on Linux; that is not Windows installer execution.
+
+GitHub's API is now reachable using the existing injected authentication. The
+environment draft includes `api.github.com`,
+`results-receiver.actions.githubusercontent.com`, and `*.blob.core.windows.net`,
+preserving the package-manager preset. The latter two are GitHub's documented
+log/artifact download destinations. API and log downloads now work using the
+existing injected authentication; no additional credentials were requested.
+
+No Windows download is claimed while installer creation and validation remain
+incomplete. Clean Windows 11 offline acceptance and full product functionality
+remain separate requirements.
+
 ## Foundation milestone — October 13, 2026
 
 This checkpoint combines specification stages 1 and 2: an established repository
@@ -42,7 +86,7 @@ The writable native sysroot avoids privileged installation.
 | `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` | Passed |
 | `npm run tauri -- build --debug --no-bundle` | Passed; standalone Linux desktop binary with compiled frontend assets |
 | Native GUI workflow | Passed with exit 0 on the final compiled bundle, including a complete app/driver process restart and record persistence |
-| Windows executable/NSIS installer build | Not run: requires a Windows build environment |
+| Windows executable/NSIS installer build | Initial Windows CI reached a failed Rust test step; installer build was skipped |
 | Clean Windows 11 offline install/use | Not run |
 | Independent security review and commercial release review | Not performed |
 
@@ -93,10 +137,10 @@ This does not validate Windows WebView2 isolation or certify security.
 
 Draft saving does not publish the environment or demonstrate restoration in a
 new task. Review and save the draft in environment settings, then publish the
-environment through the product. The current source checkpoint is committed
-locally; it has not been pushed to GitHub. The remote was initially empty, so a
-fresh remote clone cannot yet reproduce the source. Retained cloud files and a
-local commit are distinct from uploaded repository history.
+environment through the product. The foundation source checkpoint is now
+uploaded to GitHub. Retained cloud files, uploaded Git history, and restoration
+in a newly created cloud task are separate outcomes; a fresh-task restore has
+not been verified.
 
 Recoverable source checkpoints are retained outside the checkout at
 `/workspace/shared/checkpoints/eisenbart-foundation-source.tar.gz` (tracked

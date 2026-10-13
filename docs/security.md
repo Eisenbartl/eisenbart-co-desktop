@@ -32,6 +32,20 @@ Audit records live inside the same encrypted database. The application appends o
 
 Documents are not imported or stored in this milestone. Encrypted document storage, input validation, parser resource limits, provenance, approval controls, and recovery tests must be built before statement imports are considered safe. No PDF or OCR component has been approved for commercial distribution.
 
+## Windows memory-lock diagnostics
+
+SQLCipher's memory security and memory wiping remain enabled. Physical memory
+locking is best effort and can fail under operating-system quotas. The locked
+SQLCipher version has a Windows logging recursion bug: formatting a native
+memory-lock warning can trigger another failed lock and repeat until stack
+overflow. The application excludes native MEMORY diagnostics on Windows while
+preserving CORE, PROVIDER, and MUTEX diagnostics and normal application errors.
+This does not turn off lock attempts or integrity verification. The Windows
+regression exercises encryption and password rejection under a deliberately
+constrained quota in a separate process. Revisit the diagnostic filter when an
+upstream fix becomes available and retain paging/key-lifecycle review as a
+production requirement.
+
 ## Release-blocking security work
 
 - Implement authenticated encrypted backups, integrity validation, overwrite protection, and tested restoration after simulated failures.

@@ -464,6 +464,8 @@ fn open_encrypted(path: &Path, key: &[u8; 32]) -> Result<Connection, String> {
         OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .map_err(storage_error)?;
+    #[cfg(windows)]
+    configure_windows_sqlcipher_logging(&connection)?;
     let cipher_version: String = connection
         .query_row("PRAGMA cipher_version", [], |row| row.get(0))
         .map_err(storage_error)?;
@@ -494,6 +496,30 @@ fn open_encrypted(path: &Path, key: &[u8; 32]) -> Result<Connection, String> {
         )
         .map_err(storage_error)?;
     Ok(connection)
+}
+
+#[cfg(windows)]
+fn configure_windows_sqlcipher_logging(connection: &Connection) -> Result<(), String> {
+    // SQLCipher's log settings and hardened allocator are process-wide. Configure
+    // them once, before any connection enables cipher_memory_security. Its
+    // Windows stderr formatter allocates through SQLite; a VirtualLock quota
+    // failure can recursively log another MEMORY warning during that allocation.
+    // Keep core/provider/mutex diagnostics, memory wiping, and every lock attempt.
+    // Only native MEMORY diagnostics are omitted; query errors and integrity
+    // failures still propagate through the application's normal error handling.
+    static LOGGING: std::sync::OnceLock<Result<(), String>> = std::sync::OnceLock::new();
+    LOGGING
+        .get_or_init(|| {
+            connection
+                .execute_batch(
+                    "PRAGMA cipher_log_source = NONE;
+                     PRAGMA cipher_log_source = CORE;
+                     PRAGMA cipher_log_source = PROVIDER;
+                     PRAGMA cipher_log_source = MUTEX;",
+                )
+                .map_err(storage_error)
+        })
+        .clone()
 }
 
 fn integrity_check(connection: &Connection) -> Result<(), String> {
@@ -848,6 +874,124 @@ mod tests {
         assert_eq!(original, fs::read(workspace.database_path()).unwrap());
         workspace.unlock_workspace(PASSWORD.to_owned()).unwrap();
         assert_eq!(workspace.get_client(&client.id).unwrap(), client);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_memory_lock_quota_preserves_encryption_and_password_rejection() {
+        // A separate process prevents this deliberately small working-set quota
+        // from affecting parallel tests or the desktop application. Run the real
+        // allocator/authentication path; checking a PRAGMA value alone would not
+        // detect the native recursive-logging crash.
+        const CHILD: &str = "EISENBART_SQLCIPHER_LOW_LOCK_QUOTA_TEST";
+        const COMPLETE: &str = "Quota-constrained encrypted workspace regression passed";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "storage::tests::windows_memory_lock_quota_preserves_encryption_and_password_rejection",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "Quota-constrained storage process failed: {}\n{}\n{}",
+                output.status,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+            );
+            assert!(
+                String::from_utf8_lossy(&output.stdout).contains(COMPLETE),
+                "The storage regression body did not complete in the child process",
+            );
+            return;
+        }
+
+        use std::ffi::c_void;
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn GetCurrentProcess() -> *mut c_void;
+            fn SetProcessWorkingSetSize(process: *mut c_void, min: usize, max: usize) -> i32;
+            fn VirtualAlloc(
+                address: *mut c_void,
+                size: usize,
+                kind: u32,
+                protect: u32,
+            ) -> *mut c_void;
+            fn VirtualLock(address: *mut c_void, size: usize) -> i32;
+            fn VirtualUnlock(address: *mut c_void, size: usize) -> i32;
+            fn VirtualFree(address: *mut c_void, size: usize, kind: u32) -> i32;
+            fn GetLastError() -> u32;
+        }
+        const ALLOCATION: usize = 2 * 1024 * 1024;
+        const MEM_COMMIT: u32 = 0x1000;
+        const MEM_RESERVE: u32 = 0x2000;
+        const MEM_RELEASE: u32 = 0x8000;
+        const PAGE_READWRITE: u32 = 0x04;
+        const ERROR_WORKING_SET_QUOTA: u32 = 1453;
+        // SAFETY: these calls affect only this disposable child process. The
+        // region is owned here and freed once after reading the lock result.
+        // GetCurrentProcess supplies a pseudo-handle that must not be closed.
+        unsafe {
+            assert_ne!(
+                SetProcessWorkingSetSize(GetCurrentProcess(), 64 * 1024, ALLOCATION),
+                0,
+                "Could not set the regression process working-set quota: {}",
+                GetLastError(),
+            );
+            let region = VirtualAlloc(
+                std::ptr::null_mut(),
+                ALLOCATION,
+                MEM_COMMIT | MEM_RESERVE,
+                PAGE_READWRITE,
+            );
+            assert!(!region.is_null(), "Could not allocate the quota probe");
+            let locked = VirtualLock(region, ALLOCATION);
+            let lock_error = GetLastError();
+            if locked != 0 {
+                VirtualUnlock(region, ALLOCATION);
+            }
+            let freed = VirtualFree(region, 0, MEM_RELEASE);
+            assert_ne!(freed, 0, "Could not release the quota probe");
+            assert_eq!(
+                locked, 0,
+                "The regression must exercise a real lock failure"
+            );
+            assert_eq!(
+                lock_error, ERROR_WORKING_SET_QUOTA,
+                "Expected ERROR_WORKING_SET_QUOTA"
+            );
+        }
+
+        let (_directory, mut workspace, _info) = configured();
+        let client = workspace.save_client(client_input()).unwrap();
+        let connection = &workspace.session.as_ref().unwrap().connection;
+        let blob: Vec<u8> = connection
+            .query_row("SELECT zeroblob(?1)", [ALLOCATION as i64], |row| row.get(0))
+            .unwrap();
+        assert_eq!(blob.len(), ALLOCATION);
+        assert!(blob.iter().all(|byte| *byte == 0));
+        let memory_security: String = connection
+            .query_row("PRAGMA cipher_memory_security", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(memory_security, "1");
+        integrity_check(connection).unwrap();
+        workspace.lock_workspace();
+        let original = fs::read(workspace.database_path()).unwrap();
+        assert!(!original.starts_with(b"SQLite format 3"));
+        assert_eq!(
+            workspace
+                .unlock_workspace("Wrong-test-passphrase-99".to_owned())
+                .unwrap_err(),
+            OPEN_ERROR,
+        );
+        assert_eq!(workspace.list_clients().unwrap_err(), LOCKED);
+        assert_eq!(original, fs::read(workspace.database_path()).unwrap());
+        workspace.unlock_workspace(PASSWORD.to_owned()).unwrap();
+        assert_eq!(workspace.get_client(&client.id).unwrap(), client);
+        println!("{COMPLETE}");
     }
 
     #[test]
