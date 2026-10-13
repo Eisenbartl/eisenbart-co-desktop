@@ -2,9 +2,9 @@
 
 ## What is available now
 
-The verified **0.1.0 Windows x64 development installer is available** from [build 38450281912](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912). Its 11 frontend and 12 backend tests, installation, responsive native-window launch, and uninstall checks passed on a disposable Windows Server 2025 runner. See [development-status.md](development-status.md) for the exact evidence and remaining acceptance work.
+The verified **0.2.0 Windows x64 development installer is available**, including saved client budgets, from [build 38482971562](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38482971562). Its 18 frontend and 21 backend tests, installation, responsive native-window launch, uninstall, and isolated cleanup passed on a disposable Windows Server 2025 runner. See [development-status.md](development-status.md) for evidence and remaining acceptance work.
 
-[Download windows-installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912/artifacts/11842130980), sign in to GitHub if prompted, and choose **Extract All** for the ZIP. Read `README.txt` and run `Eisenbart Counseling Suite_0.1.0_x64-setup.exe`. Open **Eisenbart Counseling Suite** from the Start menu afterward. The download expires October 27, 2026. The [evaluation guide](user-guide.md) explains workspace setup, fictional clients, notes, locking, and troubleshooting.
+[Download windows-installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38482971562/artifacts/11857823874), sign in to GitHub if prompted, and choose **Extract All** for the ZIP. Read `README.txt` and run `Eisenbart Counseling Suite_0.2.0_x64-setup.exe`. Open **Eisenbart Counseling Suite** from the Start menu afterward. The download expires October 27, 2026. The [evaluation guide](user-guide.md) explains setup, fictional clients, budgets, notes, locking, and troubleshooting. Version 0.2.0 upgrades the database to schema 3; do not switch back to 0.1.0 afterward.
 
 The first target is Windows 11 x64. This is a development application for fictional data, not a production financial-record system. There is no password recovery or tested backup/restore yet.
 
@@ -30,7 +30,7 @@ These checks exercise the actual NSIS package and installed executable. They do 
 
 ## Install and evaluate
 
-The verified 0.1.0 package includes Microsoft's WebView2 runtime installer: archive inspection found the 214,090,448-byte `MicrosoftEdgeWebView2RuntimeInstaller.exe` payload and passed the installer archive integrity check. A build downloads that redistributable in advance. A fresh-machine offline test must still confirm it installs and works without preinstalled WebView2.
+The verified 0.2.0 package includes Microsoft's WebView2 runtime installer: archive inspection found the 214,090,448-byte `MicrosoftEdgeWebView2RuntimeInstaller.exe` payload and passed the installer archive integrity check. A build downloads that redistributable in advance. A fresh-machine offline test must still confirm it installs and works without preinstalled WebView2.
 
 On a Windows 11 x64 evaluation computer:
 
@@ -40,7 +40,8 @@ On a Windows 11 x64 evaluation computer:
 4. Add a fictional client, edit the profile, add a note, and change the lifecycle status.
 5. Lock the app and unlock with the password. Verify a wrong password does not unlock it.
 6. Close and reopen the program, sign in, and confirm the client and note persist.
-7. Disconnect internet access and repeat sign-in, creating/editing clients, notes, and reopening.
+7. Open a saved client's **Monthly budget**. Reproduce the [documented household example](budget-calculations.md), save, and verify the 716.67 USD unallocated result. Check a second client's budget remains separate.
+8. Disconnect internet access and repeat sign-in, client editing, notes, budgeting, and reopening. Include an upgrade from a fictional 0.1.0 workspace and verify existing clients and notes survive.
 
 The development installer is unsigned until a signing certificate is obtained and configured. Windows may display an unknown-publisher or SmartScreen prompt. Verify the download came from the expected repository build; signing and clean-machine testing are prerequisites for public distribution.
 

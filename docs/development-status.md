@@ -32,7 +32,7 @@ Executed validation for this checkpoint:
 | Rust format and Clippy (`--all-targets`, warnings denied) | Passed |
 | Native desktop build | Passed with bundled production frontend |
 | Native desktop workflow | Passed: visible budget editing, exact six-line example, encrypted saving, client isolation, locking, wrong-password rejection, and complete process restart with persisted budget |
-| Windows 0.2.0 installer | First CI run passed 18 frontend/21 backend tests, installer build, install, native-window launch, and uninstall; temporary WebView2 data cleanup encountered a lingering file lock. Bounded I/O-only cleanup wait added; full rerun pending |
+| Windows 0.2.0 installer | Passed run 38482971562: 18 frontend/21 Windows backend tests, release build, silent install, responsive x64 native window, uninstall, and isolated test-data cleanup |
 | Clean Windows 11 offline/full installed budgeting workflow | Not run |
 
 Native artifacts: `/workspace/shared/desktop-smoke-budget-final`. An initial
@@ -54,6 +54,38 @@ Cleanup retains both known-folder ownership checks and the disposable-runner
 restriction, waits at most 45 seconds for I/O failures, fails immediately for
 other errors, and still requires the test-created directory to be removed.
 It does not kill unrelated browser processes or skip the cleanup check.
+
+### Verified 0.2.0 Windows download
+
+[Download the budget development installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38482971562/artifacts/11857823874).
+[Run 38482971562](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38482971562)
+completed successfully from commit `ff5d2e2402f8e7561adfb96f710d5f2ec62fd579`.
+The installer is `Eisenbart Counseling Suite_0.2.0_x64-setup.exe`.
+GitHub sign-in may be required; artifact retention expires October 27, 2026.
+
+The final downloaded ZIP matched GitHub's SHA-256 digest and passed ZIP
+integrity. The installer matched the bundled checksum; its README matched the
+exact source commit, version, budget features, and schema-upgrade notice.
+Downloaded Windows logs independently confirmed all 18 frontend and 21 backend
+tests passed, including the real memory-lock quota regression. The validation
+log confirmed native installation, x64 executable/window, successful uninstall,
+and removal of only test-created application data. The bounded cleanup
+correction passed the complete rerun. NSIS archive inspection passed and found
+the 214,090,448-byte WebView2 offline runtime installer payload.
+
+Installer SHA-256:
+`663f1c65e8c1919fffa91917590318a703e31f32541c151f29edb86874cb2cc5`.
+Installer size: 220,903,103 bytes. ZIP size: 220,952,850 bytes.
+Installer artifact: `11857823874`; validation artifact: `11858447750`.
+Local verified files/logs: `/workspace/shared/windows-downloads/run-38482971562`.
+The native budget implementation checkpoint is `84f474b`; the subsequent
+`ff5d2e2` commit changes only Windows test cleanup and documentation.
+
+This package remains unsigned and for fictional records. Windows CI entered
+no client/password/budget workflow, and had preinstalled WebView2. Linux native
+workflow evidence and Windows backend/package checks do not establish clean
+Windows 11 offline or full installed budgeting acceptance. Those checks and
+backup/restore remain open.
 
 ## Windows development installer milestone — October 13, 2026
 
@@ -135,9 +167,10 @@ not a general network-readiness claim.
 
 ## Foundation milestone — October 13, 2026
 
-This checkpoint combines specification stages 1 and 2: an established repository
-and a functioning desktop foundation. Advanced financial modules have not been
-started. This is a development build for fictional records only.
+This earlier checkpoint combined specification stages 1 and 2: an established
+repository and a functioning desktop foundation. Advanced financial modules had
+not been started at that checkpoint. It was a development build for fictional
+records only; the later budget milestone is recorded above.
 
 Implemented:
 
@@ -241,8 +274,8 @@ clone.
 
 ## Next development priority
 
-Validate and deliver the 0.2.0 Windows package for the budget checkpoint. The
-next application milestone is exact debt payoff schedules, followed by comparable
+The budget checkpoint and its verified 0.2.0 Windows development package are
+complete. The next application milestone is exact debt payoff schedules and comparable
 snowball/avalanche plans with documented interest/rounding/payment assumptions and
 independently checked examples. Keep development scoped to fictional records.
 Clean Windows 11 offline acceptance and encrypted backup/restore remain
