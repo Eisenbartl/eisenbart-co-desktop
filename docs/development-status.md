@@ -1,48 +1,82 @@
 # Development status
 
-## Windows packaging — in progress
+## Windows development installer milestone — October 13, 2026
 
-The source foundation was uploaded to GitHub as commit `8a5430b` on `main`.
-The first actual Windows run is
-[38445920011](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38445920011).
-Its frontend build and 11 frontend tests passed. Rust compilation succeeded, but
-the test process aborted with a Windows stack overflow before installer creation;
-no installer artifact was produced by that run.
+**Download available:** [windows-installer ZIP](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912/artifacts/11842130980).
+The verified installer is `Eisenbart Counseling Suite_0.1.0_x64-setup.exe`, built
+from source commit `370d4414db381edfe3686e1106d15ea6471e1238` on `main`.
+[Windows run 38450281912](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912)
+completed successfully. The download expires October 27, 2026 and may require
+GitHub sign-in with repository access. Extract the ZIP, read `README.txt`, and
+run the installer. See [user-guide.md](user-guide.md) for first use.
 
-The error log and locked SQLCipher 4.14.0 source identified recursive native
-logging: the Windows stderr formatter allocates through SQLite; a failed
-`VirtualLock` allocation logs a memory warning, causing another allocation and
-the same warning. The Windows-only fix configures native log sources once before
-memory security activates, excluding MEMORY while retaining CORE, PROVIDER, and
-MUTEX diagnostics. Encryption, Argon2id, memory wiping, memory-lock attempts,
-integrity checks, and application errors are preserved. Memory locking remains
-best effort; native memory-lock failure warnings are omitted on Windows.
+Executed on the disposable GitHub-hosted `windows-2025` runner:
 
-A Windows-only subprocess regression forces a real lock-quota failure and checks
-encrypted allocation, integrity, persistence, incorrect-password rejection,
-unchanged files, and successful reopening. Its full Windows execution is pending.
-The existing 11 backend tests passed again on Linux after this change.
-The standalone Linux desktop was rebuilt and its full native setup/client/note/
-lock/restart smoke test passed again. Artifacts are retained at
-`/workspace/shared/desktop-smoke-windows-fix`.
+- Locked frontend production build and **11 frontend tests passed**.
+- Locked MSVC Rust build and **12 backend tests passed**, including the real
+  Windows memory-lock quota regression, encrypted persistence, integrity,
+  incorrect-password rejection, and scope protections.
+- Release NSIS installer built successfully with bundled WebView2 offline runtime.
+- Silent installation returned exit code 0; the installed program's PE machine
+  was AMD64 (`0x8664`). It displayed a responsive native window with the expected
+  title. The isolated test stopped its own process, silently uninstalled with
+  exit code 0, and verified removal of the installed files.
+- Download instructions/checksums and separate validation logs uploaded.
 
-The packaging workflow has been prepared with explicit x64 MSVC prerequisites,
-locked builds, and install/launch/uninstall checks. New PowerShell scripts verify
-the executable architecture, guard existing installations/data, test a package
-only on a disposable Windows runner, and generate a download README and SHA-256
-checksum. PowerShell 7.6.6 parsing and synthetic safety/header/checksum fixture
-checks passed on Linux; that is not Windows installer execution.
+The installer is **unsigned** and remains a development build for fictional
+records. The Windows package test entered no password, counselor account, or
+client workflow; it tested installation and native-window launch. The runner
+already had a browser runtime. A clean Windows 11 offline install without
+preinstalled WebView2, full installed client workflows, and upgrade/data-retention
+acceptance remain unrun. No security certification or commercial readiness is
+claimed.
 
-GitHub's API is now reachable using the existing injected authentication. The
-environment draft includes `api.github.com`,
-`results-receiver.actions.githubusercontent.com`, and `*.blob.core.windows.net`,
-preserving the package-manager preset. The latter two are GitHub's documented
-log/artifact download destinations. API and log downloads now work using the
-existing injected authentication; no additional credentials were requested.
+Independent checks after downloading the actual artifacts:
 
-No Windows download is claimed while installer creation and validation remain
-incomplete. Clean Windows 11 offline acceptance and full product functionality
-remain separate requirements.
+| Artifact check | Result |
+|---|---|
+| GitHub installer ZIP SHA-256 | Matched GitHub's digest; ZIP integrity passed |
+| Installer SHA-256 | Matched bundled `SHA256SUMS.txt` |
+| Download README source commit | Matched the successful run's full source commit |
+| Windows validation log | Confirmed installation, responsive x64 app, uninstall, and isolated cleanup passed |
+| NSIS archive integrity | Passed 7-Zip archive test |
+| Offline runtime payload | Found 214,090,448-byte `MicrosoftEdgeWebView2RuntimeInstaller.exe` inside the installer |
+
+Installer SHA-256:
+`d6faff55f9b5d9db6c8f6783ed64eae1ea5e17e587d50e15e30446f11f831408`.
+The installer is 220,875,970 bytes; the download ZIP is 220,925,577 bytes.
+Artifact ID: `11842130980`. Validation-log artifact ID: `11841143510`.
+Local verified downloads and run logs are retained under
+`/workspace/shared/windows-downloads/run-38450281912`.
+
+### Windows crash correction preserved in this checkpoint
+
+The initial Windows run
+[38445920011](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38445920011)
+built the frontend and Rust code but aborted its tests with a stack overflow;
+that run produced no installer. Locked SQLCipher 4.14.0 source and its error log
+identified recursive native logging: failed `VirtualLock` allocations log a
+memory warning through a formatter that itself allocates through SQLite.
+
+The Windows-only correction configures native log sources once before memory
+security activates, excluding MEMORY while retaining CORE, PROVIDER, and MUTEX
+diagnostics. Encryption, Argon2id, memory wiping, memory-lock attempts, integrity
+checks, and application errors are preserved. Memory locking remains best effort;
+native memory-lock failure warnings are omitted on Windows. The Windows-only
+subprocess regression forces an actual lock-quota failure and now passes on
+Windows. See [security.md](security.md) for this limitation and review needs.
+
+After the correction, the existing 11 Linux backend tests passed again and the
+compiled Linux desktop passed the complete synthetic setup/client/note/lock/
+restart workflow again. Those artifacts are retained at
+`/workspace/shared/desktop-smoke-windows-fix`. The Windows packaging scripts also
+passed PowerShell parsing and synthetic guard/header/checksum checks before CI.
+
+GitHub API, logs, and artifact downloads worked through the existing injected
+authentication after the environment network settings were updated. No new
+credentials were requested. Runtime configuration metadata still reports unknown
+network enforcement; successful commands establish access to these endpoints,
+not a general network-readiness claim.
 
 ## Foundation milestone — October 13, 2026
 
@@ -86,7 +120,7 @@ The writable native sysroot avoids privileged installation.
 | `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` | Passed |
 | `npm run tauri -- build --debug --no-bundle` | Passed; standalone Linux desktop binary with compiled frontend assets |
 | Native GUI workflow | Passed with exit 0 on the final compiled bundle, including a complete app/driver process restart and record persistence |
-| Windows executable/NSIS installer build | Initial Windows CI reached a failed Rust test step; installer build was skipped |
+| Windows executable/NSIS installer build | Passed on run 38450281912; automated install/native-window launch/uninstall passed |
 | Clean Windows 11 offline install/use | Not run |
 | Independent security review and commercial release review | Not performed |
 
@@ -128,7 +162,8 @@ not failed test outcomes.
 The environment draft has saved `install_script` and `start_skill`. Installation
 calls the repository's tested `scripts/cloud-setup.sh`; startup instructions cover
 tool activation, builds, checks, and new-process native GUI validation. No new
-secret bindings or network domains were required.
+secret bindings were required. Later Windows artifact validation used the
+user-reviewed GitHub API, Actions log receiver, and Azure Blob download domains.
 
 The trusted synthetic Linux GUI test needs an explicit WebKit sandbox exception
 because this cloud container denies WebKit's nested sandbox. It remains confined
@@ -151,11 +186,13 @@ clone.
 
 ## Next development priority
 
-Build the configured installer on Windows, install it on a clean Windows 11 x64
-machine, disconnect internet access, and repeat setup/client/note/lock/restart
-checks. Preserve this foundation before beginning the next application milestone:
-exact money types, documented income-frequency normalization, and a tested budget
-calculation workflow.
+The Windows development installer checkpoint is complete and available for
+evaluation. The next application milestone is the first slice of Stage 3: exact
+money types, documented income-frequency normalization, and a persistent
+client-specific budget workflow with independently checked totals. Keep it
+scoped to fictional records. Clean Windows 11 offline setup/client/note/lock/
+restart acceptance and encrypted backup/restore remain prerequisites for
+real client use.
 
 Encrypted backup/restore and a tested recovery procedure must be implemented
 before using actual client records. Financial calculations, document import and
@@ -163,3 +200,23 @@ review, debt/savings/cash-flow planning, scenarios, PDFs, multiple accounts/role
 password change/recovery, exports, licensing, installer signing, and commercial
 readiness remain incomplete. See [roadmap.md](roadmap.md) for staged criteria and
 [windows.md](windows.md) for Windows build and manual acceptance instructions.
+
+## Distance to the complete product
+
+Stages 1–2 provide the implemented architecture and desktop foundation; the
+unavailable original workbook remains unverified. A tested Windows development
+package also completes part of Stage 7. Stages 3–8 are still open:
+
+| Specification stage | Remaining work |
+|---|---|
+| 3: Financial core | Budget, debt, savings, paycheck cash flow, and scenario engines and interfaces |
+| 4: Document processing | Local CSV/text-PDF imports, extraction, provenance, reconciliation, review and approval |
+| 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
+| 6: Security/commercial | Backup/restore, password safeguards, accounts/roles, branding, licensing and independent review |
+| 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |
+| 8: Final verification | Complete installed workflows, clean Windows 11 offline tests, usability and release acceptance |
+
+These stages differ greatly in size and will be split into smaller tested
+checkpoints. A stage count is not a percentage or a reliable calendar estimate.
+The complete specified application remains substantial work; the development
+installer is suitable for evaluating the implemented foundation.

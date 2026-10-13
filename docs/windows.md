@@ -2,7 +2,9 @@
 
 ## What is available now
 
-The source includes a Tauri project and a Windows build workflow. A Windows installer is available only after that workflow or a local Windows build completes successfully and produces an artifact. See [development-status.md](development-status.md) for the exact build and test evidence; a Linux compilation does not validate Windows installation. The workflow now requires Windows tests and package installation/launch/uninstall checks to pass before uploading a download.
+The verified **0.1.0 Windows x64 development installer is available** from [build 38450281912](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912). Its 11 frontend and 12 backend tests, installation, responsive native-window launch, and uninstall checks passed on a disposable Windows Server 2025 runner. See [development-status.md](development-status.md) for the exact evidence and remaining acceptance work.
+
+[Download windows-installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912/artifacts/11842130980), sign in to GitHub if prompted, and choose **Extract All** for the ZIP. Read `README.txt` and run `Eisenbart Counseling Suite_0.1.0_x64-setup.exe`. Open **Eisenbart Counseling Suite** from the Start menu afterward. The download expires October 27, 2026. The [evaluation guide](user-guide.md) explains workspace setup, fictional clients, notes, locking, and troubleshooting.
 
 The first target is Windows 11 x64. This is a development application for fictional data, not a production financial-record system. There is no password recovery or tested backup/restore yet.
 
@@ -11,7 +13,7 @@ The first target is Windows 11 x64. This is a development application for fictio
 The source foundation has been uploaded to the repository. To download a successful Windows development build:
 
 1. Open [Windows desktop build on GitHub](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/workflows/windows.yml). Sign in to GitHub with access to the repository if prompted.
-2. Select **Windows desktop build**. Choose **Run workflow** and the branch containing this milestone, then start it. A push to the configured branch may also start the workflow automatically.
+2. Open an existing successful run for the desired checkpoint. If a fresh build is needed, choose **Run workflow** and the branch containing that milestone, then start it. A push to the configured branch may also start the workflow automatically.
 3. Wait for the run to finish. A green result means frontend/backend tests and automated installation, native-window launch, and uninstall checks passed on a disposable GitHub-hosted Windows runner. It does not mean a person tested the complete client workflow or used the application offline on a clean Windows 11 computer.
 4. Open that run and download the **windows-installer** artifact near the bottom of the page.
 5. Extract the whole downloaded ZIP file into a folder. Read `README.txt`, then open the `.exe` inside to install the development application. `SHA256SUMS.txt` records its download checksum. The workflow retains artifacts for 14 days; an expired download requires a new successful build.
@@ -28,7 +30,7 @@ These checks exercise the actual NSIS package and installed executable. They do 
 
 ## Install and evaluate
 
-The intended installer includes Microsoft's WebView2 runtime installer so WebView2 can be installed offline. A build downloads that redistributable in advance; the fresh-machine offline test must confirm it is included and usable.
+The verified 0.1.0 package includes Microsoft's WebView2 runtime installer: archive inspection found the 214,090,448-byte `MicrosoftEdgeWebView2RuntimeInstaller.exe` payload and passed the installer archive integrity check. A build downloads that redistributable in advance. A fresh-machine offline test must still confirm it installs and works without preinstalled WebView2.
 
 On a Windows 11 x64 evaluation computer:
 

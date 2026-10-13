@@ -2,11 +2,13 @@
 
 A Windows desktop application for offline financial counseling, built in tested stages. The first milestone establishes the desktop shell, local counselor sign-in, encrypted local storage, and client records. Financial planning, document processing, and reports follow after the foundation is verified.
 
-**Development build: use fictional data only.** Recovery, encrypted backups, Windows installation testing, and independent security review are required before real client use or commercial distribution. Losing the counselor password can make the current local database permanently inaccessible.
+**Development build: use fictional data only.** Recovery, encrypted backups, clean Windows 11 offline acceptance, and independent security review are required before real client use or commercial distribution. Losing the counselor password can make the current local database permanently inaccessible.
 
 ## Project status
 
-The source specification is preserved in [docs/product-specification.md](docs/product-specification.md). [Development status](docs/development-status.md) records the checks actually executed and the milestone checkpoint. Configuration for a Windows installer is not proof that an installer has been built or tested.
+The source specification is preserved in [docs/product-specification.md](docs/product-specification.md). [Development status](docs/development-status.md) records the checks actually executed and the milestone checkpoint. The Windows development installer was built and passed automated installation, native-window launch, and uninstall checks on Windows Server 2025. Full Windows 11 offline acceptance remains pending.
+
+[Download the verified Windows development installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38450281912/artifacts/11842130980). GitHub sign-in with repository access may be required. Extract the ZIP, read `README.txt`, and run the installer. This download expires October 27, 2026; follow the [Windows guide](docs/windows.md) for later builds and the [evaluation guide](docs/user-guide.md) for first use.
 
 The original Google Sheets workbook and supporting documents were not available for inspection. No spreadsheet behavior or financial formula is treated as verified. No real client records are included.
 
@@ -48,6 +50,7 @@ On Ubuntu/Debian development hosts, Tauri also requires the platform packages li
 - [Architecture and development](docs/architecture.md)
 - [Security, data storage, and recovery limitations](docs/security.md)
 - [Windows installation and build instructions](docs/windows.md)
+- [Windows evaluation and first-use guide](docs/user-guide.md)
 - [Managed cloud setup and desktop validation](docs/cloud-development.md)
 - [Staged roadmap and release acceptance criteria](docs/roadmap.md)
 - [Initial dependency license inventory](docs/licenses.md)

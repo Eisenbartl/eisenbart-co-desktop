@@ -30,7 +30,7 @@ Items above are acceptance checks, not blanket claims of completion. Check the r
 | 7: Production packaging | Signed Windows installer, offline runtime, user/admin/recovery guides, demonstration dataset | Reproducible Windows artifact, clean installation, upgrade/uninstall behavior, offline checks, accurate third-party notices |
 | 8: Final verification | Stable offline release candidate | Full installed workflows, usability/accessibility, all release-blocking tests, documented limitations |
 
-Security prerequisites are pulled forward whenever real financial data would otherwise be at risk; the stage numbering is not permission to defer encryption or recovery until after production use. The next development checkpoint should harden Windows delivery and recoverability before broad financial modules. Financial engine work can use fictional fixtures while those checks proceed.
+Security prerequisites are pulled forward whenever real financial data would otherwise be at risk; the stage numbering is not permission to defer encryption or recovery until after production use. The Windows development package now passes CI installation, native-window launch, and uninstall checks. Clean Windows 11 offline acceptance and recoverability remain open. The next application checkpoint is Stage 3's first slice: exact money values, documented income-frequency normalization, and a persistent client budget with independently checked totals. It will use fictional fixtures while recovery safeguards and Windows acceptance remain pending.
 
 ## Full-product release criteria
 
