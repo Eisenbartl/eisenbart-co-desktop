@@ -1,0 +1,212 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import App from './App';
+import type { Client, ClientNote, WorkspaceInfo } from './types';
+
+const mocks = vi.hoisted(() => ({
+  desktop: true,
+  lockHandler: undefined as (() => void) | undefined,
+  setupStatus: vi.fn(), setupWorkspace: vi.fn(), unlockWorkspace: vi.fn(),
+  lockWorkspace: vi.fn(), workspaceInfo: vi.fn(), listClients: vi.fn(),
+  getClient: vi.fn(), saveClient: vi.fn(), addClientNote: vi.fn(), listClientNotes: vi.fn(),
+  resetApiSession: vi.fn(),
+}));
+
+vi.mock('./api', () => ({
+  desktopAvailable: () => mocks.desktop,
+  resetApiSession: mocks.resetApiSession,
+  api: mocks,
+}));
+
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn(async (_event: string, handler: () => void) => {
+    mocks.lockHandler = handler;
+    return () => { if (mocks.lockHandler === handler) mocks.lockHandler = undefined; };
+  }),
+}));
+
+const workspace: WorkspaceInfo = { organizationId: 'org-1', organizationName: 'Fictional Practice', counselorId: 'counselor-1', counselorName: 'Morgan Example' };
+const alice: Client = { id: 'client-a', organizationId: 'org-1', firstName: 'Alice', lastName: 'Able', email: 'alice@example.test', phone: '', householdSize: 2, status: 'New Intake', goals: 'Fictional Alice private goal', createdAt: '2026-10-01T10:00:00Z', updatedAt: '2026-10-01T10:00:00Z' };
+const bob: Client = { ...alice, id: 'client-b', firstName: 'Bob', lastName: 'Baker', email: 'bob@example.test', goals: 'Fictional Bob goal', status: 'Planning' };
+const aliceNote: ClientNote = { id: 'note-a', clientId: alice.id, counselorId: workspace.counselorId, counselorName: workspace.counselorName, body: 'Private Alice session note', createdAt: '2026-10-01T12:00:00Z' };
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(accept => { resolve = accept; });
+  return { promise, resolve };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.desktop = true;
+  mocks.lockHandler = undefined;
+  mocks.setupStatus.mockResolvedValue({ configured: true });
+  mocks.setupWorkspace.mockResolvedValue(workspace);
+  mocks.unlockWorkspace.mockResolvedValue(workspace);
+  mocks.lockWorkspace.mockResolvedValue(undefined);
+  mocks.workspaceInfo.mockResolvedValue(workspace);
+  mocks.listClients.mockResolvedValue([alice, bob]);
+  mocks.getClient.mockImplementation(async (id: string) => id === alice.id ? alice : bob);
+  mocks.listClientNotes.mockResolvedValue([]);
+  mocks.saveClient.mockImplementation(async input => ({ ...alice, ...input, id: input.id ?? 'client-new' }));
+  mocks.addClientNote.mockImplementation(async (clientId: string, body: string) => ({ ...aliceNote, clientId, body }));
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+});
+
+async function unlock() {
+  await screen.findByRole('heading', { name: 'Welcome back' });
+  fireEvent.change(screen.getByLabelText('Workspace password'), { target: { value: 'fictional-password-123' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Unlock workspace' }));
+  await screen.findByRole('heading', { name: 'A clear view of your practice.' });
+  await waitFor(() => expect(mocks.listClients).toHaveBeenCalled());
+}
+
+async function selectClient(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: /^Clients/ }));
+  fireEvent.click(screen.getByText(name).closest('button')!);
+  await screen.findByRole('heading', { name });
+}
+
+describe('desktop workspace', () => {
+  it('requires the desktop bridge and does not create fake browser data', () => {
+    mocks.desktop = false;
+    render(<App />);
+    expect(screen.getByRole('heading', { name: 'Open the desktop application' })).toBeInTheDocument();
+    expect(mocks.setupStatus).not.toHaveBeenCalled();
+  });
+
+  it('validates first-run names, password length and confirmation before creating a workspace', async () => {
+    mocks.setupStatus.mockResolvedValue({ configured: false });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Set up your workspace' });
+    expect(screen.getByLabelText('Organization name')).toHaveValue('Eisenbart & Co.');
+    fireEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('organization and counselor names');
+    fireEvent.change(screen.getByLabelText('Counselor name'), { target: { value: 'Morgan Example' } });
+    fireEvent.change(screen.getByLabelText('Workspace password'), { target: { value: 'short' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('at least 12 characters');
+    fireEvent.change(screen.getByLabelText('Workspace password'), { target: { value: 'fictional-password-123' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'different-password-123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('passwords do not match');
+    expect(mocks.setupWorkspace).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'fictional-password-123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create workspace' }));
+    await screen.findByRole('heading', { name: 'A clear view of your practice.' });
+    expect(mocks.setupWorkspace).toHaveBeenCalledWith({ organizationName: 'Eisenbart & Co.', counselorName: 'Morgan Example', password: 'fictional-password-123' });
+  });
+
+  it('shows an incorrect-password error and clears the submitted password', async () => {
+    mocks.unlockWorkspace.mockRejectedValue('Incorrect workspace password.');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Welcome back' });
+    fireEvent.change(screen.getByLabelText('Workspace password'), { target: { value: 'wrong-password-123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock workspace' }));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('alert')).toHaveTextContent('Incorrect workspace password');
+    expect(screen.getByLabelText('Workspace password')).toHaveValue('');
+    expect(mocks.listClients).not.toHaveBeenCalled();
+    expect(screen.queryByText(alice.goals)).not.toBeInTheDocument();
+  });
+
+  it('creates a real client through the API and rejects invalid intake fields first', async () => {
+    mocks.listClients.mockResolvedValue([]);
+    render(<App />);
+    await unlock();
+    fireEvent.click(screen.getByRole('button', { name: 'Add client' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create client' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('first and last name');
+    fireEvent.change(screen.getByLabelText(/First name/), { target: { value: 'Fictional' } });
+    fireEvent.change(screen.getByLabelText(/Last name/), { target: { value: 'Client' } });
+    fireEvent.change(screen.getByLabelText(/Email address/), { target: { value: 'invalid' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create client' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('valid email');
+    expect(mocks.saveClient).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/Email address/), { target: { value: 'client@example.test' } });
+    fireEvent.change(screen.getByLabelText('Counseling goals'), { target: { value: 'Build a fictional savings plan' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create client' }));
+    await screen.findByRole('heading', { name: 'Fictional Client' });
+    expect(mocks.saveClient).toHaveBeenCalledWith(expect.objectContaining({ firstName: 'Fictional', lastName: 'Client', email: 'client@example.test', status: 'New Intake', householdSize: 1, goals: 'Build a fictional savings plan' }));
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+  });
+
+  it('updates the selected client identity and counseling status without changing client ownership', async () => {
+    render(<App />);
+    await unlock();
+    await selectClient('Alice Able');
+    fireEvent.change(screen.getByLabelText(/Last name/), { target: { value: 'Updated' } });
+    fireEvent.change(screen.getByLabelText('Counseling status'), { target: { value: 'Follow-Up' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await screen.findByRole('heading', { name: 'Alice Updated' });
+    expect(mocks.saveClient).toHaveBeenCalledWith(expect.objectContaining({ id: alice.id, lastName: 'Updated', status: 'Follow-Up' }));
+    expect(mocks.saveClient.mock.calls[0][0]).not.toHaveProperty('organizationId');
+    expect(screen.getByRole('status')).toHaveTextContent('Client saved');
+  });
+
+  it('does not show a late note response from the previous client', async () => {
+    const previousNotes = deferred<ClientNote[]>();
+    mocks.listClientNotes.mockImplementation((id: string) => id === alice.id ? previousNotes.promise : Promise.resolve([]));
+    render(<App />);
+    await unlock();
+    await selectClient('Alice Able');
+    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    await screen.findByRole('heading', { name: 'Bob Baker' });
+    await waitFor(() => expect(screen.getByLabelText('New session note')).toBeEnabled());
+    await act(async () => { previousNotes.resolve([aliceNote]); });
+    expect(screen.queryByText(aliceNote.body)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('New session note')).toHaveValue('');
+    expect(screen.getByLabelText('Counseling goals')).toHaveValue(bob.goals);
+  });
+
+  it('clears an unsaved note when switching clients and saves the new note to the current client only', async () => {
+    render(<App />);
+    await unlock();
+    await selectClient('Alice Able');
+    await waitFor(() => expect(screen.getByLabelText('New session note')).toBeEnabled());
+    fireEvent.change(screen.getByLabelText('New session note'), { target: { value: 'Unsaved private Alice draft' } });
+    await waitFor(() => expect(window.confirm).not.toHaveBeenCalled());
+    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    await screen.findByRole('heading', { name: 'Bob Baker' });
+    await waitFor(() => expect(screen.getByLabelText('New session note')).toBeEnabled());
+    expect(window.confirm).toHaveBeenCalled();
+    expect(screen.getByLabelText('New session note')).toHaveValue('');
+    expect(screen.queryByText('Unsaved private Alice draft')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('New session note'), { target: { value: 'Fictional Bob note' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save session note' }));
+    await screen.findByText('Fictional Bob note');
+    expect(mocks.addClientNote).toHaveBeenCalledWith(bob.id, 'Fictional Bob note');
+    expect(screen.getByLabelText('New session note')).toHaveValue('');
+  });
+
+  it('clears client details, notes and drafts when the native idle lock fires, then starts a clean unlocked session', async () => {
+    mocks.listClientNotes.mockResolvedValue([aliceNote]);
+    render(<App />);
+    await unlock();
+    await selectClient('Alice Able');
+    await screen.findByText(aliceNote.body);
+    fireEvent.change(screen.getByLabelText('New session note'), { target: { value: 'Sensitive unsaved draft' } });
+    await act(async () => { mocks.lockHandler?.(); });
+    await screen.findByRole('heading', { name: 'Welcome back' });
+    expect(screen.queryByText(aliceNote.body)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Counseling goals')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sensitive unsaved draft')).not.toBeInTheDocument();
+    expect(mocks.resetApiSession).toHaveBeenCalled();
+    await unlock();
+    expect(screen.queryByLabelText('New session note')).not.toBeInTheDocument();
+    expect(screen.queryByText(aliceNote.body)).not.toBeInTheDocument();
+  });
+
+  it('shows an actionable storage error and keeps the failed draft available to retry', async () => {
+    mocks.saveClient.mockRejectedValue('Unable to save this client. Check available disk space.');
+    render(<App />);
+    await unlock();
+    await selectClient('Alice Able');
+    fireEvent.change(screen.getByLabelText('Counseling goals'), { target: { value: 'A revised fictional goal' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('alert')).toHaveTextContent('disk space');
+    expect(screen.getByLabelText('Counseling goals')).toHaveValue('A revised fictional goal');
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
+  });
+});

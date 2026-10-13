@@ -1,0 +1,34 @@
+[package]
+name = "eisenbart-counseling-suite"
+version = "0.1.0"
+description = "Offline financial counseling desktop foundation"
+edition = "2021"
+rust-version = "1.90"
+publish = false
+
+[lib]
+name = "eisenbart_counseling_suite_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.3", features = [] }
+rusqlite = { version = "0.40.2", features = ["bundled-sqlcipher-vendored-openssl"] }
+argon2 = { version = "0.5", features = ["zeroize"] }
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zeroize = "1"
+chrono = { version = "0.4", features = ["clock"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.dev]
+debug = 0
+
+[profile.test]
+debug = 0
