@@ -258,9 +258,9 @@ pub fn validate_review(
     if r.evidence.is_empty()
         || r.evidence.len() > 500
         || r.label.trim().is_empty()
-        || r.label.len() > 120
+        || r.label.chars().count() > 120
         || r.reason.trim().is_empty()
-        || r.reason.len() > 500
+        || r.reason.chars().count() > 500
         || r.id.is_empty()
         || r.counselor_name.is_empty()
         || chrono::DateTime::parse_from_rfc3339(&r.reviewed_at).is_err()

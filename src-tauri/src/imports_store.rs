@@ -1094,9 +1094,18 @@ mod tests {
             .connection
             .execute_batch("DROP TRIGGER reject_payment_audit;")
             .unwrap();
-        let saved = w
-            .review_recurring_payment(&c.id, recurring_input(&s))
-            .unwrap();
+        let mut unicode = recurring_input(&s);
+        unicode.label = "ü".repeat(120);
+        unicode.reason = "é".repeat(500);
+        let saved = w.review_recurring_payment(&c.id, unicode).unwrap();
+        assert_eq!(saved.recurring_history[0].label.chars().count(), 120);
+        assert_eq!(saved.recurring_history[0].reason.chars().count(), 500);
+        let mut too_long = recurring_input(&saved);
+        too_long.label = "ü".repeat(121);
+        assert!(w.review_recurring_payment(&c.id, too_long).is_err());
+        let mut too_long = recurring_input(&saved);
+        too_long.reason = "é".repeat(501);
+        assert!(w.review_recurring_payment(&c.id, too_long).is_err());
         assert_eq!(saved.merchant_groups[0].state, "Confirmed");
         assert_eq!(saved.summary.spending, s.summary.spending);
         assert_eq!(saved.summary.net_cash, s.summary.net_cash);
