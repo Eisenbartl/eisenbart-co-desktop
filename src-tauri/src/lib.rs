@@ -1,3 +1,4 @@
+mod assessment_pdf;
 mod assessments;
 mod budget;
 mod cashflow;
@@ -148,6 +149,46 @@ async fn get_assessment_record(
     })
     .await
     .map_err(|_| "Assessment record could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn choose_assessment_pdf(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_assessment_record(&client_id, &id))?;
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("Internal assessment PDF", &["pdf"])
+            .set_file_name("counselor-assessment.pdf")
+            .blocking_save_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local PDF path.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "PDF destination selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn export_assessment_pdf(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+    path: String,
+) -> Result<assessment_pdf::Export, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.export_assessment_pdf(&client_id, &id, &path))
+    })
+    .await
+    .map_err(|_| "PDF export could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn save_assessment_record(
@@ -553,6 +594,8 @@ pub fn run() {
             list_assessment_records,
             get_assessment_record,
             save_assessment_record,
+            choose_assessment_pdf,
+            export_assessment_pdf,
             stage_client_csv,
             review_transaction,
             review_recurring_payment,

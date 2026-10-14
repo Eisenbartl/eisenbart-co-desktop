@@ -1,11 +1,11 @@
-# Saved counselor assessments — 0.13.0
+# Saved counselor assessments — schema 14
 
 In a saved client's statement-review panel, expand **Saved counselor assessments**.
 Choose 1–24 complete calendar months, enter a title, and optionally add findings,
 recommendations and follow-up arrangements. Review the approved basis, exclusions,
 estimates and missing information, then confirm and select **Save assessment
 record**. This saves an internal record inside the encrypted workspace. It is
-not a finalized client action plan or a PDF export.
+not a finalized client action plan. Version 0.14.0 adds [offline printable PDF export](assessment-pdf-export.md) of saved records.
 
 ## What is preserved
 
@@ -31,7 +31,7 @@ Recurring-pattern decisions, saved plan/scenario inputs, debt APR terms and save
 session notes are not included yet. Existing planning panels are separate entered
 estimates. No financial scenario is selected in this checkpoint. This record
 therefore supplies the assessment/reporting foundation, not the complete specified
-Counselor Report or Client Action Plan. PDF/print/local export and scenario-backed
+Counselor Report or Client Action Plan. Offline PDF/local export is implemented in 0.14.0. Direct application printing and scenario-backed
 client plans are subsequent work.
 
 ## Later changes

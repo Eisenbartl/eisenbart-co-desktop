@@ -597,6 +597,7 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     open_original_counselor_assessment(driver)
     driver.script("document.querySelector('.saved-assessment-view').scrollIntoView({block:'start',behavior:'instant'})")
     driver.screenshot(artifacts / "native-saved-counselor-assessment.png")
+    export_original_assessment_pdf(driver, artifacts, "before-restart")
     driver.click(".saved-assessments > summary")
     choose_balance_statement(driver)
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 1 differences.","rejection preserves source checks and updates approved comparisons")
@@ -636,6 +637,29 @@ def open_original_counselor_assessment(driver: WebDriver) -> None:
     driver.wait_text(".saved-assessment-view .assessment-totals","Operating cash flow$199.98","original approved figures remain immutable")
     driver.wait_text(".saved-assessment-view .verified-balance-totals","Estimated net worth at balance date$525.05","original captured balance inventory")
     driver.wait_text(".saved-assessment-view","Verify remaining sources before changing the fictional household plan.","preserved counselor recommendation")
+
+
+def export_original_assessment_pdf(driver: WebDriver, artifacts: Path, label: str) -> None:
+    destination = artifacts / f"saved-assessment-{label}.pdf"
+    if destination.exists():
+        raise SmokeFailure("PDF smoke destination must be new; never overwrite an earlier export")
+    driver.fill("#assessment-pdf-path", str(destination))
+    driver.click_button("Export saved assessment PDF")
+    driver.wait_text(".saved-assessments", "PDF saved locally", "visible native PDF export completion")
+    original = destination.read_bytes()
+    if not original.startswith(b"%PDF-"):
+        raise SmokeFailure("Native export did not create a PDF")
+    text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
+    for expected in ["Taylor original assessment", "Taylor Balance", "Smoke Test Counseling", "NEEDS REVIEW", "Operating cash flow: USD 199.98", "Estimated net worth at balance date: USD 525.05", "Verify remaining sources", "Captured transaction evidence", "INTERNAL / INCOMPLETE"]:
+        if expected not in text:
+            raise SmokeFailure(f"Native PDF missing independently expected text: {expected}")
+    if "Operating cash flow: USD 500.00" in text:
+        raise SmokeFailure("Live figures replaced the immutable historical PDF")
+    driver.click_button("Export saved assessment PDF")
+    driver.wait_text(".saved-assessments .alert.error", "already exists", "PDF overwrite safely rejected")
+    if destination.read_bytes() != original:
+        raise SmokeFailure("Rejected overwrite damaged PDF")
+    status(f"local printable PDF export preserved historical evidence and figures ({label})")
 
 
 def view_financial_dashboard(driver: WebDriver, start: str, end: str) -> None:
@@ -697,7 +721,7 @@ def initial_balance_facts(driver: WebDriver) -> None:
     save_financial_facts(driver,"Verified dated fictional inventory and three source classifications")
 
 
-def assert_statement_balances_restored(driver: WebDriver) -> None:
+def assert_statement_balances_restored(driver: WebDriver, artifacts: Path, label: str) -> None:
     driver.open_client("Taylor Balance")
     driver.wait_text(".imports-progress","Approved 2 · Rejected 1","persisted balance decisions")
     choose_balance_statement(driver)
@@ -716,6 +740,7 @@ def assert_statement_balances_restored(driver: WebDriver) -> None:
     driver.wait_text(".financial-facts-history","Financial fact history (2)","persisted immutable financial facts history")
     driver.click(".financial-facts-editor > summary")
     open_original_counselor_assessment(driver)
+    export_original_assessment_pdf(driver, artifacts, label)
     driver.click(".saved-assessments > summary")
 
 
@@ -1032,7 +1057,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.fill("#password",password)
     driver.click_button("Unlock workspace")
     assert_recurring_restored(driver)
-    assert_statement_balances_restored(driver)
+    assert_statement_balances_restored(driver, artifacts, "restart")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     driver.script("document.querySelector('.financial-dashboard').scrollIntoView({block:'start',behavior:'instant'})")
@@ -1121,7 +1146,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click(".review-history > summary")
     driver.wait_text(".review-history", "Needs Clarification → Approved", "restored immutable PDF approval history")
     assert_recurring_restored(driver)
-    assert_statement_balances_restored(driver)
+    assert_statement_balances_restored(driver, artifacts, "encrypted-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     driver.open_client("Alex Fictional")
@@ -1153,7 +1178,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_value("#cashflow-date-0", "2026-11-03", "restored original cash-flow dates after recovery")
     driver.wait_text(".imports-progress", "Approved 6 · Rejected 1", "storage-error recovery includes imported records")
     assert_recurring_restored(driver)
-    assert_statement_balances_restored(driver)
+    assert_statement_balances_restored(driver, artifacts, "error-screen-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")

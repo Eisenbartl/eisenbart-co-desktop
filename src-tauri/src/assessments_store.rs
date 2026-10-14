@@ -98,6 +98,16 @@ fn record(c: &Connection, w: &WorkspaceInfo, client: &str, id: &str) -> Result<R
     })
 }
 impl Workspace {
+    pub fn export_assessment_pdf(
+        &mut self,
+        client: &str,
+        id: &str,
+        path: &str,
+    ) -> Result<crate::assessment_pdf::Export, String> {
+        let r = self.get_assessment_record(client, id)?;
+        crate::assessment_pdf::save(&r, path, &self.data_dir)
+    }
+
     pub fn list_assessment_records(&mut self, client: &str) -> Result<Directory, String> {
         let s = self.session()?;
         let current = scoped_client(&s.connection, &s.info, client)?;

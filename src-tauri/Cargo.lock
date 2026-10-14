@@ -837,7 +837,7 @@ dependencies = [
 
 [[package]]
 name = "eisenbart-counseling-suite"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "argon2",
  "chrono",
@@ -856,6 +856,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tempfile",
+ "ttf-parser",
  "uuid",
  "windows-sys 0.61.2",
  "zeroize",

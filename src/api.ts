@@ -22,6 +22,8 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  chooseAssessmentPdf: (clientId:string,id:string)=>command<string|null>('choose_assessment_pdf',{clientId,id}),
+  exportAssessmentPdf: (clientId:string,id:string,path:string)=>command<{path:string;pages:number;recordId:string}>('export_assessment_pdf',{clientId,id,path}),
   listAssessmentRecords: (clientId:string)=>command<AssessmentDirectory>('list_assessment_records',{clientId}),
   getAssessmentRecord: (clientId:string,id:string)=>command<SavedAssessment>('get_assessment_record',{clientId,id}),
   saveAssessmentRecord: (clientId:string,input:AssessmentRecordInput)=>command<SavedAssessment>('save_assessment_record',{clientId,input}),

@@ -89,3 +89,9 @@ and verifies $500.00 approved movement and a $300.02 comparison difference.
 Two immutable order decisions and all comparisons must survive complete restart,
 normal backup restore and missing-metadata recovery. Screenshot:
 `native-statement-balances.png`. Existing clients' totals remain unchanged.
+
+The 0.14.0 workflow exports the original fictional assessment to new local PDFs,
+verifies independently expected historical figures/evidence/review flags with
+Poppler `pdftotext`, refuses overwrites without changing file bytes, and repeats
+after restart and both recovery paths. Install `poppler-utils` for this development
+check if `pdftotext` is unavailable; it is not an application dependency.

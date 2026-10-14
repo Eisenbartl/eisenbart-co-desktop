@@ -1,5 +1,45 @@
 # Development status
 
+## Stage 5D: offline internal assessment PDF export — 0.14.0 source
+
+Implemented local printable PDF export of saved immutable counselor assessments.
+Rust rechecks scoped authentication, stored integrity/evidence and original
+calculation before rendering; current source/client changes add historical
+review notices without replacing captured figures. PDFs include identity, period,
+exact approved amounts, local charts, classified/dated facts, counselor notes,
+sources/discrepancies and transaction/inventory evidence. Every page discloses
+internal/incomplete status. Embedded Open Sans and Unicode maps keep typography
+local and text extractable. No schema change (14), new renderer service, source
+write or planning inference. See [assessment-pdf-export.md](assessment-pdf-export.md).
+
+Native destination selection and a path input support local saving. Draft and
+busy guards prevent conflicting operations and late notices across clients.
+Existing files are never replaced; a synchronized private temporary file is
+published without clobbering. Unsupported glyphs/shaping characters or export
+limits fail without truncation or changing the saved record.
+
+| Check | Result |
+|---|---|
+| Locked cloud setup / frontend production build | Passed |
+| Interface suite | 80 passed; two new tests cover export identity/arguments, cancellation, failed-path retention, concurrent operation/draft blocking and late client replies |
+| Linux backend / worker suite | 116 library + 2 executable worker tests passed (118 total); four new tests cover historical 799.99/net worth 4,000.06 vs live 2,000.01, Unicode/font embedding, measured wrapping/page limits, unsupported glyph/no partial file, scoped/locked access and unsafe destinations; corrupt-record export rejection extends existing coverage |
+| Formatting / Clippy, warnings denied | Passed |
+| Native desktop compile | Passed debug build with no bundle |
+| Native full desktop/recovery/export workflow | Pending this checkpoint's run |
+| Windows source CI | Pending upload/run; no installer requested |
+| Clean Windows installation/offline release acceptance | Not run |
+
+Direct in-app printing, complete scenario-backed counselor reports, final client
+action plans, organization logos/contact branding, complex-script font fallback,
+PDF tags/archival certification and export-specific audit/permissions remain open.
+PDFs are readable local files outside workspace encryption. Existing counselor
+assessment creation remains audited; exporting does not create another audit event.
+
+Next priority: **captured planning scenarios and client action plans** with agreed
+allocations, debt/savings milestones, prioritized actions and final report review.
+The original remaining scope is recorded in [remaining-requirements.md](remaining-requirements.md).
+No new installer was created.
+
 ## Stage 5C: immutable counselor assessment records — 0.13.0 source
 
 Implemented encrypted, append-only internal assessment records with exact approved

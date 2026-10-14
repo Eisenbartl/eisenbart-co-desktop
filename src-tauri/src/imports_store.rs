@@ -1338,6 +1338,165 @@ mod tests {
         }
     }
     #[test]
+    fn assessment_pdf_exports_original_figures_unicode_evidence_and_review_status_without_writes() {
+        let (_root, mut w, _) = configured();
+        let out = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, out.path());
+        let data = facts_data(&s);
+        let s = w
+            .review_financial_facts(&c.id, facts_input(&s, data))
+            .unwrap();
+        let mut input = assessment_input(&s, &c);
+        input.findings = format!(
+            "José’s fictional café — Ελληνικά Кириллица\n{}\nFINAL NOTE",
+            "VeryLongUnbrokenFictionalEvidence".repeat(100)
+        );
+        let saved = w.save_assessment_record(&c.id, input).unwrap();
+        let id = &saved.payload.id;
+        let current = w
+            .export_assessment_pdf(&c.id, id, out.path().join("current.pdf").to_str().unwrap())
+            .unwrap();
+        assert!(current.pages > 3);
+        let bytes = fs::read(&current.path).unwrap();
+        let doc = lopdf::Document::load_mem(&bytes).unwrap();
+        let text = doc
+            .extract_text(&doc.get_pages().keys().copied().collect::<Vec<_>>())
+            .unwrap();
+        for expected in [
+            "Operating cash flow: USD 799.99",
+            "Estimated net worth at balance date: USD 4000.06",
+            "José’s fictional café — Ελληνικά Кириллица",
+            "FINAL NOTE",
+            "INTERNAL / INCOMPLETE",
+            "Page 1 of",
+            "Captured transaction evidence",
+            &saved.digest,
+        ] {
+            assert!(text.contains(expected), "Missing {expected}");
+        }
+        assert!(!text.contains("NEEDS REVIEW:"));
+        assert!(doc
+            .objects
+            .values()
+            .any(|v| v.as_dict().ok().is_some_and(|d| d.has(b"FontFile2"))));
+        assert!(!doc.objects.values().any(|v| v
+            .as_dict()
+            .ok()
+            .is_some_and(|d| d.has(b"JavaScript") || d.has(b"OpenAction"))));
+        let rent = &s.records[1].id;
+        let changed = review(
+            &mut w,
+            &c.id,
+            rent,
+            Status::Rejected,
+            "Withdraw source rent",
+            true,
+        )
+        .unwrap();
+        let oldpath = out.path().join("historical.pdf");
+        w.export_assessment_pdf(&c.id, id, oldpath.to_str().unwrap())
+            .unwrap();
+        let doc = lopdf::Document::load(&oldpath).unwrap();
+        let text = doc
+            .extract_text(&doc.get_pages().keys().copied().collect::<Vec<_>>())
+            .unwrap();
+        assert!(text.contains("NEEDS REVIEW:"));
+        assert!(text.contains("Operating cash flow: USD 799.99"));
+        assert!(!text.contains("Operating cash flow: USD 2000.01"));
+        assert_eq!(
+            w.get_assessment_record(&c.id, id).unwrap().digest,
+            saved.digest
+        );
+        assert_eq!(
+            w.get_client_imports(&c.id).unwrap().revision,
+            changed.revision
+        );
+        assert_eq!(w.list_assessment_records(&c.id).unwrap().records.len(), 1);
+    }
+    #[test]
+    fn assessment_pdf_rejects_overwrites_wrong_scope_locked_session_and_workspace_paths() {
+        let (_root, mut w, _) = configured();
+        let out = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, out.path());
+        let saved = w
+            .save_assessment_record(&c.id, assessment_input(&s, &c))
+            .unwrap();
+        let id = &saved.payload.id;
+        let path = out.path().join("private.pdf");
+        fs::write(&path, b"Existing file").unwrap();
+        assert!(w
+            .export_assessment_pdf(&c.id, id, path.to_str().unwrap())
+            .unwrap_err()
+            .contains("already exists"));
+        assert_eq!(fs::read(&path).unwrap(), b"Existing file");
+        assert!(w
+            .export_assessment_pdf(&c.id, id, w.data_dir.join("report.pdf").to_str().unwrap())
+            .is_err());
+        assert!(w.export_assessment_pdf(&c.id, id, "relative.pdf").is_err());
+        assert!(w
+            .export_assessment_pdf(&c.id, id, out.path().join("bad.txt").to_str().unwrap())
+            .is_err());
+        let nonexistent = out.path().join("missing").join("report.pdf");
+        assert!(w
+            .export_assessment_pdf(&c.id, id, nonexistent.to_str().unwrap())
+            .is_err());
+        let other = w
+            .save_client(ClientInput {
+                first_name: "Robin".into(),
+                ..client_input()
+            })
+            .unwrap();
+        let fresh = out.path().join("wrong.pdf");
+        assert!(w
+            .export_assessment_pdf(&other.id, id, fresh.to_str().unwrap())
+            .is_err());
+        assert!(!fresh.exists());
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&path, &fresh).unwrap();
+            assert!(w
+                .export_assessment_pdf(&c.id, id, fresh.to_str().unwrap())
+                .is_err());
+            assert_eq!(fs::read(&path).unwrap(), b"Existing file");
+            fs::remove_file(&fresh).unwrap();
+        }
+        w.lock_workspace();
+        assert!(w
+            .export_assessment_pdf(&c.id, id, fresh.to_str().unwrap())
+            .unwrap_err()
+            .contains("locked"));
+        assert!(!fresh.exists());
+    }
+    #[test]
+    fn assessment_pdf_fails_unsupported_characters_without_losing_record_or_leaving_partial_file() {
+        let (_root, mut w, _) = configured();
+        let out = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, out.path());
+        let mut input = assessment_input(&s, &c);
+        input.findings = "Fictional unsupported character: 🏦".into();
+        let saved = w.save_assessment_record(&c.id, input).unwrap();
+        let path = out.path().join("unsupported.pdf");
+        assert!(w
+            .export_assessment_pdf(&c.id, &saved.payload.id, path.to_str().unwrap())
+            .unwrap_err()
+            .contains("does not support"));
+        assert!(!path.exists());
+        assert_eq!(
+            w.get_assessment_record(&c.id, &saved.payload.id)
+                .unwrap()
+                .digest,
+            saved.digest
+        );
+        assert!(!fs::read_dir(out.path()).unwrap().any(|f| f
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".tmp")));
+    }
+    #[test]
     fn assessment_records_keep_original_approved_figures_after_reversal_and_profile_changes() {
         let (_root, mut w, _) = configured();
         let dir = tempdir().unwrap();
@@ -1453,6 +1612,14 @@ mod tests {
         assert!(crate::assessments::validate(&saved.payload).is_err());
         w.lock_workspace();
         assert!(w.get_assessment_record(&c.id, &saved.payload.id).is_err());
+        assert!(w
+            .export_assessment_pdf(
+                &c.id,
+                &saved.payload.id,
+                dir.path().join("corrupt.pdf").to_str().unwrap()
+            )
+            .is_err());
+        assert!(!dir.path().join("corrupt.pdf").exists());
     }
     #[test]
     fn assessment_records_schema_thirteen_rollback_restart_and_backup_recovery() {
@@ -1527,6 +1694,14 @@ mod tests {
         )
         .unwrap();
         assert!(w.get_assessment_record(&c.id, &saved.payload.id).is_err());
+        assert!(w
+            .export_assessment_pdf(
+                &c.id,
+                &saved.payload.id,
+                dir.path().join("corrupt.pdf").to_str().unwrap()
+            )
+            .is_err());
+        assert!(!dir.path().join("corrupt.pdf").exists());
         let backup = w
             .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
             .unwrap();
