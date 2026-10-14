@@ -684,7 +684,7 @@ def export_captured_planning_pdf(driver: WebDriver, artifacts: Path, label: str)
 
 def assert_captured_planning_restored(driver: WebDriver, artifacts: Path, label: str) -> None:
     driver.open_client("Alex Fictional")
-    if driver.command("GET",f"/element/{driver.find('.saved-assessments')}/property/open") is not True:
+    if driver.command("GET",f"/element/{driver.element('.saved-assessments')}/property/open") is not True:
         driver.click(".saved-assessments > summary")
     driver.select("#saved-assessment","Alex saved planning scenario — 2026-09-01 to 2026-10-31 — Needs review")
     driver.wait_text(".saved-assessment-view h3","Alex saved planning scenario","restored scenario record")
@@ -727,9 +727,10 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.click_button("Save budget and calculate")
     driver.wait_text(".budget-panel .budget-totals","$716.67","active plan reverted to original inputs")
     driver.wait_text(".saved-assessment-status","Needs review","reverting values does not restore captured plan version")
+    export_captured_planning_pdf(driver,artifacts,"before-restart")
+    driver.interactive(".assessment-export .button.primary")
     driver.script("document.querySelector('.saved-assessment-view .captured-planning').scrollIntoView({block:'start',behavior:'instant'})")
     driver.screenshot(artifacts / "native-captured-planning-scenario.png")
-    export_captured_planning_pdf(driver,artifacts,"before-restart")
     driver.click(".saved-assessments > summary")
     status("captured scenario selection, debt/savings/cash-flow assumptions, historical isolation and permanent plan-version review flags")
 

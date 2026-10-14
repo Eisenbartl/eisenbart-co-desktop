@@ -32,9 +32,9 @@ load/client and refresh guards preserve failed drafts and prevent data carryover
 | Interface suite | 83 passed; three new tests cover reviewed plan versions, selection-only IPC, separate canonical figures/escaped assumptions, stale draft retention/renewed acknowledgment, refresh/review flags and late/mismatched client replies |
 | Linux backend / worker suite | 120 library + 2 executable worker tests passed (122 total); four new tests cover independent models vs approved data, historical preservation/review flags, stale/missing/unsupported selection, scope/lock, forged outcomes/contexts/identity/version/extra fields, corrupted recovery rejection, format 1 compatibility, restart and legitimate historical restore |
 | Formatting / Clippy, warnings denied | Passed |
-| Native desktop compile | Pending this checkpoint's build completion |
-| Native full scenario/export/recovery workflow | Pending |
-| Windows source CI | Pending upload/run; installer creation remains disabled |
+| Native desktop compile | Passed standalone debug build with no bundle |
+| Native full scenario/export/recovery workflow | Initial run passed capture, plan edit/reversion and scenario PDF checks, then stopped on an early recovery locator. Added an explicit read-only panel readiness wait; final run pending |
+| Windows source CI | Initial run 38610161975: 82 interface tests passed, existing balance-review test selected before initial effects settled. The test helper now awaits render/effect completion; final run pending. All installer steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
 
 Independent model examples: income 3,250.00 / unallocated 2,150.00, Snowball

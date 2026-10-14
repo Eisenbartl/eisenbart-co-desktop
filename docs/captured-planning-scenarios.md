@@ -76,7 +76,7 @@ page-count, privacy and no-overwrite rules. See [assessment-pdf-export.md](asses
 
 Database schema remains 14; no migration or rewrite of existing records is needed.
 New assessments use payload format 2 and optional `planning`. Format 1 records
-remain readable/exportable without planning. A format 1 record cannot acquire a
+remain readable/exportable without planning. Format 2 records require version 0.15.0 or later; older report readers cannot open/export them. A format 1 record cannot acquire a
 planning attachment. The approved assessment calculator stays
 `approved-assessment-v1`; the optional planning calculator is `entered-plans-v1`.
 Future calculation changes must retain compatible v1 evaluation/readers rather
