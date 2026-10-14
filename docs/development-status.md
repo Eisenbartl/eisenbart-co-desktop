@@ -21,6 +21,14 @@ Validation in progress: focused engine/storage and interface tests passed; full
 local suites, compiled desktop/recovery workflow and Windows source checks pending.
 No installer is being built.
 
+Native testing found that selecting the same prior class in a WebKit dropdown
+left the old binding inactive after save. A diagnostic run confirmed that the
+saved control remained unclassified, while independent backend and parent
+interface tests correctly bound new source decisions. The interface now offers
+an explicit Reverify prior classification button that updates the draft from the
+current approval. The parent regression checks the correction, explicit action,
+exact new approval ID and successful saved state. Final native validation pending.
+
 Next priority: **immutable saved assessment snapshots and counselor reporting**
 using the approved source decisions and verified facts, followed by offline PDF
 reports/action plans.

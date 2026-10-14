@@ -2,7 +2,7 @@ import {act,fireEvent,render,screen,waitFor,within} from '@testing-library/react
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 import ImportsEditor from './ImportsEditor';
 import type {Client,ClientImports,CsvPreview,ImportedRecord} from './types';
-const mocks=vi.hoisted(()=>({getClientImports:vi.fn(),reviewRecurringPayment:vi.fn(),reviewStatementBalances:vi.fn(),chooseClientPdf:vi.fn(),inspectClientPdf:vi.fn(),chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn()}));
+const mocks=vi.hoisted(()=>({getClientImports:vi.fn(),reviewRecurringPayment:vi.fn(),reviewStatementBalances:vi.fn(),reviewFinancialFacts:vi.fn(),chooseClientPdf:vi.fn(),inspectClientPdf:vi.fn(),chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn()}));
 vi.mock('./api',()=>({api:mocks}));
 const client:Client={id:'client-a',organizationId:'org-a',firstName:'Alex',lastName:'Synthetic',email:'',phone:'',householdSize:1,status:'Planning',goals:'',createdAt:'',updatedAt:''};
 const summary={pending:0,needsClarification:0,approved:0,rejected:0,income:'0.00',spending:'0.00',refunds:'0.00',netSpending:'0.00',netCash:'0.00',accountNet:[] as [string,string][],warnings:['Approved rows only; all imported dates.']};
@@ -112,3 +112,29 @@ describe('statement running-balance review',()=>{
   mocks.inspectClientCsv.mockResolvedValue({...preview,headers:[...preview.headers,'Balance'],sampleRows:[[...preview.sampleRows[0],'3000']]});open();await screen.findByRole('button',{name:'Inspect CSV'});fireEvent.change(screen.getByLabelText('Local CSV file'),{target:{value:'D:\\Synthetic\\balance.csv'}});fireEvent.click(screen.getByRole('button',{name:'Inspect CSV'}));await screen.findByText(/Inspected source/);expect(screen.getByLabelText('CSV row order for after-transaction balances')).toBeDisabled();fireEvent.change(screen.getByLabelText('Reported running balance column (optional)'),{target:{value:'5'}});expect(screen.getByLabelText('CSV row order for after-transaction balances')).toHaveValue('');fireEvent.change(screen.getByLabelText('CSV row order for after-transaction balances'),{target:{value:'newestFirst'}});fireEvent.change(screen.getByLabelText('Reported running balance column (optional)'),{target:{value:'-1'}});expect(screen.getByLabelText('CSV row order for after-transaction balances')).toHaveValue('');expect(screen.getByLabelText('CSV row order for after-transaction balances')).toBeDisabled();
  });
 });
+
+ it('rebinds a necessary classification to the corrected source approval through the actual parent workflow',async()=>{
+  const rentFields={...fields,amount:'-300.02',description:'Fictional rent',category:'Housing',kind:'expense' as const};
+  const rent={...record,fields:rentFields,status:'Approved' as const,bulkEligible:false};
+  const rentHistory={...approved.history[0],id:'rent-approval-old',fields:rentFields};
+  const facts={asOf:null,fullInventory:false,balances:[],classifications:[{recordId:rent.id,approvalId:rentHistory.id,role:'necessary' as const}]};
+  const initial={...approved,records:[rent],history:[rentHistory],financialFacts:{data:facts,history:[]}};
+  const correctedFields={...rentFields,amount:'-300.01'};
+  const corrected={...initial,revision:3,records:[{...rent,fields:correctedFields}],history:[rentHistory,{...rentHistory,id:'rent-approval-new',fields:correctedFields}]};
+  mocks.getClientImports.mockResolvedValue(initial);mocks.reviewTransaction.mockResolvedValue(corrected);
+  mocks.reviewFinancialFacts.mockImplementation(async (_client,input)=>({...corrected,revision:4,financialFacts:{data:input.data,history:[]}}));
+  open();await screen.findByRole('table',{name:'Client transaction review queue'});
+  fireEvent.click(screen.getByRole('button',{name:'Review synthetic.csv record 2'}));
+  fireEvent.change(screen.getByLabelText('Verified signed amount (USD)'),{target:{value:'-300.01'}});
+  fireEvent.change(screen.getByLabelText('Decision / correction / reversal reason'),{target:{value:'Verified corrected rent'}});
+  fireEvent.click(screen.getByRole('button',{name:'Save transaction decision'}));await screen.findByText('Transaction decision saved; approved totals updated.');
+  fireEvent.click(screen.getByText('Verified classifications and dated balance facts'));
+  expect(await screen.findByText(/Needs re-verification: prior Necessary/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Reverify prior classification for Fictional rent (2)'}));
+  fireEvent.change(screen.getByLabelText('Financial facts review reason'),{target:{value:'Explicitly reverified correction'}});
+  fireEvent.click(screen.getByLabelText(/I checked these facts/));fireEvent.click(screen.getByRole('button',{name:'Save verified financial facts'}));
+  await screen.findByText('Verified financial facts saved; dashboard updated.');
+  expect(mocks.reviewFinancialFacts.mock.calls[0][1].data.classifications).toEqual([{recordId:rent.id,approvalId:'rent-approval-new',role:'necessary'}]);
+  expect(screen.queryByText(/Needs re-verification: prior Necessary/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Classification for Fictional rent (2)')).toHaveValue('necessary');
+ });

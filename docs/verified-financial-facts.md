@@ -16,7 +16,8 @@ silently allocated to either expense class.
 A classification captures the exact client-scoped transaction approval ID.
 Corrections, withdrawals or reapproval create new source decisions and make the
 old classification inactive. Returning to the same date/amount does not reactivate
-it. Re-select the classification to verify the current approval, or withdraw it.
+it. Use **Reverify prior classification** to explicitly confirm the corrected source,
+choose a different classification, or withdraw it.
 An unrelated balance edit can preserve an inactive binding, but cannot change its
 role or silently rebind it to a new approval. Source changes never erase history.
 
