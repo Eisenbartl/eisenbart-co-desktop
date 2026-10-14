@@ -205,7 +205,7 @@ export interface CsvDocument {balanceHistory:StatementBalanceHistory[];balanceRe
 export interface ImportedRecord {id:string;documentId:string;accountId:string;raw:RawCsvRecord;fields:TransactionFields;status:ReviewStatus;linkedId:string|null;reason:string;warnings:string[];duplicateIds:string[];bulkEligible:boolean}
 export interface ReviewHistory {id:string;recordId:string;fromStatus:ReviewStatus;toStatus:ReviewStatus;fields:TransactionFields;reason:string;reviewedAt:string;counselorName:string}
 export interface ImportSummary {pending:number;needsClarification:number;approved:number;rejected:number;income:string;spending:string;refunds:string;netSpending:string;netCash:string;accountNet:[string,string][];warnings:string[]}
-export interface ClientImports {merchantGroups:MerchantGroup[];recurringHistory:RecurringReview[];clientId:string;revision:number;accounts:StatementAccount[];documents:CsvDocument[];records:ImportedRecord[];history:ReviewHistory[];summary:ImportSummary}
+export interface ClientImports {financialFacts?:FinancialFacts;merchantGroups:MerchantGroup[];recurringHistory:RecurringReview[];clientId:string;revision:number;accounts:StatementAccount[];documents:CsvDocument[];records:ImportedRecord[];history:ReviewHistory[];summary:ImportSummary}
 export interface CsvStageInput {expectedRevision:number;token:string;document:CsvDocumentInput}
 export interface TransactionReviewInput {expectedRevision:number;recordId:string;status:ReviewStatus;fields:TransactionFields;reason:string;acknowledgeWarnings:boolean}
 export interface TransactionBulkInput {expectedRevision:number;recordIds:string[]}
@@ -229,9 +229,25 @@ export interface StatementBalanceHistory {id:string;documentId:string;order:Bala
 export interface StatementBalanceInput {expectedRevision:number;documentId:string;order:BalanceOrder|null;reason:string}
 
 export interface FinancialAssessment {
+ factsMetrics?:FactMetrics;
  clientId:string;revision:number;periodStart:string;periodEnd:string;calculatedOnUtc:string;
  latestApprovedDate:string|null;outdated:boolean;totals:ClientImports['summary'];operatingCashflow:string;
  months:{month:string;totals:ClientImports['summary'];operatingCashflow:string;incomeScale:number;spendingScale:number;cashflowScale:number}[];
  categories:{label:string;spending:string;scale:number}[];undatedRecords:number;reviewedPercent:number|null;
  documentIds:string[];warnings:string[];
+}
+
+export type FactRole='necessary'|'discretionary'|'takeHomePay'|'otherIncome';
+export type FactBalanceKind='cash'|'accessibleSavings'|'restrictedSavings'|'otherAsset'|'debt';
+export interface FactClassification {recordId:string;approvalId:string;role:FactRole}
+export interface FactBalance {label:string;kind:FactBalanceKind;amount:string|null;monthlyPayment:string|null;evidence:string;documentId:string|null}
+export interface FinancialFactsData {asOf:string|null;fullInventory:boolean;balances:FactBalance[];classifications:FactClassification[]}
+export interface FinancialFacts {data:FinancialFactsData|null;history:{id:string;data:FinancialFactsData;reason:string;reviewedAt:string;counselorName:string}[]}
+export interface FinancialFactsInput {expectedRevision:number;data:FinancialFactsData;reason:string;acknowledge:boolean}
+export interface FactMetrics {
+ necessarySpending:string;discretionarySpending:string;unclassifiedSpending:string;takeHomePay:string;unclassifiedIncome:string;staleClassifications:number;
+ asOf:string|null;balanceComplete:boolean;balanceAligned:boolean;balanceOutdated:boolean;
+ cash:string|null;accessibleSavings:string|null;restrictedSavings:string|null;debt:string|null;netWorth:string|null;
+ monthlyNecessaryEstimate:string|null;emergencyMonthsEstimate:string|null;takeHomePaymentPercentEstimate:string|null;
+ debtBalances:{label:string;amount:string|null;scale:number}[];
 }

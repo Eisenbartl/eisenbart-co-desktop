@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
+import type { FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
 
 export function desktopAvailable(): boolean {
   return '__TAURI_INTERNALS__' in window;
@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  reviewFinancialFacts: (clientId:string,input:FinancialFactsInput) => command<ClientImports>('review_financial_facts',{clientId,input}),
   getClientDashboard: (clientId:string,input:{fromMonth:string;throughMonth:string}) => command<FinancialAssessment>('get_client_dashboard',{clientId,input}),
   chooseClientPdf: (clientId:string) => command<string|null>('choose_client_pdf',{clientId}),
   inspectClientPdf: (clientId:string,path:string) => command<CsvPreview>('inspect_client_pdf',{clientId,path}),

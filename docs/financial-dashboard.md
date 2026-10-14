@@ -1,4 +1,4 @@
-# Approved transaction financial dashboard — 0.11.0
+# Approved transaction financial dashboard — 0.11.0 / 0.12.0 extension
 
 Open a saved client, go to the statement import/review panel, and enter **Assessment
 from month** and **Assessment through month** as YYYY-MM. Select **View financial
@@ -51,15 +51,14 @@ institution data freshness. Future transaction dates are flagged. Relevant sourc
 warnings and reconciliation conflicts prompt source review. A matching arithmetic
 check does not establish account coverage or verify an asset balance.
 
-Necessary/discretionary classification, verified take-home pay, cash/accessible
-savings, debt, net worth, debt-to-income and emergency coverage remain unavailable
-in this approved-data view. Debt balance and savings progress charts therefore
-remain pending. Existing budget/debt/savings/cash-flow panels are separate entered
-plans, not approved imported facts. Dated verified balance facts and expense
-classifications are the next checkpoint. Saved final assessment snapshots and
+Version 0.12.0 adds explicit source-bound expense/payroll classifications and
+dated counselor-verified balance facts, conditional net worth, coverage/payment
+estimates and a local debt chart. See [verified-financial-facts.md](verified-financial-facts.md).
+Gross-income lender DTI and savings progress remain pending. Existing budget/debt/savings/cash-flow panels are separate entered
+plans, not approved imported facts. Saved immutable assessment snapshots and reporting are the next checkpoint. Saved final assessment snapshots and
 reports belong to later reporting work.
 
-No schema migration is necessary: this view recomputes from schema-12 sources and
+The original 0.11.0 view required no schema migration and recomputes from schema-12 sources and
 immutable reviews. It writes no financial records, approvals, plans or audit
 history. Restart and both encrypted recovery paths preserve the sources from
 which the same view can be recalculated. This milestone does not replace final

@@ -1,4 +1,5 @@
 import {useEffect,useState,type FormEvent} from 'react';
+import FactMetricsView from './FactMetricsView';
 import {api} from './api';
 import {usd} from './BudgetEditor';
 import type {ClientImports,FinancialAssessment} from './types';
@@ -41,7 +42,7 @@ export default function FinancialDashboard({source,disabled}:{source:ClientImpor
     <div><h4>Monthly income and spending</h4><p className="field-help">Income and gross spending share a relative scale. Months without approved activity show zero imported activity.</p><table aria-label="Monthly approved income and spending"><thead><tr><th>Month / approved rows</th><th>Income</th><th>Gross spending</th></tr></thead><tbody>{result.months.map(m=><tr key={m.month}><th scope="row">{m.month}<small>{m.totals.approved} approved rows</small></th><td>{usd(m.totals.income)}<Bar scale={m.incomeScale} kind="income"/></td><td>{usd(m.totals.spending)}<Bar scale={m.spendingScale} kind="spending"/></td></tr>)}</tbody></table></div>
     <div><h4>Monthly operating cash-flow trend</h4><p className="field-help">Income minus net spending after refunds. Transfers and balance movements are excluded. Negative amounts indicate a deficit; lengths compare absolute amounts.</p><table aria-label="Monthly operating cash flow"><thead><tr><th>Month</th><th>Operating cash flow</th><th>Account movement</th></tr></thead><tbody>{result.months.map(m=><tr key={m.month}><th scope="row">{m.month}</th><td>{usd(m.operatingCashflow)}<Bar scale={m.cashflowScale} kind={m.operatingCashflow.startsWith('-')?'deficit':'income'}/></td><td>{usd(m.totals.netCash)}</td></tr>)}</tbody></table></div>
    </div>
-   <p className="field-help">Necessary/discretionary expenses, verified take-home pay, cash and accessible savings, outstanding debt, net worth, debt-to-income, and emergency coverage: unavailable. Debt balance and savings progress charts require verified balance facts. Statement arithmetic checks do not verify asset balances.</p>
+   {result.factsMetrics?<FactMetricsView value={result.factsMetrics}/>:<p className="field-help">Necessary/discretionary expenses, verified take-home pay, cash and accessible savings, outstanding debt, net worth, debt-to-income, and emergency coverage: unavailable. Debt balance and savings progress charts require verified balance facts. Statement arithmetic checks do not verify asset balances.</p>}
   </>}
  </section>;
 }

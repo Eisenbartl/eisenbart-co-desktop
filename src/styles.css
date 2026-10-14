@@ -437,3 +437,13 @@ textarea { resize: vertical; min-height: 100px; }
 .financial-bar.spending { fill: #a37144; }
 .financial-bar.deficit { fill: #b14d4d; }
 @media(max-width:600px) { .financial-dashboard { padding: 12px; } }
+.financial-facts-editor { margin: 24px 0; padding: 16px; border: 1px solid #dce2df; border-radius: 12px; }
+.financial-facts-editor > summary { cursor: pointer; font-weight: 600; }
+.financial-facts-editor fieldset { border: 0; padding: 0; }
+.financial-facts-editor h4 { margin-top: 24px; }
+.facts-classifications { width: 100%; font-size: .85rem; border-collapse: collapse; }
+.facts-classifications td, .facts-classifications th { padding: 12px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid #dce2df; }
+.facts-classifications label { min-width: 190px; }
+.financial-facts-editor .check-label { margin-top: 16px; }
+.financial-facts-history { margin-top: 20px; font-size: .85rem; overflow-wrap: anywhere; }
+.financial-facts-history > details { padding: 12px 0; }

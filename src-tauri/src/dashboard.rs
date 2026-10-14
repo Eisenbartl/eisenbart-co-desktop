@@ -33,6 +33,7 @@ pub struct Category {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Assessment {
+    pub facts_metrics: crate::financial_facts::Metrics,
     pub client_id: String,
     pub revision: i64,
     pub period_start: String,
@@ -185,9 +186,9 @@ pub fn assess(source: &Snapshot, input: Input, today: NaiveDate) -> Result<Asses
         .collect::<Vec<_>>();
     let mut warnings = vec![
         "Incomplete assessment: reviewed imported records do not establish that every account or statement is present. Zero means no approved activity in the imported records, not proof of no activity.".into(),
-        "Income is approved cash receipts, including positive interest; take-home pay is not separately verified. Spending categories do not establish necessary/discretionary classification.".into(),
+        "Income receipts include positive interest. Take-home pay and necessary/discretionary spending use separate, explicit classifications bound to exact approved source decisions.".into(),
         "Refunds reduce net spending and are shown separately from gross spending categories. Transfers and balance movements are excluded from operating cash flow, but included in account movement.".into(),
-        "Cash, accessible savings, debt, net worth, debt-to-income and emergency coverage are unavailable without verified balance and classification facts. Manual plans are separate estimates.".into(),
+        "Dated counselor-verified balance facts and source classifications supply additional metrics only when sufficient. Missing facts stay unavailable. Manual plans remain separate estimates.".into(),
         "This live view is recalculated from current decisions; it is not a saved final report. Period choices are not saved. Review percentages measure decisions on dated imported rows, not statement coverage.".into(),
     ];
     if totals.pending + totals.needs_clarification > 0 {
@@ -221,6 +222,13 @@ pub fn assess(source: &Snapshot, input: Input, today: NaiveDate) -> Result<Asses
         warnings.push("Selected source documents have statement warnings or unresolved checks. Review source documents and running-balance checks; approved amounts alone do not resolve these issues.".into());
     }
     Ok(Assessment {
+        facts_metrics: crate::financial_facts::metrics(
+            source,
+            start,
+            end,
+            today,
+            i64::from(count),
+        )?,
         client_id: source.client_id.clone(),
         revision: source.revision,
         period_start: start.to_string(),
@@ -283,6 +291,7 @@ mod tests {
         }];
         let summary = imports::summarize(&records, &accounts).unwrap();
         Snapshot {
+            financial_facts: crate::financial_facts::Facts::default(),
             client_id: "synthetic".into(),
             revision: 42,
             accounts,

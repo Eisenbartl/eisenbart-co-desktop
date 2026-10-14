@@ -227,6 +227,7 @@ pub struct Summary {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    pub financial_facts: crate::financial_facts::Facts,
     pub merchant_groups: Vec<crate::recurring::Group>,
     pub recurring_history: Vec<crate::recurring::Review>,
     pub client_id: String,

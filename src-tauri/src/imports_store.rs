@@ -122,6 +122,51 @@ fn normalize_document(mut d: DocumentInput) -> Result<DocumentInput, String> {
     }
     Ok(d)
 }
+fn read_financial_facts(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    client: &str,
+    records: &[Record],
+    history: &[History],
+    documents: &[Document],
+) -> Result<crate::financial_facts::Facts, String> {
+    use crate::financial_facts::{self, Data, Facts, Review};
+    let size:i64=c.query_row("SELECT COALESCE(SUM(length(CAST(data_json AS BLOB))),0) FROM financial_fact_reviews WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3",params![client,w.organization_id,w.counselor_id],|r|r.get(0)).map_err(storage_error)?;
+    if size > 8 * 1024 * 1024 {
+        return Err(STORAGE_ERROR.into());
+    }
+    let rows=c.prepare("SELECT id,data_json,reason,reviewed_at,counselor_name FROM financial_fact_reviews WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3 ORDER BY rowid LIMIT 101").map_err(storage_error)?.query_map(params![client,w.organization_id,w.counselor_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?))).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
+    if rows.len() > 100 {
+        return Err(STORAGE_ERROR.into());
+    }
+    let ids = documents.iter().map(|d| d.id.as_str()).collect();
+    let mut reviews = Vec::new();
+    for (id, json, reason, reviewed_at, counselor_name) in rows {
+        if json.len() > financial_facts::MAX_JSON {
+            return Err(STORAGE_ERROR.into());
+        }
+        let data: Data = decode(&json)?;
+        if financial_facts::normalize(data.clone())? != data {
+            return Err(STORAGE_ERROR.into());
+        }
+        financial_facts::validate_bindings(&data, records, history, &ids)
+            .map_err(|_| STORAGE_ERROR.to_owned())?;
+        required_text(&reason, "Facts review reason", 500)?;
+        required_text(&counselor_name, "Counselor name", 120)?;
+        chrono::DateTime::parse_from_rfc3339(&reviewed_at).map_err(|_| STORAGE_ERROR.to_owned())?;
+        reviews.push(Review {
+            id,
+            data,
+            reason,
+            reviewed_at,
+            counselor_name,
+        });
+    }
+    Ok(Facts {
+        data: reviews.last().map(|r| r.data.clone()),
+        history: reviews,
+    })
+}
 pub(super) fn read_imports(
     c: &Connection,
     w: &WorkspaceInfo,
@@ -443,7 +488,9 @@ pub(super) fn read_imports(
     }
     let merchant_groups = crate::recurring::analyze(&records, &recurring_history, &history)?;
     let summary = summarize(&records, &accounts)?;
+    let financial_facts = read_financial_facts(c, w, client, &records, &history, &documents)?;
     Ok(Snapshot {
+        financial_facts,
         merchant_groups,
         recurring_history,
         client_id: client.into(),
@@ -837,6 +884,77 @@ impl Workspace {
         tx.commit().map_err(storage_error)?;
         Ok(result)
     }
+    pub fn review_financial_facts(
+        &mut self,
+        client: &str,
+        input: crate::financial_facts::Input,
+    ) -> Result<Snapshot, String> {
+        use crate::financial_facts;
+        let s = self.session()?;
+        scoped_client(&s.connection, &s.info, client)?;
+        if !input.acknowledge {
+            return Err("Confirm that these are verified facts, not planning estimates.".into());
+        }
+        let tx = s
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(storage_error)?;
+        let current = read_imports(&tx, &s.info, client)?;
+        let data = financial_facts::normalize(input.data)?;
+        if data
+            .as_of
+            .as_deref()
+            .map(iso_date)
+            .transpose()?
+            .is_some_and(|d| d > chrono::Utc::now().date_naive())
+        {
+            return Err("Balance facts cannot have a future as-of date.".into());
+        }
+        let ids = current.documents.iter().map(|d| d.id.as_str()).collect();
+        financial_facts::validate_bindings(&data, &current.records, &current.history, &ids)?;
+        for c in &data.classifications {
+            let unchanged = current
+                .financial_facts
+                .data
+                .as_ref()
+                .is_some_and(|old| old.classifications.contains(c));
+            if !unchanged
+                && !current
+                    .records
+                    .iter()
+                    .any(|r| r.id == c.record_id && financial_facts::active(c, r, &current.history))
+            {
+                return Err("A new or changed classification requires the current approved source decision. Reverify the transaction first.".into());
+            }
+        }
+        let json = serde_json::to_string(&data).map_err(|_| STORAGE_ERROR.to_owned())?;
+        if current.financial_facts.history.len() >= 100
+            || current
+                .financial_facts
+                .history
+                .iter()
+                .map(|r| {
+                    serde_json::to_vec(&r.data)
+                        .map(|v| v.len())
+                        .unwrap_or(financial_facts::MAX_JSON)
+                })
+                .sum::<usize>()
+                + json.len()
+                > 8 * 1024 * 1024
+        {
+            return Err(
+                "Financial fact history reached its local safety limit; nothing was saved.".into(),
+            );
+        }
+        let reason = required_text(&input.reason, "Facts review reason", 500)?;
+        bump(&tx, &s.info, client, input.expected_revision)?;
+        let id = Uuid::new_v4().to_string();
+        tx.execute("INSERT INTO financial_fact_reviews(id,client_id,organization_id,counselor_id,data_json,reason,reviewed_at,counselor_name) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![id,client,s.info.organization_id,s.info.counselor_id,json,reason,timestamp(),s.info.counselor_name]).map_err(storage_error)?;
+        audit(&tx, &s.info, "financial_facts_reviewed", Some(&id))?;
+        let result = read_imports(&tx, &s.info, client)?;
+        tx.commit().map_err(storage_error)?;
+        Ok(result)
+    }
     pub fn review_statement_balances(
         &mut self,
         client: &str,
@@ -1144,6 +1262,297 @@ mod tests {
                 acknowledge_warnings: ack,
             },
         )
+    }
+    fn facts_fixture(w: &mut Workspace, client: &str, dir: &Path) -> Snapshot {
+        let s=stage(w,client,dir,"facts.csv","Date,Description,Amount,Category,Type\n2026-09-01,Fictional payroll,2000.01,Wages,income\n2026-09-02,Fictional rent,-1200.02,Housing,expense\n",doc("Facts checking"));
+        let ids = s.records.iter().map(|r| r.id.clone()).collect::<Vec<_>>();
+        for id in ids {
+            review(
+                w,
+                client,
+                &id,
+                Status::Approved,
+                "Verified fictional source",
+                true,
+            )
+            .unwrap();
+        }
+        w.get_client_imports(client).unwrap()
+    }
+    fn facts_data(s: &Snapshot) -> crate::financial_facts::Data {
+        use crate::financial_facts::{Balance, BalanceKind, Classification, Data, Role};
+        Data {
+            as_of: Some("2026-09-30".into()),
+            full_inventory: true,
+            balances: vec![
+                ("Checking", BalanceKind::Cash, "800.01", None),
+                ("Emergency", BalanceKind::AccessibleSavings, "2400.03", None),
+                ("Reserved", BalanceKind::RestrictedSavings, "300.03", None),
+                ("Property", BalanceKind::OtherAsset, "1000.04", None),
+                ("Loan", BalanceKind::Debt, "500.05", Some("100.01")),
+            ]
+            .into_iter()
+            .map(|(label, kind, amount, payment)| Balance {
+                label: label.into(),
+                kind,
+                amount: Some(amount.into()),
+                monthly_payment: payment.map(str::to_owned),
+                evidence: "Verified fictional dated account evidence".into(),
+                document_id: Some(s.documents[0].id.clone()),
+            })
+            .collect(),
+            classifications: s
+                .records
+                .iter()
+                .map(|r| Classification {
+                    record_id: r.id.clone(),
+                    approval_id: s
+                        .history
+                        .iter()
+                        .rev()
+                        .find(|h| h.record_id == r.id)
+                        .unwrap()
+                        .id
+                        .clone(),
+                    role: if r.fields.kind == Kind::Income {
+                        Role::TakeHomePay
+                    } else {
+                        Role::Necessary
+                    },
+                })
+                .collect(),
+        }
+    }
+    fn facts_input(
+        s: &Snapshot,
+        data: crate::financial_facts::Data,
+    ) -> crate::financial_facts::Input {
+        crate::financial_facts::Input {
+            expected_revision: s.revision,
+            data,
+            reason: "Verified common date, balances and transaction purposes".into(),
+            acknowledge: true,
+        }
+    }
+    fn assessed(w: &mut Workspace, client: &str) -> crate::dashboard::Assessment {
+        w.get_client_dashboard(
+            client,
+            crate::dashboard::Input {
+                from_month: "2026-09".into(),
+                through_month: "2026-09".into(),
+            },
+        )
+        .unwrap()
+    }
+    #[test]
+    fn financial_facts_exact_metrics_reversals_require_new_approval_and_unknowns_block_ratios() {
+        use crate::financial_facts::Role;
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let client = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &client.id, dir.path());
+        let data = facts_data(&s);
+        let s = w
+            .review_financial_facts(&client.id, facts_input(&s, data))
+            .unwrap();
+        let a = assessed(&mut w, &client.id);
+        let m = a.facts_metrics;
+        assert_eq!(m.necessary_spending, "1200.02");
+        assert_eq!(m.take_home_pay, "2000.01");
+        assert_eq!(m.net_worth.as_deref(), Some("4000.06"));
+        assert_eq!(m.emergency_months_estimate.as_deref(), Some("1.99"));
+        assert_eq!(
+            m.take_home_payment_percent_estimate.as_deref(),
+            Some("5.00")
+        );
+        assert_eq!(m.debt_balances[0].scale, 1000);
+        assert_eq!(m.stale_classifications, 0);
+        let rent = s.records[1].id.clone();
+        review(
+            &mut w,
+            &client.id,
+            &rent,
+            Status::Rejected,
+            "Withdraw rent approval",
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            assessed(&mut w, &client.id)
+                .facts_metrics
+                .stale_classifications,
+            1
+        );
+        let s = review(
+            &mut w,
+            &client.id,
+            &rent,
+            Status::Approved,
+            "Reverify original rent after withdrawal",
+            true,
+        )
+        .unwrap();
+        let m = assessed(&mut w, &client.id).facts_metrics;
+        assert_eq!(m.unclassified_spending, "1200.02");
+        assert!(m.emergency_months_estimate.is_none());
+        let mut data = s.financial_facts.data.clone().unwrap();
+        data.classifications[1].role = Role::Discretionary;
+        assert!(w
+            .review_financial_facts(&client.id, facts_input(&s, data))
+            .is_err());
+        assert_eq!(
+            w.get_client_imports(&client.id).unwrap().revision,
+            s.revision
+        );
+        let mut data = s.financial_facts.data.clone().unwrap();
+        data.classifications[1].approval_id = s.history.last().unwrap().id.clone();
+        let s = w
+            .review_financial_facts(&client.id, facts_input(&s, data))
+            .unwrap();
+        assert_eq!(
+            assessed(&mut w, &client.id)
+                .facts_metrics
+                .necessary_spending,
+            "1200.02"
+        );
+        let mut data = s.financial_facts.data.clone().unwrap();
+        data.balances[1].amount = None;
+        let s = w
+            .review_financial_facts(&client.id, facts_input(&s, data))
+            .unwrap();
+        let m = assessed(&mut w, &client.id).facts_metrics;
+        assert!(m.net_worth.is_none());
+        assert!(m.accessible_savings.is_none());
+        assert!(m.emergency_months_estimate.is_none());
+        let mut data = s.financial_facts.data.clone().unwrap();
+        data.balances[1].amount = Some("2400.03".into());
+        data.as_of = Some("2026-09-29".into());
+        w.review_financial_facts(&client.id, facts_input(&s, data))
+            .unwrap();
+        let m = assessed(&mut w, &client.id).facts_metrics;
+        assert!(!m.balance_aligned);
+        assert!(m.net_worth.is_some());
+        assert!(m.emergency_months_estimate.is_none());
+        assert!(m.take_home_payment_percent_estimate.is_none());
+    }
+    #[test]
+    fn financial_facts_scope_stale_revisions_audit_rollback_and_append_only_history() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let client = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &client.id, dir.path());
+        let data = facts_data(&s);
+        let other_snapshot = w.get_client_imports(&other.id).unwrap();
+        assert!(w
+            .review_financial_facts(&other.id, facts_input(&other_snapshot, data.clone()))
+            .is_err());
+        let mut i = facts_input(&s, data.clone());
+        i.acknowledge = false;
+        assert!(w.review_financial_facts(&client.id, i).is_err());
+        let mut i = facts_input(&s, data.clone());
+        i.expected_revision -= 1;
+        assert!(w.review_financial_facts(&client.id, i).is_err());
+        w.session.as_mut().unwrap().connection.execute_batch("CREATE TRIGGER reject_facts_audit BEFORE INSERT ON audit_events WHEN NEW.event='financial_facts_reviewed' BEGIN SELECT RAISE(ABORT,'Synthetic audit failure'); END;").unwrap();
+        assert!(w
+            .review_financial_facts(&client.id, facts_input(&s, data.clone()))
+            .is_err());
+        assert_eq!(
+            w.get_client_imports(&client.id).unwrap().revision,
+            s.revision
+        );
+        assert!(w
+            .get_client_imports(&client.id)
+            .unwrap()
+            .financial_facts
+            .history
+            .is_empty());
+        w.session
+            .as_mut()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TRIGGER reject_facts_audit;")
+            .unwrap();
+        let saved = w
+            .review_financial_facts(&client.id, facts_input(&s, data))
+            .unwrap();
+        assert_eq!(saved.financial_facts.history.len(), 1);
+        let c = &w.session.as_ref().unwrap().connection;
+        assert!(c
+            .execute("UPDATE financial_fact_reviews SET reason='changed'", [])
+            .is_err());
+        assert!(c.execute("DELETE FROM financial_fact_reviews", []).is_err());
+        let i = facts_input(&saved, crate::financial_facts::Data::default());
+        w.review_financial_facts(&client.id, i).unwrap();
+        let m = assessed(&mut w, &client.id).facts_metrics;
+        assert!(m.cash.is_none());
+        assert!(m.net_worth.is_none());
+        assert_eq!(m.unclassified_spending, "1200.02");
+        assert_eq!(
+            w.get_client_imports(&client.id)
+                .unwrap()
+                .financial_facts
+                .history
+                .len(),
+            2
+        );
+    }
+    #[test]
+    fn financial_facts_restart_backup_and_schema_twelve_migration_rollback_preserve_records() {
+        let (root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let client = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &client.id, dir.path());
+        let before = s.records[0].raw.clone();
+        let c = &mut w.session.as_mut().unwrap().connection;
+        c.execute_batch("DROP TABLE financial_fact_reviews; PRAGMA user_version=12; CREATE TABLE audit_events_v13(collision TEXT);").unwrap();
+        assert!(migrate(c, false).is_err());
+        assert_eq!(
+            c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            12
+        );
+        assert!(c.prepare("SELECT * FROM financial_fact_reviews").is_err());
+        c.execute_batch("DROP TABLE audit_events_v13;").unwrap();
+        migrate(c, false).unwrap();
+        let s = w.get_client_imports(&client.id).unwrap();
+        assert_eq!(s.records[0].raw, before);
+        assert!(s.financial_facts.history.is_empty());
+        let data = facts_data(&s);
+        w.review_financial_facts(&client.id, facts_input(&s, data))
+            .unwrap();
+        let backup = w
+            .create_backup(dir.path().to_str().unwrap().into(), PASSWORD.into())
+            .unwrap();
+        drop(w);
+        let mut w = Workspace::new(root.path().to_path_buf());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            assessed(&mut w, &client.id)
+                .facts_metrics
+                .net_worth
+                .as_deref(),
+            Some("4000.06")
+        );
+        w.lock_workspace();
+        let review = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(review.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            w.get_client_imports(&client.id)
+                .unwrap()
+                .financial_facts
+                .history
+                .len(),
+            1
+        );
+        assert_eq!(
+            assessed(&mut w, &client.id)
+                .facts_metrics
+                .emergency_months_estimate
+                .as_deref(),
+            Some("1.99")
+        );
     }
     const RUNNING:&str="Date,Description,Amount,Category,Type,Balance\n2026-09-01,Fictional wages,500.01,Wages,income,1500.01\n2026-09-02,Fictional rent,-300.02,Housing,expense,1199.99\n2026-09-03,Fictional fee,-0.01,Fees,fee,1199.98\n";
     fn balance_input(
@@ -1469,7 +1878,7 @@ mod tests {
             doc("Legacy checking"),
         );
         let connection = &mut w.session.as_mut().unwrap().connection;
-        connection.execute_batch("DROP TABLE statement_balance_reviews; PRAGMA user_version=11; CREATE TABLE audit_events_v12(collision TEXT);").unwrap();
+        connection.execute_batch("DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE statement_balance_reviews; PRAGMA user_version=11; CREATE TABLE audit_events_v12(collision TEXT);").unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
             connection
@@ -1812,7 +2221,7 @@ mod tests {
             .review_recurring_payment(&c.id, recurring_input(&s))
             .unwrap();
         let connection = &mut w.session.as_mut().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
+        connection.execute_batch("DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
             connection
@@ -1821,7 +2230,7 @@ mod tests {
             10
         );
         connection
-            .execute_batch("DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations;")
+            .execute_batch("DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations;")
             .unwrap();
         migrate(connection, false).unwrap();
         let after = w.get_client_imports(&c.id).unwrap();
@@ -1853,7 +2262,7 @@ mod tests {
         let connection = &mut w.session.as_mut().unwrap().connection;
         connection
             .execute_batch(
-                "DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
+                "DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
             )
             .unwrap();
         connection
@@ -2619,7 +3028,7 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
         connection
-            .execute_batch("DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
+            .execute_batch("DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
             .unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(

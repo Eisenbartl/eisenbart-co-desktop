@@ -198,9 +198,9 @@ class WebDriver:
         self.command("POST", f"/element/{element}/clear", {})
         self.command("POST", f"/element/{element}/value", {"text": value})
 
-    def select(self, selector: str, value: str) -> None:
+    def select(self, selector: str, value: str, using: str = "css selector") -> None:
         # WebDriver clicks the HTML option rather than calling application code.
-        select = self.interactive(selector)
+        select = self.interactive(selector, using)
         try:
             option = self.command("POST", f"/element/{select}/element", {
                 "using": "xpath", "value": f"./option[normalize-space(.)={json.dumps(value, ensure_ascii=False)}]",
@@ -553,8 +553,15 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
         driver.click(f".imports-table tbody tr:nth-child({index}) input[type=checkbox]")
     driver.click_button("Approve selected validated rows (3)")
     driver.wait_text(".imports-totals","$199.98","independent approved source net")
+    initial_balance_facts(driver)
     view_financial_dashboard(driver,"2026-09","2026-09")
     driver.wait_text(".assessment-totals","Operating cash flow$199.98", "initial exact approved assessment")
+    driver.wait_text(".classified-totals","Recorded necessary spending before refunds$300.02","verified necessary expense")
+    driver.wait_text(".classified-totals","Recorded discretionary spending before refunds$0.01","verified discretionary fee")
+    driver.wait_text(".verified-balance-totals","Estimated net worth at balance date$525.05","independent dated asset/debt arithmetic")
+    driver.wait_text(".verified-ratios","2.00 months","conservative accessible savings coverage")
+    driver.wait_text(".verified-ratios","5.00%","explicit take-home payment ratio")
+    driver.wait_text("table[aria-label='Verified debt balance chart']","Fictional loan","local verified debt chart")
     choose_balance_statement(driver)
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 3 matched · 0 differences.","exact original and approved balance steps")
     driver.click_button("Review balance source record 3")
@@ -564,6 +571,11 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.click_button("Save transaction decision")
     driver.wait_text(".imports-totals","$199.99","one-cent corrected approved net")
     driver.wait_text(".assessment-totals","Operating cash flow$199.99", "dashboard automatically recalculates corrected approval")
+    driver.wait_text(".classified-totals","Unclassified approved spending$300.01","corrected source invalidates its classification")
+    driver.wait_text(".financial-facts-editor","Needs re-verification: prior Necessary expense","stale source decision disclosed")
+    set_fact_classification(driver,"Fictional rent","Necessary expense")
+    save_financial_facts(driver,"Reverified necessary rent after its one-cent source correction")
+    driver.wait_text(".classified-totals","Recorded necessary spending before refunds$300.01","explicit re-verification rebinds classification")
     choose_balance_statement(driver)
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 2 differences.","source arithmetic remains intact while corrected approved steps diverge")
     driver.wait_text(".balance-check-table","Difference $0.01","independent corrected balance difference")
@@ -573,6 +585,9 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.click_button("Save transaction decision")
     driver.wait_text(".imports-totals","$500.00","rejected expense excluded from approved totals")
     driver.wait_text(".assessment-totals","Operating cash flow$500.00", "dashboard automatically excludes reversed expense")
+    driver.wait_text(".classified-totals","Recorded necessary spending before refunds$0.00","rejected necessity excluded")
+    driver.wait_text(".verified-fact-metrics","Classifications needing re-verification across this client: 1","rejection leaves old classification inactive")
+    driver.wait_text(".verified-ratios","Accessible savings coverage — estimateUnavailable","zero necessary denominator never invents coverage")
     choose_balance_statement(driver)
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 1 differences.","rejection preserves source checks and updates approved comparisons")
     driver.wait_text(".balance-check-table","Excluded","rejected balance is not an approved anchor")
@@ -609,6 +624,40 @@ def assert_alex_dashboard(driver: WebDriver) -> None:
     view_financial_dashboard(driver,"2026-09","2026-10")
 
 
+def set_fact_classification(driver: WebDriver, description: str, choice: str) -> None:
+    label = f"//label[contains(.,{json.dumps('Classification for '+description,ensure_ascii=False)})]/select"
+    driver.select(label,choice,"xpath")
+
+
+def save_financial_facts(driver: WebDriver, reason: str) -> None:
+    driver.fill("#facts-reason",reason)
+    driver.click("#facts-ack")
+    driver.click_button("Save verified financial facts")
+    driver.wait_text(".imports-panel","Verified financial facts saved; dashboard updated.","explicit verified fact save")
+    driver.wait_value("#facts-reason","","successful fact save clears reason")
+
+
+def initial_balance_facts(driver: WebDriver) -> None:
+    driver.click(".financial-facts-editor > summary")
+    set_fact_classification(driver,"Fictional wages","Verified take-home pay")
+    set_fact_classification(driver,"Fictional rent","Necessary expense")
+    set_fact_classification(driver,"Fictional fee","Discretionary expense")
+    driver.fill("#facts-as-of","2026-09-30")
+    rows=[("Fictional checking","Cash / checking","100.01",None),
+          ("Fictional emergency","Accessible, unreserved savings","600.05",None),
+          ("Fictional reserve","Reserved / restricted savings","25.02",None),
+          ("Fictional loan","Debt owed","200.03","25.01")]
+    for i,(label,kind,amount,payment) in enumerate(rows):
+        driver.click_button("Add verified balance")
+        driver.fill(f"#fact-balance-label-{i}",label)
+        driver.select(f"#fact-balance-kind-{i}",kind)
+        driver.fill(f"#fact-balance-amount-{i}",amount)
+        if payment is not None: driver.fill(f"#fact-balance-payment-{i}",payment)
+        driver.fill(f"#fact-balance-evidence-{i}","Independently verified fictional balance and required payment at September 30; separate from running.csv arithmetic")
+    driver.click("#facts-inventory")
+    save_financial_facts(driver,"Verified dated fictional inventory and three source classifications")
+
+
 def assert_statement_balances_restored(driver: WebDriver) -> None:
     driver.open_client("Taylor Balance")
     driver.wait_text(".imports-progress","Approved 2 · Rejected 1","persisted balance decisions")
@@ -621,6 +670,12 @@ def assert_statement_balances_restored(driver: WebDriver) -> None:
     driver.wait_text(".statement-balance-history","Verified original source is oldest first","persisted source-order review reason")
     view_financial_dashboard(driver,"2026-09","2026-09")
     driver.wait_text(".assessment-totals","Operating cash flow$500.00", "recomputed dashboard from persisted approved decisions")
+    driver.wait_text(".verified-balance-totals","Estimated net worth at balance date$525.05","persisted encrypted balance facts")
+    driver.wait_text(".classified-totals","Classified take-home pay receipts$500.01","persisted verified take-home classification")
+    driver.wait_text(".verified-fact-metrics","Classifications needing re-verification across this client: 1","persisted source-bound invalidation")
+    driver.click(".financial-facts-editor > summary")
+    driver.wait_text(".financial-facts-history","Financial fact history (2)","persisted immutable financial facts history")
+    driver.click(".financial-facts-editor > summary")
 
 
 def run_checks(driver: WebDriver, binary: Path, password: str,

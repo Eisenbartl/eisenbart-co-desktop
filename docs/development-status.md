@@ -1,5 +1,30 @@
 # Development status
 
+## Stage 5B: verified classifications and dated balance facts — 0.12.0 source
+
+Implemented explicit necessary/discretionary and take-home/other income
+classifications bound to exact scoped approval decisions. Corrections/reversals
+and reapproval leave old classifications inactive until explicit re-verification.
+Schema 13 adds append-only dated balance/classification snapshots with evidence,
+reason, counselor, authenticated scope, revision checks and atomic audit.
+
+The dashboard shows recorded expense/payroll classifications, dated cash/savings/
+debt, sufficient-inventory net worth, a local debt chart and clearly labeled
+coverage/payment ratio estimates. Unknowns, stale source decisions, incomplete
+inventories, mixed dates and outdated balance facts prevent unsafe conclusions.
+Manual planning inputs remain separate; missing transaction coverage remains
+explicit even after a complete balance inventory is declared. Gross-income lender
+DTI, partial per-account reserve allocations and savings-goal progress remain open.
+See [verified-financial-facts.md](verified-financial-facts.md) for formulas/limits.
+
+Validation in progress: focused engine/storage and interface tests passed; full
+local suites, compiled desktop/recovery workflow and Windows source checks pending.
+No installer is being built.
+
+Next priority: **immutable saved assessment snapshots and counselor reporting**
+using the approved source decisions and verified facts, followed by offline PDF
+reports/action plans.
+
 ## Stage 5A: approved transaction dashboard — 0.11.0 source
 
 Implemented a client-specific read-only assessment for explicit 1–24 calendar-month
@@ -964,7 +989,7 @@ clone.
 Encrypted backup/restore is implemented with authenticated files, retained
 previous workspaces, and tested interrupted/failure recovery. Clean installed
 Windows acceptance and independent security review remain prerequisites for
-actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. Statement running-balance reconciliation now adds source/approved comparisons and immutable order settings. The approved-transaction dashboard now provides explicit periods, local category/monthly/cash-flow charts and completeness flags. The next application priority is **approved expense classifications and dated verified balance facts**; keep scanned OCR and broad institution adapters in later checkpoints.
+actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. Statement running-balance reconciliation now adds source/approved comparisons and immutable order settings. The approved-transaction dashboard now provides explicit periods, local category/monthly/cash-flow charts and completeness flags. Explicit approved classifications and dated balance facts now supply the remaining recorded dashboard metrics. The next application priority is **immutable saved assessments and counselor reporting**; keep scanned OCR and broad institution adapters in later checkpoints.
 
 Advanced financial models, broader scenarios, finalized PDF reports, multiple counselor roles,
 password change/reset, exports, licensing, signing, retained-copy selection,
@@ -981,7 +1006,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 |---|---|
 | 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
 | 4: Document processing | CSV, selected text-PDF review, recurring/grouped payment review and running-balance reconciliation implemented; scanned OCR and broader institution adapters remain |
-| 5: Dashboard and reports | Approved activity charts implemented; verified balance/classification metrics, debt/savings charts, counselor reports, client action plans and reproducible offline PDFs remain |
+| 5: Dashboard and reports | Approved activity and debt charts plus recorded balance/classification metrics implemented; savings progress, saved final assessments, counselor reports, client action plans and reproducible offline PDFs remain |
 | 6: Security/commercial | Encrypted backup/restore implemented; clean Windows recovery, password safeguards, accounts/roles, branding, licensing and independent review remain |
 | 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |
 | 8: Final verification | Complete installed workflows, clean Windows 11 offline tests, usability and release acceptance |
