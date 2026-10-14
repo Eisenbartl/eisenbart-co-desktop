@@ -114,12 +114,12 @@ class WebDriver:
     def script(self, script: str, args: list[object] | None = None) -> object:
         return self.command("POST", "/execute/sync", {"script": script, "args": args or []})
 
-    def observe_script(self, script: str) -> object:
+    def observe_script(self, script: str, args: list[object] | None = None) -> object:
         # Call only for the explicit DOM/runtime observations below. A closed
         # native-driver connection may be retried once; mutations use script().
         for attempt in range(2):
             try:
-                return self.script(script)
+                return self.script(script, args)
             except DriverFailure as error:
                 if error.code != "connection error" or attempt == 1:
                     raise
@@ -189,7 +189,14 @@ class WebDriver:
         def enabled() -> str | None:
             element = self.visible(selector, using)
             if element and self.command("GET", f"/element/{element}/enabled"):
-                return element
+                # WebKit's enabled endpoint can miss inherited fieldset state.
+                # Read the browser's effective HTML disabled state before any
+                # focus, typing or click. Waiting never replays a mutation.
+                effective = self.observe_script(
+                    "return !arguments[0].matches(':disabled') && !arguments[0].closest('[inert]');",
+                    [{ELEMENT_KEY: element}])
+                if effective is True:
+                    return element
             return None
         return self.wait(enabled, f"enabled {selector}")
 
@@ -212,8 +219,16 @@ class WebDriver:
 
     def fill(self, selector: str, value: str) -> None:
         element = self.interactive(selector)
-        self.command("POST", f"/element/{element}/clear", {})
-        self.command("POST", f"/element/{element}/value", {"text": value})
+        # Native clear/focus can fail at a viewport edge after review panels
+        # refresh. Move only the viewport, then recheck enabled state. Neither
+        # clear nor typing is retried, and no application mutation is scripted.
+        self.scroll_element(element)
+        element = self.interactive(selector)
+        try:
+            self.command("POST", f"/element/{element}/clear", {})
+            self.command("POST", f"/element/{element}/value", {"text": value})
+        except DriverFailure as error:
+            raise SmokeFailure(f"Native field {selector}: {error}") from error
 
     def select(self, selector: str, value: str, using: str = "css selector") -> None:
         # WebDriver clicks the HTML option rather than calling application code.
@@ -662,7 +677,7 @@ def export_original_assessment_pdf(driver: WebDriver, artifacts: Path, label: st
         raise SmokeFailure("PDF smoke destination must be new; never overwrite an earlier export")
     driver.fill("#assessment-pdf-path", str(destination))
     driver.click_button("Export saved assessment PDF")
-    driver.wait_text(".saved-assessments", "PDF saved locally", "visible native PDF export completion")
+    driver.wait_text(".saved-assessments > .success-message", str(destination), "visible native PDF export completion for selected destination")
     original = destination.read_bytes()
     if not original.startswith(b"%PDF-"):
         raise SmokeFailure("Native export did not create a PDF")
@@ -688,7 +703,7 @@ def export_client_action_pdf(driver: WebDriver, artifacts: Path, label: str, nee
         raise SmokeFailure("Client PDF smoke destination must be new")
     driver.fill("#client-plan-pdf-path", str(destination))
     driver.click_button("Export client action plan PDF")
-    driver.wait_text(".client-action-plans", f"{destination}", "client PDF export completion")
+    driver.wait_text(".client-action-plans > .success-message", str(destination), "client PDF export completion for selected destination")
     text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
     text = " ".join(text.split())
     for expected in ["Your financial action plan", "Alex agreed client plan", "America/Chicago", "Agreed debt allocation: USD 100.00", "Agreed primary savings allocation: USD 250.00", "Unallocated / buffer: USD 1066.67", "Operating cash flow: USD 1820.02", "Strategy: Avalanche", "Projected total interest: USD 35.35", "Projected emergency completion: 2028-06-30", "Incomplete", "Follow-up arrangements"]:
@@ -744,7 +759,7 @@ def export_captured_planning_pdf(driver: WebDriver, artifacts: Path, label: str)
         raise SmokeFailure("Planning PDF smoke destination must be new")
     driver.fill("#assessment-pdf-path",str(destination))
     driver.click_button("Export saved assessment PDF")
-    driver.wait_text(".saved-assessments","PDF saved locally","native planning scenario PDF completion")
+    driver.wait_text(".saved-assessments > .success-message", str(destination), "native planning scenario PDF completion for selected destination")
     text = subprocess.run(["pdftotext","-layout",str(destination),"-"],check=True,capture_output=True,text=True).stdout
     text = " ".join(text.split())
     for expected in ["Alex saved planning scenario","Captured planning scenario / hypothetical","Monthly income: USD 3250.00","Unallocated: USD 716.67","Selected strategy: Avalanche","Projected total interest: USD 35.35","Emergency target: USD 4899.99","Primary emergency completion: 2028-06-30","Projected combined closing balance: USD 3300.00","Operating cash flow: USD 1820.02","NEEDS REVIEW"]:

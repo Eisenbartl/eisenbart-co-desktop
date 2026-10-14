@@ -39,9 +39,40 @@ encrypted recovery are covered by new backend checks.
 | Interface suite | 88 passed, including four client-plan tests and parent draft/concurrency integration |
 | Linux backend / worker suite | 126 library + 2 worker tests passed (128 total); five new storage/PDF/recovery tests and Chicago-date/IPC validation |
 | Formatting / Clippy, warnings denied | Passed |
-| Native desktop compile / full client-plan workflow | Standalone debug build passed; full native workflow running |
-| Windows source CI | Pending; installer steps remain disabled |
+| Native desktop compile / full client-plan workflow | Passed standalone debug build and final full native run, exit 0: reviewed agreement, five client PDFs, immutable figures/review flags after edits, all previous workflows, restart and both recovery paths |
+| Windows source CI | Passed source 3c63f44: [run 38618328829](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38618328829), 88 interface + 127 library + 2 worker tests (129 backend/process total); all installer/package/upload steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
+
+The first two native runs created the agreement and current client PDF but stopped
+on assessment export-field focus during inherited fieldset loading. The runner now
+reads the browser's effective `:disabled`/inert state and centers the field before
+clear/typing; neither typing, clicks nor financial writes are retried. The next run
+passed focus but exposed an older broad export completion selector matching the
+nested client-PDF notice. Export helpers now wait for the direct success message
+with the exact destination filename. All interrupted runs used disposable fictional
+workspaces; no uncertain writes were replayed. The fresh final full run passed
+with exit 0, including all exports, restart and both encrypted recovery paths.
+
+Windows-validated shipping source is
+`3c63f4499df295d6199fe8ffe213bce017ce6869`; later changes concern the native test
+runner, verification documentation and a corrected MIT dependency-license entry.
+
+Final native visual/PDF review confirmed firm/client identity, Chicago report date,
+three priorities/responsibility, conditional Avalanche interest 35.35, emergency
+target 4,899.99/completion 2028-06-30 and historical operating cash flow 1,820.02.
+Agreed monthly debt 100.00/savings 250.00/buffer 1,066.67 remain separately labeled
+from captured budget buffer 716.67. The four-page Letter PDF embeds local Unicode
+Open Sans with no forms, JavaScript or original attachments. Missing inventories
+remain unknown, and historical exports display NEEDS REVIEW.
+
+Verification logs are under `/workspace/shared`: `client-action-plan-ui.log`,
+`client-action-plan-backend.log`, `client-action-plan-date.log`,
+`client-action-plan-clippy.log`, `client-action-plan-native-build.log`,
+`client-action-plan-native-final.log`/`.exit`, and
+`client-action-plan-windows-job.log`. Final artifacts are in
+`desktop-smoke-client-action-plan-final`. Source/full-history checkpoints are
+`/workspace/shared/checkpoints/eisenbart-client-action-plans-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-client-action-plans.bundle`.
 
 This is reviewed guidance with an explicitly incomplete financial basis, not a
 commercial release or certification that all accounts/statements are present.
