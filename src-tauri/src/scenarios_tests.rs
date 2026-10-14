@@ -403,3 +403,62 @@ fn optional_absent_models_are_unavailable_and_cannot_receive_unbound_changes() {
         assert!(w.compare_financial_scenarios(&client.id, i).is_err());
     }
 }
+
+#[test]
+fn combined_buffer_keeps_the_higher_budget_debt_reserve_until_both_inputs_change() {
+    let (_dir, mut w, id) = fixture();
+    let mut budget = budget_input(1);
+    budget.lines = w.get_client_budget(&id).unwrap().lines;
+    budget.lines.push(budget::BudgetLine {
+        label: "Debt allocation".into(),
+        kind: budget::Kind::DebtPayment,
+        amount: Some("400".into()),
+        frequency: budget::Frequency::Monthly,
+        estimated: false,
+    });
+    w.save_client_budget(&id, budget).unwrap();
+    for (allocation, expected, reserved) in [
+        (None, "1616.67", "400.00"),
+        (Some("100"), "1816.67", "200.00"),
+    ] {
+        let mut i = input();
+        i.expected_revisions.budget = 2;
+        i.budget_changes = vec![
+            BudgetChange {
+                index: 0,
+                amount: Some("1600".into()),
+            },
+            BudgetChange {
+                index: 2,
+                amount: Some("100".into()),
+            },
+        ];
+        if let Some(amount) = allocation {
+            i.budget_changes.push(BudgetChange {
+                index: 3,
+                amount: Some(amount.into()),
+            });
+        }
+        i.debt_payment = Some(AmountChange {
+            amount: Some("200".into()),
+        });
+        i.emergency_contribution = Some(AmountChange {
+            amount: Some("300".into()),
+        });
+        let r = w.compare_financial_scenarios(&id, i).unwrap();
+        assert_eq!(r.proposed.first_month_buffer.as_deref(), Some(expected));
+        assert_eq!(
+            r.proposed.plans.savings.summary.as_ref().unwrap().schedule[0]
+                .debt_reserved
+                .as_deref(),
+            Some(reserved)
+        );
+        assert_eq!(
+            w.get_client_budget(&id)
+                .unwrap()
+                .summary
+                .planned_debt_payments,
+            "400.00"
+        );
+    }
+}

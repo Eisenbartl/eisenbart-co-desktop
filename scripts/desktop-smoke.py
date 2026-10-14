@@ -752,9 +752,9 @@ def check_combined_scenarios(driver: WebDriver, artifacts: Path, label: str) -> 
     driver.wait_value("#scenario-cash-date-0", "2026-11-08", "explicit ISO proposal date")
     driver.fill("#scenario-assumptions", "Temporary synthetic proposal; retain saved plans")
     driver.click_button("Compare temporary proposal")
-    driver.wait_text(".combined-scenario-results", "$1,183.34", "independent combined proposal allocation buffer")
+    driver.wait_text(".combined-scenario-results", "$983.34", "independent combined proposal allocation buffer")
     table=".combined-scenario-results table"
-    for value in ["$3,250.00", "$3,466.67", "$35.35", "$23.01", "2027-02", "2027-12-31", "$3,300.00"]:
+    for value in ["$3,250.00", "$3,466.67", "$35.35", "$23.01", "2027-02", "2027-11-30", "$3,300.00"]:
         driver.wait_text(table,value,"exact side-by-side combined financial outcome")
     driver.wait_value("#budget-amount-0", "1500.00", "combined preview does not write saved income")
     driver.wait_value("#debt-monthly-payment", "100.00", "combined preview does not write saved debt")

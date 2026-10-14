@@ -69,9 +69,9 @@ baseline avalanche at 100.00 costs 35.35. Emergency target 3,000.00 minus
 1,000.00 accessible requires seven 300.00 contributions through May 31, 2027.
 
 Native fixture uses 1,633.33 necessary spending. The same income/discretionary
-proposal yields 1,733.34 before allocations, then debt 200.00 and savings 350.00
-leave 1,183.34. Emergency target remains 4,899.99 and completion advances to
-December 31, 2027. The saved 3,250.00 income, debt 100.00, savings 200.00 and
+proposal yields 1,733.34 before allocations, then the higher budget debt reserve 400.00 (versus proposed model payment
+200.00) and savings 350.00 leave 983.34. Emergency target remains 4,899.99 and completion advances to
+November 30, 2027. The saved 3,250.00 income, debt 100.00, savings 200.00 and
 original bill date remain unchanged. Delaying the November 3 bill until November 8
 explicitly removes the shortfall while combined cash-flow closing stays 3,300.00.
 

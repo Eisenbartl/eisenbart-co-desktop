@@ -148,8 +148,8 @@ include `native-budget-methods-*.png`.
 The 0.19.0 workflow compares a temporary combined proposal before recording Alex’s
 saved planning assessment and after restart and both recovery paths. It changes
 biweekly income, discretionary spending, debt base payment, emergency contribution
-and an explicit bill date, checks exact side-by-side 3,466.67 income/1,183.34
-allocation buffer/23.01 interest/February 2027 payoff/December 2027 savings date,
+and an explicit bill date, checks exact side-by-side 3,466.67 income/983.34
+allocation buffer/23.01 interest/February 2027 payoff/November 2027 savings date,
 and confirms the saved model inputs and 3,300.00 dated closing remain intact.
 Invalid precision is rejected with the proposal retained; a read-only reload resets
 it. A fresh client mount has no temporary baseline or draft. The same complete run

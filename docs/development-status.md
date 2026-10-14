@@ -25,7 +25,7 @@ No migration/dependency/installer is introduced; schema remains 15 and historica
 
 Independent examples include 1,600 biweekly → 3,466.67; income/spending proposals
 propagate to the savings allocation check; debt 200.00/primary savings 300.00 plus
-retained goal 50.00 yield 1,816.67 buffer in the backend fixture, or 1,183.34 in
+retained goal 50.00 yield 1,816.67 buffer in the backend fixture, or 983.34 in
 the native fixture with 1,633.33 necessary spending. Proposed snowball interest
 23.01/payoff February 2027 compares with baseline avalanche 35.35. A delayed bill
 removes the projected shortfall without writing its saved date or changing the
@@ -36,9 +36,9 @@ are visible. Unknown values and missing optional models remain unavailable.
 |---|---|
 | Locked setup / production frontend build | Passed |
 | Interface suite | 102 passed; proposal input-only IPC, canonical outcomes/unknowns, preserved failures, dirty/concurrent guards, reload and client/lock/version isolation |
-| Linux backend / worker checks | Full 138-library + 2 worker run passed; subsequent five focused scenario tests passed, including two added retained-commitment/absent-model checks (140 unique library tests covered) |
+| Linux backend / worker checks | Full 138-library + 2 worker run passed; subsequent six focused scenario tests passed, including three added retained-commitment/absent-model/higher-reserve checks (141 unique library tests covered) |
 | Formatting / Clippy, warnings denied | Passed |
-| Native desktop compile / complete workflow | Standalone build passed; first workflow found locale-dependent date entry in the new proposal control. Changed to explicit YYYY-MM-DD text with Rust date validation; full rerun in progress |
+| Native desktop compile / complete workflow | Standalone build passed; first workflow found locale-dependent date entry in the new proposal control. Changed to explicit YYYY-MM-DD text with Rust date validation; second run confirmed the control fix but exposed incorrect harness reserve/date expectations. The existing higher-budget/model reserve rule is retained, displayed and independently checked; corrected full rerun in progress |
 | Windows source CI | Validation in progress; installer packaging not requested |
 | Clean Windows installation/offline release acceptance | Not run |
 
