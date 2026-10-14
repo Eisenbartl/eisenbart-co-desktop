@@ -37,7 +37,7 @@ are independently checked.
 | Linux backend / worker suite | 135 library + 2 worker tests passed (137 total); four pure framework checks plus scoped/stale/locked/no-audit-write storage verification |
 | Formatting / Clippy, warnings denied | Passed |
 | Native desktop compile / complete workflow | Passed standalone debug build and full native run, exit 0: exact comparisons/unknowns/failed assumptions with unchanged plans, all report/client workflows, restart and both recovery paths |
-| Windows source CI | Pending; installer/package/upload steps disabled |
+| Windows source CI | Passed source 2e07be0: [run 38637078036](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38637078036), 96 interface + 136 library + 2 worker tests (138 backend/process total); all installer/package/upload steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
 
 The initial Windows run stopped during frontend checks: the first application
@@ -45,7 +45,26 @@ CSV-lock test and an assessment test hit the existing five-second deadline, then
 pending application work interfered with later test isolation. Vitest now limits
 concurrent DOM workers to two; no timeout or financial/privacy assertion is
 removed or relaxed. The source application is unchanged by this runner adjustment.
-A corrected Windows validation run will verify the full suite.
+The corrected Windows run passed all 96 interface tests and the complete
+136-library/2-worker backend/process suite.
+
+Native visual review confirmed the side-by-side targets/differences and intact
+2,533.33 assignment/716.67 remaining balance. Four visible workflows before and
+after restart/normal restore/damaged-workspace recovery verified temporary input
+reset, unknown minimums, exact classification and rejected 101% assumptions.
+All previous financial, internal/client PDF, source review and recovery checks
+passed in the same complete native run. Shipping application source is
+`c1f760ac89d51e9d32db6ccf39c7d7b0be30f7aa`; source `2e07be0` adds only the
+bounded test-runner configuration and verification notes.
+
+Validation logs are under `/workspace/shared`: `budget-methods-ui.log`,
+`budget-methods-backend.log`, `budget-methods-clippy.log`,
+`budget-methods-native-build.log`, `budget-methods-native.log`/`.exit`, and
+`budget-methods-windows-job.log`. The initial Windows failure log is
+`budget-methods-windows-failed.log`. Final native artifacts are in
+`desktop-smoke-budget-methods`. Source/full-history checkpoints are
+`/workspace/shared/checkpoints/eisenbart-budget-methods-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-budget-methods.bundle`.
 
 Seven major work areas remain in the roadmap: further financial models/scenarios,
 document/OCR review, fuller intake/workflow, security/permissions, commercial
