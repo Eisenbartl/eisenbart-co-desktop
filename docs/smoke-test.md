@@ -78,3 +78,14 @@ checks **Needs review**, reapproves without reviving confirmation, and explicitl
 reconfirms. It also approves then withdraws a new fourth charge, verifies old facts still require review, and reconfirms. All three captured decisions must survive a complete process restart,
 normal backup recovery and missing-metadata recovery, with client isolation and
 unchanged planning inputs. Artifacts include `native-recurring-review.png`.
+
+The 0.10.0 workflow adds Taylor Balance with a declared after-transaction CSV
+balance column and $1,000.00 opening balance. It validates $500.01 income,
+−$300.02 rent and −$0.01 fee against $1,500.01/$1,199.99/$1,199.98 balances;
+records a wrong order and its explicit correction; verifies no automatic approval;
+bulk-approves validated rows; corrects rent to −$300.01 and checks two +$0.01
+approved discrepancies while original steps remain matched; then rejects rent
+and verifies $500.00 approved movement and a $300.02 comparison difference.
+Two immutable order decisions and all comparisons must survive complete restart,
+normal backup restore and missing-metadata recovery. Screenshot:
+`native-statement-balances.png`. Existing clients' totals remain unchanged.

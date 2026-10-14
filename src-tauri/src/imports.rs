@@ -99,6 +99,8 @@ pub struct CsvData {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DocumentInput {
     #[serde(default)]
+    pub balance_order: Option<crate::reconciliation::Order>,
+    #[serde(default)]
     pub pdf_selection: Option<Vec<crate::pdf::Locator>>,
     pub account_id: Option<String>,
     pub account_label: String,
@@ -164,6 +166,8 @@ pub struct Account {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Document {
+    pub balance_history: Vec<crate::reconciliation::Review>,
+    pub balance_reconciliation: Option<crate::reconciliation::Report>,
     pub id: String,
     pub account_id: String,
     pub file_name: String,

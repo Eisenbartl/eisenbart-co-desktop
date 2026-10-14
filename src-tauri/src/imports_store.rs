@@ -95,6 +95,9 @@ fn overlaps(snapshot: &Snapshot, record: &Record, fields: &Fields) -> bool {
         })
 }
 fn normalize_document(mut d: DocumentInput) -> Result<DocumentInput, String> {
+    if d.balance_order.is_some() && (d.pdf_selection.is_some() || d.mapping.balance.is_none()) {
+        return Err("Running-balance order requires a mapped CSV balance column; text-PDF balance columns are not supported yet.".into());
+    }
     if !matches!(d.account_kind.as_str(), "checking" | "savings") {
         return Err("Choose a checking or savings account for this CSV stage.".into());
     }
@@ -137,7 +140,14 @@ pub(super) fn read_imports(
         doc_rows
     {
         let input: DocumentInput = decode(&input)?;
+        if input.balance_order.is_some()
+            && (input.pdf_selection.is_some() || input.mapping.balance.is_none())
+        {
+            return Err(STORAGE_ERROR.into());
+        }
         documents.push(Document {
+            balance_history: vec![],
+            balance_reconciliation: None,
             id,
             account_id,
             file_name,
@@ -151,6 +161,38 @@ pub(super) fn read_imports(
             source_difference: None,
             approved_difference: None,
             warnings: vec![],
+        });
+    }
+    let balance_reviews=c.prepare("SELECT id,document_id,row_order,reason,reviewed_at,counselor_name FROM statement_balance_reviews WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3 ORDER BY rowid LIMIT 1001").map_err(storage_error)?.query_map(params![client,w.organization_id,w.counselor_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,Option<String>>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?))).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
+    if balance_reviews.len() > 1000 {
+        return Err(STORAGE_ERROR.into());
+    }
+    for (id, document_id, order, reason, reviewed_at, counselor_name) in balance_reviews {
+        let order = match order.as_deref() {
+            Some("oldestFirst") => Some(crate::reconciliation::Order::OldestFirst),
+            Some("newestFirst") => Some(crate::reconciliation::Order::NewestFirst),
+            None => None,
+            _ => return Err(STORAGE_ERROR.into()),
+        };
+        let d = documents
+            .iter_mut()
+            .find(|d| d.id == document_id)
+            .ok_or(STORAGE_ERROR)?;
+        if required_text(&reason, "Review reason", 500)? != reason
+            || required_text(&counselor_name, "Counselor name", 120)? != counselor_name
+            || chrono::DateTime::parse_from_rfc3339(&reviewed_at).is_err()
+            || (order.is_some()
+                && (d.input.mapping.balance.is_none() || d.input.pdf_selection.is_some()))
+        {
+            return Err(STORAGE_ERROR.into());
+        }
+        d.balance_history.push(crate::reconciliation::Review {
+            id,
+            document_id,
+            order,
+            reason,
+            reviewed_at,
+            counselor_name,
         });
     }
     let rows=c.prepare("SELECT r.id,r.document_id,r.raw_json,t.fields_json,t.status,t.linked_id,t.reason FROM import_records r JOIN transaction_choices t ON t.record_id=r.id AND t.client_id=r.client_id AND t.organization_id=r.organization_id AND t.counselor_id=r.counselor_id WHERE r.client_id=?1 AND r.organization_id=?2 AND r.counselor_id=?3 ORDER BY r.rowid LIMIT 5001").map_err(storage_error)?.query_map(params![client,w.organization_id,w.counselor_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,Option<String>>(5)?,r.get::<_,String>(6)?))).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
@@ -206,6 +248,16 @@ pub(super) fn read_imports(
             .filter(|r| r.document_id == d.id)
             .collect::<Vec<_>>();
         d.row_count = rs.len();
+        let order = d
+            .balance_history
+            .last()
+            .map(|h| h.order.clone())
+            .unwrap_or_else(|| d.input.balance_order.clone());
+        let report = crate::reconciliation::check(&d.input, &rs, order)?;
+        if report.conflicts() {
+            d.warnings.push("Running-balance checks have an unresolved discrepancy or date-order conflict; review the statement individually.".into());
+        }
+        d.balance_reconciliation = Some(report);
         let original = rs
             .iter()
             .map(|r| {
@@ -298,6 +350,19 @@ pub(super) fn read_imports(
         if d.source_difference.as_ref().is_some_and(|v| v != "0.00") {
             r.warnings
                 .push("Source statement has a reconciliation discrepancy.".into());
+        }
+        if d.input.mapping.balance.is_some() && d.input.pdf_selection.is_none() {
+            let report = d.balance_reconciliation.as_ref().ok_or(STORAGE_ERROR)?;
+            if report.conflicts() {
+                r.warnings.push("Running-balance discrepancy or source-order conflict requires individual review.".into());
+            } else if let Some(row) = report.rows.iter().find(|row| row.record_id == r.id) {
+                if row.source.state != crate::reconciliation::State::Matched {
+                    r.warnings.push(format!(
+                        "Running-balance source check is incomplete: {}",
+                        row.source.note
+                    ));
+                }
+            }
         }
         if let Some(warning) = period_warning(d, &r.fields) {
             r.warnings.push(warning);
@@ -772,6 +837,54 @@ impl Workspace {
         tx.commit().map_err(storage_error)?;
         Ok(result)
     }
+    pub fn review_statement_balances(
+        &mut self,
+        client: &str,
+        input: crate::reconciliation::ReviewInput,
+    ) -> Result<Snapshot, String> {
+        use crate::reconciliation::Order;
+        let s = self.session()?;
+        scoped_client(&s.connection, &s.info, client)?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(storage_error)?;
+        bump(&tx, &s.info, client, input.expected_revision)?;
+        let snapshot = read_imports(&tx, &s.info, client)?;
+        let d = snapshot
+            .documents
+            .iter()
+            .find(|d| d.id == input.document_id)
+            .ok_or("This source document is unavailable for this client.")?;
+        if input.order.is_some()
+            && (d.input.mapping.balance.is_none() || d.input.pdf_selection.is_some())
+        {
+            return Err(
+                "Choose a CSV source with a mapped after-transaction balance column.".into(),
+            );
+        }
+        if snapshot
+            .documents
+            .iter()
+            .map(|d| d.balance_history.len())
+            .sum::<usize>()
+            >= 1000
+        {
+            return Err("Statement balance review history reached its local safety limit; this choice was not saved.".into());
+        }
+        let note = required_text(&input.reason, "Source order review reason", 500)?;
+        let order = input.order.map(|v| match v {
+            Order::OldestFirst => "oldestFirst",
+            Order::NewestFirst => "newestFirst",
+        });
+        let id = Uuid::new_v4().to_string();
+        tx.execute("INSERT INTO statement_balance_reviews(id,client_id,organization_id,counselor_id,document_id,row_order,reason,reviewed_at,counselor_name) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",params![id,client,s.info.organization_id,s.info.counselor_id,d.id,order,note,timestamp(),s.info.counselor_name]).map_err(storage_error)?;
+        audit(&tx, &s.info, "statement_balance_reviewed", Some(&id))?;
+        invalidate_recurring_changes(&tx, &s.info, client)?;
+        let result = read_imports(&tx, &s.info, client)?;
+        tx.commit().map_err(storage_error)?;
+        Ok(result)
+    }
     pub fn review_recurring_payment(
         &mut self,
         client: &str,
@@ -973,6 +1086,7 @@ mod tests {
     pub(super) const CHECKING:&str="Date,Description,Amount,Category,Type\n2026-09-01,Synthetic wages,2000,Wages,income\n2026-09-02,Synthetic rent,-1200,Housing,expense\n2026-09-03,Synthetic fee,-10.01,Fees,fee\n2026-09-04,Synthetic refund,20.01,Housing,refund\n2026-09-05,Synthetic reserve transfer,-200,Savings,transfer\n";
     fn doc(label: &str) -> DocumentInput {
         DocumentInput {
+            balance_order: None,
             pdf_selection: None,
             account_id: None,
             account_label: label.into(),
@@ -1030,6 +1144,358 @@ mod tests {
                 acknowledge_warnings: ack,
             },
         )
+    }
+    const RUNNING:&str="Date,Description,Amount,Category,Type,Balance\n2026-09-01,Fictional wages,500.01,Wages,income,1500.01\n2026-09-02,Fictional rent,-300.02,Housing,expense,1199.99\n2026-09-03,Fictional fee,-0.01,Fees,fee,1199.98\n";
+    fn balance_input(
+        s: &Snapshot,
+        order: Option<crate::reconciliation::Order>,
+    ) -> crate::reconciliation::ReviewInput {
+        crate::reconciliation::ReviewInput {
+            expected_revision: s.revision,
+            document_id: s.documents[0].id.clone(),
+            order,
+            reason: "Verified original after-transaction balance column and source sequence".into(),
+        }
+    }
+    fn balance_fixture(w: &mut Workspace, client: &str, dir: &Path) -> Snapshot {
+        let (d, _) = crate::reconciliation::tests::fixture();
+        stage(w, client, dir, "running.csv", RUNNING, d)
+    }
+    #[test]
+    fn running_balance_scope_settings_corrections_reversals_restart_and_recovery() {
+        use crate::reconciliation::{Order, State};
+        let (root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let s = balance_fixture(&mut w, &c.id, dir.path());
+        assert_eq!(s.summary.approved, 0);
+        assert!(s.records.iter().all(|r| !r.bulk_eligible));
+        assert!(w
+            .bulk_approve_transactions(
+                &c.id,
+                BulkInput {
+                    expected_revision: s.revision,
+                    record_ids: s.records.iter().map(|r| r.id.clone()).collect()
+                }
+            )
+            .is_err());
+        let mut cross = balance_input(&s, Some(Order::OldestFirst));
+        cross.expected_revision = 0;
+        assert!(w.review_statement_balances(&other.id, cross).is_err());
+        let selected = w
+            .review_statement_balances(&c.id, balance_input(&s, Some(Order::OldestFirst)))
+            .unwrap();
+        assert_eq!(
+            selected.documents[0]
+                .balance_reconciliation
+                .as_ref()
+                .unwrap()
+                .source_matched,
+            3
+        );
+        assert!(selected
+            .records
+            .iter()
+            .all(|r| r.status == Status::NeedsClarification && !r.bulk_eligible));
+        assert!(selected.documents[0].input.balance_order.is_none());
+        for id in selected
+            .records
+            .iter()
+            .map(|r| r.id.clone())
+            .collect::<Vec<_>>()
+        {
+            review(
+                &mut w,
+                &c.id,
+                &id,
+                Status::Approved,
+                "Individually verified the clarified source row",
+                true,
+            )
+            .unwrap();
+        }
+        let approved = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(
+            approved.documents[0]
+                .balance_reconciliation
+                .as_ref()
+                .unwrap()
+                .approved_matched,
+            3
+        );
+        assert_eq!(approved.summary.net_cash, "199.98");
+        let mut f = approved.records[1].fields.clone();
+        f.amount = Some("-300.01".into());
+        let corrected = w
+            .review_transaction(
+                &c.id,
+                ReviewInput {
+                    expected_revision: approved.revision,
+                    record_id: approved.records[1].id.clone(),
+                    fields: f,
+                    status: Status::Approved,
+                    reason: "Verified fictional corrected payment amount".into(),
+                    acknowledge_warnings: true,
+                },
+            )
+            .unwrap();
+        let check = corrected.documents[0]
+            .balance_reconciliation
+            .as_ref()
+            .unwrap();
+        assert_eq!((check.source_matched, check.approved_differences), (3, 2));
+        assert_eq!(check.rows[2].approved.difference.as_deref(), Some("0.01"));
+        assert_eq!(corrected.summary.net_cash, "199.99");
+        assert_eq!(corrected.records[1].raw.balance.as_deref(), Some("1199.99"));
+        assert_eq!(
+            corrected.records[1].raw.extracted.amount.as_deref(),
+            Some("-300.02")
+        );
+        let reversed = review(
+            &mut w,
+            &c.id,
+            &corrected.records[1].id,
+            Status::Rejected,
+            "Withdraw source payment from approved movement",
+            true,
+        )
+        .unwrap();
+        let check = reversed.documents[0]
+            .balance_reconciliation
+            .as_ref()
+            .unwrap();
+        assert_eq!(check.rows[1].approved.state, State::Excluded);
+        assert_eq!(check.rows[2].approved.difference.as_deref(), Some("300.02"));
+        assert_eq!(reversed.summary.net_cash, "500.00");
+        assert!(w
+            .get_client_imports(&other.id)
+            .unwrap()
+            .documents
+            .is_empty());
+        w.lock_workspace();
+        assert!(w
+            .review_statement_balances(&c.id, balance_input(&reversed, None))
+            .is_err());
+        drop(w);
+        let mut w = Workspace::new(root.path().to_path_buf());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let reopened = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(
+            reopened.documents[0].balance_history,
+            reversed.documents[0].balance_history
+        );
+        assert_eq!(
+            reopened.documents[0].balance_reconciliation,
+            reversed.documents[0].balance_reconciliation
+        );
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        let cleared = w
+            .review_statement_balances(&c.id, balance_input(&reopened, None))
+            .unwrap();
+        assert!(cleared.documents[0]
+            .balance_reconciliation
+            .as_ref()
+            .unwrap()
+            .order
+            .is_none());
+        assert_eq!(cleared.summary.net_cash, "500.00");
+        assert_eq!(cleared.documents[0].balance_history.len(), 2);
+        w.lock_workspace();
+        let candidate = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(candidate.token, "RESTORE".into())
+            .unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let restored = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(
+            restored.documents[0].balance_history,
+            reversed.documents[0].balance_history
+        );
+        assert_eq!(
+            restored.documents[0].balance_reconciliation,
+            reversed.documents[0].balance_reconciliation
+        );
+        assert_eq!(restored.summary.net_cash, "500.00");
+    }
+    #[test]
+    fn balance_setting_failure_stale_revision_and_bad_source_are_atomic() {
+        use crate::reconciliation::Order;
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = balance_fixture(&mut w, &c.id, dir.path());
+        let mut empty = balance_input(&s, Some(Order::OldestFirst));
+        empty.reason = "".into();
+        assert!(w.review_statement_balances(&c.id, empty).is_err());
+        w.session.as_ref().unwrap().connection.execute_batch("CREATE TRIGGER reject_balance_audit BEFORE INSERT ON audit_events WHEN NEW.event='statement_balance_reviewed' BEGIN SELECT RAISE(ABORT,'Synthetic audit failure'); END;").unwrap();
+        assert!(w
+            .review_statement_balances(&c.id, balance_input(&s, Some(Order::OldestFirst)))
+            .is_err());
+        let after = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(after.revision, s.revision);
+        assert!(after.documents[0].balance_history.is_empty());
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TRIGGER reject_balance_audit;")
+            .unwrap();
+        let mut unicode = balance_input(&s, Some(Order::OldestFirst));
+        unicode.reason = "é".repeat(500);
+        let saved = w.review_statement_balances(&c.id, unicode).unwrap();
+        assert_eq!(
+            saved.documents[0].balance_history[0].reason.chars().count(),
+            500
+        );
+        assert!(w
+            .review_statement_balances(&c.id, balance_input(&s, None))
+            .is_err());
+        let connection = &w.session.as_ref().unwrap().connection;
+        assert!(connection
+            .execute("UPDATE statement_balance_reviews SET row_order=NULL", [])
+            .is_err());
+        assert!(connection
+            .execute("DELETE FROM statement_balance_reviews", [])
+            .is_err());
+        let wrong = w
+            .review_statement_balances(&c.id, balance_input(&saved, Some(Order::NewestFirst)))
+            .unwrap();
+        assert_eq!(
+            wrong.documents[0]
+                .balance_reconciliation
+                .as_ref()
+                .unwrap()
+                .source_sequence,
+            crate::reconciliation::Sequence::Conflict
+        );
+        assert!(wrong.records.iter().all(|r| !r.bulk_eligible));
+        assert_eq!(wrong.summary.approved, 0);
+        let mut no_column = doc("No balance column");
+        no_column.balance_order = Some(Order::OldestFirst);
+        let path = dir.path().join("no-column.csv");
+        fs::write(&path, CHECKING).unwrap();
+        let preview = w
+            .inspect_client_csv(c.id.clone(), path.to_string_lossy().into())
+            .unwrap();
+        assert!(w
+            .stage_client_csv(
+                &c.id,
+                StageInput {
+                    expected_revision: wrong.revision,
+                    token: preview.token,
+                    document: no_column
+                }
+            )
+            .is_err());
+        let (mut valid_doc, _) = crate::reconciliation::tests::fixture();
+        valid_doc.balance_order = Some(Order::OldestFirst);
+        valid_doc.account_label = "Validated balance checking".into();
+        let valid = stage(
+            &mut w,
+            &c.id,
+            dir.path(),
+            "validated.csv",
+            RUNNING,
+            valid_doc,
+        );
+        let valid_id = valid.documents.last().unwrap().id.clone();
+        let valid_rows: Vec<_> = valid
+            .records
+            .iter()
+            .filter(|r| r.document_id == valid_id)
+            .collect();
+        assert!(valid_rows.iter().all(|r| r.bulk_eligible));
+        let validated = w
+            .bulk_approve_transactions(
+                &c.id,
+                BulkInput {
+                    expected_revision: valid.revision,
+                    record_ids: valid_rows.iter().map(|r| r.id.clone()).collect(),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            validated
+                .documents
+                .last()
+                .unwrap()
+                .balance_reconciliation
+                .as_ref()
+                .unwrap()
+                .approved_matched,
+            3
+        );
+        let mismatched = RUNNING.replace("1199.99\n", "1200.00\n");
+        let (mut d, _) = crate::reconciliation::tests::fixture();
+        d.balance_order = Some(Order::OldestFirst);
+        d.account_label = "Fictional discrepancy checking".into();
+        let discrepancy = stage(&mut w, &c.id, dir.path(), "discrepancy.csv", &mismatched, d);
+        let check = discrepancy
+            .documents
+            .last()
+            .unwrap()
+            .balance_reconciliation
+            .as_ref()
+            .unwrap();
+        assert_eq!(check.source_differences, 2);
+        assert_eq!(
+            discrepancy
+                .documents
+                .last()
+                .unwrap()
+                .source_difference
+                .as_deref(),
+            Some("0.00")
+        );
+        assert!(discrepancy
+            .records
+            .iter()
+            .filter(|r| r.document_id == discrepancy.documents.last().unwrap().id)
+            .all(|r| !r.bulk_eligible));
+    }
+    #[test]
+    fn balance_schema_eleven_migration_failure_preserves_legacy_records() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let before = stage(
+            &mut w,
+            &c.id,
+            dir.path(),
+            "legacy.csv",
+            CHECKING,
+            doc("Legacy checking"),
+        );
+        let connection = &mut w.session.as_mut().unwrap().connection;
+        connection.execute_batch("DROP TABLE statement_balance_reviews; PRAGMA user_version=11; CREATE TABLE audit_events_v12(collision TEXT);").unwrap();
+        assert!(migrate(connection, false).is_err());
+        assert_eq!(
+            connection
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            11
+        );
+        assert!(connection
+            .prepare("SELECT * FROM statement_balance_reviews")
+            .is_err());
+        connection
+            .execute_batch("DROP TABLE audit_events_v12;")
+            .unwrap();
+        migrate(connection, false).unwrap();
+        let after = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(after.revision, before.revision);
+        assert_eq!(after.records[0].raw, before.records[0].raw);
+        assert!(after.documents[0].balance_history.is_empty());
+        assert_eq!(
+            after.documents[0]
+                .balance_reconciliation
+                .as_ref()
+                .unwrap()
+                .source_sequence,
+            crate::reconciliation::Sequence::NotConfigured
+        );
     }
     fn recurring_fixture(w: &mut Workspace, client: &str, dir: &Path) -> Snapshot {
         let mut d = doc("Fictional service checking");
@@ -1346,7 +1812,7 @@ mod tests {
             .review_recurring_payment(&c.id, recurring_input(&s))
             .unwrap();
         let connection = &mut w.session.as_mut().unwrap().connection;
-        connection.execute_batch("DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
+        connection.execute_batch("DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
             connection
@@ -1355,7 +1821,7 @@ mod tests {
             10
         );
         connection
-            .execute_batch("DROP TABLE recurring_review_invalidations;")
+            .execute_batch("DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations;")
             .unwrap();
         migrate(connection, false).unwrap();
         let after = w.get_client_imports(&c.id).unwrap();
@@ -1387,7 +1853,7 @@ mod tests {
         let connection = &mut w.session.as_mut().unwrap().connection;
         connection
             .execute_batch(
-                "DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
+                "DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
             )
             .unwrap();
         connection
@@ -2153,7 +2619,7 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
         connection
-            .execute_batch("DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
+            .execute_batch("DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
             .unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(

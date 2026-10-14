@@ -89,7 +89,7 @@ The expected installer output directory is `src-tauri\target\release\bundle\nsis
 
 Before sharing a release, install on a clean Windows 11 x64 machine, including one without WebView2 and without internet access. Test setup, wrong-password handling, client isolation, lock/unlock, persistence after a restart, and uninstall/reinstall data behavior. Record actual results and failures. Complete recovery, security, accessibility, licensing, signing, and broader product criteria in [roadmap.md](roadmap.md) before calling the application production-ready.
 
-The 0.9.0 source upgrades local workspaces to schema 11 for encrypted recurring-payment decision history. Recovered workspaces use the activation layout; use 0.9.0 or newer. Earlier applications cannot open schema 11. No new installer is created for this milestone.
+The 0.10.0 source upgrades local workspaces to schema 12 for encrypted statement balance-setting history. Recovered workspaces use the activation layout; use 0.10.0 or newer. Earlier applications cannot open schema 12. No new installer is created for this milestone.
 
 Windows manual recovery acceptance: create a backup on local/removable storage; reject wrong passwords and damaged files; cancel review; verify whole-workspace restore with retained original files; repeat after app restart and simulated missing metadata; verify all client plans and immutable history offline. Use a disposable fictional workspace. See [backup-recovery.md](backup-recovery.md). This installed Windows GUI/drive acceptance is separate from CI source tests.
 
@@ -103,3 +103,9 @@ subscription classification, stale-evidence invalidation including identical
 reapproval, client isolation, restart, and encrypted recovery on clean Windows 11
 offline. Source CI does not establish installed desktop acceptance. See
 [recurring-payment-review.md](recurring-payment-review.md).
+
+Running-balance acceptance must exercise explicit balance mapping/meaning and
+oldest/newest-first source order, missing figures, date conflicts, separate
+source/approved tracks, rejected/undecided exclusion, corrected amounts, setting
+history, client isolation, restart and encrypted recovery on clean Windows 11
+while offline. See [statement-balance-reconciliation.md](statement-balance-reconciliation.md).

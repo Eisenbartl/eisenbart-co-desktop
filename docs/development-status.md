@@ -1,5 +1,58 @@
 # Development status
 
+## Stage 4D: statement running-balance reconciliation — 0.10.0 source
+
+Implemented exact integer-cent comparisons for explicitly mapped after-transaction
+checking/savings CSV balances and declared oldest/newest-first source order.
+Original local steps use reported anchors and original amounts regardless of
+review status, only to check source arithmetic. Independent approved cumulative
+steps use a known entered opening and approved movements; rejected rows contribute
+nothing and never become anchors. An undecided row makes later approved
+expectations unknown. Missing dates/amounts/balances remain unknown; contradictory
+dates block checks without sorting. Rejected dates are excluded from the approved
+sequence. Same-day order is preserved and disclosed.
+Final reported-versus-entered-closing checks complement existing whole-source
+and approved-total checks. Intermediate differences cannot hide behind a matching
+whole-statement total. Matched arithmetic never approves or verifies an asset.
+
+Counselors can correct or clear order declarations with a reason. Schema 12
+stores authenticated, client/document-scoped append-only settings and generic
+audit events with optimistic revisions. Original source metadata, financial
+choices and plans remain unchanged; derived exceptions update immediately after
+corrections/reversals and block unsafe bulk approvals. Changing a setting does
+not reset Needs Clarification to Pending or automatically approve any row.
+Settings/history and comparisons survive encrypted recovery; older JSON defaults
+to unknown order. Migrations/write failures preserve existing records. Existing
+limits apply, plus 1,000 balance-setting decisions/client. Scanned/text-PDF balance
+columns, before-transaction/available/card balances and automatic statement
+completeness claims remain outside this checkpoint. See
+[statement-balance-reconciliation.md](statement-balance-reconciliation.md).
+
+| Check | Result |
+|---|---|
+| Locked setup and production frontend | Passed |
+| Interface tests | 62 passed, including explicit mapping/order, source-versus-pending display, failed draft/dirty retention, conflicting-operation guards and clearing disabled mapping |
+| Linux backend/process suite | 98 library + 2 executable worker tests passed (100 total); seven new engine/storage tests cover exact cents, both source orders, date conflicts, missing/zero/negative figures, pending/rejected exclusion, corrected fields, intermediate discrepancies, scope, stale/audit rollback, Unicode reason limits, immutability, restart/recovery and schema-11 migration rollback |
+| Independent Python Decimal examples | Original closing 1,199.98; corrected closing 1,199.99; rejecting rent gives approved movement 500.00, expected 1,500.00 and 300.02 difference |
+| Format / Clippy all targets, warnings denied | Passed |
+| Compiled native desktop workflow | Pending final isolated run |
+| Windows source CI | Pending source commit; installer creation remains manual opt-in |
+| New installer | Intentionally not built |
+| Clean installed Windows 11 offline acceptance | Not run |
+
+Two initial synthetic storage fixtures were corrected: a resolved source-order
+setting intentionally leaves imported uncertain records Needs Clarification, and
+a second account needs a unique label or existing-account selection. The final
+focused storage rerun passed all three tests without weakening either safeguard.
+Logs and fictional artifacts are under `/workspace/shared/reconciliation-*`.
+
+Next priority: **client financial dashboard** built from approved imported facts,
+with explicit assessment dates, missing/outdated-data indicators and locally
+bundled charts. Broader statement adapters, scanned OCR, saved cross-module
+scenarios, advanced financial models, reports/action-plan PDFs, multiple counselor
+roles, firm branding, licensing/signing and full release acceptance remain open.
+No new downloadable build was created, as requested.
+
 ## Stage 4C: merchant grouping and recurring-payment review — 0.9.0 source
 
 Implemented approved-only historical payment grouping within one statement account
@@ -838,7 +891,7 @@ clone.
 Encrypted backup/restore is implemented with authenticated files, retained
 previous workspaces, and tested interrupted/failure recovery. Clean installed
 Windows acceptance and independent security review remain prerequisites for
-actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. The next application priority is **row-level statement reconciliation**; keep scanned OCR and broad institution adapters in later checkpoints.
+actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. Statement running-balance reconciliation now adds source/approved comparisons and immutable order settings. The next application priority is **a client financial dashboard**; keep scanned OCR and broad institution adapters in later checkpoints.
 
 Advanced financial models, broader scenarios, finalized PDF reports, multiple counselor roles,
 password change/reset, exports, licensing, signing, retained-copy selection,
@@ -854,7 +907,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 | Specification stage | Remaining work |
 |---|---|
 | 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
-| 4: Document processing | CSV, selected text-PDF review and recurring/grouped payment review implemented; scanned OCR, institution adapters and row-level reconciliation remain |
+| 4: Document processing | CSV, selected text-PDF review, recurring/grouped payment review and running-balance reconciliation implemented; scanned OCR and broader institution adapters remain |
 | 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
 | 6: Security/commercial | Encrypted backup/restore implemented; clean Windows recovery, password safeguards, accounts/roles, branding, licensing and independent review remain |
 | 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |

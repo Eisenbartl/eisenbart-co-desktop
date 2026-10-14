@@ -518,6 +518,80 @@ def assert_recurring_restored(driver: WebDriver) -> None:
     driver.wait_text(".imports-totals","$32.05","persisted recurring client exact totals")
 
 
+
+def choose_balance_statement(driver: WebDriver) -> None:
+    driver.select("#balance-document","running.csv — Fictional balance checking")
+
+
+def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path) -> None:
+    source=data_root / "running.csv"
+    source.write_text("Date,Description,Amount,Category,Type,Balance\n2026-09-01,Fictional wages,500.01,Wages,income,1500.01\n2026-09-02,Fictional rent,-300.02,Housing,expense,1199.99\n2026-09-03,Fictional fee,-0.01,Fees,fee,1199.98\n",encoding="utf-8")
+    driver.fill("#csv-path",str(source))
+    driver.click_button("Inspect CSV")
+    driver.wait_text(".csv-preview",source.name,"synthetic running-balance source")
+    driver.fill("#csv-account-label","Fictional balance checking")
+    for key,heading in [("date","1: Date"),("description","2: Description"),("amount","3: Amount"),("category","4: Category"),("kind","5: Type"),("balance","6: Balance")]:
+        driver.select(f"#csv-map-{key}",heading)
+    driver.select("#csv-balance-order","Oldest first — after each transaction")
+    for key,value in [("openingBalance","1000.00"),("closingBalance","1199.98"),("periodStart","2026-09-01"),("periodEnd","2026-09-30")]:
+        driver.fill(f"#csv-{key}",value)
+    driver.click_button("Import into review queue")
+    driver.wait_text(".imports-progress","Pending 3","balanced source stays unapproved")
+    choose_balance_statement(driver)
+    driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 0 matched","source references do not approve financial movements")
+    driver.select("#balance-order","Newest first — after each transaction")
+    driver.fill("#balance-reason","Check conflicting declared order against source dates")
+    driver.click_button("Save statement balance setting")
+    driver.wait_text(".imports-panel","Statement balance setting saved; checks updated.","wrong order recorded explicitly")
+    choose_balance_statement(driver)
+    driver.wait_text(".statement-balance-details","Original date sequence: Conflict","wrong source order is never silently sorted")
+    driver.select("#balance-order","Oldest first — after each transaction")
+    driver.fill("#balance-reason","Verified original source is oldest first with after-transaction balances")
+    driver.click_button("Save statement balance setting")
+    driver.wait_text(".imports-panel","Statement balance setting saved; checks updated.","correct order saved without transaction approval")
+    for index in range(1,4):
+        driver.click(f".imports-table tbody tr:nth-child({index}) input[type=checkbox]")
+    driver.click_button("Approve selected validated rows (3)")
+    driver.wait_text(".imports-totals","$199.98","independent approved source net")
+    choose_balance_statement(driver)
+    driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 3 matched · 0 differences.","exact original and approved balance steps")
+    driver.click_button("Review balance source record 3")
+    driver.fill("#review-amount","-300.01")
+    driver.fill("#review-reason","Verified corrected fictional transaction; retain original figures")
+    driver.click("#review-ack")
+    driver.click_button("Save transaction decision")
+    driver.wait_text(".imports-totals","$199.99","one-cent corrected approved net")
+    choose_balance_statement(driver)
+    driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 2 differences.","source arithmetic remains intact while corrected approved steps diverge")
+    driver.wait_text(".balance-check-table","Difference $0.01","independent corrected balance difference")
+    driver.click_button("Review balance source record 3")
+    driver.select("#review-status","Rejected")
+    driver.fill("#review-reason","Withdraw corrected payment from approved movement")
+    driver.click_button("Save transaction decision")
+    driver.wait_text(".imports-totals","$500.00","rejected expense excluded from approved totals")
+    choose_balance_statement(driver)
+    driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 1 differences.","rejection preserves source checks and updates approved comparisons")
+    driver.wait_text(".balance-check-table","Excluded","rejected balance is not an approved anchor")
+    driver.wait_text(".balance-check-table","Difference $300.02","independent rejected-row discrepancy")
+    driver.click(".statement-balance-history > summary")
+    driver.wait_text(".statement-balance-history","Statement balance setting history (2)","immutable source-order decisions")
+    driver.script("document.querySelector('.balance-check-table').scrollIntoView({block:'center',behavior:'instant'})")
+    driver.screenshot(artifacts / "native-statement-balances.png")
+    status("explicit source order, exact row balances, wrong-order conflicts, separate approved data, one-cent corrections, rejected exclusion, and setting history")
+
+
+def assert_statement_balances_restored(driver: WebDriver) -> None:
+    driver.open_client("Taylor Balance")
+    driver.wait_text(".imports-progress","Approved 2 · Rejected 1","persisted balance decisions")
+    choose_balance_statement(driver)
+    driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 1 differences.","persisted source and approved comparisons")
+    driver.wait_text(".balance-check-table","Difference $300.02","persisted rejection discrepancy")
+    driver.wait_text(".imports-totals","$500.00","persisted exact approved balance client net")
+    driver.click(".statement-balance-history > summary")
+    driver.wait_text(".statement-balance-history","Statement balance setting history (2)","persisted balance setting history")
+    driver.wait_text(".statement-balance-history","Verified original source is oldest first","persisted source-order review reason")
+
+
 def run_checks(driver: WebDriver, binary: Path, password: str,
                wrong_password: str, artifacts: Path, restart_driver: Callable[[], None], data_root: Path) -> None:
     organization = "Smoke Test Counseling — Fictional"
@@ -824,11 +898,14 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_pdf_imports(driver, artifacts, data_root)
     create_client("Casey","Pattern","Review fictional recurring payments")
     check_recurring_imports(driver,artifacts,data_root)
+    create_client("Taylor","Balance","Verify fictional statement running balances")
+    check_statement_balances(driver,artifacts,data_root)
     restart_driver()
     driver.open(binary)
     driver.fill("#password",password)
     driver.click_button("Unlock workspace")
     assert_recurring_restored(driver)
+    assert_statement_balances_restored(driver)
     driver.open_client("Alex Fictional")
     driver.wait_text(".recurring-review","Synthetic rent","Alex has his own payment groups")
     if "Fictional household service" in driver.text(".recurring-review"):
@@ -914,6 +991,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click(".review-history > summary")
     driver.wait_text(".review-history", "Needs Clarification → Approved", "restored immutable PDF approval history")
     assert_recurring_restored(driver)
+    assert_statement_balances_restored(driver)
     driver.open_client("Alex Fictional")
     status("encrypted backup, wrong-password rejection, interrupted review, explicit restore, retained source, restored plans and recurring decisions")
     # Simulate missing metadata only after stopping every synthetic app process.
@@ -943,6 +1021,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_value("#cashflow-date-0", "2026-11-03", "restored original cash-flow dates after recovery")
     driver.wait_text(".imports-progress", "Approved 6 · Rejected 1", "storage-error recovery includes imported records")
     assert_recurring_restored(driver)
+    assert_statement_balances_restored(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")
 
 

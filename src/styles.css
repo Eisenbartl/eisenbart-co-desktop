@@ -418,3 +418,7 @@ textarea { resize: vertical; min-height: 100px; }
 
 .recurring-decision { padding:18px; margin:18px 0; border:1px solid var(--line); border-radius:10px; }
 .recurring-history p { font-size:12px; overflow-wrap:anywhere; }
+
+.statement-balance-details { padding:18px; margin:18px 0; border:1px solid var(--line); border-radius:10px; }
+.balance-check-table { min-width:640px; }
+.balance-progress { font-size:12px; font-weight:600; margin:18px 0; }

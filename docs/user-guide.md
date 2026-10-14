@@ -1,7 +1,7 @@
 # Windows evaluation guide
 
 This development build provides a local workspace, client profiles, counseling
-statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.9.0 source) savings planning, cash-flow calendars, encrypted backups, verified restore, CSV/selectable-text PDF transaction review, and merchant/recurring-payment review. Use fictional records only. Advanced financial
+statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.10.0 source) savings planning, cash-flow calendars, encrypted backups, verified restore, CSV/selectable-text PDF transaction review, merchant/recurring-payment review, and statement running-balance checks. Use fictional records only. Advanced financial
 calculations, scanned-document OCR, institution adapters, advanced cash-flow models, PDF reports, and
 commercial licensing are still being developed. Password reset and independent security review remain unavailable.
 
@@ -254,3 +254,7 @@ Choose **Selectable-text PDF** in the client statement panel, inspect a syntheti
 ## Review merchant groups and recurring payments (0.9.0 source)
 
 Approve the source transactions first. In the client's statement panel, scroll to **Merchant groups and recurring payments**, choose a group, and check its supporting payments. Correct verified Merchant fields to combine or separate names. Confirm or dismiss the pattern with a reason; choose the reviewed frequency and classify a subscription only after verifying it. Changed evidence requires another review. Decisions persist in encrypted storage and backups without changing planning inputs. See [steps, evidence rules, examples and limits](recurring-payment-review.md). No new installer was created.
+
+## Check statement running balances (0.10.0 source)
+
+Map the CSV's actual after-transaction balance column and declare oldest/newest-first order. In **Statement running-balance checks**, choose the statement to compare original source steps with approved cumulative amounts. Unknown data stays unknown; rejected amounts and undecided rows never supply approved balances. Date/order conflicts and discrepancies require individual review. Correct or clear an order declaration with a reason; original source values and transaction decisions remain unchanged. See [steps, examples, limits and supported balance meaning](statement-balance-reconciliation.md). No new installer was created.
