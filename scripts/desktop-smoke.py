@@ -665,6 +665,75 @@ def export_original_assessment_pdf(driver: WebDriver, artifacts: Path, label: st
     status(f"local printable PDF export preserved historical evidence and figures ({label})")
 
 
+def export_captured_planning_pdf(driver: WebDriver, artifacts: Path, label: str) -> None:
+    destination = artifacts / f"saved-planning-{label}.pdf"
+    if destination.exists():
+        raise SmokeFailure("Planning PDF smoke destination must be new")
+    driver.fill("#assessment-pdf-path",str(destination))
+    driver.click_button("Export saved assessment PDF")
+    driver.wait_text(".saved-assessments","PDF saved locally","native planning scenario PDF completion")
+    text = subprocess.run(["pdftotext","-layout",str(destination),"-"],check=True,capture_output=True,text=True).stdout
+    text = " ".join(text.split())
+    for expected in ["Alex saved planning scenario","Captured planning scenario / hypothetical","Monthly income: USD 3250.00","Unallocated: USD 716.67","Selected strategy: Avalanche","Projected total interest: USD 35.35","Emergency target: USD 4899.99","Primary emergency completion: 2028-06-30","Projected combined closing balance: USD 3300.00","Operating cash flow: USD 1820.02","NEEDS REVIEW"]:
+        if expected not in text:
+            raise SmokeFailure(f"Captured planning PDF missing expected text: {expected}")
+    if "Monthly income: USD 3466.67" in text:
+        raise SmokeFailure("Later plan income replaced captured PDF assumptions")
+    status(f"native planning PDF preserves original assumptions and independently expected milestones ({label})")
+
+
+def assert_captured_planning_restored(driver: WebDriver, artifacts: Path, label: str) -> None:
+    driver.open_client("Alex Fictional")
+    if driver.command("GET",f"/element/{driver.find('.saved-assessments')}/property/open") is not True:
+        driver.click(".saved-assessments > summary")
+    driver.select("#saved-assessment","Alex saved planning scenario — 2026-09-01 to 2026-10-31 — Needs review")
+    driver.wait_text(".saved-assessment-view h3","Alex saved planning scenario","restored scenario record")
+    driver.wait_text(".saved-assessment-status","Needs review","reverted active plans never reactivate an old captured version")
+    driver.wait_text(".saved-assessment-view .scenario-budget-totals","Income$3,250.00","captured original normalized income")
+    driver.wait_text(".saved-assessment-view .scenario-budget-totals","Unallocated$716.67","captured original allocations")
+    driver.wait_text(".saved-assessment-view .scenario-debt-summary","Selected strategy: Avalanche","preserved explicit strategy")
+    driver.wait_text(".saved-assessment-view .scenario-debt-outcome","Total interest $35.35","captured independent avalanche outcome")
+    driver.wait_text(".saved-assessment-view .scenario-savings-outcome","2028-06-30","captured savings milestone")
+    driver.wait_text(".saved-assessment-view .scenario-cashflow-outcome","$3,300.00","separate captured per-account forecast")
+    driver.wait_text(".saved-assessment-view .assessment-totals","Operating cash flow$1,820.02","approved history remains separate from entered planning")
+    export_captured_planning_pdf(driver,artifacts,label)
+    driver.click(".saved-assessments > summary")
+
+
+def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> None:
+    driver.open_client("Alex Fictional")
+    driver.click(".saved-assessments > summary")
+    driver.wait(lambda:driver.visible("#saved-assessment") is not None,"saved assessment directory before scenario")
+    driver.fill("#record-from","2026-09")
+    driver.fill("#record-through","2026-10")
+    driver.fill("#record-title","Alex saved planning scenario")
+    driver.fill("#record-recommendations","Protect fictional bills while reviewing the selected debt and savings plan.")
+    driver.click("#record-include-planning")
+    driver.click_button("Review current saved plans")
+    driver.wait_text(".scenario-selection .scenario-budget-totals","Income$3,250.00","reviewed saved planning baseline")
+    driver.fill("#record-scenario-label","Alex primary saved plan")
+    driver.fill("#record-scenario-assumptions","Entered hypothetical plans; verify lender dates and all financial coverage before commitments.")
+    driver.select("#record-debt-strategy","Avalanche")
+    driver.click("#record-ack")
+    driver.click_button("Save assessment record")
+    driver.wait_text(".saved-assessment-view h3","Alex saved planning scenario","saved scenario-backed assessment")
+    driver.wait_text(".saved-assessment-status","Recorded context matches","new captured scenario context")
+    driver.fill("#budget-amount-0","1600")
+    driver.click_button("Save budget and calculate")
+    driver.wait_text(".budget-panel .budget-totals","$3,466.67","independent later income change")
+    driver.wait_text(".saved-assessment-status","Needs review","plan revision invalidates recorded context automatically")
+    driver.wait_text(".saved-assessment-view .scenario-budget-totals","Income$3,250.00","original captured income after active plan change")
+    driver.fill("#budget-amount-0","1500")
+    driver.click_button("Save budget and calculate")
+    driver.wait_text(".budget-panel .budget-totals","$716.67","active plan reverted to original inputs")
+    driver.wait_text(".saved-assessment-status","Needs review","reverting values does not restore captured plan version")
+    driver.script("document.querySelector('.saved-assessment-view .captured-planning').scrollIntoView({block:'start',behavior:'instant'})")
+    driver.screenshot(artifacts / "native-captured-planning-scenario.png")
+    export_captured_planning_pdf(driver,artifacts,"before-restart")
+    driver.click(".saved-assessments > summary")
+    status("captured scenario selection, debt/savings/cash-flow assumptions, historical isolation and permanent plan-version review flags")
+
+
 def view_financial_dashboard(driver: WebDriver, start: str, end: str) -> None:
     driver.fill("#assessment-from", start)
     driver.fill("#assessment-through", end)
@@ -1055,12 +1124,14 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_recurring_imports(driver,artifacts,data_root)
     create_client("Taylor","Balance","Verify fictional statement running balances")
     check_statement_balances(driver,artifacts,data_root)
+    save_captured_planning_assessment(driver,artifacts)
     restart_driver()
     driver.open(binary)
     driver.fill("#password",password)
     driver.click_button("Unlock workspace")
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver, artifacts, "restart")
+    assert_captured_planning_restored(driver, artifacts, "restart")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     driver.script("document.querySelector('.financial-dashboard').scrollIntoView({block:'start',behavior:'instant'})")
@@ -1150,6 +1221,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".review-history", "Needs Clarification → Approved", "restored immutable PDF approval history")
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver, artifacts, "encrypted-restore")
+    assert_captured_planning_restored(driver, artifacts, "encrypted-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     driver.open_client("Alex Fictional")
@@ -1182,6 +1254,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".imports-progress", "Approved 6 · Rejected 1", "storage-error recovery includes imported records")
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver, artifacts, "error-screen-restore")
+    assert_captured_planning_restored(driver, artifacts, "error-screen-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")

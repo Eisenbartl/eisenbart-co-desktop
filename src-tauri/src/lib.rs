@@ -12,6 +12,7 @@ mod pdf;
 mod pdf_fixture;
 #[doc(hidden)]
 pub mod pdf_process;
+mod planning;
 mod reconciliation;
 mod recurring;
 mod savings;
@@ -124,6 +125,18 @@ fn cancel_client_csv(state: State<'_, DesktopState>, token: String) -> Result<()
         w.cancel_client_csv(&token);
         Ok(())
     })
+}
+#[tauri::command]
+async fn get_assessment_planning(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<planning::Plans, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_assessment_planning(&client_id))
+    })
+    .await
+    .map_err(|_| "Saved planning context could not be loaded.".to_owned())?
 }
 #[tauri::command]
 async fn list_assessment_records(
@@ -592,6 +605,7 @@ pub fn run() {
             get_client_dashboard,
             review_financial_facts,
             list_assessment_records,
+            get_assessment_planning,
             get_assessment_record,
             save_assessment_record,
             choose_assessment_pdf,

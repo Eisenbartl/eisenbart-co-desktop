@@ -252,7 +252,13 @@ export interface FactMetrics {
  debtBalances:{label:string;amount:string|null;scale:number}[];
 }
 
-export interface AssessmentRecordInput {expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
+export interface AssessmentRecordInput {planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
 export interface AssessmentRecordSummary {id:string;title:string;createdAt:string;periodStart:string;periodEnd:string;sourceRevision:number;needsReview:boolean}
 export interface AssessmentDirectory {clientId:string;records:AssessmentRecordSummary[]}
-export interface SavedAssessment {clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
+export interface SavedAssessment {clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
+
+export interface PlanningRevisions {budget:number;debt:number;savings:number;cashflow:number}
+export type PlanningDebtStrategy = 'none'|'snowball'|'avalanche';
+export interface AssessmentPlans {clientId:string;budget:ClientBudget;debt:ClientDebtPlan;savings:ClientSavingsPlan;cashflow:ClientCashflowPlan}
+export interface PlanningSelection {expectedRevisions:PlanningRevisions;label:string;assumptions:string;debtStrategy:PlanningDebtStrategy}
+export interface CapturedPlanning {calculator:string;label:string;assumptions:string;debtStrategy:PlanningDebtStrategy;revisions:PlanningRevisions;plans:AssessmentPlans}

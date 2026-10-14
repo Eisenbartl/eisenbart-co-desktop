@@ -1,4 +1,4 @@
-# Offline internal assessment PDF export — 0.14.0
+# Offline internal assessment PDF export — 0.15.0
 
 Open a saved client, expand **Saved counselor assessments**, and select a saved
 record. Use **Choose PDF destination**, or enter a full local path ending in
@@ -40,9 +40,7 @@ neither changes source revisions nor creates a new assessment, financial decisio
 or audit entry; assessment creation remains audited. Export-specific audit events
 and organization export permissions remain future security work.
 
-This is a printable internal assessment checkpoint. Selected planning scenarios,
-debt APR/repayment terms, recurring-review decisions and saved session notes are
-not captured yet. A complete specified Counselor Report, final report acceptance,
+Version 0.15.0 adds optional named [captured planning scenarios](captured-planning-scenarios.md), entered debt terms, explicit repayment selection, allocations, assumptions and summary milestones to the PDF. Full model schedules remain captured in the encrypted record/viewer. Recurring-review decisions and saved session notes are not captured yet. A complete specified Counselor Report, final report acceptance,
 branded Client Action Plan with prioritized actions, allocations and milestones,
 and direct application printing remain open.
 

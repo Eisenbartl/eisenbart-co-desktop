@@ -259,6 +259,389 @@ fn tag<T: serde::Serialize>(v: &T) -> String {
         .and_then(|v| v.as_str().map(str::to_owned))
         .unwrap_or_else(|| "Unknown".into())
 }
+fn plan_term<T: serde::Serialize>(value: &T) -> String {
+    let mut result = String::new();
+    for (i, c) in tag(value).chars().enumerate() {
+        if i == 0 {
+            result.extend(c.to_uppercase());
+        } else {
+            if c.is_uppercase() {
+                result.push(' ');
+            }
+            result.extend(c.to_lowercase());
+        }
+    }
+    result
+}
+fn planning_pdf(l: &mut Layout, s: &crate::planning::Snapshot) -> Result<(), String> {
+    let p = &s.plans;
+    let b = &p.budget;
+    let d = &p.debt;
+    let v = &p.savings;
+    let c = &p.cashflow;
+    l.section("Captured planning scenario / hypothetical")?;
+    l.value("Scenario", &s.label)?;
+    l.value(
+        "Assumptions",
+        if s.assumptions.is_empty() {
+            "None recorded"
+        } else {
+            &s.assumptions
+        },
+    )?;
+    l.value(
+        "Captured plan versions",
+        &format!(
+            "Budget {} / debt {} / savings {} / cash flow {}",
+            s.revisions.budget, s.revisions.debt, s.revisions.savings, s.revisions.cashflow
+        ),
+    )?;
+    l.text("Entered planning assumptions and forecasts are separate from approved historical facts. Later plan edits do not rewrite these captured values. This is not a final agreed client action plan. Cash-flow schedules are independently entered and are not automatically synchronized to budget, debt or savings amounts. This PDF prints assumptions and summary milestones; full model schedules remain captured in the encrypted record and its viewer.",10.0)?;
+    for (label, time) in [
+        ("Budget saved (UTC)", &b.updated_at),
+        ("Debt saved (UTC)", &d.updated_at),
+        ("Savings saved (UTC)", &v.updated_at),
+        ("Cash flow saved (UTC)", &c.updated_at),
+    ] {
+        l.value(label, time.as_deref().unwrap_or("Not saved"))?;
+    }
+    l.section("Entered monthly budget / proposed allocations")?;
+    for (label, val) in [
+        ("Monthly income", &b.summary.monthly_income),
+        ("Necessary spending", &b.summary.necessary_expenses),
+        ("Discretionary spending", &b.summary.discretionary_expenses),
+        (
+            "Surplus before allocations",
+            &b.summary.surplus_before_allocations,
+        ),
+        ("Proposed savings", &b.summary.proposed_savings),
+        ("Planned debt payments", &b.summary.planned_debt_payments),
+        ("Unallocated", &b.summary.unallocated),
+    ] {
+        l.value(label, &usd(val))?;
+    }
+    for (i, line) in b.lines.iter().enumerate() {
+        l.value(
+            &line.label,
+            &format!(
+                "{} / {} / entered {} / monthly {} / {}",
+                plan_term(&line.kind),
+                plan_term(&line.frequency),
+                optional(&line.amount),
+                optional(&b.summary.monthly_amounts[i]),
+                if line.estimated {
+                    "Estimated"
+                } else if line.amount.is_none() {
+                    "Missing"
+                } else {
+                    "Entered"
+                }
+            ),
+        )?;
+    }
+    for w in &b.summary.warnings {
+        l.text(w, 10.0)?;
+    }
+    l.section("Captured debt terms and selected repayment strategy")?;
+    l.value(
+        "Selected strategy",
+        match s.debt_strategy {
+            crate::planning::Strategy::None => "No repayment projection selected",
+            crate::planning::Strategy::Snowball => "Snowball",
+            crate::planning::Strategy::Avalanche => "Avalanche",
+        },
+    )?;
+    if let Some(data) = &d.data {
+        l.value("Debt start month", &data.start_month)?;
+        l.value(
+            "Entered monthly debt payment",
+            &optional(&data.monthly_payment),
+        )?;
+        for a in &data.accounts {
+            l.value(
+                "Debt account",
+                &format!("{} / {}", a.label, plan_term(&a.debt_type)),
+            )?;
+            l.value(
+                "Balance / APR",
+                &format!(
+                    "{} / {}",
+                    optional(&a.balance),
+                    a.apr
+                        .as_deref()
+                        .map(|v| format!("{v}%"))
+                        .unwrap_or_else(|| "Unknown".into())
+                ),
+            )?;
+            l.value(
+                "Minimum payment / monthly fee",
+                &format!(
+                    "{} / {}",
+                    optional(&a.minimum_payment),
+                    optional(&a.monthly_fee)
+                ),
+            )?;
+            l.value(
+                "Interest model / terms reviewed",
+                &format!(
+                    "{} / {}",
+                    plan_term(&a.interest_model),
+                    if a.verified { "Yes" } else { "No" }
+                ),
+            )?;
+            l.value(
+                "Terms note",
+                if a.terms_note.is_empty() {
+                    "None recorded"
+                } else {
+                    &a.terms_note
+                },
+            )?;
+        }
+        for x in &data.extras {
+            l.value(
+                "Extra payment",
+                &format!("{} / {}", x.month, usd(&x.amount)),
+            )?;
+        }
+        for x in &data.payment_changes {
+            l.value(
+                "Changed monthly payment",
+                &format!("{} / {}", x.month, usd(&x.amount)),
+            )?;
+        }
+    } else {
+        l.text(
+            "No saved debt plan. Repayment terms and outcomes remain missing.",
+            10.0,
+        )?;
+    }
+    if let Some(cmp) = &d.comparison {
+        for w in &cmp.warnings {
+            l.text(w, 10.0)?;
+        }
+    }
+    if let Some(result) = crate::planning::projection(s) {
+        l.value("Repayment outcome", &plan_term(&result.status))?;
+        l.value(
+            "Projected payoff month",
+            result.payoff_month.as_deref().unwrap_or("Not projected"),
+        )?;
+        for (label, val) in [
+            ("Projected total interest", &result.total_interest),
+            ("Projected total fees", &result.total_fees),
+            ("Projected total paid", &result.total_paid),
+            ("Projected remaining debt", &result.remaining_balance),
+        ] {
+            l.value(label, &usd(val))?;
+        }
+        if let Some(data) = &d.data {
+            for (i, a) in data.accounts.iter().enumerate() {
+                l.value(
+                    &format!("Projected payoff: {}", a.label),
+                    result.account_payoff_months[i]
+                        .as_deref()
+                        .unwrap_or("Not projected"),
+                )?;
+            }
+        }
+        for w in &result.warnings {
+            l.text(w, 10.0)?;
+        }
+        l.text("The supported repayment projection uses fixed monthly interest. Missing lender dates and daily, variable or promotional terms are not inferred.",10.0)?;
+    }
+    l.section("Captured savings targets / primary contribution")?;
+    if let (Some(data), Some(result)) = (&v.data, &v.summary) {
+        l.value("Savings start month", &data.start_month)?;
+        l.value("Target coverage (months)", &data.target_months.to_string())?;
+        for (label, val) in [
+            ("Entered liquid savings", &data.liquid_savings),
+            ("Entered restricted savings", &data.restricted_savings),
+            ("Obligations reserved", &data.obligations_reserved),
+            ("Accessible emergency pool", &result.accessible_emergency),
+            ("Emergency target", &result.emergency_target),
+            (
+                "Primary emergency contribution",
+                &data.emergency_contribution,
+            ),
+            (
+                "Requested monthly savings",
+                &result.requested_monthly_savings,
+            ),
+        ] {
+            l.value(label, &optional(val))?;
+        }
+        l.value(
+            "Savings priorities",
+            if data.priorities_note.is_empty() {
+                "None recorded"
+            } else {
+                &data.priorities_note
+            },
+        )?;
+        l.value(
+            "Emergency coverage (months)",
+            result.coverage_months.as_deref().unwrap_or("Unknown"),
+        )?;
+        l.value(
+            "Primary emergency completion",
+            result
+                .emergency
+                .completion_date
+                .as_deref()
+                .unwrap_or("Not projected"),
+        )?;
+        l.value(
+            "Emergency forecast status",
+            &plan_term(&result.emergency.status),
+        )?;
+        for (i, g) in data.goals.iter().enumerate() {
+            let outcome = &result.goals[i];
+            l.value("Savings goal", &g.label)?;
+            l.value(
+                "Target / due date",
+                &format!(
+                    "{} / {}",
+                    optional(&g.target_amount),
+                    g.target_date.as_deref().unwrap_or("Unknown")
+                ),
+            )?;
+            l.value(
+                "Reserved / monthly contribution",
+                &format!(
+                    "{} / {}",
+                    optional(&g.reserved_amount),
+                    optional(&g.monthly_contribution)
+                ),
+            )?;
+            l.value(
+                "Projected completion / status",
+                &format!(
+                    "{} / {}",
+                    outcome
+                        .forecast
+                        .completion_date
+                        .as_deref()
+                        .unwrap_or("Not projected"),
+                    plan_term(&outcome.forecast.status)
+                ),
+            )?;
+            l.value(
+                "Suggested contribution",
+                &optional(&outcome.suggested_contribution),
+            )?;
+            l.value(
+                "On track",
+                match outcome.on_track {
+                    Some(true) => "Yes",
+                    Some(false) => "No",
+                    None => "Unknown",
+                },
+            )?;
+            for w in &outcome.warnings {
+                l.text(w, 10.0)?;
+            }
+        }
+        for w in &result.warnings {
+            l.text(w, 10.0)?;
+        }
+        l.text("Savings uses the primary saved contribution. Alternative contribution forecasts remain comparison references and are not selected allocations.",10.0)?;
+    } else {
+        l.text(
+            "No saved savings plan. No target, contribution or milestone is inferred.",
+            10.0,
+        )?;
+    }
+    l.section("Captured dated cash-flow assumptions / independent schedule")?;
+    if let (Some(data), Some(result)) = (&c.data, &c.summary) {
+        l.value(
+            "Entered cash-flow period",
+            &format!("{} to {}", data.start_date, data.end_date),
+        )?;
+        l.value(
+            "Schedule notes",
+            if data.notes.is_empty() {
+                "None recorded"
+            } else {
+                &data.notes
+            },
+        )?;
+        for a in &data.accounts {
+            l.value(
+                &format!("Account: {}", a.label),
+                &format!(
+                    "Opening {} / projected closing {}",
+                    optional(&a.opening_balance),
+                    optional(
+                        &result
+                            .closing_balances
+                            .iter()
+                            .find(|b| b.account_id == a.id)
+                            .and_then(|b| b.amount.clone())
+                    )
+                ),
+            )?;
+        }
+        for x in &data.schedules {
+            l.value(
+                &x.label,
+                &format!(
+                    "{} / {} / {} / {}",
+                    plan_term(&x.kind),
+                    optional(&x.amount),
+                    plan_term(&x.frequency),
+                    plan_term(&x.certainty)
+                ),
+            )?;
+            l.value(
+                "First / second day / until",
+                &format!(
+                    "{} / {} / {}",
+                    x.first_date,
+                    x.second_day
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "Not applicable".into()),
+                    x.until_date.as_deref().unwrap_or("End of entered period")
+                ),
+            )?;
+            l.value(
+                "Source / destination account",
+                &format!(
+                    "{} / {}",
+                    data.accounts
+                        .iter()
+                        .find(|a| a.id == x.account_id)
+                        .map(|a| a.label.as_str())
+                        .unwrap_or("Unknown"),
+                    x.destination_id
+                        .as_ref()
+                        .and_then(|id| data.accounts.iter().find(|a| &a.id == id))
+                        .map(|a| a.label.as_str())
+                        .unwrap_or("None")
+                ),
+            )?;
+        }
+        l.value(
+            "Projected combined closing balance",
+            &optional(&result.combined_closing),
+        )?;
+        for w in &result.warnings {
+            l.text(w, 10.0)?;
+        }
+        for x in result.ledger.iter().filter(|x| !x.warnings.is_empty()) {
+            l.value(
+                "Dated forecast concern",
+                &format!("{} / {} / {}", x.date, x.label, x.warnings.join(" ")),
+            )?;
+        }
+    } else {
+        l.text(
+            "No saved dated cash-flow plan. No dates or account balances are inferred.",
+            10.0,
+        )?;
+    }
+    Ok(())
+}
 pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String> {
     let p = &r.payload;
     crate::assessments::validate(p)?;
@@ -285,7 +668,7 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
         "Calculation",
         &format!("{} / recorded app {}", p.calculator, p.app_version),
     )?;
-    l.text(if r.needs_review{"NEEDS REVIEW: source, client or firm context changed. Historical figures are preserved."}else{"Recorded context matches the current source and client profile at export."},10.0)?;
+    l.text(if r.needs_review{"NEEDS REVIEW: source, client, firm or saved planning context changed. Historical figures are preserved."}else{"Recorded context matches the current source, client profile and any saved plans at export."},10.0)?;
     for reason in &r.review_reasons {
         l.text(reason, 10.0)?;
     }
@@ -299,7 +682,7 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
         },
     )?;
     l.section("Basis, exclusions and missing information")?;
-    l.text("Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply financial amounts. Internal assessment only; no finalized client action plan, selected planning scenarios, debt APR/repayment terms, budget agreement or saved session notes are included. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets.",10.0)?;
+    l.text(if p.planning.is_some(){"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply historical financial amounts. A separately labeled hypothetical saved planning scenario is captured below; its entered debt terms, allocations and forecasts do not change approved facts or establish a final budget agreement/client action plan. Saved session notes and recurring-review decisions are not included. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."}else{"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply financial amounts. Internal assessment only; no finalized client action plan, selected planning scenarios, debt APR/repayment terms, budget agreement or saved session notes are included. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."},10.0)?;
     l.value(
         "Record counts within period",
         &format!(
@@ -417,6 +800,9 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
             .unwrap_or("Unavailable"),
     )?;
     l.text("Coverage uses accessible savings only. Payment ratio uses recorded take-home pay, not gross lender income or underwriting DTI. Estimates depend on completeness, dates and active approved classifications; missing values remain unknown.",10.0)?;
+    if let Some(s) = &p.planning {
+        planning_pdf(&mut l, s)?;
+    }
     for (title, text) in [
         ("Counselor findings", &p.findings),
         ("Counselor recommendations", &p.recommendations),

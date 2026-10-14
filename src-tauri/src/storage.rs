@@ -1066,16 +1066,7 @@ fn read_cashflow_plan(
     client_id: &str,
 ) -> Result<ClientCashflowPlan, String> {
     let savings = read_savings_plan(connection, info, client_id)?;
-    let context = cashflow::Context {
-        budget_revision: savings.context.budget_revision,
-        debt_revision: savings.context.debt_revision,
-        savings_revision: savings.revision,
-        monthly_surplus: savings.context.monthly_surplus,
-        budget_debt: savings.context.budget_debt_payments,
-        budget_savings: savings.context.budget_savings,
-        debt_monthly_payment: savings.context.debt_monthly_payment,
-        savings_monthly_contribution: savings.summary.and_then(|s| s.requested_monthly_savings),
-    };
+    let context = crate::planning::cashflow_context(&savings);
     let saved:Option<(i64,String,String)>=connection.query_row(
         "SELECT revision,plan_json,updated_at FROM client_cashflow_plans WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3",
         params![client_id,info.organization_id,info.counselor_id], |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
@@ -1113,94 +1104,7 @@ fn read_savings_plan(
 ) -> Result<ClientSavingsPlan, String> {
     let budget = read_budget(connection, info, client_id)?;
     let debt = read_debt_plan(connection, info, client_id)?;
-    let has_necessary = budget
-        .lines
-        .iter()
-        .any(|line| line.kind == budget::Kind::Necessary && line.amount.is_some());
-    let necessary_missing = budget
-        .lines
-        .iter()
-        .any(|line| line.kind == budget::Kind::Necessary && line.amount.is_none());
-    let cash_missing = budget.lines.iter().any(|line| {
-        matches!(
-            line.kind,
-            budget::Kind::Income | budget::Kind::Necessary | budget::Kind::Discretionary
-        ) && line.amount.is_none()
-    });
-    let has_income = budget
-        .lines
-        .iter()
-        .any(|line| line.kind == budget::Kind::Income && line.amount.is_some());
-    let savings_missing = budget
-        .lines
-        .iter()
-        .any(|line| line.kind == budget::Kind::Savings && line.amount.is_none());
-    let debt_missing = budget
-        .lines
-        .iter()
-        .any(|line| line.kind == budget::Kind::DebtPayment && line.amount.is_none());
-    let mut warnings = Vec::new();
-    if budget.revision == 0 {
-        warnings.push(
-            "No saved budget is available for emergency expenses or allocation checks.".to_owned(),
-        );
-    }
-    if !budget.summary.warnings.is_empty() {
-        warnings.push("Review missing, estimated, or deficit warnings in the saved budget; these projections use only entered values.".to_owned());
-    }
-    if debt.revision == 0 {
-        warnings.push("No saved debt plan: using the budget's debt allocation. Confirm that all obligations are included.".to_owned());
-    }
-    if debt
-        .comparison
-        .as_ref()
-        .is_some_and(|c| c.snowball.is_none() || c.avalanche.is_none())
-    {
-        warnings.push("The saved debt plan has incomplete or unmodeled terms; its entered payment budget does not verify required lender payments.".to_owned());
-    }
-    if debt.comparison.as_ref().is_some_and(|c| {
-        [c.snowball.as_ref(), c.avalanche.as_ref()]
-            .into_iter()
-            .flatten()
-            .any(|p| {
-                p.status != debt::Status::PaidOff || !p.negative_amortization_accounts.is_empty()
-            })
-    }) {
-        warnings.push("Review the debt plan's payment shortfall, growth, or horizon warnings; savings projections do not resolve those issues.".to_owned());
-    }
-    let debt_data = debt.data;
-    let context = savings::Context {
-        budget_revision: budget.revision,
-        debt_revision: debt.revision,
-        necessary_expenses: if has_necessary && !necessary_missing {
-            Some(budget.summary.necessary_expenses)
-        } else {
-            None
-        },
-        monthly_surplus: if budget.revision > 0 && has_income && has_necessary && !cash_missing {
-            Some(budget.summary.surplus_before_allocations)
-        } else {
-            None
-        },
-        budget_savings: if budget.revision > 0 && !savings_missing {
-            Some(budget.summary.proposed_savings)
-        } else {
-            None
-        },
-        budget_debt_payments: if budget.revision > 0 && !debt_missing {
-            Some(budget.summary.planned_debt_payments)
-        } else {
-            None
-        },
-        debt_start_month: debt_data.as_ref().map(|d| d.start_month.clone()),
-        debt_monthly_payment: debt_data.as_ref().and_then(|d| d.monthly_payment.clone()),
-        debt_changes: debt_data
-            .as_ref()
-            .map(|d| d.payment_changes.clone())
-            .unwrap_or_default(),
-        debt_extras: debt_data.map(|d| d.extras).unwrap_or_default(),
-        warnings,
-    };
+    let context = crate::planning::savings_context(&budget, &debt);
     let saved: Option<(i64,String,String)>=connection.query_row(
         "SELECT revision,plan_json,updated_at FROM client_savings_plans WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3",
         params![client_id,info.organization_id,info.counselor_id],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
@@ -1238,12 +1142,7 @@ fn read_debt_plan(
         params![client_id, info.organization_id, info.counselor_id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
     ).optional().map_err(storage_error)?;
     let budget = read_budget(connection, info, client_id)?;
-    let context = debt::BudgetContext {
-        revision: budget.revision,
-        monthly_capacity: budget.summary.available_for_debt,
-        planned_debt_payments: budget.summary.planned_debt_payments,
-        warnings: budget.summary.warnings,
-    };
+    let context = crate::planning::debt_context(&budget);
     let (revision, data, comparison, updated_at) = match saved {
         Some((revision, json, updated_at)) => {
             if json.len() > 131072 {

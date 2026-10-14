@@ -34,8 +34,8 @@ pub struct PlanInput {
     pub data: PlanData,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Context {
     pub budget_revision: i64,
     pub debt_revision: i64,
@@ -49,8 +49,8 @@ pub struct Context {
     pub debt_extras: Vec<DatedAmount>,
     pub warnings: Vec<String>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum ForecastStatus {
     Funded,
     Projected,
@@ -58,8 +58,8 @@ pub enum ForecastStatus {
     Unknown,
     HorizonReached,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Forecast {
     pub status: ForecastStatus,
     pub remaining: Option<String>,
@@ -67,8 +67,8 @@ pub struct Forecast {
     pub months_needed: Option<u32>,
     pub completion_date: Option<String>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GoalResult {
     pub suggested_contribution: Option<String>,
     pub contribution_months_before_due: Option<u32>,
@@ -76,8 +76,8 @@ pub struct GoalResult {
     pub forecast: Forecast,
     pub warnings: Vec<String>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Month {
     pub month: String,
     pub emergency_contribution: String,
@@ -86,14 +86,14 @@ pub struct Month {
     pub debt_reserved: Option<String>,
     pub unallocated: Option<String>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Scenario {
     pub forecast: Forecast,
     pub allocation_warning: Option<bool>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Summary {
     pub accessible_emergency: Option<String>,
     pub obligations_reserved: Option<String>,
@@ -108,8 +108,8 @@ pub struct Summary {
     pub warnings: Vec<String>,
     pub schedule: Vec<Month>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ClientSavingsPlan {
     pub client_id: String,
     pub revision: i64,

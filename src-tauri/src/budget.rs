@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 const MAX_CENTS: i64 = 100_000_000_000; // $1 billion per entered amount
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum Kind {
     Income,
     Necessary,
@@ -14,7 +14,7 @@ pub enum Kind {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum Frequency {
     Weekly,
     Biweekly,
@@ -41,8 +41,8 @@ pub struct BudgetInput {
     pub lines: Vec<BudgetLine>,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Summary {
     pub monthly_income: String,
     pub necessary_expenses: String,
@@ -59,8 +59,8 @@ pub struct Summary {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ClientBudget {
     pub client_id: String,
     pub revision: i64,

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { AssessmentDirectory, SavedAssessment, AssessmentRecordInput, FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
+import type { AssessmentPlans, AssessmentDirectory, SavedAssessment, AssessmentRecordInput, FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
 
 export function desktopAvailable(): boolean {
   return '__TAURI_INTERNALS__' in window;
@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getAssessmentPlanning: (clientId:string)=>command<AssessmentPlans>('get_assessment_planning',{clientId}),
   chooseAssessmentPdf: (clientId:string,id:string)=>command<string|null>('choose_assessment_pdf',{clientId,id}),
   exportAssessmentPdf: (clientId:string,id:string,path:string)=>command<{path:string;pages:number;recordId:string}>('export_assessment_pdf',{clientId,id,path}),
   listAssessmentRecords: (clientId:string)=>command<AssessmentDirectory>('list_assessment_records',{clientId}),

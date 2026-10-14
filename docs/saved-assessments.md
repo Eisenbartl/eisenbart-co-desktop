@@ -27,12 +27,7 @@ formatting and charts reuse the locally bundled dashboard components, using exac
 Rust-calculated strings and integer chart scales. Timestamps display in
 America/Chicago; calculation dates retain their explicit UTC label.
 
-Recurring-pattern decisions, saved plan/scenario inputs, debt APR terms and saved
-session notes are not included yet. Existing planning panels are separate entered
-estimates. No financial scenario is selected in this checkpoint. This record
-therefore supplies the assessment/reporting foundation, not the complete specified
-Counselor Report or Client Action Plan. Offline PDF/local export is implemented in 0.14.0. Direct application printing and scenario-backed
-client plans are subsequent work.
+Version 0.15.0 optionally attaches a named [captured planning scenario](captured-planning-scenarios.md), including saved plan inputs, debt APR/terms, explicit repayment selection and model outputs/milestones. Entered plans remain separate estimates. Recurring-pattern decisions and saved session notes are not captured yet. The complete specified Counselor Report/Client Action Plan and direct application printing remain open. Offline PDF/local export includes the scenario assumptions and summary milestones.
 
 ## Later changes
 

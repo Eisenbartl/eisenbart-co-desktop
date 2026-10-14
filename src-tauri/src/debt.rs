@@ -7,7 +7,7 @@ const MONTHS: i32 = 600;
 const BALANCE_LIMIT: i64 = 1_000_000_000_000_000;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum DebtType {
     CreditCard,
     AutoLoan,
@@ -18,7 +18,7 @@ pub enum DebtType {
     Custom,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum InterestModel {
     Unknown,
     FixedMonthly,
@@ -60,16 +60,16 @@ pub struct PlanInput {
     pub expected_revision: i64,
     pub data: PlanData,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum Status {
     PaidOff,
     InsufficientBudget,
     HorizonReached,
     ModelLimit,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Month {
     pub month: String,
     pub available_payment: String,
@@ -80,8 +80,8 @@ pub struct Month {
     pub total_payment: String,
     pub remaining_balance: String,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Projection {
     pub status: Status,
     pub payoff_month: Option<String>,
@@ -94,23 +94,23 @@ pub struct Projection {
     pub warnings: Vec<String>,
     pub schedule: Vec<Month>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Comparison {
     pub warnings: Vec<String>,
     pub snowball: Option<Projection>,
     pub avalanche: Option<Projection>,
 }
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BudgetContext {
     pub revision: i64,
     pub monthly_capacity: String,
     pub planned_debt_payments: String,
     pub warnings: Vec<String>,
 }
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ClientDebtPlan {
     pub client_id: String,
     pub revision: i64,

@@ -101,3 +101,10 @@ before the smoke run. Cargo integration tests can replace the debug application
 path with a binary expecting the development server. A refused localhost page
 means rebuild with `npm run tauri -- build --debug --no-bundle`; do not start a
 web server to make this standalone desktop check pass.
+
+The 0.15.0 workflow saves Alex's named planning scenario with explicit Avalanche
+selection, checks the entered 3,250.00 income / 716.67 unallocated / 35.35 interest /
+2028-06-30 savings milestone / 3,300.00 cash-flow closing separately from approved
+1,820.02 activity, changes/reverts the active budget without rewriting/reactivating
+the scenario, and repeats its PDF/identity/review/evidence checks after restart and
+both encrypted recovery paths. Sources and plans remain isolated by client.

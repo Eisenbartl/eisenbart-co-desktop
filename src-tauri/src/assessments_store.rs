@@ -74,6 +74,34 @@ pub(super) fn validate_records(
     }
     Ok(())
 }
+fn plan_revisions(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    client: &str,
+) -> Result<crate::planning::Revisions, String> {
+    let get = |table: &str| -> Result<i64, String> {
+        c.query_row(&format!("SELECT revision FROM {table} WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3"),params![client,w.organization_id,w.counselor_id],|r|r.get(0)).optional().map_err(storage_error).map(|v|v.unwrap_or(0))
+    };
+    Ok(crate::planning::Revisions {
+        budget: get("client_budgets")?,
+        debt: get("client_debt_plans")?,
+        savings: get("client_savings_plans")?,
+        cashflow: get("client_cashflow_plans")?,
+    })
+}
+fn read_plans(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    client: &str,
+) -> Result<crate::planning::Plans, String> {
+    Ok(crate::planning::Plans {
+        client_id: client.into(),
+        budget: read_budget(c, w, client)?,
+        debt: read_debt_plan(c, w, client)?,
+        savings: read_savings_plan(c, w, client)?,
+        cashflow: read_cashflow_plan(c, w, client)?,
+    })
+}
 fn record(c: &Connection, w: &WorkspaceInfo, client: &str, id: &str) -> Result<Record, String> {
     let (payload, digest) = decode(c, w, client, id)?;
     let current_client = scoped_client(c, w, client)?;
@@ -89,6 +117,11 @@ fn record(c: &Connection, w: &WorkspaceInfo, client: &str, id: &str) -> Result<R
         review_reasons
             .push("Workspace identity details changed after this assessment was saved.".into());
     }
+    if let Some(p) = &payload.planning {
+        if plan_revisions(c, w, client)? != p.revisions {
+            review_reasons.push("Saved budget, debt, savings or dated cash-flow plans changed after this scenario was captured. Its original assumptions and projections remain historical.".into());
+        }
+    }
     Ok(Record {
         client_id: client.into(),
         needs_review: !review_reasons.is_empty(),
@@ -98,6 +131,21 @@ fn record(c: &Connection, w: &WorkspaceInfo, client: &str, id: &str) -> Result<R
     })
 }
 impl Workspace {
+    pub fn get_assessment_planning(
+        &mut self,
+        client: &str,
+    ) -> Result<crate::planning::Plans, String> {
+        let s = self.session()?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)
+            .map_err(storage_error)?;
+        scoped_client(&tx, &s.info, client)?;
+        let plans = read_plans(&tx, &s.info, client)?;
+        tx.commit().map_err(storage_error)?;
+        Ok(plans)
+    }
+
     pub fn export_assessment_pdf(
         &mut self,
         client: &str,
@@ -115,6 +163,7 @@ impl Workspace {
         // Full records are read and verified only when opened, or during backup recovery.
         let source = imports_store::read_imports(&s.connection, &s.info, client)?;
         let rows=s.connection.prepare("SELECT id,title,created_at,period_start,period_end,source_revision FROM client_assessment_records WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3 ORDER BY rowid DESC").map_err(storage_error)?.query_map(params![client,s.info.organization_id,s.info.counselor_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,i64>(5)?))).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
+        let current_plans = plan_revisions(&s.connection, &s.info, client)?;
         let mut records = Vec::new();
         for (id, title, created_at, period_start, period_end, source_revision) in rows {
             required_text(&title, "Assessment title", 120)?;
@@ -124,6 +173,15 @@ impl Workspace {
             crate::imports::iso_date(&period_end)?;
             // Status derives from current context, never mutates the archived JSON.
             let profile_at_save:String=s.connection.query_row("SELECT json_extract(payload_json,'$.client.updatedAt') FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
+            let plan_json:Option<String>=s.connection.query_row("SELECT json_extract(payload_json,'$.planning.revisions') FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
+            let plans_changed = plan_json
+                .map(|json| {
+                    serde_json::from_str::<crate::planning::Revisions>(&json)
+                        .map(|r| r != current_plans)
+                        .map_err(|_| STORAGE_ERROR.to_owned())
+                })
+                .transpose()?
+                .unwrap_or(false);
             records.push(Summary {
                 id,
                 title,
@@ -132,7 +190,8 @@ impl Workspace {
                 period_end,
                 source_revision,
                 needs_review: source_revision != source.revision
-                    || profile_at_save != current.updated_at,
+                    || profile_at_save != current.updated_at
+                    || plans_changed,
             });
         }
         Ok(Directory {
@@ -175,7 +234,17 @@ impl Workspace {
             },
             calculation_date,
         )?;
+        let planning = input
+            .planning
+            .map(|mut selection| {
+                selection.label = required_text(&selection.label, "Scenario label", 120)?;
+                selection.assumptions =
+                    optional_text(&selection.assumptions, "Scenario assumptions", 4000, true)?;
+                crate::planning::capture(read_plans(&tx, &s.info, client)?, selection)
+            })
+            .transpose()?;
         let payload = Payload {
+            planning,
             format: assessments::FORMAT,
             calculator: assessments::CALCULATOR.into(),
             app_version: env!("CARGO_PKG_VERSION").into(),

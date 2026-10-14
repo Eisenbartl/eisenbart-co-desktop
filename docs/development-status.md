@@ -1,5 +1,58 @@
 # Development status
 
+## Stage 5E: captured saved planning scenarios — 0.15.0 source
+
+Added optional named planning snapshots to immutable internal assessments. A
+counselor reviews saved budget/debt/savings/dated cash-flow plans, states assumptions
+and explicitly chooses a repayment strategy (or none). Rust captures canonical
+inputs, exact contexts/results/schedules, plan versions/timestamps and selected
+outcomes. Approved historical activity remains separately calculated and unchanged.
+Later plan edits flag context without rewriting the original payload; restoring
+prior entered values does not restore the captured plan versions.
+
+Payload format 2 adds optional planning with `entered-plans-v1`; format 1 records
+remain readable/exportable. Schema stays 14 and old bytes are never rewritten.
+The save transaction checks source/profile and all four saved-plan versions and
+requires acknowledgment. IPC accepts selection/notes/versions, not financial
+outputs. Reads/export/recovery validate scoped identity, hash, canonical inputs,
+derived contexts and exact results from the original captured inputs. Shared pure
+context functions reuse existing live model rules without changing calculations.
+See [captured-planning-scenarios.md](captured-planning-scenarios.md).
+
+The read-only viewer shows budget assumptions/allocations, entered debt terms and
+selected payoff outcome, primary savings/goal milestones and independent dated
+cash-flow assumptions, with paginated captured schedules and preserved warnings.
+PDFs now include the selected hypothetical scenario, assumptions, terms and summary
+milestones; full model schedules remain in the encrypted record/viewer. Draft,
+load/client and refresh guards preserve failed drafts and prevent data carryover.
+
+| Check | Result |
+|---|---|
+| Locked cloud setup / production frontend build | Passed |
+| Interface suite | 83 passed; three new tests cover reviewed plan versions, selection-only IPC, separate canonical figures/escaped assumptions, stale draft retention/renewed acknowledgment, refresh/review flags and late/mismatched client replies |
+| Linux backend / worker suite | 120 library + 2 executable worker tests passed (122 total); four new tests cover independent models vs approved data, historical preservation/review flags, stale/missing/unsupported selection, scope/lock, forged outcomes/contexts/identity/version/extra fields, corrupted recovery rejection, format 1 compatibility, restart and legitimate historical restore |
+| Formatting / Clippy, warnings denied | Passed |
+| Native desktop compile | Pending this checkpoint's build completion |
+| Native full scenario/export/recovery workflow | Pending |
+| Windows source CI | Pending upload/run; installer creation remains disabled |
+| Clean Windows installation/offline release acceptance | Not run |
+
+Independent model examples: income 3,250.00 / unallocated 2,150.00, Snowball
+interest 43.10 vs Avalanche 35.35, emergency target 1,500.00 / completion
+2027-01-31. Captured historical cash flow remains 799.99 when a new approved record
+becomes 2,000.01. No frontend output can supply those captured amounts.
+
+This captures existing saved entered plans; general combined non-writing scenario
+variations/side-by-side comparison, a final client action plan, agreed priorities,
+remaining advanced debt models, recurring/session evidence and complete original
+report/release/commercial requirements remain open. A supported projection can
+still show shortfall/growth/horizon warnings; capture never certifies completeness
+or feasibility. No new dependency or installer was added.
+
+Next priority: **client action plans** with three to five prioritized actions,
+agreed allocations, selected debt/savings milestones, follow-up and final review.
+See [remaining-requirements.md](remaining-requirements.md).
+
 ## Stage 5D: offline internal assessment PDF export — 0.14.0 source
 
 Implemented local printable PDF export of saved immutable counselor assessments.

@@ -1199,7 +1199,9 @@ impl Workspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::tests::{budget_input, client_input, configured, PASSWORD};
+    use crate::storage::tests::{
+        budget_input, cashflow_input, client_input, configured, debt_input, savings_input, PASSWORD,
+    };
     use tempfile::tempdir;
     pub(super) const CHECKING:&str="Date,Description,Amount,Category,Type\n2026-09-01,Synthetic wages,2000,Wages,income\n2026-09-02,Synthetic rent,-1200,Housing,expense\n2026-09-03,Synthetic fee,-10.01,Fees,fee\n2026-09-04,Synthetic refund,20.01,Housing,refund\n2026-09-05,Synthetic reserve transfer,-200,Savings,transfer\n";
     fn doc(label: &str) -> DocumentInput {
@@ -1325,6 +1327,7 @@ mod tests {
     }
     fn assessment_input(s: &Snapshot, c: &Client) -> crate::assessments::Input {
         crate::assessments::Input {
+            planning: None,
             expected_revision: s.revision,
             expected_profile_updated_at: c.updated_at.clone(),
             from_month: "2026-09".into(),
@@ -1336,6 +1339,378 @@ mod tests {
             follow_up: "Review the fictional sources at the next appointment.".into(),
             acknowledge: true,
         }
+    }
+    fn saved_planning_fixture(w: &mut Workspace, client: &str) {
+        let mut budget = budget_input(0);
+        for (label, kind, amount) in [
+            ("Necessary", crate::budget::Kind::Necessary, "500"),
+            ("Discretionary", crate::budget::Kind::Discretionary, "200"),
+            ("Savings", crate::budget::Kind::Savings, "250"),
+            ("Debt", crate::budget::Kind::DebtPayment, "150"),
+        ] {
+            budget.lines.push(crate::budget::BudgetLine {
+                label: label.into(),
+                kind,
+                amount: Some(amount.into()),
+                frequency: crate::budget::Frequency::Monthly,
+                estimated: false,
+            });
+        }
+        w.save_client_budget(client, budget).unwrap();
+        w.save_client_debt_plan(client, debt_input(0)).unwrap();
+        w.save_client_savings_plan(client, savings_input(0))
+            .unwrap();
+        w.save_client_cashflow_plan(client, cashflow_input(0))
+            .unwrap();
+    }
+    fn scenario_input(w: &mut Workspace, s: &Snapshot, c: &Client) -> crate::assessments::Input {
+        let mut input = assessment_input(s, c);
+        let plans = w.get_assessment_planning(&c.id).unwrap();
+        input.planning = Some(crate::planning::Selection {
+            expected_revisions: plans.revisions(),
+            label: "Fictional primary plan".into(),
+            assumptions: "Entered planning estimates; lender dates remain to be verified.".into(),
+            debt_strategy: crate::planning::Strategy::Snowball,
+        });
+        input
+    }
+    #[test]
+    fn planning_snapshot_keeps_independent_historical_figures_and_original_entered_models() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let source = facts_fixture(&mut w, &c.id, dir.path());
+        saved_planning_fixture(&mut w, &c.id);
+        let input = scenario_input(&mut w, &source, &c);
+        let saved = w.save_assessment_record(&c.id, input).unwrap();
+        let id = saved.payload.id.clone();
+        let planning = saved.payload.planning.as_ref().unwrap();
+        assert_eq!(saved.payload.format, 2);
+        assert_eq!(saved.payload.assessment.operating_cashflow, "799.99");
+        assert_eq!(planning.plans.budget.summary.monthly_income, "3250.00");
+        assert_eq!(planning.plans.budget.summary.unallocated, "2150.00");
+        assert_eq!(
+            crate::planning::projection(planning)
+                .unwrap()
+                .total_interest,
+            "43.10"
+        );
+        assert_eq!(
+            planning
+                .plans
+                .savings
+                .summary
+                .as_ref()
+                .unwrap()
+                .emergency_target
+                .as_deref(),
+            Some("1500.00")
+        );
+        assert_eq!(
+            planning
+                .plans
+                .savings
+                .summary
+                .as_ref()
+                .unwrap()
+                .emergency
+                .completion_date
+                .as_deref(),
+            Some("2027-01-31")
+        );
+        let original = serde_json::to_value(planning).unwrap();
+        let digest = saved.digest.clone();
+        let rev = source.revision;
+        let mut edited = budget_input(1);
+        edited.lines[0].amount = Some("2000.01".into());
+        w.save_client_budget(&c.id, edited).unwrap();
+        let old = w.get_assessment_record(&c.id, &id).unwrap();
+        assert!(old.needs_review);
+        assert!(old
+            .review_reasons
+            .iter()
+            .any(|r| r.contains("Saved budget")));
+        assert_eq!(old.digest, digest);
+        assert_eq!(
+            serde_json::to_value(old.payload.planning.as_ref().unwrap()).unwrap(),
+            original
+        );
+        assert_eq!(w.get_client_imports(&c.id).unwrap().revision, rev);
+        assert!(w.list_assessment_records(&c.id).unwrap().records[0].needs_review);
+        let exported = w
+            .export_assessment_pdf(
+                &c.id,
+                &id,
+                dir.path().join("scenario.pdf").to_str().unwrap(),
+            )
+            .unwrap();
+        let doc = lopdf::Document::load(exported.path).unwrap();
+        let text = doc
+            .extract_text(&doc.get_pages().keys().copied().collect::<Vec<_>>())
+            .unwrap()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        for expected in [
+            "Captured planning scenario / hypothetical",
+            "Fictional primary plan",
+            "Monthly income: USD 3250.00",
+            "Projected total interest: USD 43.10",
+            "Primary emergency completion: 2027-01-31",
+            "Operating cash flow: USD 799.99",
+            "NEEDS REVIEW",
+            "Source / destination account",
+        ] {
+            assert!(text.contains(expected), "Missing {expected}");
+        }
+        let rejected = review(
+            &mut w,
+            &c.id,
+            &source.records[1].id,
+            Status::Rejected,
+            "Withdraw historical rent",
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            w.get_assessment_record(&c.id, &id)
+                .unwrap()
+                .payload
+                .assessment
+                .operating_cashflow,
+            "799.99"
+        );
+        let mut next = scenario_input(&mut w, &rejected, &c);
+        next.planning.as_mut().unwrap().debt_strategy = crate::planning::Strategy::Avalanche;
+        let new = w.save_assessment_record(&c.id, next).unwrap();
+        assert_eq!(new.payload.assessment.operating_cashflow, "2000.01");
+        assert_eq!(new.payload.planning.as_ref().unwrap().revisions.budget, 2);
+        assert_eq!(
+            new.payload.planning.as_ref().unwrap().debt_strategy,
+            crate::planning::Strategy::Avalanche
+        );
+        assert_eq!(
+            crate::planning::projection(new.payload.planning.as_ref().unwrap())
+                .unwrap()
+                .total_interest,
+            "35.35"
+        );
+        assert!(!new.needs_review);
+    }
+    #[test]
+    fn planning_snapshot_rejects_stale_choices_missing_budget_scope_and_unsupported_projection_atomically(
+    ) {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let source = facts_fixture(&mut w, &c.id, dir.path());
+        let mut input = scenario_input(&mut w, &source, &c);
+        input.planning.as_mut().unwrap().debt_strategy = crate::planning::Strategy::None;
+        assert!(w.save_assessment_record(&c.id, input).is_err());
+        saved_planning_fixture(&mut w, &c.id);
+        let stale = scenario_input(&mut w, &source, &c);
+        w.save_client_cashflow_plan(&c.id, cashflow_input(1))
+            .unwrap();
+        assert!(w
+            .save_assessment_record(&c.id, stale)
+            .err()
+            .unwrap()
+            .contains("changed elsewhere"));
+        assert!(w.list_assessment_records(&c.id).unwrap().records.is_empty());
+        let mut debt = debt_input(1);
+        debt.data.accounts[0].interest_model = crate::debt::InterestModel::Daily;
+        w.save_client_debt_plan(&c.id, debt).unwrap();
+        let input = scenario_input(&mut w, &source, &c);
+        assert!(w
+            .save_assessment_record(&c.id, input)
+            .err()
+            .unwrap()
+            .contains("no supported projection"));
+        let mut input = scenario_input(&mut w, &source, &c);
+        input.planning.as_mut().unwrap().debt_strategy = crate::planning::Strategy::None;
+        let saved = w.save_assessment_record(&c.id, input).unwrap();
+        assert!(crate::planning::projection(saved.payload.planning.as_ref().unwrap()).is_none());
+        let other = w
+            .save_client(ClientInput {
+                first_name: "Other".into(),
+                ..client_input()
+            })
+            .unwrap();
+        assert!(w
+            .get_assessment_record(&other.id, &saved.payload.id)
+            .is_err());
+        assert_eq!(
+            w.get_assessment_planning(&other.id)
+                .unwrap()
+                .revisions()
+                .budget,
+            0
+        );
+        assert!(w.get_assessment_planning("foreign-client").is_err());
+        w.lock_workspace();
+        assert!(w
+            .get_assessment_planning(&c.id)
+            .err()
+            .unwrap()
+            .contains("locked"));
+    }
+    #[test]
+    fn planning_snapshot_validation_rejects_forged_outcomes_context_identity_and_legacy_attachments(
+    ) {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let source = facts_fixture(&mut w, &c.id, dir.path());
+        saved_planning_fixture(&mut w, &c.id);
+        let input = scenario_input(&mut w, &source, &c);
+        let saved = w.save_assessment_record(&c.id, input).unwrap();
+        let value = serde_json::to_value(&saved.payload).unwrap();
+        for (pointer, bad) in [
+            (
+                "/planning/plans/budget/summary/monthlyIncome",
+                serde_json::json!("9999.99"),
+            ),
+            (
+                "/planning/plans/debt/comparison/snowball/totalInterest",
+                serde_json::json!("0.00"),
+            ),
+            (
+                "/planning/plans/savings/summary/emergency/completionDate",
+                serde_json::json!("2026-01-01"),
+            ),
+            (
+                "/planning/plans/cashflow/summary/combinedClosing",
+                serde_json::json!("9999.99"),
+            ),
+            (
+                "/planning/plans/savings/context/budgetRevision",
+                serde_json::json!(9),
+            ),
+            (
+                "/planning/plans/debt/clientId",
+                serde_json::json!("other-client"),
+            ),
+            ("/planning/revisions/budget", serde_json::json!(2)),
+            ("/planning/calculator", serde_json::json!("unsupported-v2")),
+            ("/format", serde_json::json!(1)),
+        ] {
+            let mut changed = value.clone();
+            *changed.pointer_mut(pointer).unwrap() = bad;
+            let p: crate::assessments::Payload = serde_json::from_value(changed).unwrap();
+            assert!(
+                crate::assessments::validate(&p).is_err(),
+                "Accepted {pointer}"
+            );
+        }
+        let mut extra = value.clone();
+        extra["planning"]["plans"]["budget"]["unrecognized"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<crate::assessments::Payload>(extra).is_err());
+        let mut changed = value.clone();
+        changed["planning"]["plans"]["savings"]["summary"]["emergencyTarget"] =
+            serde_json::json!("999.99");
+        let json = serde_json::to_string(&changed).unwrap();
+        let hash = format!("{:x}", Sha256::digest(json.as_bytes()));
+        let conn = &w.session.as_ref().unwrap().connection;
+        conn.execute_batch("DROP TRIGGER assessment_records_no_update;")
+            .unwrap();
+        conn.execute(
+            "UPDATE client_assessment_records SET payload_json=?1,digest=?2 WHERE id=?3",
+            params![json, hash, saved.payload.id],
+        )
+        .unwrap();
+        assert!(w.get_assessment_record(&c.id, &saved.payload.id).is_err());
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        assert!(w.prepare_restore(backup.path, PASSWORD.into()).is_err());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            w.get_client_imports(&c.id).unwrap().revision,
+            source.revision
+        );
+    }
+    #[test]
+    fn planning_snapshot_restart_and_recovery_keep_historical_models_and_read_format_one() {
+        let (root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let source = facts_fixture(&mut w, &c.id, dir.path());
+        let old = w
+            .save_assessment_record(&c.id, assessment_input(&source, &c))
+            .unwrap();
+        let mut legacy = serde_json::to_value(&old.payload).unwrap();
+        legacy["format"] = serde_json::json!(1);
+        legacy["appVersion"] = serde_json::json!("0.14.0");
+        assert!(!legacy.as_object().unwrap().contains_key("planning"));
+        let json = serde_json::to_string(&legacy).unwrap();
+        let hash = format!("{:x}", Sha256::digest(json.as_bytes()));
+        let conn = &w.session.as_ref().unwrap().connection;
+        conn.execute_batch("DROP TRIGGER assessment_records_no_update;")
+            .unwrap();
+        conn.execute(
+            "UPDATE client_assessment_records SET payload_json=?1,digest=?2 WHERE id=?3",
+            params![json, hash, old.payload.id],
+        )
+        .unwrap();
+        conn.execute_batch(
+            include_str!("assessments-schema.sql")
+                .lines()
+                .find(|l| l.starts_with("CREATE TRIGGER assessment_records_no_update "))
+                .unwrap(),
+        )
+        .unwrap();
+        saved_planning_fixture(&mut w, &c.id);
+        let input = scenario_input(&mut w, &source, &c);
+        let saved = w.save_assessment_record(&c.id, input).unwrap();
+        let digest = saved.digest.clone();
+        w.save_client_budget(&c.id, budget_input(1)).unwrap();
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        drop(w);
+        let mut w = Workspace::new(root.path().to_path_buf());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let legacy = w.get_assessment_record(&c.id, &old.payload.id).unwrap();
+        assert_eq!(legacy.payload.format, 1);
+        assert!(legacy.payload.planning.is_none());
+        assert!(!legacy.needs_review);
+        let current = w.get_assessment_record(&c.id, &saved.payload.id).unwrap();
+        assert!(current.needs_review);
+        assert_eq!(current.digest, digest);
+        assert_eq!(
+            crate::planning::projection(current.payload.planning.as_ref().unwrap())
+                .unwrap()
+                .total_interest,
+            "43.10"
+        );
+        w.lock_workspace();
+        let review = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(review.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let restored = w.get_assessment_record(&c.id, &saved.payload.id).unwrap();
+        assert_eq!(restored.digest, digest);
+        assert!(restored.needs_review);
+        assert_eq!(
+            restored
+                .payload
+                .planning
+                .as_ref()
+                .unwrap()
+                .plans
+                .budget
+                .summary
+                .unallocated,
+            "2150.00"
+        );
+        assert_eq!(
+            w.get_assessment_record(&c.id, &old.payload.id)
+                .unwrap()
+                .payload
+                .format,
+            1
+        );
     }
     #[test]
     fn assessment_pdf_exports_original_figures_unicode_evidence_and_review_status_without_writes() {

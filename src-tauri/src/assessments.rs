@@ -6,11 +6,13 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 pub const MAX_PAYLOAD: usize = 8 * 1024 * 1024;
-pub const FORMAT: u32 = 1;
+pub const FORMAT: u32 = 2;
 pub const CALCULATOR: &str = "approved-assessment-v1";
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Input {
+    #[serde(default)]
+    pub planning: Option<crate::planning::Selection>,
     pub expected_revision: i64,
     pub expected_profile_updated_at: String,
     pub from_month: String,
@@ -24,6 +26,8 @@ pub struct Input {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Payload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub planning: Option<crate::planning::Snapshot>,
     pub format: u32,
     pub calculator: String,
     pub app_version: String,
@@ -89,7 +93,8 @@ pub fn capture(mut source: imports::Snapshot) -> imports::Snapshot {
 }
 pub fn validate(payload: &Payload) -> Result<(), String> {
     let bad = || "The saved assessment evidence is invalid or unsupported.".to_owned();
-    if payload.format != FORMAT
+    if !matches!(payload.format, 1 | FORMAT)
+        || (payload.format == 1 && payload.planning.is_some())
         || payload.calculator != CALCULATOR
         || payload.app_version.is_empty()
         || payload.id.is_empty()
@@ -99,6 +104,9 @@ pub fn validate(payload: &Payload) -> Result<(), String> {
         || payload.basis.revision != payload.assessment.revision
     {
         return Err(bad());
+    }
+    if let Some(p) = &payload.planning {
+        crate::planning::validate(p, &payload.client.id)?;
     }
     let date = chrono::DateTime::parse_from_rfc3339(&payload.created_at)
         .map_err(|_| bad())?

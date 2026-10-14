@@ -12,7 +12,7 @@ pub struct Account {
     pub opening_balance: Option<String>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum Kind {
     Paycheck,
     Bill,
@@ -28,7 +28,7 @@ impl Kind {
     }
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum Frequency {
     Once,
     Weekly,
@@ -37,7 +37,7 @@ pub enum Frequency {
     Monthly,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub enum Certainty {
     Confirmed,
     Estimated,
@@ -71,8 +71,8 @@ pub struct PlanInput {
     pub expected_revision: i64,
     pub data: PlanData,
 }
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Context {
     pub budget_revision: i64,
     pub debt_revision: i64,
@@ -83,14 +83,14 @@ pub struct Context {
     pub debt_monthly_payment: Option<String>,
     pub savings_monthly_contribution: Option<String>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Balance {
     pub account_id: String,
     pub amount: Option<String>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Entry {
     pub schedule_index: usize,
     pub date: String,
@@ -106,8 +106,8 @@ pub struct Entry {
     pub next_paycheck: Option<String>,
     pub warnings: Vec<String>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Day {
     pub date: String,
     pub balances: Vec<Balance>,
@@ -115,8 +115,8 @@ pub struct Day {
     pub entry_indices: Vec<usize>,
     pub warnings: Vec<String>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Summary {
     pub ledger: Vec<Entry>,
     pub days: Vec<Day>,
@@ -124,8 +124,8 @@ pub struct Summary {
     pub combined_closing: Option<String>,
     pub warnings: Vec<String>,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ClientCashflowPlan {
     pub client_id: String,
     pub revision: i64,
