@@ -143,3 +143,14 @@ minimum yields needs 1,733.33 / future 600.00, standard targets 1,625.00 / 975.0
 percentages fail with assumptions retained; no saved budget or source value changes.
 Temporary comparison inputs reset across client/restart boundaries. Artifacts
 include `native-budget-methods-*.png`.
+
+
+The 0.19.0 workflow compares a temporary combined proposal before recording Alex’s
+saved planning assessment and after restart and both recovery paths. It changes
+biweekly income, discretionary spending, debt base payment, emergency contribution
+and an explicit bill date, checks exact side-by-side 3,466.67 income/1,183.34
+allocation buffer/23.01 interest/February 2027 payoff/December 2027 savings date,
+and confirms the saved model inputs and 3,300.00 dated closing remain intact.
+Invalid precision is rejected with the proposal retained; a read-only reload resets
+it. A fresh client mount has no temporary baseline or draft. The same complete run
+retains all prior report, action-plan, source review and encrypted recovery checks.

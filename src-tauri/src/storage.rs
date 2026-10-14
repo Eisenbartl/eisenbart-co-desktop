@@ -427,6 +427,15 @@ impl Workspace {
         crate::dashboard::assess(&snapshot, input, chrono::Utc::now().date_naive())
     }
 
+    pub fn compare_financial_scenarios(
+        &mut self,
+        client_id: &str,
+        input: crate::scenarios::Input,
+    ) -> Result<crate::scenarios::Comparison, String> {
+        let plans = self.get_assessment_planning(client_id)?;
+        crate::scenarios::compare(plans, input)
+    }
+
     pub fn compare_budget_methods(
         &mut self,
         client_id: &str,
@@ -3092,3 +3101,7 @@ mod tests {
         assert!(w.compare_budget_methods(&client.id, input()).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "scenarios_tests.rs"]
+mod scenario_tests;

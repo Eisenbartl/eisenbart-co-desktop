@@ -735,6 +735,42 @@ def assert_counselor_evidence_restored(driver: WebDriver, artifacts: Path, label
     driver.click(".saved-assessments > summary")
 
 
+def check_combined_scenarios(driver: WebDriver, artifacts: Path, label: str) -> None:
+    driver.click(".combined-scenarios > details > summary")
+    if driver.visible("#scenario-label"):
+        raise SmokeFailure("A temporary combined proposal unexpectedly persisted")
+    driver.click_button("Reload saved scenario baseline")
+    driver.wait_value("#scenario-debt", "100.00", "saved debt baseline for combined comparison")
+    driver.click(".scenario-budget-changes > summary")
+    driver.fill("#scenario-budget-0", "1600")
+    driver.fill("#scenario-budget-3", "100")
+    driver.fill("#scenario-debt", "200")
+    driver.fill("#scenario-emergency", "300")
+    driver.select("#scenario-proposedStrategy", "Snowball")
+    driver.click(".scenario-cash-changes > summary")
+    driver.fill("#scenario-cash-date-0", "2026-11-08")
+    driver.fill("#scenario-assumptions", "Temporary synthetic proposal; retain saved plans")
+    driver.click_button("Compare temporary proposal")
+    driver.wait_text(".combined-scenario-results", "$1,183.34", "independent combined proposal allocation buffer")
+    table=".combined-scenario-results table"
+    for value in ["$3,250.00", "$3,466.67", "$35.35", "$23.01", "2027-02", "2027-12-31", "$3,300.00"]:
+        driver.wait_text(table,value,"exact side-by-side combined financial outcome")
+    driver.wait_value("#budget-amount-0", "1500.00", "combined preview does not write saved income")
+    driver.wait_value("#debt-monthly-payment", "100.00", "combined preview does not write saved debt")
+    driver.wait_value("#savings-emergencyContribution", "200.00", "combined preview does not write saved savings")
+    driver.wait_value("#cashflow-date-0", "2026-11-03", "combined preview does not write saved dated schedules")
+    driver.scroll_to(".combined-scenario-results", "center")
+    driver.screenshot(artifacts / f"native-combined-scenarios-{label}.png")
+    driver.fill("#scenario-debt", "12.345")
+    driver.click_button("Compare temporary proposal")
+    driver.wait_text(".combined-scenarios [role=alert]", "two decimal", "invalid proposal precision is rejected")
+    driver.wait_value("#scenario-debt", "12.345", "failed proposal retained for correction")
+    driver.click_button("Reload saved scenario baseline")
+    driver.wait_value("#scenario-debt", "100.00", "read-only reload restores original baseline")
+    driver.click(".combined-scenarios > details > summary")
+    status("combined exact what-if comparison, separate dated edits, unchanged saved models, rejected assumptions and temporary input reset")
+
+
 def check_budget_methods(driver: WebDriver, artifacts: Path, label: str) -> None:
     if driver.command("GET", f"/element/{driver.element('.budget-methods')}/property/open") is not True:
         driver.click(".budget-methods > summary")
@@ -884,6 +920,7 @@ def assert_captured_planning_restored(driver: WebDriver, artifacts: Path, label:
 
 def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> None:
     driver.open_client("Alex Fictional")
+    check_combined_scenarios(driver, artifacts, "initial")
     driver.click(".saved-assessments > summary")
     driver.wait(lambda:driver.visible("#saved-assessment") is not None,"saved assessment directory before scenario")
     driver.fill("#record-from","2026-09")
@@ -1324,6 +1361,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_statement_balances_restored(driver, artifacts, "restart")
     assert_captured_planning_restored(driver, artifacts, "restart")
     check_budget_methods(driver, artifacts, "restart")
+    check_combined_scenarios(driver, artifacts, "restart")
     assert_counselor_evidence_restored(driver, artifacts, "restart")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
@@ -1416,6 +1454,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_statement_balances_restored(driver, artifacts, "encrypted-restore")
     assert_captured_planning_restored(driver, artifacts, "encrypted-restore")
     check_budget_methods(driver, artifacts, "encrypted-restore")
+    check_combined_scenarios(driver, artifacts, "encrypted-restore")
     assert_counselor_evidence_restored(driver, artifacts, "encrypted-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
@@ -1451,6 +1490,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_statement_balances_restored(driver, artifacts, "error-screen-restore")
     assert_captured_planning_restored(driver, artifacts, "error-screen-restore")
     check_budget_methods(driver, artifacts, "error-screen-restore")
+    check_combined_scenarios(driver, artifacts, "error-screen-restore")
     assert_counselor_evidence_restored(driver, artifacts, "error-screen-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)

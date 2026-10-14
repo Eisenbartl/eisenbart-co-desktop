@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   chooseBackupFolder:vi.fn(), chooseRestoreFile:vi.fn(), createWorkspaceBackup:vi.fn(), prepareWorkspaceRestore:vi.fn(), confirmWorkspaceRestore:vi.fn(), cancelWorkspaceRestore:vi.fn(),
   chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),getClientImports:vi.fn(),reviewRecurringPayment:vi.fn(),reviewStatementBalances:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn(),
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
+  getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
 }));
 
@@ -80,6 +81,20 @@ async function selectClient(name: string) {
 }
 
 describe('desktop workspace', () => {
+  it('blocks writes during scenario baseline loading and clears temporary proposals and late replies on lock',async()=>{
+    const pending=deferred<unknown>();mocks.getAssessmentPlanning.mockReturnValueOnce(pending.promise);
+    render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No saved budget yet');await screen.findByText('No imported transactions yet');
+    fireEvent.click(screen.getByText('Compare combined financial scenarios'));
+    fireEvent.click(screen.getByRole('button',{name:'Reload saved scenario baseline'}));
+    await waitFor(()=>expect(screen.getByRole('button',{name:'Add income'})).toBeDisabled());
+    expect(screen.getByRole('button',{name:'Save changes'})).toBeDisabled();
+    await act(async()=>mocks.lockHandler?.());
+    await act(async()=>pending.resolve({clientId:'client-a',privateAssumption:'Alice private scenario'}));
+    expect(document.documentElement.outerHTML).not.toContain('Alice private scenario');
+    expect(screen.queryByText('Compare combined financial scenarios')).not.toBeInTheDocument();
+    expect(mocks.compareFinancialScenarios).not.toHaveBeenCalled();
+  });
+
   it('guards unsaved CSV selection and clears private source paths on lock',async()=>{
     render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No imported transactions yet');
     fireEvent.change(screen.getByLabelText('Local CSV file'),{target:{value:'D:\\Synthetic\\alice-private.csv'}});

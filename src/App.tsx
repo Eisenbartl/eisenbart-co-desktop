@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import SavingsEditor from './SavingsEditor';
 import DebtEditor from './DebtEditor';
 import BudgetEditor from './BudgetEditor';
+import ScenarioComparisons from './ScenarioComparisons';
 import { listen } from '@tauri-apps/api/event';
 import { api, desktopAvailable, resetApiSession } from './api';
 import { CLIENT_STATUSES, type Client, type ClientInput, type ClientNote, type SetupInput, type RestoreResult, type WorkspaceInfo } from './types';
@@ -140,6 +141,7 @@ function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy }:
   const [baseline, setBaseline] = useState<ClientInput>(() => client ? clientInput(client) : emptyClient());
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [scenarioBusy,setScenarioBusy]=useState(false);
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteDirty, setNoteDirty] = useState(false);
   const [budgetDirty, setBudgetDirty] = useState(false);
@@ -156,7 +158,7 @@ function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy }:
   const mounted = useRef(true);
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline) || noteDirty || budgetDirty || debtDirty || savingsDirty || cashflowDirty || importsDirty;
   useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
-  useEffect(() => { onBusy(saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy); }, [saving, noteSaving, budgetSaving, debtSaving, savingsSaving, cashflowSaving, importsBusy, onBusy]);
+  useEffect(() => { onBusy(saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy); }, [saving, noteSaving, budgetSaving, debtSaving, savingsSaving, cashflowSaving, importsBusy, scenarioBusy, onBusy]);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; onDirty(false); onBusy(false); };
@@ -194,7 +196,7 @@ function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy }:
     <div className="panel editor-panel">
       <div className="panel-heading"><div><p className="eyebrow">{client ? 'CLIENT RECORD' : 'CLIENT INTAKE'}</p><h2>{client ? `${client.firstName} ${client.lastName}` : 'Add a new client'}</h2></div>{client && <Status status={client.status} />}</div>
       <form onSubmit={save} noValidate>
-        <fieldset disabled={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy}>
+        <fieldset disabled={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy}>
           <div className="form-section"><h3>Personal information</h3><p className="muted small">Start with the essentials. You can add details as counseling progresses.</p></div>
           <div className="form-grid">
             <label htmlFor="first-name">First name <span className="required">*</span><input id="first-name" value={draft.firstName} onChange={e => update('firstName', e.target.value)} maxLength={100} autoComplete="given-name" required /></label>
@@ -212,12 +214,13 @@ function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy }:
         </fieldset>
       </form>
     </div>
-    {client ? <ClientNotes key={client.id} client={client} workspace={workspace} onBusy={setNoteSaving} onDirty={setNoteDirty} clientSaving={saving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy} /> : <div className="panel notes-placeholder"><Icon name="file" size={25} /><div><h3>Session notes</h3><p className="muted small">Save this client first to start a dated counseling history.</p></div></div>}
-    {client && <BudgetEditor key={client.id} client={client} onDirty={setBudgetDirty} onBusy={setBudgetSaving} otherSaving={saving || noteSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy} />}
-    {client && <DebtEditor key={client.id} client={client} onDirty={setDebtDirty} onBusy={setDebtSaving} otherSaving={saving || noteSaving || budgetSaving || savingsSaving || cashflowSaving || importsBusy} />}
-    {client && <SavingsEditor key={client.id} client={client} onDirty={setSavingsDirty} onBusy={setSavingsSaving} otherSaving={saving || noteSaving || budgetSaving || debtSaving || cashflowSaving || importsBusy} />}
-    {client && <CashflowEditor key={client.id} client={client} onDirty={setCashflowDirty} onBusy={setCashflowSaving} otherSaving={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || importsBusy} />}
-    {client && <ImportsEditor key={client.id} client={client} onDirty={setImportsDirty} onBusy={setImportsBusy} otherSaving={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving} />}
+    {client ? <ClientNotes key={client.id} client={client} workspace={workspace} onBusy={setNoteSaving} onDirty={setNoteDirty} clientSaving={saving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy} /> : <div className="panel notes-placeholder"><Icon name="file" size={25} /><div><h3>Session notes</h3><p className="muted small">Save this client first to start a dated counseling history.</p></div></div>}
+    {client && <BudgetEditor key={client.id} client={client} onDirty={setBudgetDirty} onBusy={setBudgetSaving} otherSaving={saving || noteSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy} />}
+    {client && <DebtEditor key={client.id} client={client} onDirty={setDebtDirty} onBusy={setDebtSaving} otherSaving={saving || noteSaving || budgetSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy} />}
+    {client && <SavingsEditor key={client.id} client={client} onDirty={setSavingsDirty} onBusy={setSavingsSaving} otherSaving={saving || noteSaving || budgetSaving || debtSaving || cashflowSaving || importsBusy || scenarioBusy} />}
+    {client && <CashflowEditor key={client.id} client={client} onDirty={setCashflowDirty} onBusy={setCashflowSaving} otherSaving={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || importsBusy || scenarioBusy} />}
+    {client && <ScenarioComparisons key={client.id} clientId={client.id} disabled={dirty || saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy} onBusy={setScenarioBusy} />}
+    {client && <ImportsEditor key={client.id} client={client} onDirty={setImportsDirty} onBusy={setImportsBusy} otherSaving={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || scenarioBusy} />}
   </div>;
 }
 

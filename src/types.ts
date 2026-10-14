@@ -277,3 +277,18 @@ export interface ActionPlanDirectory {clientId:string;records:{id:string;title:s
 export interface BudgetMethodInput {expectedRevision:number;requiredDebtMinimum:string|null;needsPercent:string;wantsPercent:string;futurePercent:string}
 export interface BudgetMethodBucket {label:string;percent:string;actual:string|null;target:string|null;difference:string|null;position:'unavailable'|'at'|'above'|'below'}
 export interface BudgetMethodComparison {clientId:string;revision:number;calculator:string;requiredDebtMinimum:string|null;zeroBased:{income:string|null;assigned:string|null;remaining:string|null;status:'incomplete'|'fullyAssigned'|'unassigned'|'overAssigned'};standard:{label:string;buckets:BudgetMethodBucket[]};custom:{label:string;buckets:BudgetMethodBucket[]};warnings:string[]}
+
+export interface ScenarioAmountChange {amount:string|null}
+export interface ScenarioBudgetChange {index:number;amount:string|null}
+export interface ScenarioCashChange {index:number;amount:string|null;firstDate:string}
+export interface ScenarioInput {
+ expectedRevisions:PlanningRevisions;label:string;assumptions:string;
+ baselineStrategy:PlanningDebtStrategy;proposedStrategy:PlanningDebtStrategy;
+ budgetChanges:ScenarioBudgetChange[];debtPayment:ScenarioAmountChange|null;
+ emergencyContribution:ScenarioAmountChange|null;cashChanges:ScenarioCashChange[];
+}
+export interface ScenarioOutcome {strategy:PlanningDebtStrategy;firstMonthBuffer:string|null;plans:AssessmentPlans}
+export interface ScenarioComparison {
+ calculator:string;clientId:string;createdAt:string;revisions:PlanningRevisions;input:ScenarioInput;
+ baseline:ScenarioOutcome;proposed:ScenarioOutcome;warnings:string[];
+}

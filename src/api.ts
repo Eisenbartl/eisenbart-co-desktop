@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { BudgetMethodInput, BudgetMethodComparison, AssessmentEvidencePreview, ActionPlanReview, ActionPlanInput, SavedActionPlan, ActionPlanDirectory, AssessmentPlans, AssessmentDirectory, SavedAssessment, AssessmentRecordInput, FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
+import type { ScenarioInput, ScenarioComparison, BudgetMethodInput, BudgetMethodComparison, AssessmentEvidencePreview, ActionPlanReview, ActionPlanInput, SavedActionPlan, ActionPlanDirectory, AssessmentPlans, AssessmentDirectory, SavedAssessment, AssessmentRecordInput, FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
 
 export function desktopAvailable(): boolean {
   return '__TAURI_INTERNALS__' in window;
@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  compareFinancialScenarios:(clientId:string,input:ScenarioInput)=>command<ScenarioComparison>('compare_financial_scenarios',{clientId,input}),
   compareBudgetMethods:(clientId:string,input:BudgetMethodInput)=>command<BudgetMethodComparison>('compare_budget_methods',{clientId,input}),
   getAssessmentEvidence:(clientId:string)=>command<AssessmentEvidencePreview>('get_assessment_evidence',{clientId}),
   reviewClientActionPlan: (clientId:string,assessmentId:string)=>command<ActionPlanReview>('review_client_action_plan',{clientId,assessmentId}),

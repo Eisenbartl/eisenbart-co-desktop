@@ -63,3 +63,5 @@ Cloud tasks already use an isolated environment: reuse the checkout under `/work
 The Windows workflow builds an NSIS installer with Tauri's `offlineInstaller` WebView2 mode. This is intended to include the WebView2 runtime installer so the resulting package can install without fetching that component during installation. Building it requires network access to obtain dependencies and the runtime redistributable.
 
 The packaging configuration must be exercised on Windows. Merely committing the workflow does not produce an executable, verify the NSIS installer, demonstrate offline installation, or provide a signing certificate. Follow [windows.md](windows.md) for the build and release checks.
+
+Combined scenario previews (`combined-preview-v1`) read all four scoped saved models atomically, validate the baseline and expected versions, and recalculate an indexed proposal with the same Rust calculators and shared contexts. React sends input strings only; no scenario or live-plan write occurs. Dated entries require explicit edits. Historical captures retain `entered-plans-v1` unchanged. See [combined-scenario-comparisons.md](combined-scenario-comparisons.md).

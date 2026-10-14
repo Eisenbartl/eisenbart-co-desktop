@@ -1,5 +1,52 @@
 # Development status
 
+## Stage 3F: temporary combined scenario comparisons — 0.19.0 source
+
+Counselors can now explicitly load all four saved models and compare them side by
+side with a temporary proposal. Existing budget amounts/frequencies, debt base
+payment and strategy, primary emergency contribution, and explicit dated-entry
+amounts/dates can be adjusted. The comparison shows allocation buffers, repayment
+cost/payoff/status, savings target/completion/status and dated closing/warning
+counts, with canonical changes and both sets of model limitations. Scratch inputs
+reset across clients/locks/restart and live-plan edits. Historical scenarios,
+reports, client agreements, approved facts, live plans and audit events remain
+unchanged. See [combined-scenario-comparisons.md](combined-scenario-comparisons.md).
+
+Rust reads a scoped atomic baseline, checks all four expected versions and
+canonical model calculations, validates bounded indexed input-only proposals and
+recalculates shared budget/debt/savings/cash-flow contexts in order. It preserves
+exact cents/rounding, unknowns and unsupported terms. Changed budget/dates are
+estimates; cash-flow entries are never automatically synchronized. Existing future
+debt changes/extras and savings goal/reserve commitments stay in force. The
+interface blocks competing writes/unfinished edits, invalidates old comparisons,
+retains failed drafts and rejects late/wrong-client/version/calculator replies.
+No migration/dependency/installer is introduced; schema remains 15 and historical
+`entered-plans-v1` captures stay unchanged. This preview uses `combined-preview-v1`.
+
+Independent examples include 1,600 biweekly → 3,466.67; income/spending proposals
+propagate to the savings allocation check; debt 200.00/primary savings 300.00 plus
+retained goal 50.00 yield 1,816.67 buffer in the backend fixture, or 1,183.34 in
+the native fixture with 1,633.33 necessary spending. Proposed snowball interest
+23.01/payoff February 2027 compares with baseline avalanche 35.35. A delayed bill
+removes the projected shortfall without writing its saved date or changing the
+3,300.00 closing. Future debt changes/extras remain reserved and later deficits
+are visible. Unknown values and missing optional models remain unavailable.
+
+| Check | Result |
+|---|---|
+| Locked setup / production frontend build | Passed |
+| Interface suite | 102 passed; proposal input-only IPC, canonical outcomes/unknowns, preserved failures, dirty/concurrent guards, reload and client/lock/version isolation |
+| Linux backend / worker checks | Full 138-library + 2 worker run passed; subsequent five focused scenario tests passed, including two added retained-commitment/absent-model checks (140 unique library tests covered) |
+| Formatting / Clippy, warnings denied | Passed |
+| Native desktop compile / complete workflow | Validation in progress |
+| Windows source CI | Validation in progress; installer packaging not requested |
+| Clean Windows installation/offline release acceptance | Not run |
+
+Next priority: **persistent combined scenarios and explicit selection for reports**,
+retaining input assumptions, versions, outcomes and uncertainty independently of
+approved history. Seven major roadmap work areas remain; this checkpoint advances
+the financial-model area without completing it or establishing release readiness.
+
 ## Stage 3E: optional budget method comparisons — 0.18.0 source
 
 The saved-budget panel now offers read-only zero-based, 50/30/20 and custom

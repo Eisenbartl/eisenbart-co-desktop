@@ -19,6 +19,7 @@ mod reconciliation;
 mod recurring;
 mod report_evidence;
 mod savings;
+mod scenarios;
 mod storage;
 
 use models::{Client, ClientInput, ClientNote, SetupStatus, SetupWorkspaceInput, WorkspaceInfo};
@@ -596,6 +597,19 @@ fn list_client_notes(
 }
 
 #[tauri::command]
+async fn compare_financial_scenarios(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: scenarios::Input,
+) -> Result<scenarios::Comparison, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.compare_financial_scenarios(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Financial scenario comparison could not finish.".to_owned())?
+}
+#[tauri::command]
 async fn compare_budget_methods(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -763,6 +777,7 @@ pub fn run() {
             add_client_note,
             list_client_notes,
             compare_budget_methods,
+            compare_financial_scenarios,
             get_client_budget,
             save_client_budget,
             get_client_debt_plan,
