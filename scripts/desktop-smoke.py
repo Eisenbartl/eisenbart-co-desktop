@@ -126,6 +126,24 @@ class WebDriver:
                 time.sleep(0.25)
         raise SmokeFailure("Read-only script observation did not complete")
 
+    def scroll_element(self, element: str, block: str = "center") -> None:
+        # Narrow viewport movement only: no arbitrary script, focus, typing,
+        # clicks, application commands or financial writes can enter this retry.
+        if block not in ("center", "start"):
+            raise ValueError("Unsupported viewport alignment")
+        for attempt in range(2):
+            try:
+                self.script("arguments[0].scrollIntoView({block:arguments[1],inline:'nearest',behavior:'instant'});",
+                            [{ELEMENT_KEY: element}, block])
+                return
+            except DriverFailure as error:
+                if error.code != "connection error" or attempt == 1:
+                    raise
+                time.sleep(0.25)
+
+    def scroll_to(self, selector: str, block: str = "center") -> None:
+        self.scroll_element(self.element(selector), block)
+
     def find(self, selector: str, using: str = "css selector") -> str:
         # Finding an element is read-only. WebKitWebDriver can occasionally
         # close a locator connection during native startup/teardown. Retry one
@@ -180,8 +198,7 @@ class WebDriver:
         # WebKit's automatic scrolling can leave a partially visible control
         # at the viewport edge and click its old position. Center first; this
         # changes only the viewport and never invokes application commands.
-        self.script("arguments[0].scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});",
-                    [{ELEMENT_KEY: element}])
+        self.scroll_element(element)
         self.command("GET", f"/element/{element}/displayed")
         self.command("POST", f"/element/{element}/click", {})
 
@@ -347,7 +364,7 @@ def check_csv_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> No
     driver.click_button("Review checking.csv record 5")
     driver.select("#review-status", "Approved")
     driver.fill("#review-reason", "Verified synthetic merchant refund; offset spending, not income")
-    driver.script("document.querySelector('#review-ack').scrollIntoView({block: 'center', behavior: 'instant'})")
+    driver.scroll_to("#review-ack", "center")
     driver.click("#review-ack")
     driver.wait(lambda: driver.command("GET", f"/element/{driver.find('#review-ack')}/property/checked") is True,
                 "individual source acknowledgment selected")
@@ -375,7 +392,7 @@ def check_csv_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> No
     driver.click_button("Review checking.csv record 4")
     driver.click(".review-history > summary")
     driver.wait_text(".review-history", "Approved → Rejected", "immutable reversal history")
-    driver.script("document.querySelector('.transaction-review').scrollIntoView({block: 'center'})")
+    driver.scroll_to(".transaction-review", "center")
     driver.screenshot(artifacts / "native-csv-review.png")
     inspect(checking, "Synthetic checking", "1000", "1610", existing=True)
     driver.wait_text(".imports-panel [role=alert]", "already", "same-account exact-source duplicate rejected")
@@ -425,7 +442,7 @@ def check_pdf_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> No
     driver.click_button("Review statement.pdf record 1")
     driver.click(".transaction-review > details > summary")
     driver.wait_text(".transaction-review", "2026-10-01 Fictional payroll 1000.01", "original PDF text remains immutable")
-    driver.script("document.querySelector('.transaction-review').scrollIntoView({block:'center'})")
+    driver.scroll_to(".transaction-review", "center")
     driver.screenshot(artifacts / "native-pdf-review.png")
     status("bounded separate PDF parser, damaged-file rejection, explicit source-line selection, page provenance, individual approval, and pending-data exclusion")
 
@@ -503,7 +520,7 @@ def check_recurring_imports(driver: WebDriver, artifacts: Path, data_root: Path)
     driver.click(".recurring-history > summary")
     driver.wait_text(".recurring-history","Payment pattern decision history (3)","append-only recurring decision history")
     driver.wait_text(".recurring-history","Reconfirmed all three source decisions after reversal","captured reason history")
-    driver.script("document.querySelector('.recurring-review').scrollIntoView({block:'start',behavior:'instant'})")
+    driver.scroll_to(".recurring-review", "start")
     driver.screenshot(artifacts / "native-recurring-review.png")
     status("merchant evidence, month-end suggestions, explicit subscription decisions, exact totals, reversal invalidation, and append-only history")
 
@@ -595,7 +612,7 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     save_counselor_assessment(driver,"Taylor post-withdrawal assessment")
     driver.wait_text(".saved-assessment-view .assessment-totals","Operating cash flow$500.00","new assessment excludes the withdrawn approval")
     open_original_counselor_assessment(driver)
-    driver.script("document.querySelector('.saved-assessment-view').scrollIntoView({block:'start',behavior:'instant'})")
+    driver.scroll_to(".saved-assessment-view", "start")
     driver.screenshot(artifacts / "native-saved-counselor-assessment.png")
     export_original_assessment_pdf(driver, artifacts, "before-restart")
     driver.click(".saved-assessments > summary")
@@ -605,7 +622,7 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.wait_text(".balance-check-table","Difference $300.02","independent rejected-row discrepancy")
     driver.click(".statement-balance-history > summary")
     driver.wait_text(".statement-balance-history","Statement balance setting history (2)","immutable source-order decisions")
-    driver.script("document.querySelector('.balance-check-table').scrollIntoView({block:'center',behavior:'instant'})")
+    driver.scroll_to(".balance-check-table", "center")
     driver.screenshot(artifacts / "native-statement-balances.png")
     status("explicit source order, exact row balances, wrong-order conflicts, separate approved data, one-cent corrections, rejected exclusion, and setting history")
 
@@ -729,7 +746,7 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.wait_text(".saved-assessment-status","Needs review","reverting values does not restore captured plan version")
     export_captured_planning_pdf(driver,artifacts,"before-restart")
     driver.interactive(".assessment-export .button.primary")
-    driver.script("document.querySelector('.saved-assessment-view .captured-planning').scrollIntoView({block:'start',behavior:'instant'})")
+    driver.scroll_to(".saved-assessment-view .captured-planning", "start")
     driver.screenshot(artifacts / "native-captured-planning-scenario.png")
     driver.click(".saved-assessments > summary")
     status("captured scenario selection, debt/savings/cash-flow assumptions, historical isolation and permanent plan-version review flags")
@@ -890,7 +907,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_value("#budget-amount-0", "1500.00", "canonical stored income")
     for total in ["$3,250.00", "$1,633.33", "$1,833.33", "$1,416.67", "$1,116.67", "$716.67"]:
         driver.wait_text(".budget-totals", total, f"independently checked monthly plan total {total}")
-    driver.script("document.querySelector('.budget-results').scrollIntoView({block: 'center'})")
+    driver.scroll_to(".budget-results", "center")
     driver.screenshot(artifacts / "native-budget.png")
     status("exact client budget calculation, encrypted save, and allocations")
 
@@ -919,7 +936,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.select("#debt-strategy", "Avalanche")
     driver.wait_text(".debt-month-table", "$90.00", "avalanche first-month target payment")
     driver.wait_text(".debt-month-table", "$420.00", "avalanche first-month closing balance")
-    driver.script("document.querySelector('.debt-results').scrollIntoView({block: 'start'})")
+    driver.scroll_to(".debt-results", "start")
     driver.screenshot(artifacts / "native-debt-comparison.png")
     status("saved debt strategies and monthly account schedules match independent examples")
 
@@ -953,7 +970,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text("table[aria-label='Emergency contribution scenarios']", "Exceeds entered funds", "overallocated scenario warning")
     driver.select("#savings-schedule-month", "2028-06")
     driver.wait_text(".savings-schedule", "$99.99", "capped final emergency contribution")
-    driver.script("document.querySelector('.savings-results').scrollIntoView({block: 'start'})")
+    driver.scroll_to(".savings-results", "start")
     driver.screenshot(artifacts / "native-savings.png")
     status("savings buckets, exact coverage/targets/deadlines, contribution scenarios, and allocation checks")
 
@@ -985,12 +1002,12 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".cashflow-day-details", "2026-11-06", "next entered payday")
     for value in ["$2,100.00", "$1,200.00", "$3,300.00"]:
         driver.wait_text(".cashflow-results .budget-totals", value, "independent closing balance")
-    driver.script("document.querySelector('.cashflow-calendar').scrollIntoView({block: 'center'})")
+    driver.scroll_to(".cashflow-calendar", "center")
     driver.screenshot(artifacts / "native-cashflow-calendar.png")
     driver.click_button("Chronological ledger")
     driver.wait_text(".cashflow-ledger", "-$700.00", "chronological running balance")
     driver.wait_text(".cashflow-ledger", "Alex synthetic account transfer", "paired transfer in ledger")
-    driver.script("document.querySelector('.cashflow-ledger').scrollIntoView({block: 'center'})")
+    driver.scroll_to(".cashflow-ledger", "center")
     driver.screenshot(artifacts / "native-cashflow-ledger.png")
     driver.fill("#cashflow-date-0", "2026-11-08")
     driver.click_button("Preview cash flow / refresh references")
@@ -1135,7 +1152,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_captured_planning_restored(driver, artifacts, "restart")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
-    driver.script("document.querySelector('.financial-dashboard').scrollIntoView({block:'start',behavior:'instant'})")
+    driver.scroll_to(".financial-dashboard", "start")
     driver.screenshot(artifacts / "native-financial-dashboard.png")
     driver.wait_text(".recurring-review","Synthetic rent","Alex has his own payment groups")
     if "Fictional household service" in driver.text(".recurring-review"):

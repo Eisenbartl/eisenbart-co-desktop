@@ -33,14 +33,48 @@ load/client and refresh guards preserve failed drafts and prevent data carryover
 | Linux backend / worker suite | 120 library + 2 executable worker tests passed (122 total); four new tests cover independent models vs approved data, historical preservation/review flags, stale/missing/unsupported selection, scope/lock, forged outcomes/contexts/identity/version/extra fields, corrupted recovery rejection, format 1 compatibility, restart and legitimate historical restore |
 | Formatting / Clippy, warnings denied | Passed |
 | Native desktop compile | Passed standalone debug build with no bundle |
-| Native full scenario/export/recovery workflow | Initial run passed capture, plan edit/reversion and scenario PDF checks, then stopped on an early recovery locator. Added an explicit read-only panel readiness wait; final run pending |
-| Windows source CI | Initial run 38610161975: 82 interface tests passed, existing balance-review test selected before initial effects settled. The test helper now awaits render/effect completion; final run pending. All installer steps skipped |
+| Native full scenario/export/recovery workflow | Passed final shipping source c1a7d8b with corrected readiness/viewport harness: explicit Avalanche capture, separate approved figures, budget edit/reversion without rewriting/reactivating the record, four scenario PDFs, all previous workflows, restart and both encrypted recovery paths; runner exit 0 |
+| Windows source CI | Passed final shipping source c1a7d8b: [run 38611157947](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38611157947), 83 interface + 121 library + 2 worker tests (123 backend/process total); all installer/package/upload steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
 
 Independent model examples: income 3,250.00 / unallocated 2,150.00, Snowball
 interest 43.10 vs Avalanche 35.35, emergency target 1,500.00 / completion
 2027-01-31. Captured historical cash flow remains 799.99 when a new approved record
 becomes 2,000.01. No frontend output can supply those captured amounts.
+
+Initial Windows run 38610161975 passed 82 interface tests but stopped on an existing
+balance-review test before backend checks. The ImportsEditor test helper now waits
+for initial render/React effects before exposing review controls to the tests;
+financial assertions remain intact. The corrected Windows run passed.
+
+The first native run passed capture, source/planning isolation, plan edit/reversion
+and PDF checks, then selected a recovery panel before it had loaded. The recovery
+helper now explicitly waits for that panel with a read-only observation. A second
+run lost a driver connection while scrolling before a CSV approval; screenshot
+and driver log confirmed a responsive app/transport reset. A narrow viewport helper
+now retries one connection closure using fixed scroll-only code. It cannot type,
+click, invoke app commands or replay approvals/saves; general scripts and financial
+mutations still have no automatic retry. A fresh isolated full run completed with
+exit 0, without weakening assertions or replaying interrupted writes.
+
+Final shipping source `c1a7d8ba6a8ed2c5a9585aa0b97151e252c73730` is uploaded and
+Windows-validated; the final test-harness correction and verification notes are
+preserved in the checkpoint. Native UI/PDF visual review confirmed the captured
+hypothetical label/assumptions, America/Chicago saved-plan times, original monthly
+income 3,250.00 / unallocated 716.67, entered terms and explicit Avalanche outcome
+35.35 interest, and disclosures about independent plans/missing information. The
+fictional nine-page PDF preserves original approved 1,820.02 activity, savings
+milestone 2028-06-30 and independent cash-flow closing 3,300.00 after later changes.
+No forms, JavaScript, original attachments or workspace credentials are included.
+
+Source/full-history checkpoints are saved outside the checkout at
+`/workspace/shared/checkpoints/eisenbart-planning-scenarios-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-planning-scenarios.bundle`. Validation logs
+are under `/workspace/shared`: `planning-snapshot-ui-tests.log`,
+`planning-snapshot-backend-tests.log`, `planning-snapshot-focused-tests.log`,
+`planning-snapshot-clippy.log`, `planning-snapshot-native-complete.log`,
+`planning-snapshot-native-complete.exit` and `planning-snapshot-windows-validation.log`.
+Final native artifacts are in `desktop-smoke-planning-snapshot-complete`.
 
 This captures existing saved entered plans; general combined non-writing scenario
 variations/side-by-side comparison, a final client action plan, agreed priorities,

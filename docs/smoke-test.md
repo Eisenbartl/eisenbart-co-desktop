@@ -108,3 +108,9 @@ selection, checks the entered 3,250.00 income / 716.67 unallocated / 35.35 inter
 1,820.02 activity, changes/reverts the active budget without rewriting/reactivating
 the scenario, and repeats its PDF/identity/review/evidence checks after restart and
 both encrypted recovery paths. Sources and plans remain isolated by client.
+
+Viewport movement now uses a dedicated helper with fixed `scrollIntoView` code
+and only an element/alignment argument. It retries one driver connection closure
+while moving the viewport, including positioning before a click. It cannot type,
+click, invoke application commands or replay a financial mutation. General scripts,
+clicks, typing, approvals and saves still have no automatic retry.
