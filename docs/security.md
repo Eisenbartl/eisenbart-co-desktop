@@ -30,7 +30,7 @@ SQLCipher protects the database at rest. It does not protect against malware, a 
 
 Audit records live inside the same encrypted database. The application appends operational history, but this does not make the history tamper-proof against someone with the key and direct database access. Avoid sensitive values in logs and audit descriptions.
 
-Documents are not imported or stored in this milestone. Encrypted document storage, input validation, parser resource limits, provenance, approval controls, and recovery tests must be built before statement imports are considered safe. No PDF or OCR component has been approved for commercial distribution.
+Bounded synthetic UTF-8 CSV imports now use explicit mapping, no active-content execution, immutable provenance/history, client-scoped encrypted storage, authorized optional original-file BLOBs, atomic decisions, duplicate warnings, and approved-only exact totals. Lock clears transient previews. Existing encrypted backups include imported sources/history; restore checks approved records and reciprocal transfer links. See [csv-import-review.md](csv-import-review.md) for resource limits and unimplemented parser/review features. This does not establish installed Windows or independent security acceptance. PDF/OCR components remain unselected.
 
 ## Windows memory-lock diagnostics
 

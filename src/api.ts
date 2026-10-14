@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
+import type { ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
 
 export function desktopAvailable(): boolean {
   return '__TAURI_INTERNALS__' in window;
@@ -22,6 +22,14 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  chooseClientCsv: (clientId:string) => command<string|null>('choose_client_csv',{clientId}),
+  inspectClientCsv: (clientId:string,path:string) => command<CsvPreview>('inspect_client_csv',{clientId,path}),
+  cancelClientCsv: (token:string) => command<void>('cancel_client_csv',{token}),
+  getClientImports: (clientId:string) => command<ClientImports>('get_client_imports',{clientId}),
+  stageClientCsv: (clientId:string,input:CsvStageInput) => command<ClientImports>('stage_client_csv',{clientId,input}),
+  reviewTransaction: (clientId:string,input:TransactionReviewInput) => command<ClientImports>('review_transaction',{clientId,input}),
+  bulkApproveTransactions: (clientId:string,input:TransactionBulkInput) => command<ClientImports>('bulk_approve_transactions',{clientId,input}),
+  pairTransferTransactions: (clientId:string,input:TransactionPairInput) => command<ClientImports>('pair_transfer_transactions',{clientId,input}),
   chooseBackupFolder: () => command<string | null>('choose_backup_folder'),
   chooseRestoreFile: () => command<string | null>('choose_restore_file'),
   createWorkspaceBackup: (directory: string, password: string) => command<BackupResult>('create_workspace_backup', {directory,password}),

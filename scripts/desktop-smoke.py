@@ -113,6 +113,18 @@ class WebDriver:
     def script(self, script: str, args: list[object] | None = None) -> object:
         return self.command("POST", "/execute/sync", {"script": script, "args": args or []})
 
+    def observe_script(self, script: str) -> object:
+        # Call only for the explicit DOM/runtime observations below. A closed
+        # native-driver connection may be retried once; mutations use script().
+        for attempt in range(2):
+            try:
+                return self.script(script)
+            except DriverFailure as error:
+                if error.code != "connection error" or attempt == 1:
+                    raise
+                time.sleep(0.25)
+        raise SmokeFailure("Read-only script observation did not complete")
+
     def find(self, selector: str, using: str = "css selector") -> str:
         # Finding an element is read-only. WebKitWebDriver can occasionally
         # close a locator connection during native startup/teardown. Retry one
@@ -164,6 +176,12 @@ class WebDriver:
 
     def click(self, selector: str, using: str = "css selector") -> None:
         element = self.interactive(selector, using)
+        # WebKit's automatic scrolling can leave a partially visible control
+        # at the viewport edge and click its old position. Center first; this
+        # changes only the viewport and never invokes application commands.
+        self.script("arguments[0].scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});",
+                    [{ELEMENT_KEY: element}])
+        self.command("GET", f"/element/{element}/displayed")
         self.command("POST", f"/element/{element}/click", {})
 
     def click_button(self, text: str) -> None:
@@ -182,9 +200,13 @@ class WebDriver:
     def select(self, selector: str, value: str) -> None:
         # WebDriver clicks the HTML option rather than calling application code.
         select = self.interactive(selector)
-        option = self.command("POST", f"/element/{select}/element", {
-            "using": "xpath", "value": f"./option[normalize-space(.)={json.dumps(value)}]",
-        })
+        try:
+            option = self.command("POST", f"/element/{select}/element", {
+                "using": "xpath", "value": f"./option[normalize-space(.)={json.dumps(value, ensure_ascii=False)}]",
+            })
+        except DriverFailure as error:
+            available = self.command("GET", f"/element/{select}/property/textContent")
+            raise SmokeFailure(f"Could not select {value!r} in {selector}; choices={available!r}: {error}") from None
         if not isinstance(option, dict) or ELEMENT_KEY not in option:
             raise SmokeFailure("Native driver did not return the requested workflow option")
         self.command("POST", f"/element/{option[ELEMENT_KEY]}/click", {})
@@ -278,6 +300,89 @@ def status(message: str) -> None:
     print(f"PASS {message}", flush=True)
 
 
+def check_csv_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> None:
+    """Visible review workflow with independently known exact-cent results."""
+    source = data_root / "external-csv"
+    source.mkdir()
+    checking = source / "checking.csv"
+    checking.write_text("Date,Description,Amount,Category,Type\n"
+        "2026-09-01,Synthetic wages,2000,Wages,income\n"
+        "2026-09-02,Synthetic rent,-1200,Housing,expense\n"
+        "2026-09-03,Synthetic fee,-10.01,Fees,fee\n"
+        "2026-09-04,Synthetic refund,20.01,Housing,refund\n"
+        "2026-09-05,Synthetic reserve transfer,-200,Savings,transfer\n", encoding="utf-8")
+    savings = source / "savings.csv"
+    savings.write_text("Date,Description,Amount,Category,Type\n"
+        "2026-09-06,Synthetic incoming transfer,200,Savings,transfer\n", encoding="utf-8")
+
+    def inspect(path: Path, account: str, opening: str, closing: str, existing: bool = False) -> None:
+        driver.fill("#csv-path", str(path))
+        driver.click_button("Inspect CSV")
+        driver.wait_text(".csv-preview", path.name, "captured CSV source sample")
+        if existing:
+            driver.select("#csv-account", account)
+        else:
+            driver.fill("#csv-account-label", account)
+            if account == "Synthetic savings":
+                driver.select("#csv-account-kind", "Savings")
+        for key, heading in [("date", "1: Date"), ("description", "2: Description"),
+                             ("amount", "3: Amount"), ("category", "4: Category"), ("kind", "5: Type")]:
+            driver.select(f"#csv-map-{key}", heading)
+        for key, value in [("periodStart", "2026-09-01"), ("periodEnd", "2026-09-30"),
+                           ("openingBalance", opening), ("closingBalance", closing)]:
+            driver.fill(f"#csv-{key}", value)
+        retention = "//label[contains(.,'Authorize retaining the complete original CSV')]/input"
+        driver.click(retention, "xpath")
+        driver.wait(lambda: driver.command("GET", f"/element/{driver.find(retention, 'xpath')}/property/checked") is True,
+                    "explicit source retention checkbox selected")
+        driver.click_button("Import into review queue")
+
+    inspect(checking, "Synthetic checking", "1000", "1610")
+    driver.wait_text(".imports-progress", "Approved 0", "no automatic transaction approvals")
+    for index in range(1, 4):
+        driver.click(f".imports-table tbody tr:nth-child({index}) input[type=checkbox]")
+    driver.click_button("Approve selected validated rows (3)")
+    driver.wait_text(".imports-totals", "$1,210.01", "independent expense and fee total")
+    driver.click_button("Review checking.csv record 5")
+    driver.select("#review-status", "Approved")
+    driver.fill("#review-reason", "Verified synthetic merchant refund; offset spending, not income")
+    driver.script("document.querySelector('#review-ack').scrollIntoView({block: 'center', behavior: 'instant'})")
+    driver.click("#review-ack")
+    driver.wait(lambda: driver.command("GET", f"/element/{driver.find('#review-ack')}/property/checked") is True,
+                "individual source acknowledgment selected")
+    driver.click_button("Save transaction decision")
+    driver.wait_text(".imports-totals", "$1,190.00", "refund offsets spending exactly")
+    driver.click_button("Review checking.csv record 4")
+    driver.select("#review-status", "Rejected")
+    driver.fill("#review-reason", "Synthetic fee excluded after individual review")
+    driver.click_button("Save transaction decision")
+    driver.wait_text(".imports-totals", "$1,179.99", "rejection withdraws earlier fee approval")
+    status("CSV import remains unapproved until explicit decisions; refund and fee reversal match independent exact totals")
+    inspect(savings, "Synthetic savings", "300", "500")
+    driver.wait_text(".imports-progress", "Approved 3", "new source remains unapproved")
+    driver.click(".transfer-review > summary")
+    driver.select("#transfer-left", "Synthetic checking · 2026-09-05 · -$200.00 · Synthetic reserve transfer")
+    driver.select("#transfer-right", "Synthetic savings · 2026-09-06 · $200.00 · Synthetic incoming transfer")
+    driver.fill("#transfer-reason", "Verified equal opposite synthetic movements between owned accounts")
+    driver.click_button("Approve paired internal transfer")
+    driver.wait_text(".imports-progress", "Approved 5 · Rejected 1", "both transfer legs approved atomically")
+    for value in ["$2,000.00", "$1,200.00", "$20.01", "$1,179.99", "$820.01", "$620.01", "$200.00"]:
+        driver.wait_text(".imports-totals", value, "independently checked approved totals and account activity")
+    driver.click(".imports-sources > summary")
+    driver.wait_text(".imports-sources", "complete source retained with authorization", "source retention authorization")
+    driver.wait_text(".imports-sources", "Approved difference after every row is decided: $10.01", "rejected fee remains visible in statement discrepancy")
+    driver.click_button("Review checking.csv record 4")
+    driver.click(".review-history > summary")
+    driver.wait_text(".review-history", "Approved → Rejected", "immutable reversal history")
+    driver.script("document.querySelector('.transaction-review').scrollIntoView({block: 'center'})")
+    driver.screenshot(artifacts / "native-csv-review.png")
+    inspect(checking, "Synthetic checking", "1000", "1610", existing=True)
+    driver.wait_text(".imports-panel [role=alert]", "already", "same-account exact-source duplicate rejected")
+    driver.click_button("Cancel CSV preview")
+    driver.wait_value("#csv-path", "", "cancel clears transient source path")
+    status("CSV provenance, explicit bulk/individual decisions, refund, reversal, transfer pairing, duplicate rejection and encrypted retention")
+
+
 def run_checks(driver: WebDriver, binary: Path, password: str,
                wrong_password: str, artifacts: Path, restart_driver: Callable[[], None], data_root: Path) -> None:
     organization = "Smoke Test Counseling — Fictional"
@@ -292,7 +397,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
 
     driver.open(binary)
     driver.element("#organization")
-    if driver.script("return Boolean(window.__TAURI_INTERNALS__)") is not True:
+    if driver.observe_script("return Boolean(window.__TAURI_INTERNALS__)") is not True:
         raise SmokeFailure("This session is not running in the native Tauri desktop runtime")
     location = urllib.parse.urlsplit(str(driver.command("GET", "/url")))
     embedded = ((location.scheme in ("http", "https") and location.hostname == "tauri.localhost")
@@ -465,6 +570,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".cashflow-results", "Saved cash-flow forecast", "unchanged saved-date preview")
     status("dated cash flow, per-account shortfall, paired transfer, calendar/ledger, and non-writing date preview")
 
+    check_csv_imports(driver, artifacts, data_root)
+
     create_client(second_name, second_last, "Create a fictional spending plan")
     driver.wait_text(".notes-history", "No session notes yet.", "second client's empty note history")
     if note in driver.text(".notes-history"):
@@ -481,6 +588,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".cashflow-panel", "No saved cash-flow plan yet", "second client's empty cash-flow plan")
     if driver.visible("#cashflow-account-label-0"):
         raise SmokeFailure("The first client's cash-flow account appeared for another client")
+    driver.wait_text(".imports-panel", "No imported transactions yet", "isolated second client CSV queue")
     status("two clients with isolated notes, budgets, debts, savings, and cash flow")
 
     driver.open_client("Alex Fictional")
@@ -496,13 +604,13 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click_button("Lock workspace")
     driver.element("#password")
     private_values = [f"{first_name} {first_last}", f"{second_name} {second_last}",
-                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve", "Alex synthetic checking", "Alex synthetic cash-flow priority", "Alex synthetic dated pay"]
+                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve", "Alex synthetic checking", "Alex synthetic cash-flow priority", "Alex synthetic dated pay", "Synthetic reserve transfer", "Synthetic incoming transfer", "Synthetic checking", "checking.csv"]
 
     def assert_locked() -> None:
-        markup = str(driver.script("return document.documentElement.outerHTML"))
+        markup = str(driver.observe_script("return document.documentElement.outerHTML"))
         if any(value in markup for value in private_values):
             raise SmokeFailure("Private workspace data remained in the DOM after locking")
-        if driver.script("return document.querySelector('#password').value") != "":
+        if driver.observe_script("return document.querySelector('#password').value") != "":
             raise SmokeFailure("The locked screen retained a password value")
 
     assert_locked()
@@ -530,7 +638,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     # Verify the application is responsive before a deliberate process stop.
     # Restart the native driver too: WebKitGTK session deletion/reuse can race
     # its browser shutdown, independent of application storage correctness.
-    if driver.script("return Boolean(window.__TAURI_INTERNALS__)") is not True:
+    if driver.observe_script("return Boolean(window.__TAURI_INTERNALS__)") is not True:
         raise SmokeFailure("The application stopped responding before persistence validation")
     restart_driver()
     driver.open(binary)
@@ -555,6 +663,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".savings-results", "2028-06-30", "persisted emergency forecast")
     driver.wait_value("#cashflow-date-0", "2026-11-03", "persisted original payment date")
     driver.wait_text(".cashflow-results .budget-totals", "$3,300.00", "persisted cash-flow forecast")
+    driver.wait_text(".imports-progress", "Approved 5 · Rejected 1", "persisted CSV decisions and paired transfers")
+    driver.wait_text(".imports-totals", "$820.01", "persisted exact approved activity")
     driver.open_client("Robin Synthetic")
     driver.wait_text(".editor-panel", "Robin Synthetic", "persisted second client")
     driver.wait_text(".notes-history", "No session notes yet.", "persisted second client's empty note history")
@@ -572,6 +682,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".cashflow-panel", "No saved cash-flow plan yet", "persisted second client's empty cash flow")
     if driver.visible("#cashflow-account-label-0"):
         raise SmokeFailure("Persisted cash-flow plans crossed client boundaries")
+    driver.wait_text(".imports-panel", "No imported transactions yet", "persisted CSV isolation")
     status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets/debts/savings/cash-flow plans")
 
 
@@ -645,6 +756,11 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".budget-totals", "$716.67", "restored budget")
     driver.wait_text(".savings-results", "2028-06-30", "restored savings plan")
     driver.wait_text(".cashflow-results .budget-totals", "$3,300.00", "restored cash-flow plan")
+    driver.wait_text(".imports-progress", "Approved 5 · Rejected 1", "backup restores CSV decisions and reciprocal links")
+    driver.wait_text(".imports-totals", "$820.01", "backup restores exact imported totals")
+    driver.click_button("Review checking.csv record 4")
+    driver.click(".review-history > summary")
+    driver.wait_text(".review-history", "Approved → Rejected", "backup restores immutable review history")
     status("encrypted backup, wrong-password rejection, interrupted review, explicit restore, retained source, and restored plans")
     # Simulate missing metadata only after stopping every synthetic app process.
     # The error-screen recovery flow must work without opening the damaged vault.
@@ -671,6 +787,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.open_client("Alex Fictional")
     driver.wait_text(".notes-history", note, "restored records after simulated metadata loss")
     driver.wait_value("#cashflow-date-0", "2026-11-03", "restored original cash-flow dates after recovery")
+    driver.wait_text(".imports-progress", "Approved 5 · Rejected 1", "storage-error recovery includes imported records")
     status("fresh-process activation and error-screen recovery after simulated metadata loss")
 
 
@@ -747,6 +864,11 @@ def main() -> int:
                     driver.wait(ready, "native WebDriver readiness", seconds=25)
                     run_checks(driver, binary, password, wrong_password, artifacts, restart_driver, root)
                 except (SmokeFailure, OSError, ValueError):
+                    try:
+                        if driver.visible(".imports-panel [role=alert]"):
+                            print("CSV diagnostic: " + driver.safe(driver.text(".imports-panel [role=alert]")), flush=True)
+                    except SmokeFailure:
+                        pass
                     if driver.session_id:
                         try:
                             driver.screenshot(artifacts / "failure.png")

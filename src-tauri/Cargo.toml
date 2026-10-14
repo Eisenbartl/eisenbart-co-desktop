@@ -1,6 +1,6 @@
 [package]
 name = "eisenbart-counseling-suite"
-version = "0.6.0"
+version = "0.7.0"
 description = "Offline financial counseling desktop foundation"
 edition = "2021"
 rust-version = "1.90"
@@ -27,6 +27,7 @@ hmac = "0.12.1"
 sha2 = "0.10.9"
 tauri-plugin-dialog = "2"
 fs2 = "0.4.3"
+csv = "1.4.0"
 
 [dev-dependencies]
 tempfile = "3"

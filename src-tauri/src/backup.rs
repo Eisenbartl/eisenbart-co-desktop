@@ -554,6 +554,7 @@ impl Workspace {
             read_debt_plan(&connection, &workspace_info, id)?;
             read_savings_plan(&connection, &workspace_info, id)?;
             read_cashflow_plan(&connection, &workspace_info, id)?;
+            imports_store::read_imports(&connection, &workspace_info, id)?;
         }
         let review = RestoreReview {
             token: Uuid::new_v4().to_string(),
@@ -1034,7 +1035,7 @@ mod tests {
         let client = all_records(&mut w);
         let target = tempdir().unwrap();
         let connection = &w.session.as_ref().unwrap().connection;
-        connection.execute_batch("CREATE TABLE audit_events_v6 (
+        connection.execute_batch("DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; CREATE TABLE audit_events_v6 (
             id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
             event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved','cashflow_plan_saved')),
             entity_id TEXT,created_at TEXT NOT NULL,
@@ -1073,7 +1074,7 @@ mod tests {
                 .unwrap()
                 .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
                 .unwrap(),
-            7
+            SCHEMA_VERSION
         );
         w.confirm_restore(r.token, "RESTORE".into()).unwrap();
         w.unlock_workspace(PASSWORD.into()).unwrap();

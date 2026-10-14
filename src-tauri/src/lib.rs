@@ -1,6 +1,7 @@
 mod budget;
 mod cashflow;
 mod debt;
+mod imports;
 mod models;
 mod savings;
 mod storage;
@@ -30,6 +31,110 @@ fn access<T>(
         let _ = state.handle.emit("workspace-locked", ());
     }
     operation(&mut workspace)
+}
+
+#[tauri::command]
+async fn choose_client_csv(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_client(&client_id))?;
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("UTF-8 CSV statements", &["csv"])
+            .blocking_pick_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local CSV file.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "CSV selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn inspect_client_csv(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    path: String,
+) -> Result<imports::Preview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.inspect_client_csv(client_id, path))
+    })
+    .await
+    .map_err(|_| "CSV inspection could not finish.".to_owned())?
+}
+#[tauri::command]
+fn cancel_client_csv(state: State<'_, DesktopState>, token: String) -> Result<(), String> {
+    access(&state, |w| {
+        w.cancel_client_csv(&token);
+        Ok(())
+    })
+}
+#[tauri::command]
+fn get_client_imports(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<imports::Snapshot, String> {
+    access(&state, |w| w.get_client_imports(&client_id))
+}
+#[tauri::command]
+async fn stage_client_csv(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: imports::StageInput,
+) -> Result<imports::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.stage_client_csv(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Import/review operation could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn review_transaction(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: imports::ReviewInput,
+) -> Result<imports::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.review_transaction(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Import/review operation could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn bulk_approve_transactions(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: imports::BulkInput,
+) -> Result<imports::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.bulk_approve_transactions(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Import/review operation could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn pair_transfer_transactions(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: imports::PairInput,
+) -> Result<imports::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.pair_transfer_transactions(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Import/review operation could not finish.".to_owned())?
 }
 
 #[tauri::command]
@@ -310,6 +415,14 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            choose_client_csv,
+            inspect_client_csv,
+            cancel_client_csv,
+            get_client_imports,
+            stage_client_csv,
+            review_transaction,
+            bulk_approve_transactions,
+            pair_transfer_transactions,
             choose_backup_folder,
             choose_restore_file,
             create_workspace_backup,

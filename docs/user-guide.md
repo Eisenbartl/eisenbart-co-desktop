@@ -1,8 +1,8 @@
 # Windows evaluation guide
 
 This development build provides a local workspace, client profiles, counseling
-statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.6.0 source) savings planning, cash-flow calendars, encrypted backups, and verified restore. Use fictional records only. Advanced financial
-calculations, statement imports, advanced cash-flow models, PDF reports, and
+statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.7.0 source) savings planning, cash-flow calendars, encrypted backups, verified restore, and CSV transaction review. Use fictional records only. Advanced financial
+calculations, PDF statement extraction, advanced cash-flow models, PDF reports, and
 commercial licensing are still being developed. Password reset and independent security review remain unavailable.
 
 ## Install and open
@@ -238,3 +238,9 @@ See [cash-flow-calculations.md](cash-flow-calculations.md) for exact assumptions
 ## Back up and recover (0.6.0 source)
 
 Open **Settings**, choose a backup folder outside the app data folder, enter your current password, and choose **Create encrypted backup**. Keep multiple copies, preferably on a separate drive. To recover, lock the workspace and expand **Restore an encrypted backup**. Verify the selected file using its password, review the workspace, type **RESTORE**, and confirm. The app keeps prior files separately and does not merge newer records into the backup. Use the [backup and recovery guide](backup-recovery.md) for the complete procedure and password-loss consequences. The earlier 0.3.0 download does not contain these controls.
+
+## Import and review CSV statements (0.7.0 source)
+
+Open a saved client, choose a synthetic USD checking/savings CSV, and click **Inspect CSV**. Select the actual date, description, amount, and optional classification columns; select the account and enter only known statement metadata. The complete original file is retained only if you check its authorization box. Click **Import into review queue**, then review and explicitly approve eligible rows. Nothing is approved by importing.
+
+Refunds offset spending; paired internal transfers avoid extra income/expense. Corrections, conflicting rows, and reversals need individual review and reasons. Totals use only approved records and do not alter the client's planning inputs. See [CSV steps, supported formats, examples, and limits](csv-import-review.md). The old 0.3.0 installer does not contain this feature; no new download was created.

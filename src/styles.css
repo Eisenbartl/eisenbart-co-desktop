@@ -392,3 +392,23 @@ textarea { resize: vertical; min-height: 100px; }
 .backup-success { margin-top:20px; padding:15px; background:#edf7f1; border:1px solid #b6d7c2; border-radius:9px; font-size:12px; }
 .backup-file-path { overflow-wrap:anywhere; }
 .restore-review h3 { margin:20px 0 14px; }
+
+.imports-panel { padding:26px; }
+.imports-panel > .muted { margin-bottom:18px; }
+.imports-panel label { display:flex; flex-direction:column; gap:7px; margin:12px 0; font-size:12px; }
+.imports-panel label.check-label { flex-direction:row; align-items:start; gap:10px; }
+.imports-panel .check-label input { width:auto; margin:2px 0; }
+.imports-panel .form-grid { gap:0 14px; }
+.imports-panel .budget-table-wrap td,.imports-panel .budget-table-wrap th { white-space:normal; min-width:115px; overflow-wrap:anywhere; }
+.imports-panel .budget-table-wrap td:first-child,.imports-panel .budget-table-wrap th:first-child { min-width:40px; }
+.csv-preview,.transaction-review { padding:18px; margin:18px 0; border:1px solid var(--line); border-radius:10px; }
+.imports-panel details > summary { font-size:13px; font-weight:600; cursor:pointer; margin:15px 0; }
+.imports-panel .details-list dd,.imports-panel .field-help { overflow-wrap:anywhere; }
+.imports-progress { font-size:12px; font-weight:600; margin:18px 0; }
+
+.imports-table { min-width:690px; }
+.imports-panel .imports-table th:first-child { min-width:55px; overflow-wrap:normal; }
+
+.imports-panel input[type="checkbox"] { width:16px; height:16px; padding:0; flex:0 0 16px; }
+
+.imports-panel .budget-table-wrap { max-width:100%; overflow-x:auto; margin:16px 0; }

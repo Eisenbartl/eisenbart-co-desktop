@@ -1,5 +1,81 @@
 # Development status
 
+## Stage 4A: local CSV import and transaction review — 0.7.0 source
+
+Following the original staged specification, implemented explicit, bounded local
+CSV inspection/mapping, client checking/savings account association, entered
+statement periods/balances, immutable source provenance, optional authorized
+complete-source retention inside SQLCipher, duplicate advisories, a client review
+queue, and the exact Pending / Needs Clarification / Approved / Rejected states.
+Importing never approves a record. Unknown dates/amounts remain unknown; no
+income, account number, merchant classification, or statement balance is guessed.
+
+Rust owns exact-cent approved-only totals and all decisions. Refunds offset
+spending; verified equal/opposite transfer legs update separate accounts without
+extra income/expense. Bulk approval accepts only 1–100 unchanged validated
+Pending rows; conflicts/corrections/uncertain data require individual review.
+Approval reversals immediately withdraw their effects and retain immutable
+before/after fields, links, reviewer, timestamp, and reason. Reversing a linked
+transfer clears both approvals atomically. Imported facts never rewrite planning
+inputs. Table filters leave the clearly labeled all-imported-dates totals intact.
+
+Schema 8 preserves all earlier plans and audit history; scoped composite keys,
+optimistic revisions, immediate transactions, and atomic audit writes protect
+isolation and stale/failing operations. Same-account identical source hashes
+cannot import again. Original/corrected row overlaps and reference matches are
+advisory; repeated legitimate movements need explicit review. Duplicate diagnostics
+are capped at 20 related IDs per row to bound large overlap groups. Captured
+source bytes expire after 15 minutes or lock; canceling inspection writes nothing.
+Backups include authorized original CSV BLOBs, provenance, choices, and history;
+restore also validates imported totals and reciprocal approved transfer links.
+
+See [csv-import-review.md](csv-import-review.md) for user steps, supported formats,
+source/accepted statement checks, independently known examples, storage, and limits.
+No new Windows installer was built, as requested. The old 0.3.0 download lacks
+this stage. Clean Windows 11 installed/offline CSV and recovery acceptance and
+independent security review remain unrun. Continue using fictional records.
+
+| Check | Result |
+|---|---|
+| Locked dependency setup, production frontend, compiled debug native application | Passed |
+| Frontend tests | 54 passed, including explicit CSV mapping/retention, pending staging, escaped source text, cancel/no-write, native totals, decision payloads, exact failed-draft retention, transfer pairing, failed-load protection, late responses, and private-path lock/navigation guards |
+| Linux Rust tests | Full suite 77 passed; focused import suite 13 passed, including a 2,000-row overlap with bounded diagnostics; schema 7 migration/rollback and existing schema 1–6 fixtures preserve prior records |
+| Independent Python Decimal example | Confirmed net spending 1,179.99; checking activity 620.01; savings 200; combined 820.01; source checking closes 1,610 before fee rejection |
+| Rust format and Clippy all targets, warnings denied | Passed |
+| Full compiled Linux native desktop workflow | Passed: existing plans; explicit CSV mapping/retention; no automatic approval; bulk approval, individual refund, fee reversal/history, transfer pairing, repeated-source rejection; two-client isolation; lock/wrong password; full restart; backup interruption, restored CSV decisions/history/links and missing-metadata recovery |
+| Native visual inspection | Review/history inspected; final table-scrolling adjustment compiled and awaiting final native layout rerun |
+| Windows source CI | Runs on this source commit; results recorded below when complete |
+| New Windows installer | Intentionally not built |
+| Clean installed Windows 11 offline workflows/native pickers | Not run |
+
+Native full-workflow artifacts: `/workspace/shared/desktop-smoke-imports-final-verified`.
+Final logs: `import-backend-complete.log`, `import-bounded-tests.log`,
+`import-frontend-final.log`, `import-frontend-build-final.log`,
+`import-clippy-final.log`, and `import-native-final-verified.log` under
+`/workspace/shared`. Negative SQLCipher fixtures reject altered/wrong-key data;
+expected authentication diagnostics do not indicate failed checks.
+
+During implementation, a CRLF/multiline source-line locator, fraction grouping,
+rejected-row duplicate reapproval, and excessive duplicate diagnostics were
+corrected before passing tests. Clippy findings were fixed through clearer parser
+control flow and grouped review updates. Native inspection corrected checkbox
+sizing. The harness now centers visible controls before clicking to avoid
+WebKit's partial-viewport click issue, preserves Unicode in XPath option labels,
+and retries one explicit read-only DOM/runtime observation on connection closure.
+Early driver interruptions were discarded and rerun in fresh temporary workspaces;
+financial writes, clicks, typing, and general scripts are never replayed. No
+security verification or assertion was disabled. The final CSV table scrolls
+inside its wrapper; final native layout verification is recorded separately.
+
+Windows source validation and source/history checkpoints are finalized after the
+source commit. Normal pushes run source checks; installer packaging stays skipped.
+
+Next priority: selected **text-based PDF statement extraction**, retaining source
+locators and uncertainty and feeding this same review queue. Scanned OCR,
+institution/card parsers, inferred recurring groups, row-by-row running-balance
+checks, finalized reports, advanced scenarios, licensing/signing, and commercial
+release acceptance remain unfinished.
+
 ## Recovery hardening: encrypted backup and restore — 0.6.0 source
 
 Following the original staged specification, implemented manual encrypted local
@@ -582,11 +658,7 @@ clone.
 Encrypted backup/restore is implemented with authenticated files, retained
 previous workspaces, and tested interrupted/failure recovery. Clean installed
 Windows acceptance and independent security review remain prerequisites for
-actual client use. The next application priority is **local CSV statement import
-with provenance, duplicate checks, and explicit review/approval**. Approved
-historical facts must remain distinct from planning estimates and rejected data.
-Begin with synthetic CSVs, bounded parsing, exact amounts, a review queue, and
-client-scoped encrypted records; add PDF extraction in a later checkpoint.
+actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. The next application priority is **selected text-based PDF statement extraction** feeding the same review workflow; keep scanned OCR and broad institution adapters in later checkpoints.
 
 Advanced financial models, broader scenarios, PDFs, multiple counselor roles,
 password change/reset, exports, licensing, signing, retained-copy selection,
@@ -602,7 +674,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 | Specification stage | Remaining work |
 |---|---|
 | 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
-| 4: Document processing | Local CSV/text-PDF imports, extraction, provenance, reconciliation, review and approval |
+| 4: Document processing | CSV review implemented; selected text-PDF extraction, scanned OCR, institution adapters, recurring/grouped review, and row-level reconciliation remain |
 | 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
 | 6: Security/commercial | Encrypted backup/restore implemented; clean Windows recovery, password safeguards, accounts/roles, branding, licensing and independent review remain |
 | 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |

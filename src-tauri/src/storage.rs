@@ -2,6 +2,8 @@
 //! using the authenticated organization and counselor, never IDs from the UI.
 #[path = "backup.rs"]
 pub mod backup;
+#[path = "imports_store.rs"]
+pub mod imports_store;
 
 use crate::budget::{self, BudgetInput, BudgetLine, ClientBudget};
 use crate::cashflow::{self, ClientCashflowPlan};
@@ -26,7 +28,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 7;
+const SCHEMA_VERSION: i32 = 8;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -55,6 +57,7 @@ pub struct Workspace {
     active_dir: PathBuf,
     session: Option<Session>,
     pending_restore: Option<backup::Candidate>,
+    pending_csv: Option<imports_store::PendingCsv>,
 }
 
 impl Workspace {
@@ -64,11 +67,15 @@ impl Workspace {
             data_dir,
             session: None,
             pending_restore: None,
+            pending_csv: None,
         }
     }
 
     /// Called by the application timer; it must not extend the session.
     pub fn expire_if_idle(&mut self) -> bool {
+        if self.pending_csv.as_ref().is_some_and(|p| p.expired()) {
+            self.pending_csv = None;
+        }
         if self.pending_restore.as_ref().is_some_and(|p| p.expired()) {
             self.pending_restore = None;
         }
@@ -83,6 +90,7 @@ impl Workspace {
                 .is_some_and(|session| session.last_activity.elapsed() >= AUTO_LOCK_AFTER);
         if expired {
             self.session = None;
+            self.pending_csv = None;
         }
         expired
     }
@@ -251,6 +259,7 @@ impl Workspace {
         // Dropping the only connection releases SQLCipher's in-memory key.
         self.session = None;
         self.pending_restore = None;
+        self.pending_csv = None;
     }
 
     pub fn workspace_info(&mut self) -> Result<WorkspaceInfo, String> {
@@ -993,6 +1002,12 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
             CREATE TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
             PRAGMA user_version=7;"
         ).map_err(storage_error)?;
+        version = 7;
+    }
+    if version == 7 {
+        transaction
+            .execute_batch(include_str!("imports-schema.sql"))
+            .map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;
     integrity_check(connection)
@@ -1752,6 +1767,17 @@ mod tests {
         assert!(workspace.list_client_notes(&local.id).unwrap().is_empty());
         for foreign_id in [&other_org_client, &other_counselor_client] {
             assert_eq!(
+                workspace.get_client_imports(foreign_id).err().unwrap(),
+                UNAVAILABLE_CLIENT
+            );
+            assert_eq!(
+                workspace
+                    .inspect_client_csv(foreign_id.to_string(), "never-read.csv".into())
+                    .err()
+                    .unwrap(),
+                UNAVAILABLE_CLIENT
+            );
+            assert_eq!(
                 workspace.get_client_cashflow_plan(foreign_id).unwrap_err(),
                 UNAVAILABLE_CLIENT
             );
@@ -2045,6 +2071,94 @@ mod tests {
         assert_eq!(other.get_client_cashflow_plan(&client.id).unwrap(), saved);
     }
     #[test]
+    fn csv_schema_seven_migration_and_failure_preserve_all_records() {
+        let (_directory, mut workspace, _) = configured();
+        let client = workspace.save_client(client_input()).unwrap();
+        let note = workspace
+            .add_client_note(&client.id, "Synthetic pre-import history")
+            .unwrap();
+        let budget = workspace
+            .save_client_budget(&client.id, budget_input(0))
+            .unwrap();
+        let debt = workspace
+            .save_client_debt_plan(&client.id, debt_input(0))
+            .unwrap();
+        let savings = workspace
+            .save_client_savings_plan(&client.id, savings_input(0))
+            .unwrap();
+        let cashflow = workspace
+            .save_client_cashflow_plan(&client.id, cashflow_input(0))
+            .unwrap();
+        let connection = &mut workspace.session.as_mut().unwrap().connection;
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
+            .unwrap();
+        connection.execute_batch("DROP TABLE transaction_review_history; DROP TABLE transaction_choices;
+            DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state;
+            CREATE TABLE audit_events_old (
+                id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
+                event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved','cashflow_plan_saved','backup_created','workspace_restored')),
+                entity_id TEXT,created_at TEXT NOT NULL,
+                FOREIGN KEY(organization_id) REFERENCES organizations(id), FOREIGN KEY(counselor_id,organization_id) REFERENCES counselors(id,organization_id));
+            INSERT INTO audit_events_old SELECT * FROM audit_events; DROP TABLE audit_events;
+            ALTER TABLE audit_events_old RENAME TO audit_events;
+            CREATE INDEX audit_events_scope ON audit_events(organization_id,counselor_id,created_at);
+            CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
+            CREATE TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
+            PRAGMA user_version=7; CREATE TABLE audit_events_v8(collision TEXT);").unwrap();
+        assert!(migrate(connection, false).is_err());
+        assert_eq!(
+            connection
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            7
+        );
+        assert!(connection
+            .prepare("SELECT * FROM import_documents")
+            .is_err());
+        assert!(connection.execute("DELETE FROM audit_events", []).is_err());
+        connection
+            .execute("DROP TABLE audit_events_v8", [])
+            .unwrap();
+        migrate(connection, false).unwrap();
+        assert_eq!(
+            connection
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            SCHEMA_VERSION
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            count
+        );
+        assert!(connection
+            .execute("UPDATE audit_events SET event='client_updated'", [])
+            .is_err());
+        assert_eq!(workspace.get_client(&client.id).unwrap(), client);
+        assert_eq!(workspace.list_client_notes(&client.id).unwrap(), vec![note]);
+        assert_eq!(workspace.get_client_budget(&client.id).unwrap(), budget);
+        assert_eq!(
+            serde_json::to_value(workspace.get_client_debt_plan(&client.id).unwrap()).unwrap(),
+            serde_json::to_value(debt).unwrap()
+        );
+        assert_eq!(
+            workspace.get_client_savings_plan(&client.id).unwrap(),
+            savings
+        );
+        assert_eq!(
+            workspace.get_client_cashflow_plan(&client.id).unwrap(),
+            cashflow
+        );
+        assert!(workspace
+            .get_client_imports(&client.id)
+            .unwrap()
+            .records
+            .is_empty());
+    }
+    #[test]
     fn cashflow_schema_five_migration_and_failure_preserve_all_records() {
         let (_directory, mut workspace, _) = configured();
         let client = workspace.save_client(client_input()).unwrap();
@@ -2064,7 +2178,7 @@ mod tests {
         let count: i64 = connection
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        connection.execute_batch("DROP TABLE client_cashflow_plans;
+        connection.execute_batch("DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans;
             CREATE TABLE audit_events_v5 (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved')),
@@ -2274,7 +2388,7 @@ mod tests {
 
     fn restore_version_four_schema(connection: &Connection) {
         connection.execute_batch(
-            "DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans;
+            "DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans;
              CREATE TABLE audit_events_v4 (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved')),
@@ -2503,7 +2617,7 @@ mod tests {
 
     fn restore_version_three_schema(connection: &Connection) {
         connection.execute_batch(
-            "DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans;
+            "DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans;
              CREATE TABLE audit_events_v3 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added', 'budget_saved')),
@@ -2690,7 +2804,7 @@ mod tests {
     fn restore_version_two_schema(connection: &Connection) {
         // Recreate the actual old audit constraint, not just its version number.
         connection.execute_batch(
-            "DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets;
+            "DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets;
              CREATE TABLE audit_events_v2 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added')),
@@ -2823,7 +2937,7 @@ mod tests {
             .unwrap()
             .connection
             .execute_batch(
-                "DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
+                "DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
             )
             .unwrap();
         workspace.lock_workspace();

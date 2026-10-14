@@ -18,6 +18,7 @@ This is a preliminary inventory of runtime dependencies, not a completed commerc
 | `serde_json` | 1.0.154 | MIT OR Apache-2.0 |
 | `zeroize` | 1.9.1 | Apache-2.0 OR MIT |
 | `chrono` | 0.4.45 | MIT OR Apache-2.0 |
+| `csv` | 1.4.0 | MIT OR Unlicense |
 
 For dual-licensed components, select and record the license under which the release distributes them and preserve the applicable notices. The repository's own source currently has no public redistribution license (`UNLICENSED` in the frontend package); that does not replace third-party license obligations or define commercial end-user terms.
 
@@ -27,7 +28,7 @@ For dual-licensed components, select and record the license under which the rele
 - `openssl-src` 300.6.1+3.6.3 declares MIT/Apache-2.0 for its build wrapper; bundled OpenSSL 3.6.3 has its own Apache-2.0 license file. Preserve the native-library obligations as well as Rust wrapper notices.
 - Microsoft WebView2 is a separate runtime redistributable. The intended offline installer includes its installer; review Microsoft's current redistribution terms and relevant notices before commercial release. This inventory does not establish that this review has been completed.
 - NSIS and Windows installer tooling, all transitive Rust/npm dependencies, and the exact packaged native binaries still need a distribution inventory and notices review.
-- No document-parsing, OCR, PDF-report, or charting dependencies have been selected for later milestones. Their licensing must be reviewed before adoption.
+- CSV parsing uses `csv` 1.4.0 and `csv-core` 0.1.13 (MIT OR Unlicense), with `ryu` 1.0.23 (Apache-2.0 OR BSL-1.0) added by the locked CSV dependency. Metadata was inspected; complete commercial notices review remains open. No PDF, OCR, report, or charting dependencies have been selected.
 - Interface fonts use the operating system's font stack; no third-party font file is bundled in this foundation. Recheck if branded fonts or other assets are introduced.
 
 ## Before distribution

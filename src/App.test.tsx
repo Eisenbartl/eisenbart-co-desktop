@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   lockWorkspace: vi.fn(), workspaceInfo: vi.fn(), listClients: vi.fn(),
   getClient: vi.fn(), saveClient: vi.fn(), addClientNote: vi.fn(), listClientNotes: vi.fn(),
   chooseBackupFolder:vi.fn(), chooseRestoreFile:vi.fn(), createWorkspaceBackup:vi.fn(), prepareWorkspaceRestore:vi.fn(), confirmWorkspaceRestore:vi.fn(), cancelWorkspaceRestore:vi.fn(),
+  chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),getClientImports:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn(),
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
 }));
@@ -40,6 +41,8 @@ function deferred<T>() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getClientImports.mockImplementation(async (clientId:string)=>({clientId,revision:0,accounts:[],documents:[],records:[],history:[],summary:{pending:0,needsClarification:0,approved:0,rejected:0,income:'0.00',spending:'0.00',refunds:'0.00',netSpending:'0.00',netCash:'0.00',accountNet:[],warnings:[]}}));
+  mocks.cancelClientCsv.mockResolvedValue(undefined);
   mocks.cancelWorkspaceRestore.mockResolvedValue(undefined);
   mocks.prepareWorkspaceRestore.mockResolvedValue({token:'synthetic-review',organizationName:'Recovered firm',counselorName:'Recovered counselor',clientCount:2,createdAt:'2026-10-14T00:00:00Z',sourceSchema:7,currentWorkspacePresent:true});
   mocks.confirmWorkspaceRestore.mockResolvedValue({previousWorkspacePreserved:true,durabilityWarning:false});
@@ -77,6 +80,13 @@ async function selectClient(name: string) {
 }
 
 describe('desktop workspace', () => {
+  it('guards unsaved CSV selection and clears private source paths on lock',async()=>{
+    render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No imported transactions yet');
+    fireEvent.change(screen.getByLabelText('Local CSV file'),{target:{value:'D:\\Synthetic\\alice-private.csv'}});
+    vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByText('Bob Baker').closest('button')!);expect(window.confirm).toHaveBeenCalled();expect(screen.getByLabelText('Local CSV file')).toHaveValue('D:\\Synthetic\\alice-private.csv');
+    await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('alice-private.csv');expect(mocks.stageClientCsv).not.toHaveBeenCalled();
+  });
+
   it('permits verified recovery when damaged workspace setup fails and returns to a clean locked screen',async()=>{
     mocks.setupStatus.mockRejectedValueOnce('Workspace files are incomplete.');render(<App/>);await screen.findByText('Unable to open the workspace');
     fireEvent.click(screen.getByText('Restore an encrypted backup'));

@@ -192,3 +192,21 @@ export interface ClientCashflowPlan { clientId: string; revision: number; update
 export interface BackupResult { path: string; createdAt: string; auditRecorded: boolean; durabilityWarning: boolean }
 export interface RestoreReview { token: string; organizationName: string; counselorName: string; clientCount: number; createdAt: string; sourceSchema: number; currentWorkspacePresent: boolean }
 export interface RestoreResult { previousWorkspacePreserved: boolean; durabilityWarning: boolean }
+
+export type TransactionKind='unclassified'|'income'|'expense'|'transfer'|'refund'|'fee'|'interest'|'balanceMovement';
+export type ReviewStatus='Pending'|'Needs Clarification'|'Approved'|'Rejected';
+export interface CsvMapping {date:number;description:number;amountMode:'signed'|'debitCredit';amount:number|null;debit:number|null;credit:number|null;signedIsDebit:boolean;dateFormat:'iso'|'mdy'|'dmy';merchant:number|null;category:number|null;kind:number|null;reference:number|null;balance:number|null}
+export interface TransactionFields {date:string|null;amount:string|null;description:string;merchant:string;category:string;kind:TransactionKind}
+export interface RawCsvRecord {extractionMethod:string;recordNumber:number;line:number;reportedDate:string;reportedAmount:string|null;reportedDebit:string|null;reportedCredit:string|null;reportedDescription:string;reportedMerchant:string|null;reportedCategory:string|null;reportedKind:string|null;reportedReference:string|null;reportedBalance:string|null;extracted:TransactionFields;reference:string|null;balance:string|null;issues:string[]}
+export interface CsvDocumentInput {accountId:string|null;accountLabel:string;accountKind:string;periodStart:string|null;periodEnd:string|null;openingBalance:string|null;closingBalance:string|null;retainSource:boolean;mapping:CsvMapping}
+export interface CsvPreview {clientId:string;token:string;fileName:string;sha256:string;byteCount:number;headers:string[];sampleRows:string[][];rowCount:number}
+export interface StatementAccount {id:string;label:string;kind:string}
+export interface CsvDocument {id:string;accountId:string;fileName:string;sha256:string;byteCount:number;importedAt:string;sourceRetained:boolean;input:CsvDocumentInput;rowCount:number;sourceExpectedClosing:string|null;sourceDifference:string|null;approvedDifference:string|null;warnings:string[]}
+export interface ImportedRecord {id:string;documentId:string;accountId:string;raw:RawCsvRecord;fields:TransactionFields;status:ReviewStatus;linkedId:string|null;reason:string;warnings:string[];duplicateIds:string[];bulkEligible:boolean}
+export interface ReviewHistory {id:string;recordId:string;fromStatus:ReviewStatus;toStatus:ReviewStatus;fields:TransactionFields;reason:string;reviewedAt:string;counselorName:string}
+export interface ImportSummary {pending:number;needsClarification:number;approved:number;rejected:number;income:string;spending:string;refunds:string;netSpending:string;netCash:string;accountNet:[string,string][];warnings:string[]}
+export interface ClientImports {clientId:string;revision:number;accounts:StatementAccount[];documents:CsvDocument[];records:ImportedRecord[];history:ReviewHistory[];summary:ImportSummary}
+export interface CsvStageInput {expectedRevision:number;token:string;document:CsvDocumentInput}
+export interface TransactionReviewInput {expectedRevision:number;recordId:string;status:ReviewStatus;fields:TransactionFields;reason:string;acknowledgeWarnings:boolean}
+export interface TransactionBulkInput {expectedRevision:number;recordIds:string[]}
+export interface TransactionPairInput {expectedRevision:number;leftId:string;rightId:string;reason:string}
