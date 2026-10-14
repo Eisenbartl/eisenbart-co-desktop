@@ -107,3 +107,17 @@ The native fixture independently verifies 100.01 + 600.05 + 25.02 − 200.03 =
 **5.00%**. A one-cent expense correction invalidates necessity until explicit
 re-verification. Rejecting that expense removes it and retains the inactive
 classification/history through restart and both encrypted recovery paths.
+
+## Validation checkpoint
+
+Final implementation 96cd863 passed 73 interface tests, 108 Linux library plus
+2 executable worker tests, formatting/Clippy and the compiled native workflow.
+Windows source CI [38593850120](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38593850120)
+passed 109 library plus 2 worker tests and all 73 interface tests. Installer,
+installation-acceptance and upload steps were skipped. The native workflow
+verified explicit facts, exact metrics, correction/re-verification, rejection
+exclusion, full-process restart and both encrypted recovery paths with unchanged
+history/bindings. Earlier failed dropdown re-verification runs and their safe
+inactive result are documented in development-status.md. No financial mutation
+was replayed. Schema 13 requires an application that supports that schema; older
+executables reject newer workspaces. Keep encrypted backups before future upgrades.

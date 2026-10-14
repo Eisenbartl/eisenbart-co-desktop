@@ -17,9 +17,26 @@ explicit even after a complete balance inventory is declared. Gross-income lende
 DTI, partial per-account reserve allocations and savings-goal progress remain open.
 See [verified-financial-facts.md](verified-financial-facts.md) for formulas/limits.
 
-Validation in progress: focused engine/storage and interface tests passed; full
-local suites, compiled desktop/recovery workflow and Windows source checks pending.
-No installer is being built.
+| Check | Result |
+|---|---|
+| Locked setup / production frontend | Passed |
+| Interface suite | 73 passed, including four facts-editor, two metric-display and one full parent correction/re-verification regression |
+| Linux backend / worker suite | 108 library + 2 executable worker tests passed (110 total); new tests cover exact cents/ratios, unknowns, Unicode/bounds, source corrections/reapproval, scoped bindings, audit/revision rollback, append-only history, restart/recovery and schema-12 upgrade/rollback |
+| Independent Python Decimal examples | Passed: net worth 4,000.06 / 525.05, coverage 1.99 / 2.00 months, payment ratio 5.00% |
+| Formatting / Clippy, warnings denied | Passed |
+| Compiled native desktop workflow | Passed full existing finance/import workflows, explicit classifications and dated inventory, exact net worth/ratios, correction invalidation and explicit re-verification, withdrawal exclusion, local debt chart, full restart and both encrypted recovery paths with preserved bindings/history |
+| Windows source CI | Passed implementation 96cd863: [run 38593850120](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38593850120), 73 interface + 109 library + 2 worker tests (111 backend/process total); all installer/package/upload steps skipped |
+| New installer / clean installed Windows offline acceptance | Not run |
+
+Initial checks caught a JSX delimiter and test helper calls using command names
+instead of backend method names; both were corrected. Storage tests caught a
+foreign-key reference to a nonexistent client key. The migration now uses the
+repository's existing client/organization and counselor/organization keys, with
+authoritative counselor ownership enforced in Rust. Focused tests then passed,
+followed by the full local suite. A timing-sensitive recurring-detail assertion
+failed in a combined interface run while its isolated case passed. It now awaits
+the rendered detail before checking the same warning/disabled confirmation; the
+complete interface suite subsequently passed. No safeguard was relaxed.
 
 Native testing found that selecting the same prior class in a WebKit dropdown
 left the old binding inactive after save. A diagnostic run confirmed that the
@@ -27,7 +44,20 @@ saved control remained unclassified, while independent backend and parent
 interface tests correctly bound new source decisions. The interface now offers
 an explicit Reverify prior classification button that updates the draft from the
 current approval. The parent regression checks the correction, explicit action,
-exact new approval ID and successful saved state. Final native validation pending.
+exact new approval ID and successful saved state. The complete native run passed
+from final implementation 96cd863 after this fix, without replaying any financial
+write. The two earlier native attempts preserved inactive classifications when
+re-verification had not taken effect. Neither was counted as a passing workflow.
+
+Final implementation `96cd863199d0f4d83b9ee476af10dbc6681942e0` is uploaded and
+Windows-validated. Source/full-history checkpoints are saved outside the checkout:
+`/workspace/shared/checkpoints/eisenbart-verified-facts-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-verified-facts.bundle`. Validation logs and
+native artifacts remain under `/workspace/shared`, including
+`facts-backend-tests.log`, `facts-ui-tests.log`, `facts-native-complete.log`,
+`facts-windows-validation.log` and `desktop-smoke-facts-complete`.
+This source checkpoint does not establish clean Windows installation/offline
+acceptance, commercial readiness or independent security review.
 
 Next priority: **immutable saved assessment snapshots and counselor reporting**
 using the approved source decisions and verified facts, followed by offline PDF
