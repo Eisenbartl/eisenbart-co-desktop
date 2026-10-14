@@ -7,7 +7,8 @@ const cash=(v:string|null)=>v===null?'Unknown':usd(v);
 function Result({value}:{value:BalanceComparison}){return <><strong className={value.state==='Difference'||value.state==='OrderConflict'?'cashflow-warning-label':''}>{stateLabel(value.state)}</strong><br/>Expected {cash(value.expected)}<br/>Difference {cash(value.difference)}{!['Matched','Difference'].includes(value.state)&&<p className="field-help">{value.note}</p>}</>;}
 export default function StatementBalanceReview({saved,disabled,onDirty,onReview,onRecord}:{saved:ClientImports;disabled:boolean;onDirty:(v:boolean)=>void;onReview:(v:StatementBalanceInput)=>Promise<boolean>;onRecord:(id:string)=>void}){
  const [selected,setSelected]=useState(''),[order,setOrder]=useState<BalanceOrder|null>(null),[reason,setReason]=useState(''),[edited,setEdited]=useState(false);
- useEffect(()=>{setSelected('');setReason('');setEdited(false);},[saved.clientId,saved.revision]);
+ useEffect(()=>{setSelected('');setReason('');setEdited(false);},[saved.clientId]);
+ useEffect(()=>{setReason('');setEdited(false);},[saved.revision]);
  useEffect(()=>{onDirty(edited);return()=>onDirty(false);},[edited,onDirty]);
  const doc=saved.documents.find(d=>d.id===selected),report=doc?.balanceReconciliation;
  function choose(id:string){if(edited&&!window.confirm('Discard unsaved statement balance review edits?'))return;const d=saved.documents.find(d=>d.id===id);setSelected(id);setOrder(d?.balanceReconciliation?.order??null);setReason('');setEdited(false);}

@@ -44,6 +44,9 @@ Two initial synthetic storage fixtures were corrected: a resolved source-order
 setting intentionally leaves imported uncertain records Needs Clarification, and
 a second account needs a unique label or existing-account selection. The final
 focused storage rerun passed all three tests without weakening either safeguard.
+Native UI testing found a selected statement panel closing on a saved revision;
+the panel now retains its source selection and displays fresh results. An
+interface regression checks results remain visible after a successful setting save.
 Logs and fictional artifacts are under `/workspace/shared/reconciliation-*`.
 
 Next priority: **client financial dashboard** built from approved imported facts,
