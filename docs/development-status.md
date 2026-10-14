@@ -33,7 +33,7 @@ for user steps, exact format, file layout, retained-copy limits, and durability.
 | Compiled native desktop workflow | Passed: full existing client/financial workflows; encrypted backup; wrong backup password; process stop during verified review leaves original active; explicit restore retains original database bytes and all saved plans; fresh process detects missing metadata and recovers through the error screen |
 | Native visual inspection | Passed for backup controls and authenticated restore review; native OS picker dialogs themselves were not exercised by WebDriver |
 | Deferred Windows download metadata | Parsed successfully with PowerShell; packaging not invoked |
-| Windows source checks | Pending source push/CI |
+| Windows source checks | Run [38496639835](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38496639835) passed from 85f0c13: production frontend build, 47 interface tests and 64 Rust tests, including Windows file locks, pointer replacement, backup/restore failures, and SQLCipher memory-lock regression |
 | New Windows installer | Intentionally not built, as requested |
 | Clean Windows 11 installed/offline recovery and physical removable-drive/power-loss drill | Not run |
 
@@ -47,6 +47,20 @@ and fixture error formatting were corrected before tests passed. Final review
 also tightened exclusive staging and ensured a failed temporary-pointer claim
 cannot delete a pre-existing file. Snapshot sync handles have write access for
 Windows FlushFileBuffers compatibility; Windows source validation is recorded separately.
+
+Source commit `85f0c134adcc536bc0d4b2328f1c7cf119a38895` is uploaded to
+main. Windows source CI passed, and installer build, install/launch/uninstall,
+metadata preparation, installer upload, and validation-log upload were explicitly
+skipped. No manual package run was requested. The full Windows source test log is
+retained at `/workspace/shared/recovery-windows-validation.log`. This verifies
+Windows core compilation and tests, not installed Windows GUI/picker/offline
+recovery or real removable-drive durability.
+
+Recoverable tracked-source and full-history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-recovery-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-recovery.bundle`, refreshed and verified
+after the final validation notes commit. These are development source archives;
+application data backups use the separate encrypted `.ebcbackup` format.
 
 A durable backup survives a subsequent audit-write failure and reports that
 warning; its snapshot contains prior audit history. A post-activation directory
