@@ -31,7 +31,12 @@ export default function FinancialDashboard({source,disabled}:{source:ClientImpor
   {loading&&<p role="status">Calculating approved assessment…</p>}
   {error&&<div role="alert" className="alert error">{error}<button className="text-button" disabled={disabled||loading} onClick={()=>setRetry(v=>v+1)}>Retry financial dashboard</button></div>}
   {!period&&<p className="empty-note">Select an assessment period to see approved financial activity.</p>}
-  {result&&<>
+  {result&&<FinancialAssessmentView value={result}/> }
+ </section>;
+}
+
+export function FinancialAssessmentView({value:result}:{value:FinancialAssessment}) {
+ return <>
    <p className="assessment-basis">Assessment {result.periodStart} through {result.periodEnd} · Approved records only · Incomplete{result.outdated?' · Outdated period':''} · Source revision {result.revision} · Calculated {result.calculatedOnUtc} (UTC)</p>
    <p className="field-help">Latest approved transaction in period: {result.latestApprovedDate??'None'}. Source documents containing dated records: {result.documentIds.length}.</p>
    <dl className="budget-totals assessment-totals"><div><dt>Approved income receipts</dt><dd>{usd(result.totals.income)}</dd></div><div><dt>Gross spending</dt><dd>{usd(result.totals.spending)}</dd></div><div><dt>Refunds</dt><dd>{usd(result.totals.refunds)}</dd></div><div><dt>Net spending after refunds</dt><dd>{usd(result.totals.netSpending)}</dd></div><div><dt>Operating cash flow</dt><dd>{usd(result.operatingCashflow)}</dd></div><div><dt>All account movement</dt><dd>{usd(result.totals.netCash)}</dd></div></dl>
@@ -43,6 +48,5 @@ export default function FinancialDashboard({source,disabled}:{source:ClientImpor
     <div><h4>Monthly operating cash-flow trend</h4><p className="field-help">Income minus net spending after refunds. Transfers and balance movements are excluded. Negative amounts indicate a deficit; lengths compare absolute amounts.</p><table aria-label="Monthly operating cash flow"><thead><tr><th>Month</th><th>Operating cash flow</th><th>Account movement</th></tr></thead><tbody>{result.months.map(m=><tr key={m.month}><th scope="row">{m.month}</th><td>{usd(m.operatingCashflow)}<Bar scale={m.cashflowScale} kind={m.operatingCashflow.startsWith('-')?'deficit':'income'}/></td><td>{usd(m.totals.netCash)}</td></tr>)}</tbody></table></div>
    </div>
    {result.factsMetrics?<FactMetricsView value={result.factsMetrics}/>:<p className="field-help">Necessary/discretionary expenses, verified take-home pay, cash and accessible savings, outstanding debt, net worth, debt-to-income, and emergency coverage: unavailable. Debt balance and savings progress charts require verified balance facts. Statement arithmetic checks do not verify asset balances.</p>}
-  </>}
- </section>;
+ </>;
 }

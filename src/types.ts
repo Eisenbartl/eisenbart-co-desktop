@@ -251,3 +251,8 @@ export interface FactMetrics {
  monthlyNecessaryEstimate:string|null;emergencyMonthsEstimate:string|null;takeHomePaymentPercentEstimate:string|null;
  debtBalances:{label:string;amount:string|null;scale:number}[];
 }
+
+export interface AssessmentRecordInput {expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
+export interface AssessmentRecordSummary {id:string;title:string;createdAt:string;periodStart:string;periodEnd:string;sourceRevision:number;needsReview:boolean}
+export interface AssessmentDirectory {clientId:string;records:AssessmentRecordSummary[]}
+export interface SavedAssessment {clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}

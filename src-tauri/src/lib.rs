@@ -1,3 +1,4 @@
+mod assessments;
 mod budget;
 mod cashflow;
 mod dashboard;
@@ -122,6 +123,44 @@ fn cancel_client_csv(state: State<'_, DesktopState>, token: String) -> Result<()
         w.cancel_client_csv(&token);
         Ok(())
     })
+}
+#[tauri::command]
+async fn list_assessment_records(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<assessments::Directory, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.list_assessment_records(&client_id))
+    })
+    .await
+    .map_err(|_| "Assessment records could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn get_assessment_record(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+) -> Result<assessments::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_assessment_record(&client_id, &id))
+    })
+    .await
+    .map_err(|_| "Assessment record could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn save_assessment_record(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: assessments::Input,
+) -> Result<assessments::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_assessment_record(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Assessment record could not be saved.".to_owned())?
 }
 #[tauri::command]
 fn review_financial_facts(
@@ -511,6 +550,9 @@ pub fn run() {
             get_client_imports,
             get_client_dashboard,
             review_financial_facts,
+            list_assessment_records,
+            get_assessment_record,
+            save_assessment_record,
             stage_client_csv,
             review_transaction,
             review_recurring_payment,

@@ -63,7 +63,7 @@ pub struct ReviewInput {
     pub subscription: bool,
     pub reason: String,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Group {
     pub id: String,

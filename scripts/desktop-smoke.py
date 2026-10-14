@@ -562,6 +562,9 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.wait_text(".verified-ratios","2.00 months","conservative accessible savings coverage")
     driver.wait_text(".verified-ratios","5.00%","explicit take-home payment ratio")
     driver.wait_text("table[aria-label='Verified debt balance chart']","Fictional loan","local verified debt chart")
+    save_counselor_assessment(driver,"Taylor original assessment")
+    driver.wait_text(".saved-assessment-view .assessment-totals","Operating cash flow$199.98","independent captured assessment amount")
+    driver.click(".saved-assessments > summary")
     choose_balance_statement(driver)
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 3 matched · 0 differences.","exact original and approved balance steps")
     driver.click_button("Review balance source record 3")
@@ -589,6 +592,12 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.wait_text(".classified-totals","Recorded necessary spending before refunds$0.00","rejected necessity excluded")
     driver.wait_text(".verified-fact-metrics","Classifications needing re-verification across this client: 1","rejection leaves old classification inactive")
     driver.wait_text(".verified-ratios","Accessible savings coverage — estimateUnavailable","zero necessary denominator never invents coverage")
+    save_counselor_assessment(driver,"Taylor post-withdrawal assessment")
+    driver.wait_text(".saved-assessment-view .assessment-totals","Operating cash flow$500.00","new assessment excludes the withdrawn approval")
+    open_original_counselor_assessment(driver)
+    driver.script("document.querySelector('.saved-assessment-view').scrollIntoView({block:'start',behavior:'instant'})")
+    driver.screenshot(artifacts / "native-saved-counselor-assessment.png")
+    driver.click(".saved-assessments > summary")
     choose_balance_statement(driver)
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 1 differences.","rejection preserves source checks and updates approved comparisons")
     driver.wait_text(".balance-check-table","Excluded","rejected balance is not an approved anchor")
@@ -598,6 +607,35 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.script("document.querySelector('.balance-check-table').scrollIntoView({block:'center',behavior:'instant'})")
     driver.screenshot(artifacts / "native-statement-balances.png")
     status("explicit source order, exact row balances, wrong-order conflicts, separate approved data, one-cent corrections, rejected exclusion, and setting history")
+
+
+def save_counselor_assessment(driver: WebDriver, title: str) -> None:
+    if driver.command("GET", f"/element/{driver.find('.saved-assessments')}/property/open") is not True:
+        driver.click(".saved-assessments > summary")
+    driver.wait(lambda: driver.visible("#saved-assessment") is not None, "scoped assessment directory")
+    driver.fill("#record-from","2026-09")
+    driver.fill("#record-through","2026-09")
+    driver.fill("#record-title",title)
+    driver.fill("#record-findings","Fictional findings based on approved source decisions; missing coverage remains disclosed.")
+    driver.fill("#record-recommendations","Verify remaining sources before changing the fictional household plan.")
+    driver.fill("#record-followUp","Review the fictional records at the next counseling appointment.")
+    driver.click("#record-ack")
+    driver.click_button("Save assessment record")
+    driver.wait_text(".saved-assessments","Assessment record saved with its supporting evidence.","immutable counselor assessment saved")
+    driver.wait_text(".saved-assessment-view h3",title,"saved assessment title")
+    driver.wait_value("#record-title","","successful save clears draft")
+    driver.wait_text(".saved-assessment-status","Recorded context matches", "new assessment source context")
+
+
+def open_original_counselor_assessment(driver: WebDriver) -> None:
+    if driver.command("GET", f"/element/{driver.find('.saved-assessments')}/property/open") is not True:
+        driver.click(".saved-assessments > summary")
+    driver.select("#saved-assessment","Taylor original assessment — 2026-09-01 to 2026-09-30 — Needs review")
+    driver.wait_text(".saved-assessment-view h3","Taylor original assessment","persisted original counselor assessment")
+    driver.wait_text(".saved-assessment-status","Needs review","changed source does not rewrite historical assessment")
+    driver.wait_text(".saved-assessment-view .assessment-totals","Operating cash flow$199.98","original approved figures remain immutable")
+    driver.wait_text(".saved-assessment-view .verified-balance-totals","Estimated net worth at balance date$525.05","original captured balance inventory")
+    driver.wait_text(".saved-assessment-view","Verify remaining sources before changing the fictional household plan.","preserved counselor recommendation")
 
 
 def view_financial_dashboard(driver: WebDriver, start: str, end: str) -> None:
@@ -677,6 +715,8 @@ def assert_statement_balances_restored(driver: WebDriver) -> None:
     driver.click(".financial-facts-editor > summary")
     driver.wait_text(".financial-facts-history","Financial fact history (2)","persisted immutable financial facts history")
     driver.click(".financial-facts-editor > summary")
+    open_original_counselor_assessment(driver)
+    driver.click(".saved-assessments > summary")
 
 
 def run_checks(driver: WebDriver, binary: Path, password: str,

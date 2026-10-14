@@ -143,7 +143,7 @@ pub struct PairInput {
     pub right_id: String,
     pub reason: String,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Preview {
     pub pdf_pages: Option<Vec<crate::pdf::Page>>,
@@ -156,14 +156,14 @@ pub struct Preview {
     pub sample_rows: Vec<Vec<String>>,
     pub row_count: usize,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
     pub id: String,
     pub label: String,
     pub kind: String,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Document {
     pub balance_history: Vec<crate::reconciliation::Review>,
@@ -182,7 +182,7 @@ pub struct Document {
     pub approved_difference: Option<String>,
     pub warnings: Vec<String>,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Record {
     pub id: String,
@@ -197,7 +197,7 @@ pub struct Record {
     pub duplicate_ids: Vec<String>,
     pub bulk_eligible: bool,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct History {
     pub id: String,
@@ -209,7 +209,7 @@ pub struct History {
     pub reviewed_at: String,
     pub counselor_name: String,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Summary {
     pub pending: usize,
@@ -224,7 +224,7 @@ pub struct Summary {
     pub account_net: Vec<(String, String)>,
     pub warnings: Vec<String>,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub financial_facts: crate::financial_facts::Facts,

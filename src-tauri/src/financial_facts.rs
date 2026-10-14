@@ -66,7 +66,7 @@ pub struct Review {
     pub reviewed_at: String,
     pub counselor_name: String,
 }
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Facts {
     pub data: Option<Data>,
@@ -190,14 +190,14 @@ pub fn active(c: &Classification, record: &Record, history: &[History]) -> bool 
                     && h.fields == record.fields
             })
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BalanceBar {
     pub label: String,
     pub amount: Option<String>,
     pub scale: u16,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Metrics {
     pub necessary_spending: String,

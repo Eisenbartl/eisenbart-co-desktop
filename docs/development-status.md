@@ -1,5 +1,43 @@
 # Development status
 
+## Stage 5C: immutable counselor assessment records — 0.13.0 source
+
+Implemented encrypted, append-only internal assessment records with exact approved
+figures, saved profile/firm/counselor identity, captured transaction decisions/raw
+evidence, document references/checks and verified balance facts. Counselors can
+add findings, recommendations and follow-up. Reused offline charts/text tables
+show the captured assessment; paged evidence retains exclusions and original
+source locators. Corrections/reversals/profile changes flag prior context without
+rewriting historical figures. New records recalculate current approved data.
+
+Schema 14 adds scoped records and atomic audit. Save checks source revision and
+profile timestamp, requires acknowledgment and takes only notes/period/context
+from IPC. Reads/recovery validate digest, headers, bindings and captured arithmetic
+at the original date. Draft/source context and late-reply guards prevent unsafe
+updates or cross-client carryover. Saving a report does not alter financial
+source decisions/revisions or plans. See [saved-assessments.md](saved-assessments.md).
+
+| Check | Result |
+|---|---|
+| Locked setup / production frontend | Passed |
+| Interface suite | 78 passed, including five saved-assessment tests for scoped lazy load/save, canonical display, failed-draft retention, explicit changed-context review, late-client replies and conflicting-operation guards |
+| Linux backend / worker suite | 112 library + 2 executable worker tests passed (114 total); four new tests cover immutable old figures versus new approved results, source/profile changes, scope, stale context, acknowledgment, atomic audit rollback, immutable SQL, malformed figures/dates, schema-13 upgrade/rollback, restart/recovery and corrupted snapshot rejection |
+| Formatting / Clippy, warnings denied | Passed |
+| Compiled desktop application | Built; extended assessment/correction/restart/recovery workflow pending |
+| Windows source CI | Pending push; installer/package/upload remains manual |
+| New installer / clean Windows offline acceptance | Not run |
+
+Financial examples preserve 799.99 / net worth 4,000.06 before a source withdrawal;
+a new record shows 2,000.01 while the original still retains 799.99. Existing
+native examples preserve original 199.98 while live/current records change to
+500.00. No financial amounts are accepted from the report form.
+
+Next priority: **offline PDF report export and scenario-backed client action plans**.
+The complete original Counselor Report, selected scenarios, saved plan assumptions
+and final client plans remain open. See [remaining-requirements.md](remaining-requirements.md)
+for the remaining original scope; clean Windows offline acceptance and commercial
+readiness are still pending.
+
 ## Stage 5B: verified classifications and dated balance facts — 0.12.0 source
 
 Implemented explicit necessary/discretionary and take-home/other income
@@ -1027,7 +1065,7 @@ clone.
 Encrypted backup/restore is implemented with authenticated files, retained
 previous workspaces, and tested interrupted/failure recovery. Clean installed
 Windows acceptance and independent security review remain prerequisites for
-actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. Statement running-balance reconciliation now adds source/approved comparisons and immutable order settings. The approved-transaction dashboard now provides explicit periods, local category/monthly/cash-flow charts and completeness flags. Explicit approved classifications and dated balance facts now supply the remaining recorded dashboard metrics. The next application priority is **immutable saved assessments and counselor reporting**; keep scanned OCR and broad institution adapters in later checkpoints.
+actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. Statement running-balance reconciliation now adds source/approved comparisons and immutable order settings. The approved-transaction dashboard now provides explicit periods, local category/monthly/cash-flow charts and completeness flags. Explicit approved classifications and dated balance facts now supply the remaining recorded dashboard metrics. Immutable internal assessment records now preserve approved figures and evidence. The next application priority is **offline PDF report export and scenario-backed client action plans**; keep scanned OCR and broad institution adapters in later checkpoints.
 
 Advanced financial models, broader scenarios, finalized PDF reports, multiple counselor roles,
 password change/reset, exports, licensing, signing, retained-copy selection,
@@ -1044,7 +1082,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 |---|---|
 | 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
 | 4: Document processing | CSV, selected text-PDF review, recurring/grouped payment review and running-balance reconciliation implemented; scanned OCR and broader institution adapters remain |
-| 5: Dashboard and reports | Approved activity and debt charts plus recorded balance/classification metrics implemented; savings progress, saved final assessments, counselor reports, client action plans and reproducible offline PDFs remain |
+| 5: Dashboard and reports | Approved activity and debt charts plus recorded balance/classification metrics implemented; savings progress, completed scenario-backed counselor reports/client plans and reproducible offline PDFs remain; internal immutable assessments are implemented |
 | 6: Security/commercial | Encrypted backup/restore implemented; clean Windows recovery, password safeguards, accounts/roles, branding, licensing and independent review remain |
 | 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |
 | 8: Final verification | Complete installed workflows, clean Windows 11 offline tests, usability and release acceptance |

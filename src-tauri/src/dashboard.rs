@@ -13,7 +13,7 @@ pub struct Input {
     pub from_month: String,
     pub through_month: String,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Month {
     pub month: String,
@@ -23,14 +23,14 @@ pub struct Month {
     pub spending_scale: u16,
     pub cashflow_scale: u16,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Category {
     pub label: String,
     pub spending: String,
     pub scale: u16,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Assessment {
     pub facts_metrics: crate::financial_facts::Metrics,

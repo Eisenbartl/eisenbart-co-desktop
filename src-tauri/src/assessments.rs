@@ -1,0 +1,244 @@
+//! Immutable counselor assessment evidence; later source changes never rewrite it.
+use crate::{
+    dashboard, imports,
+    models::{Client, WorkspaceInfo},
+};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+pub const MAX_PAYLOAD: usize = 8 * 1024 * 1024;
+pub const FORMAT: u32 = 1;
+pub const CALCULATOR: &str = "approved-assessment-v1";
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Input {
+    pub expected_revision: i64,
+    pub expected_profile_updated_at: String,
+    pub from_month: String,
+    pub through_month: String,
+    pub title: String,
+    pub findings: String,
+    pub recommendations: String,
+    pub follow_up: String,
+    pub acknowledge: bool,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Payload {
+    pub format: u32,
+    pub calculator: String,
+    pub app_version: String,
+    pub id: String,
+    pub created_at: String,
+    pub workspace: WorkspaceInfo,
+    pub client: Client,
+    pub title: String,
+    pub findings: String,
+    pub recommendations: String,
+    pub follow_up: String,
+    pub assessment: dashboard::Assessment,
+    pub basis: imports::Snapshot,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Summary {
+    pub id: String,
+    pub title: String,
+    pub created_at: String,
+    pub period_start: String,
+    pub period_end: String,
+    pub source_revision: i64,
+    pub needs_review: bool,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Directory {
+    pub client_id: String,
+    pub records: Vec<Summary>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Record {
+    pub client_id: String,
+    pub payload: Payload,
+    pub digest: String,
+    pub needs_review: bool,
+    pub review_reasons: Vec<String>,
+}
+
+pub fn capture(mut source: imports::Snapshot) -> imports::Snapshot {
+    // Keep exact current decisions plus older approved bindings needed by facts.
+    let mut latest = HashMap::new();
+    for h in &source.history {
+        latest.insert(h.record_id.as_str(), h.id.as_str());
+    }
+    let mut ids = latest
+        .values()
+        .map(|id| (*id).to_owned())
+        .collect::<HashSet<_>>();
+    if let Some(data) = &source.financial_facts.data {
+        ids.extend(data.classifications.iter().map(|c| c.approval_id.clone()));
+    }
+    source.history.retain(|h| ids.contains(&h.id));
+    source.financial_facts.history = source.financial_facts.history.pop().into_iter().collect();
+    for d in &mut source.documents {
+        d.balance_history = d.balance_history.pop().into_iter().collect();
+    }
+    source.merchant_groups.clear();
+    source.recurring_history.clear();
+    source
+}
+pub fn validate(payload: &Payload) -> Result<(), String> {
+    let bad = || "The saved assessment evidence is invalid or unsupported.".to_owned();
+    if payload.format != FORMAT
+        || payload.calculator != CALCULATOR
+        || payload.app_version.is_empty()
+        || payload.id.is_empty()
+        || payload.client.id != payload.basis.client_id
+        || payload.client.id != payload.assessment.client_id
+        || payload.client.organization_id != payload.workspace.organization_id
+        || payload.basis.revision != payload.assessment.revision
+    {
+        return Err(bad());
+    }
+    let date = chrono::DateTime::parse_from_rfc3339(&payload.created_at)
+        .map_err(|_| bad())?
+        .date_naive();
+    if date.to_string() != payload.assessment.calculated_on_utc {
+        return Err(bad());
+    }
+    let s = &payload.basis;
+    if s.records.len() > 5000
+        || s.documents.len() > 50
+        || s.accounts.len() > 20
+        || s.history.len() > 5500
+        || s.financial_facts.history.len() > 1
+        || !s.merchant_groups.is_empty()
+        || !s.recurring_history.is_empty()
+    {
+        return Err(bad());
+    }
+    let records = s
+        .records
+        .iter()
+        .map(|r| r.id.as_str())
+        .collect::<HashSet<_>>();
+    let docs = s
+        .documents
+        .iter()
+        .map(|d| d.id.as_str())
+        .collect::<HashSet<_>>();
+    let accounts = s
+        .accounts
+        .iter()
+        .map(|a| a.id.as_str())
+        .collect::<HashSet<_>>();
+    let decisions = s
+        .history
+        .iter()
+        .map(|h| h.id.as_str())
+        .collect::<HashSet<_>>();
+    if records.len() != s.records.len()
+        || docs.len() != s.documents.len()
+        || accounts.len() != s.accounts.len()
+        || decisions.len() != s.history.len()
+    {
+        return Err(bad());
+    }
+    for d in &s.documents {
+        if !accounts.contains(d.account_id.as_str())
+            || d.sha256.len() != 64
+            || !d.sha256.bytes().all(|b| b.is_ascii_hexdigit())
+            || d.balance_history.len() > 1
+        {
+            return Err(bad());
+        }
+    }
+    for h in &s.history {
+        if !records.contains(h.record_id.as_str()) {
+            return Err(bad());
+        }
+    }
+    for r in &s.records {
+        if !docs.contains(r.document_id.as_str())
+            || !accounts.contains(r.account_id.as_str())
+            || !s
+                .documents
+                .iter()
+                .any(|d| d.id == r.document_id && d.account_id == r.account_id)
+        {
+            return Err(bad());
+        }
+        let latest = s.history.iter().rev().find(|h| h.record_id == r.id);
+        if let Some(h) = latest {
+            if h.to_status != r.status || h.fields != r.fields {
+                return Err(bad());
+            }
+        } else if matches!(
+            r.status,
+            imports::Status::Approved | imports::Status::Rejected
+        ) {
+            return Err(bad());
+        }
+        if r.status == imports::Status::Approved && imports::approval_error(&r.fields).is_some() {
+            return Err(bad());
+        }
+        if r.status == imports::Status::Approved && r.fields.kind == imports::Kind::Transfer {
+            let other = r
+                .linked_id
+                .as_deref()
+                .and_then(|id| s.records.iter().find(|x| x.id == id))
+                .ok_or_else(bad)?;
+            if other.status != imports::Status::Approved
+                || other.fields.kind != imports::Kind::Transfer
+                || other.linked_id.as_deref() != Some(&r.id)
+                || other.account_id == r.account_id
+                || imports::signed_money(other.fields.amount.as_deref().ok_or_else(bad)?)?
+                    != -imports::signed_money(r.fields.amount.as_deref().ok_or_else(bad)?)?
+            {
+                return Err(bad());
+            }
+        }
+    }
+    if let Some(data) = &s.financial_facts.data {
+        if crate::financial_facts::normalize(data.clone())? != *data
+            || s.financial_facts.history.last().map(|h| &h.data) != Some(data)
+        {
+            return Err(bad());
+        }
+        crate::financial_facts::validate_bindings(data, &s.records, &s.history, &docs)?;
+    } else if !s.financial_facts.history.is_empty() {
+        return Err(bad());
+    }
+    imports::iso_date(&payload.assessment.period_start)?;
+    imports::iso_date(&payload.assessment.period_end)?;
+    let summary = imports::summarize(&s.records, &s.accounts)?;
+    if serde_json::to_value(summary).map_err(|_| bad())?
+        != serde_json::to_value(&s.summary).map_err(|_| bad())?
+    {
+        return Err(bad());
+    }
+    let expected = dashboard::assess(
+        s,
+        dashboard::Input {
+            from_month: payload
+                .assessment
+                .period_start
+                .get(..7)
+                .ok_or_else(bad)?
+                .to_owned(),
+            through_month: payload
+                .assessment
+                .period_end
+                .get(..7)
+                .ok_or_else(bad)?
+                .to_owned(),
+        },
+        date,
+    )?;
+    if serde_json::to_value(expected).map_err(|_| bad())?
+        != serde_json::to_value(&payload.assessment).map_err(|_| bad())?
+    {
+        return Err(bad());
+    }
+    Ok(())
+}

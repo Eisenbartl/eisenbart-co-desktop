@@ -28,7 +28,7 @@ pub struct ReviewInput {
     pub order: Option<Order>,
     pub reason: String,
 }
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, Deserialize)]
 pub enum State {
     Matched,
     Difference,
@@ -38,7 +38,7 @@ pub enum State {
     NotConfigured,
     OrderConflict,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Comparison {
     pub state: State,
@@ -62,14 +62,14 @@ impl Comparison {
         }
     }
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
 pub enum Sequence {
     Valid,
     Unknown,
     Conflict,
     NotConfigured,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Row {
     pub record_id: String,
@@ -77,7 +77,7 @@ pub struct Row {
     pub source: Comparison,
     pub approved: Comparison,
 }
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Report {
     pub order: Option<Order>,

@@ -447,3 +447,13 @@ textarea { resize: vertical; min-height: 100px; }
 .financial-facts-editor .check-label { margin-top: 16px; }
 .financial-facts-history { margin-top: 20px; font-size: .85rem; overflow-wrap: anywhere; }
 .financial-facts-history > details { padding: 12px 0; }
+.saved-assessments { margin: 24px 0; padding: 20px; border: 1px solid #dce2df; border-radius: 12px; }
+.saved-assessments > summary { cursor: pointer; font-weight: 600; }
+.saved-assessments fieldset { border: 0; margin: 0; padding: 0; }
+.saved-assessments form label, .saved-assessments > label { margin-top: 16px; }
+.saved-assessment-view { margin-top: 28px; padding-top: 24px; border-top: 2px solid #dce2df; }
+.saved-assessment-identity, .saved-assessment-status { line-height: 1.6; font-weight: 600; }
+.saved-assessment-view .assessment-note { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.saved-assessment-view > details { margin: 20px 0; font-size: .85rem; overflow-wrap: anywhere; }
+.saved-assessment-view table { font-size: .85rem; width: 100%; border-collapse: collapse; }
+.saved-assessment-view td, .saved-assessment-view th { text-align: left; vertical-align: top; padding: 10px; border-bottom: 1px solid #dce2df; }

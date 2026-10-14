@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetupStatus {
     pub configured: bool,
@@ -14,7 +14,7 @@ pub struct SetupWorkspaceInput {
     pub password: String,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceInfo {
     pub organization_id: String,
@@ -23,7 +23,7 @@ pub struct WorkspaceInfo {
     pub counselor_name: String,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Client {
     pub id: String,
@@ -52,7 +52,7 @@ pub struct ClientInput {
     pub goals: String,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientNote {
     pub id: String,

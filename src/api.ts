@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
+import type { AssessmentDirectory, SavedAssessment, AssessmentRecordInput, FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
 
 export function desktopAvailable(): boolean {
   return '__TAURI_INTERNALS__' in window;
@@ -22,6 +22,9 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  listAssessmentRecords: (clientId:string)=>command<AssessmentDirectory>('list_assessment_records',{clientId}),
+  getAssessmentRecord: (clientId:string,id:string)=>command<SavedAssessment>('get_assessment_record',{clientId,id}),
+  saveAssessmentRecord: (clientId:string,input:AssessmentRecordInput)=>command<SavedAssessment>('save_assessment_record',{clientId,input}),
   reviewFinancialFacts: (clientId:string,input:FinancialFactsInput) => command<ClientImports>('review_financial_facts',{clientId,input}),
   getClientDashboard: (clientId:string,input:{fromMonth:string;throughMonth:string}) => command<FinancialAssessment>('get_client_dashboard',{clientId,input}),
   chooseClientPdf: (clientId:string) => command<string|null>('choose_client_pdf',{clientId}),

@@ -1323,6 +1323,221 @@ mod tests {
                 .collect(),
         }
     }
+    fn assessment_input(s: &Snapshot, c: &Client) -> crate::assessments::Input {
+        crate::assessments::Input {
+            expected_revision: s.revision,
+            expected_profile_updated_at: c.updated_at.clone(),
+            from_month: "2026-09".into(),
+            through_month: "2026-09".into(),
+            title: "Fictional September assessment".into(),
+            findings: "Approved source review; missing statement coverage remains disclosed."
+                .into(),
+            recommendations: "Verify the remaining records before making commitments.".into(),
+            follow_up: "Review the fictional sources at the next appointment.".into(),
+            acknowledge: true,
+        }
+    }
+    #[test]
+    fn assessment_records_keep_original_approved_figures_after_reversal_and_profile_changes() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, dir.path());
+        let data = facts_data(&s);
+        let s = w
+            .review_financial_facts(&c.id, facts_input(&s, data))
+            .unwrap();
+        let saved = w
+            .save_assessment_record(&c.id, assessment_input(&s, &c))
+            .unwrap();
+        let id = saved.payload.id.clone();
+        let digest = saved.digest.clone();
+        assert_eq!(saved.payload.assessment.operating_cashflow, "799.99");
+        assert_eq!(
+            saved.payload.assessment.facts_metrics.net_worth.as_deref(),
+            Some("4000.06")
+        );
+        assert!(!saved.needs_review);
+        assert_eq!(w.get_client_imports(&c.id).unwrap().revision, s.revision);
+        let rent = s.records[1].id.clone();
+        let rejected = review(
+            &mut w,
+            &c.id,
+            &rent,
+            Status::Rejected,
+            "Withdraw source rent",
+            true,
+        )
+        .unwrap();
+        let historical = w.get_assessment_record(&c.id, &id).unwrap();
+        assert!(historical.needs_review);
+        assert_eq!(historical.digest, digest);
+        assert_eq!(historical.payload.assessment.operating_cashflow, "799.99");
+        let new = w
+            .save_assessment_record(&c.id, assessment_input(&rejected, &c))
+            .unwrap();
+        assert_eq!(new.payload.assessment.operating_cashflow, "2000.01");
+        assert_eq!(new.payload.assessment.totals.rejected, 1);
+        assert!(!new.needs_review);
+        assert_eq!(
+            new.payload.assessment.facts_metrics.necessary_spending,
+            "0.00"
+        );
+        assert!(
+            w.list_assessment_records(&c.id)
+                .unwrap()
+                .records
+                .iter()
+                .find(|r| r.id == id)
+                .unwrap()
+                .needs_review
+        );
+        let mut changed = client_input();
+        changed.id = Some(c.id.clone());
+        changed.first_name = "Renamed fictional client".into();
+        w.save_client(changed).unwrap();
+        let older = w.get_assessment_record(&c.id, &new.payload.id).unwrap();
+        assert!(older.needs_review);
+        assert_eq!(older.payload.client.first_name, "Synthetic");
+        let conn = &w.session.as_ref().unwrap().connection;
+        assert!(conn
+            .execute("UPDATE client_assessment_records SET title='changed'", [])
+            .is_err());
+        assert!(conn
+            .execute("DELETE FROM client_assessment_records", [])
+            .is_err());
+    }
+    #[test]
+    fn assessment_records_scope_stale_acknowledgment_audit_and_payload_validation_are_safe() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, dir.path());
+        let mut input = assessment_input(&s, &c);
+        input.acknowledge = false;
+        assert!(w.save_assessment_record(&c.id, input).is_err());
+        let mut input = assessment_input(&s, &c);
+        input.expected_revision -= 1;
+        assert!(w.save_assessment_record(&c.id, input).is_err());
+        let mut input = assessment_input(&s, &c);
+        input.expected_profile_updated_at = "old".into();
+        assert!(w.save_assessment_record(&c.id, input).is_err());
+        let conn = &w.session.as_ref().unwrap().connection;
+        conn.execute_batch("CREATE TRIGGER reject_assessment_audit BEFORE INSERT ON audit_events WHEN NEW.event='assessment_recorded' BEGIN SELECT RAISE(ABORT,'Synthetic audit failure'); END;").unwrap();
+        assert!(w
+            .save_assessment_record(&c.id, assessment_input(&s, &c))
+            .is_err());
+        assert!(w.list_assessment_records(&c.id).unwrap().records.is_empty());
+        assert_eq!(w.get_client_imports(&c.id).unwrap().revision, s.revision);
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TRIGGER reject_assessment_audit;")
+            .unwrap();
+        let mut saved = w
+            .save_assessment_record(&c.id, assessment_input(&s, &c))
+            .unwrap();
+        assert!(w
+            .get_assessment_record(&other.id, &saved.payload.id)
+            .is_err());
+        assert!(w
+            .list_assessment_records(&other.id)
+            .unwrap()
+            .records
+            .is_empty());
+        saved.payload.assessment.totals.income = "999999.99".into();
+        assert!(crate::assessments::validate(&saved.payload).is_err());
+        saved.payload.assessment.period_start = "x".into();
+        assert!(crate::assessments::validate(&saved.payload).is_err());
+        w.lock_workspace();
+        assert!(w.get_assessment_record(&c.id, &saved.payload.id).is_err());
+    }
+    #[test]
+    fn assessment_records_schema_thirteen_rollback_restart_and_backup_recovery() {
+        let (root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, dir.path());
+        let data = facts_data(&s);
+        let s = w
+            .review_financial_facts(&c.id, facts_input(&s, data))
+            .unwrap();
+        let conn = &mut w.session.as_mut().unwrap().connection;
+        conn.execute_batch("DROP TABLE client_assessment_records; PRAGMA user_version=13; CREATE TABLE audit_events_v14(collision TEXT);").unwrap();
+        assert!(migrate(conn, false).is_err());
+        assert_eq!(
+            conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            13
+        );
+        assert!(conn
+            .prepare("SELECT * FROM client_assessment_records")
+            .is_err());
+        conn.execute_batch("DROP TABLE audit_events_v14;").unwrap();
+        migrate(conn, false).unwrap();
+        let saved = w
+            .save_assessment_record(&c.id, assessment_input(&s, &c))
+            .unwrap();
+        let id = saved.payload.id.clone();
+        let digest = saved.digest.clone();
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        drop(w);
+        let mut w = Workspace::new(root.path().to_path_buf());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(w.get_assessment_record(&c.id, &id).unwrap().digest, digest);
+        let s = w.get_client_imports(&c.id).unwrap();
+        review(
+            &mut w,
+            &c.id,
+            &s.records[1].id,
+            Status::Rejected,
+            "Change after backup",
+            true,
+        )
+        .unwrap();
+        assert!(w.get_assessment_record(&c.id, &id).unwrap().needs_review);
+        w.lock_workspace();
+        let r = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(r.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let restored = w.get_assessment_record(&c.id, &id).unwrap();
+        assert_eq!(restored.digest, digest);
+        assert!(!restored.needs_review);
+        assert_eq!(restored.payload.basis.financial_facts.history.len(), 1);
+    }
+    #[test]
+    fn assessment_records_corrupt_evidence_is_rejected_before_backup_activation() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, dir.path());
+        let saved = w
+            .save_assessment_record(&c.id, assessment_input(&s, &c))
+            .unwrap();
+        let conn = &w.session.as_ref().unwrap().connection;
+        conn.execute_batch("DROP TRIGGER assessment_records_no_update;")
+            .unwrap();
+        conn.execute(
+            "UPDATE client_assessment_records SET payload_json='{}' WHERE id=?1",
+            [&saved.payload.id],
+        )
+        .unwrap();
+        assert!(w.get_assessment_record(&c.id, &saved.payload.id).is_err());
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        assert!(w.prepare_restore(backup.path, PASSWORD.into()).is_err());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            w.get_client_imports(&c.id).unwrap().summary.income,
+            "2000.01"
+        );
+    }
     fn facts_input(
         s: &Snapshot,
         data: crate::financial_facts::Data,
@@ -1505,7 +1720,7 @@ mod tests {
         let s = facts_fixture(&mut w, &client.id, dir.path());
         let before = s.records[0].raw.clone();
         let c = &mut w.session.as_mut().unwrap().connection;
-        c.execute_batch("DROP TABLE financial_fact_reviews; PRAGMA user_version=12; CREATE TABLE audit_events_v13(collision TEXT);").unwrap();
+        c.execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE financial_fact_reviews; PRAGMA user_version=12; CREATE TABLE audit_events_v13(collision TEXT);").unwrap();
         assert!(migrate(c, false).is_err());
         assert_eq!(
             c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
@@ -1878,7 +2093,7 @@ mod tests {
             doc("Legacy checking"),
         );
         let connection = &mut w.session.as_mut().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE statement_balance_reviews; PRAGMA user_version=11; CREATE TABLE audit_events_v12(collision TEXT);").unwrap();
+        connection.execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE statement_balance_reviews; PRAGMA user_version=11; CREATE TABLE audit_events_v12(collision TEXT);").unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
             connection
@@ -2221,7 +2436,7 @@ mod tests {
             .review_recurring_payment(&c.id, recurring_input(&s))
             .unwrap();
         let connection = &mut w.session.as_mut().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
+        connection.execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
             connection
@@ -2230,7 +2445,7 @@ mod tests {
             10
         );
         connection
-            .execute_batch("DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations;")
+            .execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations;")
             .unwrap();
         migrate(connection, false).unwrap();
         let after = w.get_client_imports(&c.id).unwrap();
@@ -2262,7 +2477,7 @@ mod tests {
         let connection = &mut w.session.as_mut().unwrap().connection;
         connection
             .execute_batch(
-                "DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
+                "DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
             )
             .unwrap();
         connection
@@ -3028,7 +3243,7 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
         connection
-            .execute_batch("DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
+            .execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
             .unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
