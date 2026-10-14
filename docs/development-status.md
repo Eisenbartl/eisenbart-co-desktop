@@ -40,9 +40,39 @@ original reviewed 10.01 approval; withdrawal yields 22.04 without deleting it.
 | Interface suite | 91 passed; new selection-only IPC, historical context/escaped notes, unchanged figures, failed draft/renewed acknowledgment, note cap, mismatched source/client and late reply tests |
 | Linux backend / worker suite | 130 library + 2 worker tests passed (132 total); four new report/PDF/provenance/scope/forgery/restart/recovery checks; relevant PDF checks repeated after adding Chicago evidence timestamps |
 | Formatting / Clippy, warnings denied | Passed |
-| Native desktop compile / expanded report workflow | Standalone debug build passed; full expanded-report and recovery workflow running |
-| Windows source CI | Pending; installer/package steps remain disabled |
+| Native desktop compile / expanded report workflow | Passed standalone debug build and final full native run, exit 0: selected notes, preserved prior review state after reconfirmation, new-note flags, four counselor PDFs, existing planning/client PDFs, restart and both recovery paths |
+| Windows source CI | Passed shipping source 0abe32e: [run 38632476167](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38632476167), 91 interface + 131 library + 2 worker tests (133 backend/process total); all installer/package/upload steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
+
+The first native run created the expanded report but expected a Needs review group
+after the fixture had already explicitly reconfirmed it. The harness now captures
+before reconfirmation, so the original historical status/reason can be checked
+against the later current confirmation. A second run lost the driver connection
+at a preexisting CSV click; driver logs and screenshot showed a responsive app and
+connection reset. The uncertain click was not replayed. Each attempt uses a fresh
+disposable fictional workspace; the corrected full run passed with exit 0.
+
+Windows-validated shipping source is
+`0abe32e3a6930a727442a73a81321b99eedc36a5`. Later changes concern the native
+fixture timing and verification documentation.
+
+Final UI/PDF visual review confirmed the selected note/author/Chicago timestamp,
+original payment dates, historical state/reason and source/approval bindings. The
+six-page Letter counselor PDF embeds local Unicode Open Sans, with no forms,
+JavaScript or original attachments. It preserves 32.05 historical spending and
+-32.05 operating cash flow; narrative 9999.99 and later notes remain excluded from
+financial amounts and original context. New notes and later reconfirmation flag
+context without rewriting captured evidence. Alex's selected note remains scoped,
+and the client PDF continues to exclude internal session/payment evidence.
+
+Validation logs are under `/workspace/shared`: `counselor-evidence-ui.log`,
+`counselor-evidence-backend.log`, `counselor-evidence-focused.log`,
+`counselor-evidence-clippy.log`, `counselor-evidence-native-build.log`,
+`counselor-evidence-native-complete.log`/`.exit`, and
+`counselor-evidence-windows-job.log`. Final artifacts are in
+`desktop-smoke-counselor-evidence-complete`. Source/full-history checkpoints are
+`/workspace/shared/checkpoints/eisenbart-counselor-report-evidence-source.tar.gz`
+and `/workspace/shared/checkpoints/eisenbart-counselor-report-evidence.bundle`.
 
 Complete coverage/final certification, remaining financial models and combined
 scenario comparisons, branding/logo/contact details, direct print commands,

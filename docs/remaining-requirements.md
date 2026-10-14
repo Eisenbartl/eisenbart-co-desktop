@@ -10,7 +10,7 @@ This is a development checkpoint, not a commercial release.
 
 | Work area | Main remaining work |
 |---|---|
-| Reports and client plans — next | Remaining financial models/scenario comparisons in counselor reports; client-plan logo/contact branding and complete-basis final validation; direct application printing; savings-goal progress and final report validation |
+| Reports and client plans | Remaining financial models/scenario comparisons in counselor reports; client-plan logo/contact branding and complete-basis final validation; direct application printing; savings-goal progress and final report validation |
 | Financial models — next | Additional budget methods, advanced daily/variable/promotional debt terms, broader combined saved scenarios, delayed transfer settlement, finer account reserve allocation, and meaningful gross-income underwriting metrics where verified data exists |
 | Documents/review | Scanned PDF/OCR, institution/card/loan/paystub adapters, broader supported input formats, category suggestions and document/account workflow refinements with provenance/review safeguards |
 | Client management/workflow | Full specified household/employment/financial intake fields, reminders/follow-up tracking, and remaining account/document/action-history views |
