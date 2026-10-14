@@ -1,5 +1,60 @@
 # Development status
 
+## Stage 3D: paycheck-based cash-flow calendar — 0.5.0 source
+
+Implemented persistent cash-flow plans with up to 20 separate accounts; exact
+opening/running/closing balances; entered weekly, biweekly, semimonthly, monthly,
+and irregular one-time schedules; dated bills/loan payments/external savings;
+paired internal transfers; confirmed/estimated schedules; a calendar with daily
+account review; and a chronological ledger. Dated entries are never manufactured
+from monthly budgets or forecasts. Current budget/debt/savings revisions and
+amounts are references for reviewing completeness, not automatic transactions.
+
+The engine identifies negative opening, intermediate, and daily balances, bills
+before the next entered paycheck, missing funding dates, and concentrated payment
+days. Same-day debits precede credits conservatively, keeping shortfalls visible
+even when daily/monthly totals are positive. Transfers preserve combined cash;
+a reserve account never silently covers checking. Unknown amounts remain unknown
+and propagate only to affected accounts. Dates respect leap years, original
+monthly anchors, inclusive end dates, and semimonthly collision deduplication.
+
+The counselor can edit a date and preview an alternative without saving. Preview
+refreshes references, preserves the draft/baseline, and does not write records,
+revisions, or audit events. Adjustments require actual payee permission and do
+not guarantee bank processing. Encrypted schema 6 preserves all earlier plans
+and immutable audit records; atomic saves and optimistic revisions reject stale
+windows, failures roll back, and locking clears private state. Older applications
+cannot reopen schema 6. See [cash-flow-calculations.md](cash-flow-calculations.md).
+
+| Check | Result |
+|---|---|
+| Locked setup, production frontend build, compiled debug native desktop | Passed |
+| Interface tests | 40 passed, including 7 cash-flow tests and client navigation/lock guards |
+| Linux Rust tests | 53 passed, including 8 independent cash-flow calculation tests and 3 persistence/migration/atomicity tests; foreign firm/counselor scope also covers get/preview/save |
+| Independent Python Decimal fixture | Checking -700 with combined +300 before payday; transfer conserves 1,800; closes checking 2,100 + reserve 1,200 = 3,300 |
+| Rust format and Clippy all targets with warnings denied | Passed |
+| Final native GUI workflow | Passed: account/activity entry, calendar/ledger, independently checked balances and next payday, preview without writing, client isolation, lock/wrong password/unlock, full process restart and original saved date |
+| Final calendar visual inspection | Passed after widening cells and adding horizontal scrolling to keep amounts readable in narrow client panels |
+| Deferred Windows download metadata | Parsed with PowerShell; packaging not invoked |
+| New Windows installer | Intentionally not built, as requested |
+| Current Windows source checks | Pending source push/CI; final conclusion recorded separately when available |
+| Clean Windows 11 offline installed cash-flow workflow | Not run |
+
+Final native artifacts: `/workspace/shared/desktop-smoke-cashflow-verified`.
+The initial native run stopped on a transient read-only text GET connection
+closure after setup. Driver logs confirmed the connection closed before the
+response completed. The harness now retries one GET observation, matching its
+existing one-retry locator handling; typing, clicks, saves, and JavaScript are
+never replayed. The rerun and final layout run passed the full required workflow.
+An initially incomplete TypeScript test fixture was corrected before the successful
+production build; one ambiguous test locator was narrowed to the account-name field.
+
+Source-only checkpoint; no installer, bank integration, actual transaction
+reconciliation, overdraft fees, holds, holiday shifts, or delayed transfer
+settlement. Only entered accounts/activity are projected. Fictional records
+remain required while supported encrypted recovery and Windows acceptance are
+unfinished. The earlier 0.3.0 download contains neither savings nor cash flow.
+
 ## Stage 3C: emergency savings and sinking funds — 0.4.0 source
 
 Implemented persistent client savings plans: emergency targets for 1/3/6/custom
@@ -34,7 +89,7 @@ schema 5 workspace.
 | Independent Python Decimal examples | Confirmed remaining 3,899.99; 200/month requires 20 months with final 99.99; 100/month needs 39 months; 300/month needs 13; 200 over 3 eligible months requires 66.67/month; coverage floors to 0.61 |
 | Rust format and Clippy, all targets with warnings denied | Passed |
 | Final compiled native desktop workflow | Passed: visible savings/reserve/goal/scenario editing, known independent results, cap at final transfer, client isolation, lock/wrong password, and full process restart with saved savings |
-| Windows source checks | Run 38489872140 started from e3e06dc; frontend checks passed and backend tests were running. Final conclusion unavailable after GitHub began returning HTTP 401 |
+| Windows source checks | Run 38489872140 succeeded from e3e06dc; conclusion confirmed during the cash-flow stage after GitHub access returned |
 | New Windows installer/package | Intentionally not built, per request to save packaging time |
 | Clean Windows 11 installed/offline savings acceptance | Not run |
 
@@ -67,11 +122,14 @@ authenticate. Runtime status exposed no configured credential refresh capability
 No credential values were inspected or printed, no alternate identity was used,
 and no interactive login or replacement token was requested.
 
-The final Windows result and skipped-package step records therefore remain
-unverified; this is not a reported build/test failure. The workflow definition
+At the end of this savings stage, the final Windows result and skipped-package
+step records were unverified; this was not a reported build/test failure.
+During the cash-flow stage, normal injected Git/CLI access returned and run
+38489872140 was confirmed successful. The local notes are included in the next
+source push. The workflow definition
 makes installer/package upload steps conditional on manual opt-in, and no such
 run was requested. Local checks passed and the complete source was already
-uploaded. Final validation notes are committed locally for later synchronization.
+uploaded. Final validation notes were committed locally for later synchronization.
 
 Recoverable source/history checkpoints are retained at
 `/workspace/shared/checkpoints/eisenbart-savings-source.tar.gz` and
@@ -433,21 +491,19 @@ clone.
 
 ## Next development priority
 
-The savings source checkpoint is implemented and locally validated. Recheck
-the Windows source-check conclusion when GitHub access is available; no installer
-is needed for this checkpoint. The next application
-milestone is the paycheck-based cash-flow calendar, with dated inflows/bills,
-running balances, and warnings for cash shortfalls despite positive monthly
-averages. Preserve budgets, debt plans, and savings allocations as separate
-planning inputs. Keep fixtures fictional; recovery and clean Windows 11 offline
-acceptance remain prerequisites for real client use.
+The dated cash-flow source checkpoint is implemented. The next priority is
+**encrypted backup/restore with a tested recovery procedure**, before importing
+or using actual client records. Recovery must preserve encrypted workspace
+metadata and client plans, verify integrity, reject incorrect credentials and
+corruption, and safely restore without destroying the existing workspace on a
+failure. This is a prerequisite for reliable professional use.
 
-Encrypted backup/restore and a tested recovery procedure must be implemented
-before using actual client records. Broader financial calculations, document import and
-review, advanced debt models, dated cash-flow planning, scenarios, PDFs, multiple accounts/roles,
-password change/recovery, exports, licensing, installer signing, and commercial
-readiness remain incomplete. See [roadmap.md](roadmap.md) for staged criteria and
-[windows.md](windows.md) for Windows build and manual acceptance instructions.
+Advanced financial models, approved document imports, broader scenarios, PDFs,
+multiple accounts/roles for counselors, password change/recovery, exports,
+licensing, installer signing, and commercial readiness remain incomplete.
+Clean Windows 11 offline acceptance and independent security review remain open.
+See [roadmap.md](roadmap.md) for staged criteria and [windows.md](windows.md)
+for Windows build and manual acceptance instructions.
 
 ## Distance to the complete product
 
@@ -457,7 +513,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 
 | Specification stage | Remaining work |
 |---|---|
-| 3: Financial core | Exact budgets, fixed-monthly debt schedules, and savings goals implemented; optional budget methods, advanced debt terms, paycheck cash flow, and broader scenario engines remain |
+| 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
 | 4: Document processing | Local CSV/text-PDF imports, extraction, provenance, reconciliation, review and approval |
 | 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
 | 6: Security/commercial | Backup/restore, password safeguards, accounts/roles, branding, licensing and independent review |

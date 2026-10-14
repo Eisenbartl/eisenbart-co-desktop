@@ -164,3 +164,27 @@ export interface ClientSavingsPlan {
   clientId: string; revision: number; updatedAt: string | null; data: SavingsPlanData | null;
   summary: SavingsSummary | null; context: SavingsContext;
 }
+
+export interface CashflowAccount { id: string; label: string; openingBalance: string | null }
+export type CashflowKind = 'paycheck' | 'bill' | 'loan' | 'savings' | 'otherInflow' | 'otherOutflow' | 'transfer';
+export type CashflowFrequency = 'once' | 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+export interface CashflowSchedule {
+  label: string; accountId: string; destinationId: string | null; kind: CashflowKind; amount: string | null;
+  firstDate: string; frequency: CashflowFrequency; secondDay: number | null; untilDate: string | null;
+  certainty: 'confirmed' | 'estimated';
+}
+export interface CashflowPlanData { startDate: string; endDate: string; accounts: CashflowAccount[]; schedules: CashflowSchedule[]; notes: string }
+export interface CashflowPlanInput { expectedRevision: number; data: CashflowPlanData }
+export interface CashflowContext {
+  budgetRevision: number; debtRevision: number; savingsRevision: number; monthlySurplus: string | null;
+  budgetDebt: string | null; budgetSavings: string | null; debtMonthlyPayment: string | null; savingsMonthlyContribution: string | null;
+}
+export interface CashflowBalance { accountId: string; amount: string | null }
+export interface CashflowEntry {
+  scheduleIndex: number; date: string; label: string; kind: CashflowKind; certainty: 'confirmed' | 'estimated';
+  accountId: string; destinationId: string | null; amount: string | null; sourceBalance: string | null;
+  destinationBalance: string | null; combinedBalance: string | null; nextPaycheck: string | null; warnings: string[];
+}
+export interface CashflowDay { date: string; balances: CashflowBalance[]; combinedBalance: string | null; entryIndices: number[]; warnings: string[] }
+export interface CashflowSummary { ledger: CashflowEntry[]; days: CashflowDay[]; closingBalances: CashflowBalance[]; combinedClosing: string | null; warnings: string[] }
+export interface ClientCashflowPlan { clientId: string; revision: number; updatedAt: string | null; data: CashflowPlanData | null; summary: CashflowSummary | null; context: CashflowContext }

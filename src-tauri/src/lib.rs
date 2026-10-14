@@ -1,4 +1,5 @@
 mod budget;
+mod cashflow;
 mod debt;
 mod models;
 mod savings;
@@ -149,6 +150,36 @@ fn save_client_debt_plan(
 }
 
 #[tauri::command]
+fn get_client_cashflow_plan(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<cashflow::ClientCashflowPlan, String> {
+    access(&state, |workspace| {
+        workspace.get_client_cashflow_plan(&client_id)
+    })
+}
+#[tauri::command]
+fn preview_client_cashflow_plan(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: cashflow::PlanInput,
+) -> Result<cashflow::ClientCashflowPlan, String> {
+    access(&state, |workspace| {
+        workspace.preview_client_cashflow_plan(&client_id, input)
+    })
+}
+#[tauri::command]
+fn save_client_cashflow_plan(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: cashflow::PlanInput,
+) -> Result<cashflow::ClientCashflowPlan, String> {
+    access(&state, |workspace| {
+        workspace.save_client_cashflow_plan(&client_id, input)
+    })
+}
+
+#[tauri::command]
 fn get_client_savings_plan(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -203,6 +234,9 @@ pub fn run() {
             save_client_budget,
             get_client_debt_plan,
             save_client_debt_plan,
+            get_client_cashflow_plan,
+            preview_client_cashflow_plan,
+            save_client_cashflow_plan,
             get_client_savings_plan,
             save_client_savings_plan
         ])

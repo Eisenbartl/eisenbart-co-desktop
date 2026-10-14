@@ -2,7 +2,7 @@
 
 ## What is available now
 
-The current 0.4.0 savings milestone is source-only, per the request to avoid another download. The existing 0.3.0 installer below does not include savings. Normal Windows CI now builds/tests the code without packaging; an installer requires a manual workflow run with **package_installer** enabled.
+The current 0.5.0 cash-flow milestone is source-only, per the request to avoid another download. The existing 0.3.0 installer below does not include savings or cash flow. Normal Windows CI now builds/tests the code without packaging; an installer requires a manual workflow run with **package_installer** enabled.
 
 
 The verified **0.3.0 Windows x64 development installer is available**, including client budgets and fixed-monthly debt payoff comparisons, from [build 38485910521](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521). Its 25 frontend and 32 backend tests, installation, responsive native-window launch, uninstall, and isolated cleanup passed on a disposable Windows Server 2025 runner. See [development-status.md](development-status.md) for evidence and remaining acceptance work.
@@ -88,3 +88,5 @@ The expected installer output directory is `src-tauri\target\release\bundle\nsis
 ## Windows release acceptance still required
 
 Before sharing a release, install on a clean Windows 11 x64 machine, including one without WebView2 and without internet access. Test setup, wrong-password handling, client isolation, lock/unlock, persistence after a restart, and uninstall/reinstall data behavior. Record actual results and failures. Complete recovery, security, accessibility, licensing, signing, and broader product criteria in [roadmap.md](roadmap.md) before calling the application production-ready.
+
+The 0.5.0 source upgrades local workspaces to schema 6. Earlier applications cannot reopen them. No new installer is created for this milestone.

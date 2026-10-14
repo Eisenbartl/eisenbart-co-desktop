@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
   setupStatus: vi.fn(), setupWorkspace: vi.fn(), unlockWorkspace: vi.fn(),
   lockWorkspace: vi.fn(), workspaceInfo: vi.fn(), listClients: vi.fn(),
   getClient: vi.fn(), saveClient: vi.fn(), addClientNote: vi.fn(), listClientNotes: vi.fn(),
-  resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
+  resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
+  getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
 }));
 
 vi.mock('./api', () => ({
@@ -48,6 +49,7 @@ beforeEach(() => {
   mocks.listClients.mockResolvedValue([alice, bob]);
   mocks.getClient.mockImplementation(async (id: string) => id === alice.id ? alice : bob);
   mocks.listClientNotes.mockResolvedValue([]);
+  mocks.getClientCashflowPlan.mockImplementation(async (clientId:string)=>({clientId,revision:0,updatedAt:null,data:null,summary:null,context:{budgetRevision:0,debtRevision:0,savingsRevision:0,monthlySurplus:null,budgetDebt:null,budgetSavings:null,debtMonthlyPayment:null,savingsMonthlyContribution:null}}));
   mocks.getClientSavingsPlan.mockImplementation(async (clientId:string)=>({clientId,revision:0,updatedAt:null,data:null,summary:null,context:{budgetRevision:0,debtRevision:0,necessaryExpenses:null,monthlySurplus:null,budgetSavings:null,budgetDebtPayments:null,debtStartMonth:null,debtMonthlyPayment:null,debtChanges:[],debtExtras:[],warnings:[]}}));
   mocks.getClientDebtPlan.mockImplementation(async (clientId: string) => ({ clientId, revision: 0, updatedAt: null, data: null, comparison: null, budgetContext: {revision:0, monthlyCapacity:'0.00', plannedDebtPayments:'0.00', warnings:[]} }));
   mocks.getClientBudget.mockImplementation(async (clientId: string) => ({ clientId, revision: 0, updatedAt: null, lines: [], summary: { monthlyIncome: '0.00', necessaryExpenses: '0.00', discretionaryExpenses: '0.00', totalSpending: '0.00', surplusBeforeAllocations: '0.00', proposedSavings: '0.00', availableForDebt: '0.00', plannedDebtPayments: '0.00', unallocated: '0.00', monthlyAmounts: [], missingCount: 0, estimatedCount: 0, warnings: ['No income amount entered; this plan is incomplete.'] } }));
@@ -71,6 +73,15 @@ async function selectClient(name: string) {
 }
 
 describe('desktop workspace', () => {
+  it('guards cash-flow edits and removes private account data on lock',async()=>{
+    render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No saved cash-flow plan yet');
+    fireEvent.click(screen.getByRole('button',{name:'Add cash-flow account'}));
+    fireEvent.change(screen.getByLabelText('Account name'),{target:{value:'Alice private checking'}});
+    vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    expect(window.confirm).toHaveBeenCalled();expect(screen.getByLabelText('Account name')).toHaveValue('Alice private checking');
+    await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Alice private checking');expect(mocks.saveClientCashflowPlan).not.toHaveBeenCalled();
+  });
+
   it('guards unsaved savings edits and clears private reserves on lock',async()=>{
     render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No saved savings plan yet');
     fireEvent.change(screen.getByLabelText('Funding priorities and notes'),{target:{value:'Alice private savings priority'}});

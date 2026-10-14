@@ -82,7 +82,16 @@ class WebDriver:
     def command(self, method: str, path: str, payload: object = None) -> object:
         if self.session_id is None:
             raise SmokeFailure("No native desktop session is open")
-        return self.request(method, f"/session/{self.session_id}{path}", payload)
+        # Only GET observations are idempotent. Retry a single native-driver
+        # connection closure; never replay POST actions or financial writes.
+        for attempt in range(2):
+            try:
+                return self.request(method, f"/session/{self.session_id}{path}", payload)
+            except DriverFailure as error:
+                if method != "GET" or error.code != "connection error" or attempt == 1:
+                    raise
+                time.sleep(0.25)
+        raise SmokeFailure("Read-only driver retry did not complete")
 
     def open(self, binary: Path) -> None:
         value = self.request("POST", "/session", {
@@ -409,6 +418,53 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.screenshot(artifacts / "native-savings.png")
     status("savings buckets, exact coverage/targets/deadlines, contribution scenarios, and allocation checks")
 
+    driver.wait_text(".cashflow-panel", "No saved cash-flow plan yet", "first client's empty cash-flow plan")
+    driver.fill("#cashflow-start", "2026-11-01")
+    driver.fill("#cashflow-end", "2026-11-30")
+    for index, name, amount in [(0, "Alex synthetic checking", "500"), (1, "Alex synthetic reserve account", "1000")]:
+        driver.click_button("Add cash-flow account")
+        driver.fill(f"#cashflow-account-label-{index}", name)
+        driver.fill(f"#cashflow-account-balance-{index}", amount)
+    for index, name, kind, amount, date, frequency in [
+        (0, "Alex synthetic rent date", "Bill", "1200", "2026-11-03", "One time / irregular"),
+        (1, "Alex synthetic dated pay", "Paycheck", "1500", "2026-11-06", "Every two weeks"),
+        (2, "Alex synthetic account transfer", "Transfer between modeled accounts", "200", "2026-11-07", "One time / irregular"),
+    ]:
+        driver.click_button("Add dated activity")
+        driver.fill(f"#cashflow-label-{index}", name)
+        driver.select(f"#cashflow-kind-{index}", kind)
+        driver.fill(f"#cashflow-amount-{index}", amount)
+        driver.fill(f"#cashflow-date-{index}", date)
+        driver.select(f"#cashflow-frequency-{index}", frequency)
+        if index == 2:
+            driver.select(f"#cashflow-destination-{index}", "Alex synthetic reserve account")
+    driver.fill("#cashflow-notes", "Alex synthetic cash-flow priority")
+    driver.click_button("Save cash-flow plan and calculate")
+    driver.wait_text(".cashflow-panel", "Cash-flow plan saved and calculated.", "saved dated cash-flow plan")
+    driver.click("button[aria-label='Review 2026-11-03']")
+    driver.wait_text(".cashflow-day-details", "-$700.00", "account shortfall despite positive combined balance")
+    driver.wait_text(".cashflow-day-details", "2026-11-06", "next entered payday")
+    for value in ["$2,100.00", "$1,200.00", "$3,300.00"]:
+        driver.wait_text(".cashflow-results .budget-totals", value, "independent closing balance")
+    driver.script("document.querySelector('.cashflow-calendar').scrollIntoView({block: 'center'})")
+    driver.screenshot(artifacts / "native-cashflow-calendar.png")
+    driver.click_button("Chronological ledger")
+    driver.wait_text(".cashflow-ledger", "-$700.00", "chronological running balance")
+    driver.wait_text(".cashflow-ledger", "Alex synthetic account transfer", "paired transfer in ledger")
+    driver.script("document.querySelector('.cashflow-ledger').scrollIntoView({block: 'center'})")
+    driver.screenshot(artifacts / "native-cashflow-ledger.png")
+    driver.fill("#cashflow-date-0", "2026-11-08")
+    driver.click_button("Preview cash flow / refresh references")
+    driver.wait_text(".cashflow-results", "Draft cash-flow preview", "unsaved adjusted payment preview")
+    driver.click("button[aria-label='Review 2026-11-03']")
+    if "shortfall" in driver.text(".cashflow-day-details"):
+        raise SmokeFailure("Moving rent after payday did not remove the original shortfall in the preview")
+    # Restore the draft to its saved date without writing. Restart must preserve Nov 3.
+    driver.fill("#cashflow-date-0", "2026-11-03")
+    driver.click_button("Preview cash flow / refresh references")
+    driver.wait_text(".cashflow-results", "Saved cash-flow forecast", "unchanged saved-date preview")
+    status("dated cash flow, per-account shortfall, paired transfer, calendar/ledger, and non-writing date preview")
+
     create_client(second_name, second_last, "Create a fictional spending plan")
     driver.wait_text(".notes-history", "No session notes yet.", "second client's empty note history")
     if note in driver.text(".notes-history"):
@@ -422,7 +478,10 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".savings-panel", "No saved savings plan yet", "second client's empty savings plan")
     if driver.visible("#savings-goal-label-0"):
         raise SmokeFailure("The first client's sinking fund appeared in the second client's plan")
-    status("two clients with isolated notes, budgets, debts, and savings")
+    driver.wait_text(".cashflow-panel", "No saved cash-flow plan yet", "second client's empty cash-flow plan")
+    if driver.visible("#cashflow-account-label-0"):
+        raise SmokeFailure("The first client's cash-flow account appeared for another client")
+    status("two clients with isolated notes, budgets, debts, savings, and cash flow")
 
     driver.open_client("Alex Fictional")
     driver.wait_text(".notes-history", note, "first client's note after selection")
@@ -437,7 +496,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click_button("Lock workspace")
     driver.element("#password")
     private_values = [f"{first_name} {first_last}", f"{second_name} {second_last}",
-                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve"]
+                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve", "Alex synthetic checking", "Alex synthetic cash-flow priority", "Alex synthetic dated pay"]
 
     def assert_locked() -> None:
         markup = str(driver.script("return document.documentElement.outerHTML"))
@@ -464,6 +523,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".debt-comparison", "$35.35", "debt comparison after unlocking")
     driver.wait_value("#savings-priorities", "Alex synthetic reserve priority", "savings after unlocking")
     driver.wait_text(".savings-results", "2028-06-30", "savings forecast after unlocking")
+    driver.wait_value("#cashflow-notes", "Alex synthetic cash-flow priority", "cash-flow plan after unlocking")
+    driver.wait_value("#cashflow-date-0", "2026-11-03", "preview did not change saved payment date")
     status("manual lock clears private data; incorrect password rejected; correct unlock")
 
     # Verify the application is responsive before a deliberate process stop.
@@ -492,6 +553,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".debt-comparison", "$35.35", "persisted exact debt comparison")
     driver.wait_value("#savings-goal-label-0", "Alex synthetic insurance reserve", "persisted sinking fund")
     driver.wait_text(".savings-results", "2028-06-30", "persisted emergency forecast")
+    driver.wait_value("#cashflow-date-0", "2026-11-03", "persisted original payment date")
+    driver.wait_text(".cashflow-results .budget-totals", "$3,300.00", "persisted cash-flow forecast")
     driver.open_client("Robin Synthetic")
     driver.wait_text(".editor-panel", "Robin Synthetic", "persisted second client")
     driver.wait_text(".notes-history", "No session notes yet.", "persisted second client's empty note history")
@@ -506,7 +569,10 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".savings-panel", "No saved savings plan yet", "persisted second client's empty savings plan")
     if driver.visible("#savings-goal-label-0"):
         raise SmokeFailure("Persisted savings crossed client boundaries after relaunch")
-    status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets/debts/savings")
+    driver.wait_text(".cashflow-panel", "No saved cash-flow plan yet", "persisted second client's empty cash flow")
+    if driver.visible("#cashflow-account-label-0"):
+        raise SmokeFailure("Persisted cash-flow plans crossed client boundaries")
+    status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets/debts/savings/cash-flow plans")
 
 
 def main() -> int:

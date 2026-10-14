@@ -364,3 +364,22 @@ textarea { resize: vertical; min-height: 100px; }
 .savings-schedule { margin-top: 24px; }
 
 .savings-results .debt-table-scroll td { white-space: normal; }
+
+.cashflow-controls { display:flex; gap:12px; align-items:end; flex-wrap:wrap; margin:22px 0; }
+.cashflow-controls label { flex:1; min-width:160px; }
+.cashflow-calendar { display:grid; grid-template-columns:repeat(7,minmax(120px,1fr)); gap:5px; overflow-x:auto; }
+.calendar-weekday { text-align:center; font-size:.75rem; color:var(--muted); padding:8px 0; }
+.cashflow-day { min-height:110px; padding:9px; border:1px solid #d8e1dc; background:#f9fcfa; border-radius:8px; text-align:left; display:flex; flex-direction:column; gap:5px; color:inherit; font:inherit; overflow-wrap:anywhere; cursor:pointer; }
+.cashflow-day span { font-size:.7rem; line-height:1.4; }
+.cashflow-day[aria-pressed=true] { outline:2px solid #367b64; outline-offset:-2px; }
+.cashflow-day-warning { background:#fff5e9; border-color:#d1a36d; }
+.cashflow-warning-label { color:#8b3b25; font-weight:700; }
+.cashflow-ledger td,.cashflow-ledger th { white-space:normal; min-width:110px; overflow-wrap:anywhere; }
+.cashflow-ledger td:last-child { min-width:220px; }
+.cashflow-day-details { margin-top:16px; padding:16px; border:1px solid #d8e1dc; border-radius:10px; }
+@media(max-width:800px) { .cashflow-calendar { grid-template-columns:repeat(7,minmax(120px,1fr)); } }
+
+.cashflow-panel { padding:26px; }
+.cashflow-panel > .muted { margin-bottom:20px; }
+.cashflow-panel label { display:flex; flex-direction:column; gap:7px; font-size:12px; }
+.cashflow-panel label.savings-section-title { margin-bottom:18px; }

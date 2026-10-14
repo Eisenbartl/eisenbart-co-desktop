@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
+import type { ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
 
 export function desktopAvailable(): boolean {
   return '__TAURI_INTERNALS__' in window;
@@ -22,6 +22,9 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getClientCashflowPlan: (clientId: string) => command<ClientCashflowPlan>('get_client_cashflow_plan', {clientId}),
+  previewClientCashflowPlan: (clientId: string, input: CashflowPlanInput) => command<ClientCashflowPlan>('preview_client_cashflow_plan', {clientId,input}),
+  saveClientCashflowPlan: (clientId: string, input: CashflowPlanInput) => command<ClientCashflowPlan>('save_client_cashflow_plan', {clientId,input}),
   getClientSavingsPlan: (clientId: string) => command<ClientSavingsPlan>('get_client_savings_plan', {clientId}),
   saveClientSavingsPlan: (clientId: string, input: SavingsPlanInput) => command<ClientSavingsPlan>('save_client_savings_plan', {clientId,input}),
   getClientDebtPlan: (clientId: string) => command<ClientDebtPlan>('get_client_debt_plan', { clientId }),

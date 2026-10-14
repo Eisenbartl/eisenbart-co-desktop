@@ -1,8 +1,8 @@
 # Windows evaluation guide
 
 This development build provides a local workspace, client profiles, counseling
-statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.4.0 source) savings planning. Use fictional records only. Advanced financial
-calculations, statement imports, dated cash-flow planning, PDF reports, and
+statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.5.0 source) savings planning and cash-flow calendars. Use fictional records only. Advanced financial
+calculations, statement imports, advanced cash-flow models, PDF reports, and
 commercial licensing are still being developed. Password recovery and tested
 backup/restore are not available.
 
@@ -197,3 +197,40 @@ doing. Keep your password private and preserve the local files. Do not delete,
 edit, or reset the data folder, create a replacement workspace, or reinstall as
 a recovery shortcut. The [Windows guide](windows.md) explains where files live;
 the [security guide](security.md) explains password and recovery limits.
+
+
+## Forecast cash flow (0.5.0 source)
+
+The earlier 0.3.0 downloadable installer does not contain this feature. Open a
+saved fictional client and scroll to **Cash-flow calendar**.
+
+1. Enter a start/end date, up to 366 days inclusive.
+2. Add accounts and their balances immediately before the first day's activity.
+   Include savings as another account if you intend to model internal transfers.
+   Blank means unknown; 0 means a known zero. Negative opening balances are allowed.
+3. Add dated paychecks, bills, loan payments, savings, or other activity. Dates
+   and amounts must come from known schedules or clearly marked estimates.
+   Weekly, every-two-week, twice-monthly, monthly, and irregular one-time schedules
+   are supported. Twice-monthly activity needs a second day of month.
+4. For internal transfers, select a different destination account. Use external
+   savings payments only when the receiving account is outside this model.
+5. Choose **Preview cash flow / refresh references**. Check calendar days for
+   account shortfalls and concentrated payments; choose **Chronological ledger**
+   to examine balances after individual events. Change the month to inspect longer
+   periods. Preview does not save changed dates or amounts.
+6. If a bill precedes payday, confirm whether the payee permits a different date.
+   Edit that date and preview again to compare. Choose **Save cash-flow plan and
+   calculate** to preserve the intended plan when ready.
+
+A positive combined balance can coexist with insufficient funds in checking.
+Same-day debits precede credits conservatively, so a payment can warn even if a
+later deposit makes the day close positive. Unknown activity makes affected
+balances unknown; other accounts can still be checked. Blank dates are rejected,
+not invented. Bank holds, holidays, fees, delayed transfer settlement, and actual
+posted transactions are not modeled. Confirmed schedules are not bank verified.
+
+Budget, debt, and savings references help you review allocations, but their
+monthly amounts do not provide verified transaction dates. Enter all dated
+obligations once, including variable expenses, future debt extras, and intended
+savings transfers. No budget, debt, or savings plan is changed automatically.
+See [cash-flow-calculations.md](cash-flow-calculations.md) for exact assumptions.
