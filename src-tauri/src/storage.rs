@@ -28,7 +28,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 9;
+const SCHEMA_VERSION: i32 = 10;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -1013,6 +1013,12 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
     if version == 8 {
         transaction
             .execute_batch(include_str!("pdf-schema.sql"))
+            .map_err(storage_error)?;
+        version = 9;
+    }
+    if version == 9 {
+        transaction
+            .execute_batch(include_str!("recurring-schema.sql"))
             .map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;
@@ -2106,7 +2112,7 @@ mod tests {
         let count: i64 = connection
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        connection.execute_batch("DROP TABLE transaction_review_history; DROP TABLE transaction_choices;
+        connection.execute_batch("DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices;
             DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state;
             CREATE TABLE audit_events_old (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
@@ -2191,7 +2197,7 @@ mod tests {
         let count: i64 = connection
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        connection.execute_batch("DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans;
+        connection.execute_batch("DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans;
             CREATE TABLE audit_events_v5 (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved')),
@@ -2401,7 +2407,7 @@ mod tests {
 
     fn restore_version_four_schema(connection: &Connection) {
         connection.execute_batch(
-            "DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans;
+            "DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans;
              CREATE TABLE audit_events_v4 (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved')),
@@ -2630,7 +2636,7 @@ mod tests {
 
     fn restore_version_three_schema(connection: &Connection) {
         connection.execute_batch(
-            "DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans;
+            "DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans;
              CREATE TABLE audit_events_v3 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added', 'budget_saved')),
@@ -2817,7 +2823,7 @@ mod tests {
     fn restore_version_two_schema(connection: &Connection) {
         // Recreate the actual old audit constraint, not just its version number.
         connection.execute_batch(
-            "DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets;
+            "DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets;
              CREATE TABLE audit_events_v2 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added')),
@@ -2950,7 +2956,7 @@ mod tests {
             .unwrap()
             .connection
             .execute_batch(
-                "DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
+                "DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
             )
             .unwrap();
         workspace.lock_workspace();

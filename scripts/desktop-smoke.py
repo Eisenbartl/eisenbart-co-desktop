@@ -430,6 +430,67 @@ def check_pdf_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> No
     status("bounded separate PDF parser, damaged-file rejection, explicit source-line selection, page provenance, individual approval, and pending-data exclusion")
 
 
+
+def check_recurring_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> None:
+    source=data_root / "external-service.csv"
+    source.write_text("Date,Description,Amount,Category,Type\n2026-01-31,Fictional service,-10.01,Services,expense\n2026-02-28,Fictional service,-12.03,Services,expense\n2026-03-31,Fictional service,-10.01,Services,expense\n",encoding="utf-8")
+    driver.fill("#csv-path",str(source))
+    driver.click_button("Inspect CSV")
+    driver.wait_text(".csv-preview",source.name,"fictional recurring source")
+    driver.fill("#csv-account-label","Fictional service checking")
+    for key,heading in [("date","1: Date"),("description","2: Description"),("amount","3: Amount"),("category","4: Category"),("kind","5: Type")]:
+        driver.select(f"#csv-map-{key}",heading)
+    driver.click_button("Import into review queue")
+    driver.wait_text(".imports-progress","Pending 3","recurring source is never auto-approved")
+    driver.wait_text(".recurring-review","No approved payment groups yet.","pending rows excluded from groups")
+    for index in range(1,4):
+        driver.click(f".imports-table tbody tr:nth-child({index}) input[type=checkbox]")
+    driver.click_button("Approve selected validated rows (3)")
+    driver.wait_text(".recurring-review","total $32.05","independent exact payment total")
+    driver.wait_text(".recurring-review","Suggested: Monthly","calendar month-end advisory")
+    driver.click_button("Review payments for Fictional service")
+    driver.wait_text(".recurring-decision","2026-01-31 through 2026-03-31","visible payment evidence dates")
+    driver.fill("#recurring-label","Fictional household service")
+    driver.select("#recurring-frequency","Monthly")
+    driver.click("#recurring-subscription")
+    driver.fill("#recurring-reason","Verified three synthetic statements and fictional subscription contract")
+    driver.click_button("Save payment pattern decision")
+    driver.wait_text(".recurring-review","Counselor-classified subscription","explicit subscription classification")
+    driver.wait_text(".imports-totals","Spending before refunds","financial totals still present")
+    driver.wait_text(".imports-totals","$32.05","confirmation does not change transaction totals")
+    driver.click_button("Review external-service.csv record 2")
+    driver.select("#review-status","Rejected")
+    driver.fill("#review-reason","Withdraw source approval for recurring evidence test")
+    driver.click_button("Save transaction decision")
+    driver.wait_text(".recurring-review","Needs review","source reversal invalidates confirmation")
+    driver.wait_text(".imports-totals","$22.04","withdrawn payment excluded from official total")
+    driver.click_button("Review external-service.csv record 2")
+    driver.select("#review-status","Approved")
+    driver.fill("#review-reason","Verified source again after correction")
+    driver.click_button("Save transaction decision")
+    driver.wait_text(".recurring-review","Needs review","reapproval does not silently revive prior confirmation")
+    driver.click_button("Review payments for Fictional service")
+    driver.wait_text(".recurring-decision","Evidence changed.","changed evidence explanation")
+    driver.fill("#recurring-reason","Reconfirmed all three source decisions after reversal")
+    driver.click_button("Save payment pattern decision")
+    driver.wait_text(".recurring-review","Counselor-classified subscription","explicit reconfirmation")
+    driver.click(".recurring-history > summary")
+    driver.wait_text(".recurring-history","Payment pattern decision history (2)","append-only recurring decision history")
+    driver.wait_text(".recurring-history","Reconfirmed all three source decisions after reversal","captured reason history")
+    driver.script("document.querySelector('.recurring-review').scrollIntoView({block:'start',behavior:'instant'})")
+    driver.screenshot(artifacts / "native-recurring-review.png")
+    status("merchant evidence, month-end suggestions, explicit subscription decisions, exact totals, reversal invalidation, and append-only history")
+
+
+def assert_recurring_restored(driver: WebDriver) -> None:
+    driver.open_client("Casey Pattern")
+    driver.wait_text(".recurring-review","Counselor-classified subscription","persisted recurring confirmation")
+    driver.click(".recurring-history > summary")
+    driver.wait_text(".recurring-history","Payment pattern decision history (2)","persisted recurring history")
+    driver.wait_text(".recurring-history","Reconfirmed all three source decisions after reversal","persisted recurring evidence-bound reason")
+    driver.wait_text(".imports-totals","$32.05","persisted recurring client exact totals")
+
+
 def run_checks(driver: WebDriver, binary: Path, password: str,
                wrong_password: str, artifacts: Path, restart_driver: Callable[[], None], data_root: Path) -> None:
     organization = "Smoke Test Counseling — Fictional"
@@ -734,6 +795,17 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
 
 
     check_pdf_imports(driver, artifacts, data_root)
+    create_client("Casey","Pattern","Review fictional recurring payments")
+    check_recurring_imports(driver,artifacts,data_root)
+    restart_driver()
+    driver.open(binary)
+    driver.fill("#password",password)
+    driver.click_button("Unlock workspace")
+    assert_recurring_restored(driver)
+    driver.open_client("Alex Fictional")
+    driver.wait_text(".recurring-review","Synthetic rent","Alex has his own payment groups")
+    if "Fictional household service" in driver.text(".recurring-review"):
+        raise SmokeFailure("Recurring decisions crossed client boundaries")
 
     # Exercise recovery only in this synthetic app-data directory. No native
     # commands are invoked directly; passwords and paths use visible controls.
@@ -814,7 +886,9 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".transaction-review", "page 1, extracted line", "restored PDF provenance")
     driver.click(".review-history > summary")
     driver.wait_text(".review-history", "Needs Clarification → Approved", "restored immutable PDF approval history")
-    status("encrypted backup, wrong-password rejection, interrupted review, explicit restore, retained source, and restored plans")
+    assert_recurring_restored(driver)
+    driver.open_client("Alex Fictional")
+    status("encrypted backup, wrong-password rejection, interrupted review, explicit restore, retained source, restored plans and recurring decisions")
     # Simulate missing metadata only after stopping every synthetic app process.
     # The error-screen recovery flow must work without opening the damaged vault.
     pointer=original_path.parent / "workspace-active.json"
@@ -841,7 +915,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".notes-history", note, "restored records after simulated metadata loss")
     driver.wait_value("#cashflow-date-0", "2026-11-03", "restored original cash-flow dates after recovery")
     driver.wait_text(".imports-progress", "Approved 6 · Rejected 1", "storage-error recovery includes imported records")
-    status("fresh-process activation and error-screen recovery after simulated metadata loss")
+    assert_recurring_restored(driver)
+    status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")
 
 
 def main() -> int:

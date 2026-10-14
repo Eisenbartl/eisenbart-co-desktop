@@ -223,6 +223,8 @@ pub struct Summary {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    pub merchant_groups: Vec<crate::recurring::Group>,
+    pub recurring_history: Vec<crate::recurring::Review>,
     pub client_id: String,
     pub revision: i64,
     pub accounts: Vec<Account>,

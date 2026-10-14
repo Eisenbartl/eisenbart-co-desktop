@@ -357,8 +357,29 @@ pub(super) fn read_imports(
             counselor_name,
         });
     }
+    let size: i64 = c.query_row("SELECT COALESCE(SUM(length(CAST(review_json AS BLOB))),0) FROM recurring_review_history WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3",params![client,w.organization_id,w.counselor_id],|r|r.get(0)).map_err(storage_error)?;
+    if size > 8 * 1024 * 1024 {
+        return Err(STORAGE_ERROR.into());
+    }
+    let recurring_rows = c.prepare("SELECT id,review_json FROM recurring_review_history WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3 ORDER BY rowid LIMIT 1001").map_err(storage_error)?.query_map(params![client,w.organization_id,w.counselor_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
+    if recurring_rows.len() > 1000 {
+        return Err(STORAGE_ERROR.into());
+    }
+    let mut recurring_history = Vec::new();
+    for (id, value) in recurring_rows {
+        let review: crate::recurring::Review = decode(&value)?;
+        if review.id != id {
+            return Err(STORAGE_ERROR.into());
+        }
+        crate::recurring::validate_review(&review, &records, &history)
+            .map_err(|_| STORAGE_ERROR.to_owned())?;
+        recurring_history.push(review);
+    }
+    let merchant_groups = crate::recurring::analyze(&records, &recurring_history, &history)?;
     let summary = summarize(&records, &accounts)?;
     Ok(Snapshot {
+        merchant_groups,
+        recurring_history,
         client_id: client.into(),
         revision: revision(c, w, client)?,
         accounts,
@@ -725,6 +746,74 @@ impl Workspace {
         tx.commit().map_err(storage_error)?;
         Ok(result)
     }
+    pub fn review_recurring_payment(
+        &mut self,
+        client: &str,
+        input: crate::recurring::ReviewInput,
+    ) -> Result<Snapshot, String> {
+        use crate::recurring::{Decision, Review};
+        let s = self.session()?;
+        scoped_client(&s.connection, &s.info, client)?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(storage_error)?;
+        bump(&tx, &s.info, client, input.expected_revision)?;
+        let snapshot = read_imports(&tx, &s.info, client)?;
+        let g = snapshot
+            .merchant_groups
+            .iter()
+            .find(|g| g.id == input.group_id)
+            .ok_or("This payment group is unavailable; reopen the client.")?;
+        if g.evidence_hash != input.evidence_hash {
+            return Err(
+                "Payment evidence changed. Reopen the client and review the current payments."
+                    .into(),
+            );
+        }
+        if g.evidence.len() > 500 {
+            return Err("Separate this group before reviewing more than 500 payments.".into());
+        }
+        if input.decision == Decision::Confirmed && (!g.can_confirm || input.frequency.is_none()) {
+            return Err("Confirm at least three approved payments on distinct dates, resolve possible duplicates, and choose a frequency.".into());
+        }
+        if input.decision == Decision::Dismissed
+            && (input.frequency.is_some() || input.subscription)
+        {
+            return Err(
+                "A dismissed pattern cannot have a frequency or subscription classification."
+                    .into(),
+            );
+        }
+        let label = required_text(&input.label, "Payment label", 120)?;
+        let reason = required_text(&input.reason, "Payment review reason", 500)?;
+        let r = Review {
+            id: Uuid::new_v4().to_string(),
+            group_id: g.id.clone(),
+            evidence_hash: g.evidence_hash.clone(),
+            label,
+            decision: input.decision,
+            frequency: input.frequency,
+            subscription: input.subscription,
+            reason,
+            reviewed_at: timestamp(),
+            counselor_name: s.info.counselor_name.clone(),
+            evidence: g.evidence.clone(),
+        };
+        let value = json(&r)?;
+        let size:i64=tx.query_row("SELECT COALESCE(SUM(length(CAST(review_json AS BLOB))),0) FROM recurring_review_history WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3",params![client,s.info.organization_id,s.info.counselor_id],|r|r.get(0)).map_err(storage_error)?;
+        if snapshot.recurring_history.len() >= 1000
+            || value.len() > 262144
+            || size + value.len() as i64 > 8 * 1024 * 1024
+        {
+            return Err("Payment review history reached its local safety limit; this decision was not saved.".into());
+        }
+        tx.execute("INSERT INTO recurring_review_history(id,client_id,organization_id,counselor_id,review_json) VALUES(?1,?2,?3,?4,?5)",params![r.id,client,s.info.organization_id,s.info.counselor_id,value]).map_err(storage_error)?;
+        audit(&tx, &s.info, "recurring_reviewed", Some(&r.id))?;
+        let result = read_imports(&tx, &s.info, client)?;
+        tx.commit().map_err(storage_error)?;
+        Ok(result)
+    }
     pub fn bulk_approve_transactions(
         &mut self,
         client: &str,
@@ -911,6 +1000,263 @@ mod tests {
                 acknowledge_warnings: ack,
             },
         )
+    }
+    fn recurring_fixture(w: &mut Workspace, client: &str, dir: &Path) -> Snapshot {
+        let mut d = doc("Fictional service checking");
+        d.period_start = None;
+        d.period_end = None;
+        d.opening_balance = None;
+        d.closing_balance = None;
+        let s=stage(w,client,dir,"service.csv","Date,Description,Amount,Category,Type\n2026-01-31,Fictional service,-10.01,Services,expense\n2026-02-28,Fictional service,-12.03,Services,expense\n2026-03-31,Fictional service,-10.01,Services,expense\n",d);
+        assert!(s.merchant_groups.is_empty());
+        w.bulk_approve_transactions(
+            client,
+            BulkInput {
+                expected_revision: s.revision,
+                record_ids: s.records.iter().map(|r| r.id.clone()).collect(),
+            },
+        )
+        .unwrap()
+    }
+    fn recurring_input(s: &Snapshot) -> crate::recurring::ReviewInput {
+        let g = &s.merchant_groups[0];
+        crate::recurring::ReviewInput {
+            expected_revision: s.revision,
+            group_id: g.id.clone(),
+            evidence_hash: g.evidence_hash.clone(),
+            label: "Fictional service contract".into(),
+            decision: crate::recurring::Decision::Confirmed,
+            frequency: Some(crate::recurring::Frequency::Monthly),
+            subscription: true,
+            reason: "Verified three original statements and fictional subscription contract".into(),
+        }
+    }
+    #[test]
+    fn recurring_decisions_are_scoped_atomic_persistent_and_backed_up() {
+        let (root, mut w, _) = configured();
+        let target = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let s = recurring_fixture(&mut w, &c.id, target.path());
+        assert_eq!(s.merchant_groups[0].total_paid, "32.05");
+        assert_eq!(
+            s.merchant_groups[0].suggested_frequency,
+            Some(crate::recurring::Frequency::Monthly)
+        );
+        let mut other_input = recurring_input(&s);
+        other_input.expected_revision = 0;
+        assert!(w.review_recurring_payment(&other.id, other_input).is_err());
+        let mut bad = recurring_input(&s);
+        bad.reason = "".into();
+        assert!(w.review_recurring_payment(&c.id, bad).is_err());
+        assert_eq!(w.get_client_imports(&c.id).unwrap().revision, s.revision);
+        let connection = &w.session.as_ref().unwrap().connection;
+        connection.execute_batch("CREATE TRIGGER reject_payment_audit BEFORE INSERT ON audit_events WHEN NEW.event='recurring_reviewed' BEGIN SELECT RAISE(ABORT,'Synthetic audit failure'); END;").unwrap();
+        assert!(w
+            .review_recurring_payment(&c.id, recurring_input(&s))
+            .is_err());
+        let untouched = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(untouched.revision, s.revision);
+        assert!(untouched.recurring_history.is_empty());
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TRIGGER reject_payment_audit;")
+            .unwrap();
+        let saved = w
+            .review_recurring_payment(&c.id, recurring_input(&s))
+            .unwrap();
+        assert_eq!(saved.merchant_groups[0].state, "Confirmed");
+        assert_eq!(saved.summary.spending, s.summary.spending);
+        assert_eq!(saved.summary.net_cash, s.summary.net_cash);
+        assert!(w
+            .get_client_imports(&other.id)
+            .unwrap()
+            .recurring_history
+            .is_empty());
+        assert!(w
+            .review_recurring_payment(&c.id, recurring_input(&s))
+            .is_err());
+        let connection = &w.session.as_ref().unwrap().connection;
+        assert!(connection
+            .execute("UPDATE recurring_review_history SET review_json='{}'", [])
+            .is_err());
+        assert!(connection
+            .execute("DELETE FROM recurring_review_history", [])
+            .is_err());
+        w.lock_workspace();
+        assert!(w
+            .review_recurring_payment(&c.id, recurring_input(&saved))
+            .is_err());
+        drop(w);
+        let mut w = Workspace::new(root.path().to_path_buf());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            w.get_client_imports(&c.id).unwrap().recurring_history,
+            saved.recurring_history
+        );
+        let backup = w
+            .create_backup(target.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        let mut input = recurring_input(&saved);
+        input.decision = crate::recurring::Decision::Dismissed;
+        input.frequency = None;
+        input.subscription = false;
+        input.reason = "Not an ongoing contract after counselor review".into();
+        assert_eq!(
+            w.review_recurring_payment(&c.id, input)
+                .unwrap()
+                .merchant_groups[0]
+                .state,
+            "Dismissed"
+        );
+        w.lock_workspace();
+        let candidate = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(candidate.token, "RESTORE".into())
+            .unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let restored = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(restored.recurring_history, saved.recurring_history);
+        assert_eq!(restored.merchant_groups[0].state, "Confirmed");
+    }
+    #[test]
+    fn recurring_reversals_duplicates_corrections_and_stale_evidence_require_review() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = recurring_fixture(&mut w, &c.id, dir.path());
+        let saved = w
+            .review_recurring_payment(&c.id, recurring_input(&s))
+            .unwrap();
+        let first = saved.records[0].id.clone();
+        let reversed = review(
+            &mut w,
+            &c.id,
+            &first,
+            Status::Rejected,
+            "Withdraw inaccurate source approval",
+            true,
+        )
+        .unwrap();
+        assert_eq!(reversed.merchant_groups[0].state, "Needs review");
+        assert!(!reversed.merchant_groups[0].can_confirm);
+        assert!(w
+            .review_recurring_payment(&c.id, recurring_input(&reversed))
+            .is_err());
+        let again = review(
+            &mut w,
+            &c.id,
+            &first,
+            Status::Approved,
+            "Verified source again",
+            true,
+        )
+        .unwrap();
+        assert_eq!(again.merchant_groups[0].state, "Needs review");
+        let mut stale = recurring_input(&again);
+        stale.evidence_hash = saved.merchant_groups[0].evidence_hash.clone();
+        assert!(w.review_recurring_payment(&c.id, stale).is_err());
+        let confirmed = w
+            .review_recurring_payment(&c.id, recurring_input(&again))
+            .unwrap();
+        assert_eq!(confirmed.recurring_history.len(), 2);
+        let r = &confirmed.records[0];
+        let mut f = r.fields.clone();
+        f.merchant = "Another fictional merchant".into();
+        let changed = w
+            .review_transaction(
+                &c.id,
+                ReviewInput {
+                    expected_revision: confirmed.revision,
+                    record_id: r.id.clone(),
+                    fields: f,
+                    status: Status::Approved,
+                    reason: "Verified different merchant identity".into(),
+                    acknowledge_warnings: true,
+                },
+            )
+            .unwrap();
+        assert_eq!(changed.merchant_groups.len(), 2);
+        assert_eq!(
+            changed
+                .merchant_groups
+                .iter()
+                .find(|g| g.id == confirmed.merchant_groups[0].id)
+                .unwrap()
+                .state,
+            "Needs review"
+        );
+        let mut d = doc("");
+        d.account_id = Some(changed.accounts[0].id.clone());
+        d.period_start = None;
+        d.period_end = None;
+        d.opening_balance = None;
+        d.closing_balance = None;
+        let duplicate=stage(&mut w,&c.id,dir.path(),"overlap.csv","Date,Description,Amount,Category,Type\n2026-02-28,Fictional service,-12.03,Services,expense\n",d);
+        assert!(duplicate
+            .merchant_groups
+            .iter()
+            .find(|g| g.id == confirmed.merchant_groups[0].id)
+            .unwrap()
+            .warnings
+            .iter()
+            .any(|w| w.contains("duplicate")));
+        for id in duplicate
+            .records
+            .iter()
+            .map(|r| r.id.clone())
+            .collect::<Vec<_>>()
+        {
+            review(
+                &mut w,
+                &c.id,
+                &id,
+                Status::Rejected,
+                "Remove remaining payment evidence",
+                true,
+            )
+            .unwrap();
+        }
+        let none = w.get_client_imports(&c.id).unwrap();
+        assert!(none.merchant_groups.is_empty());
+        assert_eq!(none.recurring_history.len(), 2);
+    }
+    #[test]
+    fn recurring_schema_nine_migration_rolls_back_and_preserves_imports() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let before = recurring_fixture(&mut w, &c.id, dir.path());
+        let connection = &mut w.session.as_mut().unwrap().connection;
+        connection
+            .execute_batch("DROP TABLE recurring_review_history;")
+            .unwrap();
+        connection
+            .execute_batch(include_str!("pdf-schema.sql"))
+            .unwrap();
+        connection
+            .execute_batch("CREATE TABLE audit_events_v10(collision TEXT);")
+            .unwrap();
+        assert!(migrate(connection, false).is_err());
+        assert!(connection
+            .prepare("SELECT * FROM recurring_review_history")
+            .is_err());
+        assert_eq!(
+            connection
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            9
+        );
+        connection
+            .execute_batch("DROP TABLE audit_events_v10;")
+            .unwrap();
+        migrate(connection, false).unwrap();
+        let after = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(after.revision, before.revision);
+        assert_eq!(after.records.len(), before.records.len());
+        assert_eq!(after.summary.spending, "32.05");
+        assert!(after.recurring_history.is_empty());
     }
     #[test]
     fn independent_approved_totals_refunds_reversals_and_paired_transfers() {
@@ -1649,7 +1995,7 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
         connection
-            .execute_batch("PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
+            .execute_batch("DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
             .unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(

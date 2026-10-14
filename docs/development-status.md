@@ -1,5 +1,60 @@
 # Development status
 
+## Stage 4C: merchant grouping and recurring-payment review — 0.9.0 source
+
+Implemented approved-only historical payment grouping within one statement account
+and type. Exact normalized verified merchant names control membership; absent
+merchants use the exact description with an explicit fallback warning. Counselors
+combine or separate payments by correcting verified Merchant fields in source
+review, preserving original provenance and correction history. Expense/fee groups
+show exact integer-cent observed totals, amount ranges, dates and source locators;
+other types and unapproved records never enter this checkpoint's analysis.
+
+Conservative suggestions require at least three distinct approved payment dates,
+no unresolved duplicate conflicts, and every adjacent interval matching weekly,
+fortnightly, calendar-monthly, quarterly or annual rules. Month-end/leap-day dates
+and variable amounts have independently checked examples. There is no automatic
+subscription classification, confirmation, fixed future charge or planning write.
+Counselors explicitly choose/correct frequency and label, optionally classify a
+verified subscription, or dismiss/withdraw a pattern with a reason.
+
+Schema 10 captures append-only decision evidence, exact approval-history IDs,
+reviewer/time/reason, revision/hash checks and atomic generic audit events in the
+encrypted workspace. Changed/reversed evidence requires new review; identical
+reapproval does not silently reactivate prior confirmation. Absent groups retain
+historical decisions. Authenticated client scope, failed-save retention, unsaved
+navigation/lock guards, restart, backup and restore validation remain active.
+Limits: 500 captured payments/decision, 256 KiB/decision JSON, 1,000 decisions
+and 8 MiB captured JSON/client; bounds fail without deleting history. Existing
+source limits apply. See [recurring-payment-review.md](recurring-payment-review.md).
+
+| Check | Result |
+|---|---|
+| Locked setup, production frontend and native debug build | Passed |
+| Interface tests | 59 passed; explicit decisions/frequency correction, unchanged exact totals, failed draft/dirty retention, conflicting-operation guards and changed-evidence dismissal |
+| Linux Rust suite | 90 library + 2 executable worker tests passed (92 total); 6 new tests cover independent patterns, exclusions, duplicates, reversal/reapproval, scope, atomic audit failure, stale writes/hashes, lock/restart, backup restore and schema-9 rollback |
+| Independent Python Decimal example | 32.05 observed total; 22.04 after first payment is withdrawn |
+| Format / Clippy all targets, warnings denied | Passed |
+| Compiled native desktop workflow | Passed full existing financial/CSV/PDF workflow plus merchant patterns, subscription confirmation, source reversal/reapproval/reconfirmation, exact totals, client isolation, full-process restart and both encrypted recovery paths |
+| Windows source CI | Pending source commit; packaging remains manual opt-in |
+| New Windows installer | Intentionally not built |
+| Clean installed Windows 11 offline acceptance | Not run |
+
+Initial backend regression found an older PDF migration fixture retaining the
+newer recurring-history table while simulating schema 8; its downgrade fixture
+was corrected and the complete suite rerun. A backup test fixture was corrected
+to use the existing lock-before-restore rule. An initial native run stopped after
+a WebDriver transport closure during the prior cash-flow workflow; no financial
+write was replayed or assertion weakened, and the complete run restarted in a
+fresh disposable workspace. Native visual review prompted using the existing compact table styles and a bordered decision form; the final styled build is undergoing the full native workflow again. Source/debug logs and fictional artifacts are under
+`/workspace/shared/recurring-*` and `/workspace/shared/desktop-smoke-recurring-final`.
+
+Next priority: **row-level statement reconciliation** against known reported
+running balances, with explicit source/order/sign checks and unresolved exceptions.
+Scanned OCR, institution adapters, dashboards/reports, advanced models,
+accounts/roles, licensing/signing and full installed/commercial acceptance remain
+unfinished. No new download was created, as requested.
+
 ## Stage 4B: selectable-text PDF import and review — 0.8.0 source
 
 Implemented bounded local PDF inspection in a supervised child of the desktop
@@ -755,9 +810,9 @@ clone.
 Encrypted backup/restore is implemented with authenticated files, retained
 previous workspaces, and tested interrupted/failure recovery. Clean installed
 Windows acceptance and independent security review remain prerequisites for
-actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. The next application priority is **merchant grouping and recurring-payment review**; keep scanned OCR and broad institution adapters in later checkpoints.
+actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. The next application priority is **row-level statement reconciliation**; keep scanned OCR and broad institution adapters in later checkpoints.
 
-Advanced financial models, broader scenarios, PDFs, multiple counselor roles,
+Advanced financial models, broader scenarios, finalized PDF reports, multiple counselor roles,
 password change/reset, exports, licensing, signing, retained-copy selection,
 scheduled backups, and commercial readiness remain incomplete. See
 [roadmap.md](roadmap.md) and [windows.md](windows.md) for staged criteria.
@@ -771,7 +826,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 | Specification stage | Remaining work |
 |---|---|
 | 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
-| 4: Document processing | CSV and selected text-PDF review implemented; scanned OCR, institution adapters, recurring/grouped review, and row-level reconciliation remain |
+| 4: Document processing | CSV, selected text-PDF review and recurring/grouped payment review implemented; scanned OCR, institution adapters and row-level reconciliation remain |
 | 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
 | 6: Security/commercial | Encrypted backup/restore implemented; clean Windows recovery, password safeguards, accounts/roles, branding, licensing and independent review remain |
 | 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |

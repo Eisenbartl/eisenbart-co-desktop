@@ -69,3 +69,12 @@ prove the absence of outbound network traffic, or certify production security.
 The harness centers visible controls before a native click to avoid WebKit partial-viewport coordinate errors. Unicode labels are preserved in XPath literals. Explicit read-only DOM/runtime observations, locator reads, and GET observations retry one connection closure; clicks, typing, financial writes, and general scripts are never replayed. Source-retention and acknowledgment checkboxes must be observed selected before submission.
 
 The PDF checkpoint extends the same visible native workflow with a generated fictional text PDF, separate parser execution, damaged-file rejection, explicit transaction-line selection, page/line provenance, individual source approval, pending-expense exclusion, original retention, and backup/error-screen recovery of PDF decisions/history. The standard-library fixture generator is `scripts/synthetic_pdf.py`; it is a development helper, not part of the shipped application.
+
+The 0.9.0 workflow also creates Casey Pattern with three fictional month-end
+service payments ($10.01, $12.03, $10.01). It verifies pending exclusion,
+merchant evidence, a monthly suggestion and the independent $32.05 total;
+explicitly confirms a subscription; reverses an approval ($22.04 remains);
+checks **Needs review**, reapproves without reviving confirmation, and explicitly
+reconfirms. Both captured decisions must survive a complete process restart,
+normal backup recovery and missing-metadata recovery, with client isolation and
+unchanged planning inputs. Artifacts include `native-recurring-review.png`.

@@ -89,10 +89,17 @@ The expected installer output directory is `src-tauri\target\release\bundle\nsis
 
 Before sharing a release, install on a clean Windows 11 x64 machine, including one without WebView2 and without internet access. Test setup, wrong-password handling, client isolation, lock/unlock, persistence after a restart, and uninstall/reinstall data behavior. Record actual results and failures. Complete recovery, security, accessibility, licensing, signing, and broader product criteria in [roadmap.md](roadmap.md) before calling the application production-ready.
 
-The 0.8.0 source upgrades local workspaces to schema 9. Recovered workspaces use the activation layout; use 0.8.0 or newer. Earlier applications cannot open schema 9 and do not understand that layout. No new installer is created for this milestone.
+The 0.9.0 source upgrades local workspaces to schema 10 for encrypted recurring-payment decision history. Recovered workspaces use the activation layout; use 0.9.0 or newer. Earlier applications cannot open schema 10. No new installer is created for this milestone.
 
 Windows manual recovery acceptance: create a backup on local/removable storage; reject wrong passwords and damaged files; cancel review; verify whole-workspace restore with retained original files; repeat after app restart and simulated missing metadata; verify all client plans and immutable history offline. Use a disposable fictional workspace. See [backup-recovery.md](backup-recovery.md). This installed Windows GUI/drive acceptance is separate from CI source tests.
 
 CSV acceptance must also exercise native file selection, explicit mapping, pending/clarification/approved/rejected states, duplicate handling, refunds, transfers, source retention, lock/restart isolation, and backup recovery on clean Windows 11 while offline. Linux native checks and Windows source tests establish separate results. See [csv-import-review.md](csv-import-review.md).
 
 Windows PDF acceptance must exercise native file selection, parser-job memory limits, malformed/protected/scanned rejection, explicit page/line selection, individual decisions, original-source retention, isolation, and backup recovery while offline. Source tests verify the worker executable/protocol; clean Windows 11 GUI acceptance remains unrun. See [pdf-import-review.md](pdf-import-review.md).
+
+Recurring-payment acceptance must exercise corrected merchant grouping, approved-only
+evidence, variable amounts/month-end suggestions, explicit confirmation/dismissal,
+subscription classification, stale-evidence invalidation including identical
+reapproval, client isolation, restart, and encrypted recovery on clean Windows 11
+offline. Source CI does not establish installed desktop acceptance. See
+[recurring-payment-review.md](recurring-payment-review.md).

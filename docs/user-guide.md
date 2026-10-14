@@ -1,7 +1,7 @@
 # Windows evaluation guide
 
 This development build provides a local workspace, client profiles, counseling
-statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.8.0 source) savings planning, cash-flow calendars, encrypted backups, verified restore, and CSV/selectable-text PDF transaction review. Use fictional records only. Advanced financial
+statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.9.0 source) savings planning, cash-flow calendars, encrypted backups, verified restore, CSV/selectable-text PDF transaction review, and merchant/recurring-payment review. Use fictional records only. Advanced financial
 calculations, scanned-document OCR, institution adapters, advanced cash-flow models, PDF reports, and
 commercial licensing are still being developed. Password reset and independent security review remain unavailable.
 
@@ -250,3 +250,7 @@ Refunds offset spending; paired internal transfers avoid extra income/expense. C
 Choose **Selectable-text PDF** in the client statement panel, inspect a synthetic PDF, expand its pages, and select only transaction lines. Choose the account and actual date format; leave unknown metadata blank. Original-file retention requires its checkbox. Import, then verify each record against its original page, classify/category it, enter a reason, and explicitly approve or reject it. Every PDF row starts as Needs Clarification; bulk approval is unavailable.
 
 [PDF instructions, supported layout, examples, and limits](pdf-import-review.md) explain wrapped/ambiguous text, protected/scanned files, exact totals, and recovery. The older installer lacks this source checkpoint; no new download was created.
+
+## Review merchant groups and recurring payments (0.9.0 source)
+
+Approve the source transactions first. In the client's statement panel, scroll to **Merchant groups and recurring payments**, choose a group, and check its supporting payments. Correct verified Merchant fields to combine or separate names. Confirm or dismiss the pattern with a reason; choose the reviewed frequency and classify a subscription only after verifying it. Changed evidence requires another review. Decisions persist in encrypted storage and backups without changing planning inputs. See [steps, evidence rules, examples and limits](recurring-payment-review.md). No new installer was created.

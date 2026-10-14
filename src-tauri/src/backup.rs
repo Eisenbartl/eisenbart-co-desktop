@@ -1035,7 +1035,7 @@ mod tests {
         let client = all_records(&mut w);
         let target = tempdir().unwrap();
         let connection = &w.session.as_ref().unwrap().connection;
-        connection.execute_batch("DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; CREATE TABLE audit_events_v6 (
+        connection.execute_batch("DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; CREATE TABLE audit_events_v6 (
             id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
             event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved','cashflow_plan_saved')),
             entity_id TEXT,created_at TEXT NOT NULL,

@@ -8,6 +8,7 @@ mod pdf;
 mod pdf_fixture;
 #[doc(hidden)]
 pub mod pdf_process;
+mod recurring;
 mod savings;
 mod storage;
 
@@ -138,6 +139,19 @@ async fn stage_client_csv(
     })
     .await
     .map_err(|_| "Import/review operation could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn review_recurring_payment(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: recurring::ReviewInput,
+) -> Result<imports::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.review_recurring_payment(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Payment review could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn review_transaction(
@@ -465,6 +479,7 @@ pub fn run() {
             get_client_imports,
             stage_client_csv,
             review_transaction,
+            review_recurring_payment,
             bulk_approve_transactions,
             pair_transfer_transactions,
             choose_backup_folder,

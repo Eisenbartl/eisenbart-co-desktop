@@ -205,7 +205,7 @@ export interface CsvDocument {id:string;accountId:string;fileName:string;sha256:
 export interface ImportedRecord {id:string;documentId:string;accountId:string;raw:RawCsvRecord;fields:TransactionFields;status:ReviewStatus;linkedId:string|null;reason:string;warnings:string[];duplicateIds:string[];bulkEligible:boolean}
 export interface ReviewHistory {id:string;recordId:string;fromStatus:ReviewStatus;toStatus:ReviewStatus;fields:TransactionFields;reason:string;reviewedAt:string;counselorName:string}
 export interface ImportSummary {pending:number;needsClarification:number;approved:number;rejected:number;income:string;spending:string;refunds:string;netSpending:string;netCash:string;accountNet:[string,string][];warnings:string[]}
-export interface ClientImports {clientId:string;revision:number;accounts:StatementAccount[];documents:CsvDocument[];records:ImportedRecord[];history:ReviewHistory[];summary:ImportSummary}
+export interface ClientImports {merchantGroups:MerchantGroup[];recurringHistory:RecurringReview[];clientId:string;revision:number;accounts:StatementAccount[];documents:CsvDocument[];records:ImportedRecord[];history:ReviewHistory[];summary:ImportSummary}
 export interface CsvStageInput {expectedRevision:number;token:string;document:CsvDocumentInput}
 export interface TransactionReviewInput {expectedRevision:number;recordId:string;status:ReviewStatus;fields:TransactionFields;reason:string;acknowledgeWarnings:boolean}
 export interface TransactionBulkInput {expectedRevision:number;recordIds:string[]}
@@ -213,3 +213,9 @@ export interface TransactionPairInput {expectedRevision:number;leftId:string;rig
 
 export interface PdfLocator {page:number;line:number}
 export interface PdfPage {number:number;text:string}
+
+export type RecurringFrequency='weekly'|'fortnightly'|'monthly'|'quarterly'|'annual'|'irregular';
+export interface PaymentEvidence {recordId:string;approvalId:string;documentId:string;accountId:string;page:number|null;line:number;fields:TransactionFields;duplicateIds:string[]}
+export interface RecurringReview {id:string;groupId:string;evidenceHash:string;label:string;decision:'confirmed'|'dismissed';frequency:RecurringFrequency|null;subscription:boolean;reason:string;reviewedAt:string;counselorName:string;evidence:PaymentEvidence[]}
+export interface MerchantGroup {id:string;merchant:string;usesDescription:boolean;accountId:string;kind:TransactionKind;evidenceHash:string;evidence:PaymentEvidence[];totalPaid:string;smallestPayment:string;largestPayment:string;suggestedFrequency:RecurringFrequency|null;canConfirm:boolean;warnings:string[];state:'Unreviewed'|'Confirmed'|'Dismissed'|'Needs review';review:RecurringReview|null}
+export interface RecurringReviewInput {expectedRevision:number;groupId:string;evidenceHash:string;label:string;decision:'confirmed'|'dismissed';frequency:RecurringFrequency|null;subscription:boolean;reason:string}
