@@ -95,3 +95,9 @@ verifies independently expected historical figures/evidence/review flags with
 Poppler `pdftotext`, refuses overwrites without changing file bytes, and repeats
 after restart and both recovery paths. Install `poppler-utils` for this development
 check if `pdftotext` is unavailable; it is not an application dependency.
+
+Build the standalone native executable **after** Cargo tests and Clippy, immediately
+before the smoke run. Cargo integration tests can replace the debug application
+path with a binary expecting the development server. A refused localhost page
+means rebuild with `npm run tauri -- build --debug --no-bundle`; do not start a
+web server to make this standalone desktop check pass.

@@ -22,11 +22,11 @@ limits fail without truncation or changing the saved record.
 |---|---|
 | Locked cloud setup / frontend production build | Passed |
 | Interface suite | 80 passed; two new tests cover export identity/arguments, cancellation, failed-path retention, concurrent operation/draft blocking and late client replies |
-| Linux backend / worker suite | 116 library + 2 executable worker tests passed (118 total); four new tests cover historical 799.99/net worth 4,000.06 vs live 2,000.01, Unicode/font embedding, measured wrapping/page limits, unsupported glyph/no partial file, scoped/locked access and unsafe destinations; corrupt-record export rejection extends existing coverage |
+| Linux backend / worker suite | Full suite: 116 library + 2 executable worker tests passed (118 total); all four focused PDF tests also passed after the historical-warning presentation correction; four new tests cover historical 799.99/net worth 4,000.06 vs live 2,000.01, Unicode/font embedding, measured wrapping/page limits, unsupported glyph/no partial file, scoped/locked access and unsafe destinations; corrupt-record export rejection extends existing coverage |
 | Formatting / Clippy, warnings denied | Passed |
 | Native desktop compile | Passed debug build with no bundle |
-| Native full desktop/recovery/export workflow | Passed implementation 52dee12, including four actual PDF exports and unchanged files on rejected overwrites; visual review prompted historical warning wording correction, final native run pending |
-| Windows source CI | First run 38604263280: 79 interface tests passed, one recurring-review test failed before backend checks. Added deterministic initial-load/effect settling and enabled-button check without weakening assertions; corrected source run pending. All installer steps skipped |
+| Native full desktop/recovery/export workflow | Passed final implementation 6f6bf1e: four actual printable PDF exports preserve original 199.98/net worth 525.05 versus current 500.00, captured evidence/review flags and fixed-record wording; byte-for-byte preservation after refused overwrites; restart and both encrypted recovery paths |
+| Windows source CI | Passed final implementation 6f6bf1e: [run 38605164502](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38605164502), 80 interface + 117 library + 2 worker tests (119 backend/process total); all installer/package/upload steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
 
 Direct in-app printing, complete scenario-backed counselor reports, final client
@@ -34,6 +34,36 @@ action plans, organization logos/contact branding, complex-script font fallback,
 PDF tags/archival certification and export-specific audit/permissions remain open.
 PDFs are readable local files outside workspace encryption. Existing counselor
 assessment creation remains audited; exporting does not create another audit event.
+
+Initial Windows run 38604263280 passed 79 interface tests but failed the recurring
+review test before backend checks. The test now explicitly settles initial React
+loading effects and observes enabled review controls before clicking; its original
+verification/withdrawal assertions remain intact. Final Windows checks passed.
+Native visual inspection found a captured live-dashboard warning in the initial
+PDF; saved views now render historical context wording without changing the
+archived warning/financial payload or live dashboard.
+
+The first native implementation run passed. During final validation, a later
+focused Cargo test replaced the standalone executable with a development-server
+binary; its refused-localhost screenshot identified the cause before data entry.
+The standalone build was rebuilt last. A subsequent driver connection dropped
+while typing the first report title; screenshot/driver log confirmed a responsive
+app and a transport reset. No typing/save was replayed. A fresh isolated run from
+the same final committed implementation passed the complete workflow. The build
+order and transport limits are recorded in [smoke-test.md](smoke-test.md).
+
+Final implementation `6f6bf1ebb4d7ffd65b7bfcec2cfeb6223f67a220` is uploaded and
+Windows-validated. Native PDF visual review confirmed firm/client/counselor,
+fixed original period/figures, review notices, readable charts/typography/margins,
+page numbers and honest incomplete status. Final fictional PDF: five Letter pages,
+embedded font/extractable text, no forms, JavaScript, original attachments or
+workspace credentials. Source/full-history checkpoints are saved outside the
+checkout at `/workspace/shared/checkpoints/eisenbart-pdf-export-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-pdf-export.bundle`. Validation logs remain
+under `/workspace/shared`: `pdf-export-ui-tests.log`, `pdf-export-backend-tests.log`,
+`pdf-export-focused-tests.log`, `pdf-export-clippy.log`,
+`pdf-export-native-complete.log`, `pdf-export-windows-validation.log`; final native
+artifacts are in `desktop-smoke-pdf-export-complete`.
 
 Next priority: **captured planning scenarios and client action plans** with agreed
 allocations, debt/savings milestones, prioritized actions and final report review.
