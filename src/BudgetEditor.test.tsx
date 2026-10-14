@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import BudgetEditor, { usd } from './BudgetEditor';
-import type { Client, ClientBudget } from './types';
+import type { Client, ClientBudget, BudgetMethodComparison } from './types';
 
-const mocks = vi.hoisted(() => ({ getClientBudget: vi.fn(), saveClientBudget: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getClientBudget: vi.fn(), saveClientBudget: vi.fn(),compareBudgetMethods:vi.fn() }));
 vi.mock('./api', () => ({ api: mocks }));
 const client: Client = { id: 'client-a', organizationId: 'org-a', firstName: 'Alex', lastName: 'Fictional', email: '', phone: '', householdSize: 1, status: 'Planning', goals: '', createdAt: '', updatedAt: '' };
 const empty: ClientBudget = { clientId: client.id, revision: 0, updatedAt: null, lines: [], summary: {
@@ -88,4 +88,8 @@ describe('client budget editor', () => {
     expect(usd('433333333333.00')).toBe('$433,333,333,333.00');
     expect(usd('-0.01')).toBe('-$0.01');
   });
+});
+
+it('blocks budget writes during comparison, hides dirty results and reloads saved context without saving',async()=>{
+ mocks.getClientBudget.mockResolvedValue(saved);const p=deferred<BudgetMethodComparison>();mocks.compareBudgetMethods.mockReturnValueOnce(p.promise);const busy=vi.fn();await act(async()=>{render(<BudgetEditor client={client} onBusy={busy} onDirty={vi.fn()} otherSaving={false}/>);});await screen.findByText('Monthly plan summary');fireEvent.click(screen.getByText('Compare optional budget methods'));fireEvent.click(screen.getByRole('button',{name:'Compare saved budget'}));expect(screen.getByRole('button',{name:'Save budget and calculate'})).toBeDisabled();expect(screen.getByLabelText('Amount (USD)')).toBeDisabled();await act(async()=>p.resolve({clientId:client.id,revision:1,calculator:'budget-framework-v1',requiredDebtMinimum:'0.00',zeroBased:{income:'3250.00',assigned:null,remaining:null,status:'incomplete'},standard:{label:'50/30/20',buckets:[]},custom:{label:'Custom',buckets:[]},warnings:['Necessary expenses unknown']}));await screen.findByRole('region',{name:'Saved budget framework comparison'});await waitFor(()=>expect(busy).toHaveBeenLastCalledWith(false));expect(screen.getByRole('button',{name:'Save budget and calculate'})).toBeEnabled();fireEvent.change(screen.getByLabelText('Amount (USD)'),{target:{value:'1000'}});expect(screen.getByRole('button',{name:'Compare saved budget'})).toBeDisabled();expect(screen.queryByRole('region',{name:'Saved budget framework comparison'})).not.toBeInTheDocument();fireEvent.change(screen.getByLabelText('Amount (USD)'),{target:{value:'1500.00'}});expect(screen.getByRole('button',{name:'Reload saved budget'})).toBeEnabled();mocks.getClientBudget.mockResolvedValue({...saved,revision:2});fireEvent.click(screen.getByRole('button',{name:'Reload saved budget'}));await waitFor(()=>expect(mocks.getClientBudget).toHaveBeenCalledTimes(2));await screen.findByText('Monthly plan summary');expect(screen.queryByRole('region',{name:'Saved budget framework comparison'})).not.toBeInTheDocument();expect(mocks.saveClientBudget).not.toHaveBeenCalled();
 });

@@ -135,3 +135,11 @@ verify before-restart, restart, encrypted restore and damaged-workspace recovery
 evidence. Alex's planning report also captures only his selected note; client PDFs
 exclude internal counseling evidence. Artifacts include
 `native-counselor-report-evidence.png` and `counselor-evidence-*.pdf`.
+
+The 0.18.0 workflow compares Alex's saved budget before model entry and after
+restart/each encrypted recovery path. Unknown minimums stay unavailable; a 100.00
+minimum yields needs 1,733.33 / future 600.00, standard targets 1,625.00 / 975.00 /
+650.00 and custom needs target 1,950.00. Zero-based remaining stays 716.67. Invalid
+percentages fail with assumptions retained; no saved budget or source value changes.
+Temporary comparison inputs reset across client/restart boundaries. Artifacts
+include `native-budget-methods-*.png`.

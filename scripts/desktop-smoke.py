@@ -735,6 +735,31 @@ def assert_counselor_evidence_restored(driver: WebDriver, artifacts: Path, label
     driver.click(".saved-assessments > summary")
 
 
+def check_budget_methods(driver: WebDriver, artifacts: Path, label: str) -> None:
+    if driver.command("GET", f"/element/{driver.element('.budget-methods')}/property/open") is not True:
+        driver.click(".budget-methods > summary")
+    driver.wait_value("#method-minimum", "", "framework assumptions do not carry across restart/client changes")
+    driver.click_button("Compare saved budget")
+    driver.wait_text(".method-zero", "Unassigned / deficit$716.67", "zero-based framework preserves original unassigned amount")
+    driver.wait_text("table[aria-label='Optional budget percentage comparison']", "Unavailable", "unknown required minimums never become zero")
+    driver.fill("#method-minimum", "100")
+    driver.click_button("Compare saved budget")
+    for expected in ["$1,733.33", "$1,625.00", "$108.33", "-$775.00", "$600.00", "$1,950.00", "-$216.67", "-$50.00"]:
+        driver.wait_text("table[aria-label='Optional budget percentage comparison']", expected, "independently expected reference comparison " + expected)
+    driver.wait_text(".method-zero", "Spending and allocations assigned$2,533.33", "minimum reclassification does not duplicate payments")
+    driver.fill("#method-needsPercent", "61")
+    driver.click_button("Compare saved budget")
+    driver.wait_text(".budget-methods [role=alert]", "total exactly 100.00%", "invalid percentages rejected without changing saved plan")
+    driver.wait_value("#method-needsPercent", "61", "failed assumptions retained")
+    driver.fill("#method-needsPercent", "60")
+    driver.click_button("Compare saved budget")
+    driver.wait_text(".method-zero", "Unassigned / deficit$716.67", "saved plan unaffected by comparison failure")
+    driver.scroll_to(".budget-method-results", "start")
+    driver.screenshot(artifacts / f"native-budget-methods-{label}.png")
+    driver.click(".budget-methods > summary")
+    status(f"optional budget frameworks, exact targets, minimum reclassification, unknowns and failed comparison leave saved finances unchanged ({label})")
+
+
 def export_original_assessment_pdf(driver: WebDriver, artifacts: Path, label: str) -> None:
     destination = artifacts / f"saved-assessment-{label}.pdf"
     if destination.exists():
@@ -1057,6 +1082,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.scroll_to(".budget-results", "center")
     driver.screenshot(artifacts / "native-budget.png")
     status("exact client budget calculation, encrypted save, and allocations")
+    check_budget_methods(driver, artifacts, "initial")
 
     driver.wait_text(".debt-panel", "No saved debt plan yet", "first client's empty debt plan")
     driver.fill("#debt-start-month", "2026-11")
@@ -1297,6 +1323,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver, artifacts, "restart")
     assert_captured_planning_restored(driver, artifacts, "restart")
+    check_budget_methods(driver, artifacts, "restart")
     assert_counselor_evidence_restored(driver, artifacts, "restart")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
@@ -1388,6 +1415,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver, artifacts, "encrypted-restore")
     assert_captured_planning_restored(driver, artifacts, "encrypted-restore")
+    check_budget_methods(driver, artifacts, "encrypted-restore")
     assert_counselor_evidence_restored(driver, artifacts, "encrypted-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
@@ -1422,6 +1450,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver, artifacts, "error-screen-restore")
     assert_captured_planning_restored(driver, artifacts, "error-screen-restore")
+    check_budget_methods(driver, artifacts, "error-screen-restore")
     assert_counselor_evidence_restored(driver, artifacts, "error-screen-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)

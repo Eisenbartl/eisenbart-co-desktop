@@ -2,6 +2,7 @@ mod action_plans;
 mod assessment_pdf;
 mod assessments;
 mod budget;
+mod budget_methods;
 mod cashflow;
 mod dashboard;
 mod debt;
@@ -595,6 +596,19 @@ fn list_client_notes(
 }
 
 #[tauri::command]
+async fn compare_budget_methods(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: budget_methods::Input,
+) -> Result<budget_methods::Comparison, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.compare_budget_methods(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Budget comparison could not finish.".to_owned())?
+}
+#[tauri::command]
 fn get_client_budget(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -748,6 +762,7 @@ pub fn run() {
             save_client,
             add_client_note,
             list_client_notes,
+            compare_budget_methods,
             get_client_budget,
             save_client_budget,
             get_client_debt_plan,

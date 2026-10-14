@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from './api';
+import BudgetMethods from './BudgetMethods';
 import type { BudgetFrequency, BudgetKind, BudgetLine, Client, ClientBudget } from './types';
 
 const kinds: [BudgetKind, string][] = [['income', 'Take-home income'], ['necessary', 'Necessary expense'], ['discretionary', 'Discretionary expense'], ['savings', 'Savings allocation'], ['debtPayment', 'Debt payment allocation']];
@@ -19,6 +20,7 @@ export default function BudgetEditor({ client, onDirty, onBusy, otherSaving }: {
   const [lines, setLines] = useState<BudgetLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [methodBusy,setMethodBusy]=useState(false);
   const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -26,7 +28,7 @@ export default function BudgetEditor({ client, onDirty, onBusy, otherSaving }: {
   const mounted = useRef(true);
   const dirty = saved !== null && JSON.stringify(lines) !== JSON.stringify(saved.lines);
   useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
-  useEffect(() => { onBusy(saving); }, [saving, onBusy]);
+  useEffect(() => { onBusy(saving||methodBusy); }, [saving,methodBusy, onBusy]);
   useEffect(() => {
     mounted.current = true;
     let current = true;
@@ -50,7 +52,7 @@ export default function BudgetEditor({ client, onDirty, onBusy, otherSaving }: {
   }
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!saved || saving || otherSaving) return;
+    if (!saved || saving || methodBusy || otherSaving) return;
     setError(''); setNotice(''); setSaving(true);
     onBusy(true);
     try {
@@ -68,7 +70,7 @@ export default function BudgetEditor({ client, onDirty, onBusy, otherSaving }: {
     <p className="muted small">Plan for {client.firstName} {client.lastName}. Enter take-home income and customize your spending categories. These planning amounts do not change historical transactions.</p>
     {loading ? <p role="status">Loading budget…</p> : loadError ? <><div className="error-message" role="alert">{loadError}</div><button type="button" className="button secondary" onClick={() => setAttempt(value => value + 1)}>Retry loading budget</button></> : <>
       <form onSubmit={save} noValidate>
-        <fieldset disabled={saving || otherSaving}>
+        <fieldset disabled={saving || methodBusy || otherSaving}>
           <p className="field-help">Amounts are in USD, without commas or dollar signs (for example, 1250.50). Leave an unknown amount blank; enter 0 for a known zero. Irregular amounts are estimated monthly totals.</p>
           {!lines.length && <p className="empty-note">No budget lines yet. Add income, expenses, and any planned allocations.</p>}
           <div className="budget-lines">{lines.map((line, index) => <div className="budget-line" key={index}>
@@ -98,6 +100,7 @@ export default function BudgetEditor({ client, onDirty, onBusy, otherSaving }: {
         {summary.warnings.length > 0 && <div className="budget-warnings"><h4>Review this plan</h4><ul>{summary.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
         <p className="field-help">Monthly averages use 52 weekly or 26 biweekly payments per year, 2 twice-monthly payments per month, and annual amounts ÷ 12. Each line rounds to cents before totals are added. Averages do not predict the timing of paychecks or bills. Debt payments belong in debt allocations, not both expenses and allocations.</p>
       </div>}
+      {saved&&<BudgetMethods budget={saved} disabled={dirty||saving||otherSaving} onBusy={setMethodBusy} onReload={()=>{if(!dirty&&!saving&&!methodBusy&&!otherSaving)setAttempt(v=>v+1);}}/>}
     </>}
   </section>;
 }

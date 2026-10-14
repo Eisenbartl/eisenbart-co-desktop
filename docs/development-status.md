@@ -1,5 +1,55 @@
 # Development status
 
+## Stage 3E: optional budget method comparisons — 0.18.0 source
+
+The saved-budget panel now offers read-only zero-based, 50/30/20 and custom
+percentage references. Required minimum debt is classified from existing planned
+debt into needs; savings and extra debt share the future bucket. The zero-based
+check shows assigned/unassigned income or deficit without assigning funds.
+A side-by-side table shows entered amounts, targets, exact signed differences and
+reference positions. These optional guidelines never change plans, agreements,
+reports, approved sources or audit events. Inputs/results are temporary and reset
+across clients/restart; the saved budget remains persistent.
+
+Rust rechecks authenticated scope, saved revision and canonical budget arithmetic.
+IPC accepts strings/revision only. Percentages use integer basis points, must total
+exactly 100.00%, and targets use largest-remainder cents (ties needs/wants/future)
+so the target sum exactly equals entered monthly income. Unknown income/amounts
+and minimums withhold affected figures, rather than becoming zero or compliance.
+Estimates, incomplete expenses, zero income and separate model assumptions stay
+explicit. Failed inputs are retained; edits hide old results, competing writes are
+blocked, and stale budgets can be reloaded without a save. No migration/dependency
+or installer is added. See [budget-method-comparisons.md](budget-method-comparisons.md).
+
+Independent example: income 3,250.00, necessary 1,633.33, wants 200.00, savings
+300.00/debt 400.00; zero-based assigned 2,533.33/remaining 716.67. Minimum debt
+100.00 gives needs 1,733.33/future 600.00. Standard targets 1,625.00/975.00/650.00
+produce differences +108.33/-775.00/-50.00; custom 60/20/20 needs target 1,950.00
+produces -216.67. For 1.01 at 33.33/33.33/33.34, targets 0.34/0.33/0.34 conserve
+all cents. Known balanced/deficit/zero, missing income/expenses, unknown minimums,
+invalid precision/percent sums, large aggregate amounts, and cent conservation
+are independently checked.
+
+| Check | Result |
+|---|---|
+| Locked setup / production frontend build | Passed |
+| Interface suite | 96 passed; lazy/input-only comparison, canonical figures, failed assumptions, unknowns, client/version mismatch/late replies, dirty/concurrent guards and read-only budget reload |
+| Linux backend / worker suite | 135 library + 2 worker tests passed (137 total); four pure framework checks plus scoped/stale/locked/no-audit-write storage verification |
+| Formatting / Clippy, warnings denied | Passed |
+| Native desktop compile / complete workflow | Standalone debug build passed; full native comparison/report/recovery workflow running |
+| Windows source CI | Pending; installer/package/upload steps disabled |
+| Clean Windows installation/offline release acceptance | Not run |
+
+Seven major work areas remain in the roadmap: further financial models/scenarios,
+document/OCR review, fuller intake/workflow, security/permissions, commercial
+branding/support, report refinements and Windows release acceptance. Each requires
+smaller checkpoints; this feature does not complete the whole financial-model area.
+See [remaining-requirements.md](remaining-requirements.md). Original stages 3–8 are
+still partly open; the count is not a time or percentage estimate.
+
+Next priority: **combined non-writing scenario comparisons**, building on entered
+budget/debt/savings/cash-flow models while preserving historical records.
+
 ## Stage 5G: expanded counselor report evidence — 0.17.0 source
 
 Internal assessments can now optionally capture selected saved session notes and

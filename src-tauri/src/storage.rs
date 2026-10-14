@@ -427,6 +427,15 @@ impl Workspace {
         crate::dashboard::assess(&snapshot, input, chrono::Utc::now().date_naive())
     }
 
+    pub fn compare_budget_methods(
+        &mut self,
+        client_id: &str,
+        input: crate::budget_methods::Input,
+    ) -> Result<crate::budget_methods::Comparison, String> {
+        let budget = self.get_client_budget(client_id)?;
+        crate::budget_methods::compare(&budget, input)
+    }
+
     pub fn get_client_budget(&mut self, client_id: &str) -> Result<ClientBudget, String> {
         let session = self.session()?;
         scoped_client(&session.connection, &session.info, client_id)?;
@@ -3032,5 +3041,54 @@ mod tests {
             .is_err());
         assert_eq!(workspace.workspace_info().unwrap(), info);
         assert_eq!(workspace.get_client(&client.id).unwrap(), client);
+    }
+    #[test]
+    fn budget_method_comparison_is_scoped_revision_checked_and_never_writes() {
+        let (_root, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let b = w.save_client_budget(&client.id, budget_input(0)).unwrap();
+        let input = || crate::budget_methods::Input {
+            expected_revision: 1,
+            required_debt_minimum: None,
+            needs_percent: "60".into(),
+            wants_percent: "20".into(),
+            future_percent: "20".into(),
+        };
+        let before: i64 = w
+            .session
+            .as_ref()
+            .unwrap()
+            .connection
+            .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
+            .unwrap();
+        let result = w.compare_budget_methods(&client.id, input()).unwrap();
+        assert_eq!(result.client_id, client.id);
+        assert_eq!(
+            result.standard.buckets[0].target.as_deref(),
+            Some("1625.00")
+        );
+        assert_eq!(w.get_client_budget(&client.id).unwrap(), b);
+        assert_eq!(
+            w.session
+                .as_ref()
+                .unwrap()
+                .connection
+                .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            before
+        );
+        assert!(w.compare_budget_methods(&other.id, input()).is_err());
+        assert!(w.compare_budget_methods("foreign-client", input()).is_err());
+        let mut changed = input();
+        changed.expected_revision = 0;
+        assert!(w.compare_budget_methods(&client.id, changed).is_err());
+        let mut invalid = serde_json::json!({"expectedRevision":1,"requiredDebtMinimum":null,"needsPercent":"60","wantsPercent":"20","futurePercent":"20"});
+        assert!(serde_json::from_value::<crate::budget_methods::Input>(invalid.clone()).is_ok());
+        invalid["targets"] = serde_json::json!([1, 2, 3]);
+        assert!(serde_json::from_value::<crate::budget_methods::Input>(invalid).is_err());
+        w.lock_workspace();
+        assert!(w.compare_budget_methods(&client.id, input()).is_err());
     }
 }

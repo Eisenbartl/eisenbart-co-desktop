@@ -469,3 +469,9 @@ textarea { resize: vertical; min-height: 100px; }
 .report-evidence-selection .assessment-note { display: block; margin-top: 8px; }
 .captured-report-evidence { margin-top: 24px; }
 .captured-report-evidence h4 { margin-top: 24px; }
+
+.budget-methods { margin-top: 24px; padding: 18px; border: 1px solid var(--line); border-radius: 8px; }
+.budget-methods > summary { cursor: pointer; font-weight: 600; }
+.budget-methods fieldset { border: 0; margin: 18px 0; padding: 0; }
+.budget-methods label { margin-top: 12px; }
+.budget-method-results h4 { margin: 20px 0 12px; }

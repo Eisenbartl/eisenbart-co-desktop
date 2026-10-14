@@ -273,3 +273,7 @@ export interface ActionPlanReview {clientId:string;assessmentId:string;assessmen
 export interface ActionPlanPayload {format:number;calculator:string;id:string;clientId:string;assessmentId:string;assessmentDigest:string;createdAt:string;reportDate:string;appVersion:string;title:string;data:ActionPlanData;allocations:ActionAllocations;disclosures:string[]}
 export interface SavedActionPlan {clientId:string;payload:ActionPlanPayload;assessment:SavedAssessment;digest:string;needsReview:boolean;reviewReasons:string[]}
 export interface ActionPlanDirectory {clientId:string;records:{id:string;title:string;createdAt:string;reportDate:string;assessmentId:string;needsReview:boolean}[]}
+
+export interface BudgetMethodInput {expectedRevision:number;requiredDebtMinimum:string|null;needsPercent:string;wantsPercent:string;futurePercent:string}
+export interface BudgetMethodBucket {label:string;percent:string;actual:string|null;target:string|null;difference:string|null;position:'unavailable'|'at'|'above'|'below'}
+export interface BudgetMethodComparison {clientId:string;revision:number;calculator:string;requiredDebtMinimum:string|null;zeroBased:{income:string|null;assigned:string|null;remaining:string|null;status:'incomplete'|'fullyAssigned'|'unassigned'|'overAssigned'};standard:{label:string;buckets:BudgetMethodBucket[]};custom:{label:string;buckets:BudgetMethodBucket[]};warnings:string[]}
