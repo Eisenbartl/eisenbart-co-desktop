@@ -157,10 +157,16 @@ impl Layout {
         self.y -= 13.0;
         Ok(())
     }
-    fn finish(mut self) -> Result<(Vec<u8>, usize), String> {
+    fn finish(self) -> Result<(Vec<u8>, usize), String> {
+        self.finish_labeled(
+            "INTERNAL / INCOMPLETE",
+            "Internal counselor assessment - incomplete information",
+        )
+    }
+    fn finish_labeled(mut self, label: &str, title: &str) -> Result<(Vec<u8>, usize), String> {
         let count = self.pages.len();
         for i in 0..count {
-            let text = format!("INTERNAL / INCOMPLETE  |  Page {} of {count}", i + 1);
+            let text = format!("{label}  |  Page {} of {count}", i + 1);
             let encoded = self.encode(&text)?;
             self.pages[i].extend([
                 Operation::new("BT", vec![]),
@@ -234,7 +240,7 @@ impl Layout {
         );
         let catalog = d.add_object(dictionary! {"Type"=>"Catalog","Pages"=>pages});
         d.trailer.set("Root", catalog);
-        let info=d.add_object(dictionary!{"Producer"=>Object::string_literal(concat!("Eisenbart Counseling Suite ",env!("CARGO_PKG_VERSION"))),"Title"=>Object::string_literal("Internal counselor assessment - incomplete information")});
+        let info=d.add_object(dictionary!{"Producer"=>Object::string_literal(concat!("Eisenbart Counseling Suite ",env!("CARGO_PKG_VERSION"))),"Title"=>Object::string_literal(title)});
         d.trailer.set("Info", info);
         d.compress();
         let mut bytes = vec![];
@@ -954,7 +960,211 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
     l.text("This checksum checks the stored record bytes, not this exported file, and is not a digital signature or certification. This local PDF contains readable client information outside workspace encryption. It contains captured evidence references, not attached original statement files. Keep it in an appropriate private location. Review the original sources and assumptions before acting on incomplete information.",10.0)?;
     l.finish()
 }
+pub fn render_action_plan(r: &crate::action_plans::Record) -> Result<(Vec<u8>, usize), String> {
+    crate::action_plans::validate(&r.payload, &r.assessment)?;
+    let p = &r.payload;
+    let basis = &r.assessment.payload;
+    let historical = &basis.assessment;
+    let scenario = basis
+        .planning
+        .as_ref()
+        .ok_or("A captured scenario is required.")?;
+    let mut l = Layout::new()?;
+    l.text(&basis.workspace.organization_name, 18.0)?;
+    l.text("Your financial action plan", 18.0)?;
+    l.text(&p.title, 13.0)?;
+    l.value(
+        "Prepared for",
+        &format!("{} {}", basis.client.first_name, basis.client.last_name),
+    )?;
+    l.value("Counselor", &basis.workspace.counselor_name)?;
+    l.value("Report date (America/Chicago)", &p.report_date)?;
+    l.value(
+        "Historical assessment period",
+        &format!("{} to {}", historical.period_start, historical.period_end),
+    )?;
+    l.text(if r.needs_review{"NEEDS REVIEW: supporting data changed after this plan was recorded. These original steps, allocations and forecasts are historical; review current information before acting."}else{"COUNSELOR-REVIEWED GUIDANCE / INCOMPLETE FINANCIAL BASIS"},10.0)?;
+    for reason in &r.review_reasons {
+        l.text(reason, 10.0)?;
+    }
+    l.section("Your prioritized next steps")?;
+    for (i, a) in p.data.actions.iter().enumerate() {
+        l.text(&format!("{}. {}", i + 1, a.step), 12.0)?;
+        l.value(
+            "Responsible person",
+            match a.owner {
+                crate::action_plans::Owner::Client => "Client",
+                crate::action_plans::Owner::Counselor => "Counselor",
+            },
+        )?;
+        l.value("Target date", a.due_date.as_deref().unwrap_or("To arrange"))?;
+    }
+    l.section("Agreed monthly budget and allocations")?;
+    l.text(&p.data.budget_recommendations, 10.0)?;
+    l.value("Captured scenario", &scenario.label)?;
+    l.text("The figures below are entered monthly planning assumptions. They are separate from historical statement totals. Debt and primary savings payments follow the selected saved models when available, with budget allocations used when those models are missing.",10.0)?;
+    for (label, val) in [
+        ("Monthly planning income", &p.allocations.monthly_income),
+        ("Necessary spending", &p.allocations.necessary),
+        ("Discretionary spending", &p.allocations.discretionary),
+        ("Surplus before allocations", &p.allocations.surplus),
+        ("Agreed debt allocation", &p.allocations.debt),
+        ("Agreed primary savings allocation", &p.allocations.savings),
+        ("Unallocated / buffer", &p.allocations.unallocated),
+    ] {
+        l.value(label, &usd(val))?;
+    }
+    l.section("Historical financial position / approved imported activity")?;
+    for (label, val) in [
+        ("Approved income receipts", &historical.totals.income),
+        ("Gross spending", &historical.totals.spending),
+        ("Expense refunds", &historical.totals.refunds),
+        ("Net spending", &historical.totals.net_spending),
+        ("Operating cash flow", &historical.operating_cashflow),
+    ] {
+        l.value(label, &usd(val))?;
+    }
+    let f = &historical.facts_metrics;
+    l.value(
+        "Verified inventory date",
+        f.as_of.as_deref().unwrap_or("Unknown"),
+    )?;
+    for (label, val) in [
+        ("Recorded cash", &f.cash),
+        ("Recorded accessible savings", &f.accessible_savings),
+        ("Recorded debt", &f.debt),
+        ("Estimated net worth at inventory date", &f.net_worth),
+    ] {
+        l.value(label, &optional(val))?;
+    }
+    if !historical.categories.is_empty() {
+        l.section("Approved spending breakdown")?;
+        for c in &historical.categories {
+            l.bar(&c.label, &usd(&c.spending), c.scale)?;
+        }
+    }
+    l.section("Selected debt strategy and conditional milestones")?;
+    l.value(
+        "Strategy",
+        match scenario.debt_strategy {
+            crate::planning::Strategy::None => "No repayment projection selected",
+            crate::planning::Strategy::Snowball => "Snowball",
+            crate::planning::Strategy::Avalanche => "Avalanche",
+        },
+    )?;
+    if let Some(result) = crate::planning::projection(scenario) {
+        l.value("Projected outcome", &plan_term(&result.status))?;
+        l.value(
+            "Projected payoff month",
+            result.payoff_month.as_deref().unwrap_or("Not projected"),
+        )?;
+        l.value("Projected total interest", &usd(&result.total_interest))?;
+        l.value("Projected fees", &usd(&result.total_fees))?;
+        l.value(
+            "Projected remaining balance",
+            &usd(&result.remaining_balance),
+        )?;
+        if let Some(d) = &scenario.plans.debt.data {
+            for (i, a) in d.accounts.iter().enumerate() {
+                l.value(
+                    &format!("Projected payoff: {}", a.label),
+                    result.account_payoff_months[i]
+                        .as_deref()
+                        .unwrap_or("Not projected"),
+                )?;
+            }
+        }
+    } else {
+        l.text(
+            "No payoff milestone is promised. Review the missing or unsupported repayment terms.",
+            10.0,
+        )?;
+    }
+    l.section("Emergency savings and goal milestones")?;
+    if let Some(v) = &scenario.plans.savings.summary {
+        l.value("Emergency target", &optional(&v.emergency_target))?;
+        l.value(
+            "Accessible emergency pool (entered plan)",
+            &optional(&v.accessible_emergency),
+        )?;
+        l.value(
+            "Primary emergency contribution",
+            &optional(&v.emergency.contribution),
+        )?;
+        l.value(
+            "Projected emergency completion",
+            v.emergency
+                .completion_date
+                .as_deref()
+                .unwrap_or("Not projected"),
+        )?;
+        l.value("Emergency forecast status", &plan_term(&v.emergency.status))?;
+        if let Some(d) = &scenario.plans.savings.data {
+            for (i, g) in d.goals.iter().enumerate() {
+                l.value(
+                    &g.label,
+                    &format!(
+                        "Target {} / due {} / entered monthly {} / projected completion {}",
+                        optional(&g.target_amount),
+                        g.target_date.as_deref().unwrap_or("Unknown"),
+                        optional(&g.monthly_contribution),
+                        v.goals[i]
+                            .forecast
+                            .completion_date
+                            .as_deref()
+                            .unwrap_or("Not projected")
+                    ),
+                )?;
+            }
+        }
+    } else {
+        l.text(
+            "No savings forecast is captured. Verify goals and deadlines at follow-up.",
+            10.0,
+        )?;
+    }
+    l.section("Follow-up arrangements")?;
+    l.text(&p.data.follow_up, 11.0)?;
+    l.value(
+        "Follow-up date",
+        p.data.follow_up_date.as_deref().unwrap_or("To arrange"),
+    )?;
+    l.section("Reviewed limitations and assumptions")?;
+    l.text(&p.data.limitations, 10.0)?;
+    l.value(
+        "Captured scenario assumptions",
+        if scenario.assumptions.is_empty() {
+            "None recorded"
+        } else {
+            &scenario.assumptions
+        },
+    )?;
+    for warning in &p.disclosures {
+        l.text(warning, 9.0)?;
+    }
+    l.text("Keep this local PDF in a private location; it contains readable client information outside workspace encryption. Original statements and internal transaction evidence are retained separately, not attached. This plan is recorded by the counselor and is not an electronic client signature or professional certification.",9.0)?;
+    l.value("Supporting assessment", &p.assessment_id)?;
+    l.value("Action plan record", &p.id)?;
+    l.finish_labeled(
+        if r.needs_review {
+            "CLIENT ACTION PLAN / NEEDS REVIEW"
+        } else {
+            "CLIENT ACTION PLAN / INCOMPLETE BASIS"
+        },
+        "Client action plan - reviewed guidance",
+    )
+}
 pub fn save(r: &Record, path: &str, workspace: &Path) -> Result<Export, String> {
+    let (bytes, pages) = render(r, &chrono::Utc::now().to_rfc3339())?;
+    save_bytes(&r.payload.id, bytes, pages, path, workspace)
+}
+pub fn save_bytes(
+    id: &str,
+    bytes: Vec<u8>,
+    pages: usize,
+    path: &str,
+    workspace: &Path,
+) -> Result<Export, String> {
     let p = Path::new(path);
     if !p.is_absolute()
         || p.extension()
@@ -978,7 +1188,6 @@ pub fn save(r: &Record, path: &str, workspace: &Path) -> Result<Export, String> 
     if target.try_exists().map_err(|_| ERROR)? {
         return Err("A file already exists at that path. Choose a new PDF filename; exports never overwrite files.".into());
     }
-    let (bytes, pages) = render(r, &chrono::Utc::now().to_rfc3339())?;
     let mut temporary =
         tempfile::NamedTempFile::new_in(&parent).map_err(|_| "The PDF folder is not writable.")?;
     temporary
@@ -995,7 +1204,7 @@ pub fn save(r: &Record, path: &str, workspace: &Path) -> Result<Export, String> 
     Ok(Export {
         path: target.to_string_lossy().into_owned(),
         pages,
-        record_id: r.payload.id.clone(),
+        record_id: id.to_owned(),
     })
 }
 

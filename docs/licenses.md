@@ -18,6 +18,7 @@ This is a preliminary inventory of runtime dependencies, not a completed commerc
 | `serde_json` | 1.0.154 | MIT OR Apache-2.0 |
 | `zeroize` | 1.9.1 | Apache-2.0 OR MIT |
 | `chrono` | 0.4.45 | MIT OR Apache-2.0 |
+| `chrono-tz` (bundled timezone rules) | 0.10.4 | MIT OR Apache-2.0 |
 | `csv` | 1.4.0 | MIT OR Unlicense |
 | `pdf-extract` | 0.12.1 | MIT |
 | `lopdf` | 0.42.0 | MIT |
@@ -26,6 +27,8 @@ This is a preliminary inventory of runtime dependencies, not a completed commerc
 | Bundled Open Sans Regular font | Debian fonts-open-sans asset, Google 2010–2011 | Apache-2.0 |
 
 For dual-licensed components, select and record the license under which the release distributes them and preserve the applicable notices. The repository's own source currently has no public redistribution license (`UNLICENSED` in the frontend package); that does not replace third-party license obligations or define commercial end-user terms.
+
+`chrono-tz` adds locked `phf`/`phf_shared` 0.12.1 (MIT OR Apache-2.0) alongside existing 0.13.1 entries; timezone source data is bundled for offline America/Chicago dates. Package metadata was inspected; full transitive notices remain part of release review.
 
 ## Native components and packaging
 

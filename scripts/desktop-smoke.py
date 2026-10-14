@@ -682,6 +682,62 @@ def export_original_assessment_pdf(driver: WebDriver, artifacts: Path, label: st
     status(f"local printable PDF export preserved historical evidence and figures ({label})")
 
 
+def export_client_action_pdf(driver: WebDriver, artifacts: Path, label: str, needs_review: bool = True) -> None:
+    destination = artifacts / f"client-action-plan-{label}.pdf"
+    if destination.exists():
+        raise SmokeFailure("Client PDF smoke destination must be new")
+    driver.fill("#client-plan-pdf-path", str(destination))
+    driver.click_button("Export client action plan PDF")
+    driver.wait_text(".client-action-plans", f"{destination}", "client PDF export completion")
+    text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
+    text = " ".join(text.split())
+    for expected in ["Your financial action plan", "Alex agreed client plan", "America/Chicago", "Agreed debt allocation: USD 100.00", "Agreed primary savings allocation: USD 250.00", "Unallocated / buffer: USD 1066.67", "Operating cash flow: USD 1820.02", "Strategy: Avalanche", "Projected total interest: USD 35.35", "Projected emergency completion: 2028-06-30", "Incomplete", "Follow-up arrangements"]:
+        if expected.lower() not in text.lower():
+            raise SmokeFailure(f"Client action plan PDF missing expected text: {expected}")
+    if needs_review and "NEEDS REVIEW" not in text:
+        raise SmokeFailure("Historical client plan omitted its review flag")
+    if text.index("Verify missing statements") > text.index("Confirm lender payment dates"):
+        raise SmokeFailure("Client plan priority order changed")
+    status(f"client PDF preserves agreed allocations, priorities, conditional milestones and historical basis ({label})")
+
+
+def assert_client_action_restored(driver: WebDriver, artifacts: Path, label: str) -> None:
+    if driver.command("GET", f"/element/{driver.element('.client-action-plans')}/property/open") is not True:
+        driver.click(".client-action-plans > summary")
+    driver.interactive("#saved-action-plan")
+    option = driver.observe_script("return Array.from(document.querySelector('#saved-action-plan').options).find(x=>x.textContent.includes('Alex agreed client plan'))?.textContent")
+    if not option or "Needs review" not in option:
+        raise SmokeFailure("Restored client plan directory omitted historical review flag")
+    driver.select("#saved-action-plan", option)
+    driver.wait_text(".saved-client-action-plan h3", "Alex agreed client plan", "restored client plan")
+    driver.wait_text(".action-plan-status", "Needs review", "client agreement inherits changed supporting context")
+    driver.wait_text(".saved-client-action-plan .action-allocation-totals", "Unallocated / buffer$1,066.67", "immutable agreed model payments")
+    driver.wait_text(".saved-client-action-plan", "Verify missing statements", "persisted priorities")
+    export_client_action_pdf(driver, artifacts, label)
+
+
+def save_client_action_plan(driver: WebDriver, artifacts: Path) -> None:
+    driver.click(".client-action-plans > summary")
+    driver.interactive("#saved-action-plan")
+    driver.click_button("Review client plan basis")
+    driver.wait_text(".action-plan-basis", "Unallocated / buffer$1,066.67", "authoritative monthly agreement from selected models")
+    driver.fill("#action-plan-title", "Alex agreed client plan")
+    driver.fill("#action-budget-recommendations", "Protect fictional bills; agree on selected model contributions and verify actual lender dates.")
+    for i, step in enumerate(["Verify missing statements", "Confirm lender payment dates", "Arrange primary savings contributions"]):
+        driver.fill(f"#action-step-{i}", step)
+    driver.select("#action-owner-1", "Counselor")
+    driver.fill("#action-follow-up", "Arrange a fictional appointment after verifying the missing records.")
+    driver.fill("#action-limitations", "Entered estimates; statement coverage remains incomplete and forecasts are conditional.")
+    driver.click("#action-plan-ack")
+    driver.click_button("Record client action plan")
+    driver.wait_text(".saved-client-action-plan h3", "Alex agreed client plan", "recorded client plan")
+    driver.wait_text(".action-plan-status", "Recorded basis matches", "current recorded client agreement")
+    export_client_action_pdf(driver, artifacts, "current", False)
+    driver.interactive("#client-plan-pdf-path")
+    driver.scroll_to(".saved-client-action-plan", "start")
+    driver.screenshot(artifacts / "native-client-action-plan.png")
+
+
 def export_captured_planning_pdf(driver: WebDriver, artifacts: Path, label: str) -> None:
     destination = artifacts / f"saved-planning-{label}.pdf"
     if destination.exists():
@@ -714,6 +770,7 @@ def assert_captured_planning_restored(driver: WebDriver, artifacts: Path, label:
     driver.wait_text(".saved-assessment-view .scenario-cashflow-outcome","$3,300.00","separate captured per-account forecast")
     driver.wait_text(".saved-assessment-view .assessment-totals","Operating cash flow$1,820.02","approved history remains separate from entered planning")
     export_captured_planning_pdf(driver,artifacts,label)
+    assert_client_action_restored(driver, artifacts, label)
     driver.click(".saved-assessments > summary")
 
 
@@ -735,6 +792,7 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.click_button("Save assessment record")
     driver.wait_text(".saved-assessment-view h3","Alex saved planning scenario","saved scenario-backed assessment")
     driver.wait_text(".saved-assessment-status","Recorded context matches","new captured scenario context")
+    save_client_action_plan(driver, artifacts)
     driver.fill("#budget-amount-0","1600")
     driver.click_button("Save budget and calculate")
     driver.wait_text(".budget-panel .budget-totals","$3,466.67","independent later income change")
@@ -745,6 +803,8 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.wait_text(".budget-panel .budget-totals","$716.67","active plan reverted to original inputs")
     driver.wait_text(".saved-assessment-status","Needs review","reverting values does not restore captured plan version")
     export_captured_planning_pdf(driver,artifacts,"before-restart")
+    driver.wait_text(".action-plan-status", "Needs review", "active plan edits flag recorded client agreement")
+    export_client_action_pdf(driver, artifacts, "before-restart")
     driver.interactive(".assessment-export .button.primary")
     driver.scroll_to(".saved-assessment-view .captured-planning", "start")
     driver.screenshot(artifacts / "native-captured-planning-scenario.png")

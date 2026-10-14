@@ -102,7 +102,12 @@ fn read_plans(
         cashflow: read_cashflow_plan(c, w, client)?,
     })
 }
-fn record(c: &Connection, w: &WorkspaceInfo, client: &str, id: &str) -> Result<Record, String> {
+pub(super) fn record(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    client: &str,
+    id: &str,
+) -> Result<Record, String> {
     let (payload, digest) = decode(c, w, client, id)?;
     let current_client = scoped_client(c, w, client)?;
     let revision:i64=c.query_row("SELECT revision FROM client_import_state WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3",params![client,w.organization_id,w.counselor_id],|r|r.get(0)).optional().map_err(storage_error)?.unwrap_or(0);

@@ -1,5 +1,58 @@
 # Development status
 
+## Stage 5F: immutable client action plans — 0.16.0 source
+
+Client action plans now record three to five ordered agreed steps, responsible
+people, optional target dates, budget recommendations, follow-up and reviewed
+limitations. A counselor selects a current immutable assessment with a captured
+scenario, reviews backend-derived allocations/disclosures and acknowledges the
+client, approved decisions, assignments, estimates and missing information.
+The separate client PDF includes saved firm/client identity, Chicago report date,
+historical position and income/spending breakdown, budget agreement, selected
+strategy, emergency/goal targets and conditional milestones, priorities and
+follow-up. Local fonts/vector bars remain offline. Existing files are never
+replaced. Print the saved PDF through a local viewer.
+
+Schema 15 adds scoped append-only plans, a composite immutable assessment link and
+atomic creation audit. IPC accepts notes/selection rather than financial outputs.
+Exact cent arithmetic derives selected debt/primary savings allocations; unknown
+entered budget amounts and allocations exceeding surplus block recording.
+Differences from captured budget allocations are disclosed without editing active
+plans. Reads/export/recovery validate hashes, scoped parent identity, canonical
+text/dates and recomputed original allocations/disclosures. Chicago date rules
+are bundled by locked chrono-tz 0.10.4; no network/system timezone is needed.
+Draft and busy guards protect navigation and competing assessment edits. Later
+supporting changes mark guidance Needs review without changing original values.
+See [client-action-plans.md](client-action-plans.md).
+
+Independent example: income 3,250.00 less necessary 500.00/discretionary 200.00
+leaves surplus 2,550.00. Selected debt 100.00 plus primary savings 250.00 leave
+2,200.00, separately from captured budget debt 150.00/buffer 2,150.00 and approved
+historical cash flow 799.99. Unicode client typography, Chicago winter/summer
+midnight dates, failed atomic audit, scoped/locked access, immutable history,
+forged rehashed financial outputs, schema 14 rollback/upgrade, restart and
+encrypted recovery are covered by new backend checks.
+
+| Check | Result |
+|---|---|
+| Locked setup / production frontend build | Passed |
+| Interface suite | 88 passed, including four client-plan tests and parent draft/concurrency integration |
+| Linux backend / worker suite | 126 library + 2 worker tests passed (128 total); five new storage/PDF/recovery tests and Chicago-date/IPC validation |
+| Formatting / Clippy, warnings denied | Passed |
+| Native desktop compile / full client-plan workflow | Standalone debug build passed; full native workflow running |
+| Windows source CI | Pending; installer steps remain disabled |
+| Clean Windows installation/offline release acceptance | Not run |
+
+This is reviewed guidance with an explicitly incomplete financial basis, not a
+commercial release or certification that all accounts/statements are present.
+Client signatures, completed-action history/reminders, logo/contact branding,
+direct application printing, complete-basis final validation, remaining financial
+models and release acceptance remain open. No installer is being created.
+
+Next priority: **expanded counselor reports**, incorporating captured session and
+recurring-review evidence with original provenance and historical validation.
+See [remaining-requirements.md](remaining-requirements.md).
+
 ## Stage 5E: captured saved planning scenarios — 0.15.0 source
 
 Added optional named planning snapshots to immutable internal assessments. A

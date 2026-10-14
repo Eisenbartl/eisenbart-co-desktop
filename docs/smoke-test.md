@@ -114,3 +114,15 @@ and only an element/alignment argument. It retries one driver connection closure
 while moving the viewport, including positioning before a click. It cannot type,
 click, invoke application commands or replay a financial mutation. General scripts,
 clicks, typing, approvals and saves still have no automatic retry.
+
+The 0.16.0 workflow records Alex's client action plan from the current selected
+assessment before editing/reverting his budget. It reviews and records three
+priorities, counselor responsibility, recommendations, limitations and follow-up
+without invented dates. Independently expected model payments are debt 100.00,
+primary savings 250.00 and buffer 1,066.67; the captured original budget separately
+retains 716.67. Client PDFs preserve approved historical cash flow 1,820.02,
+Avalanche interest 35.35 and emergency completion 2028-06-30. Five client PDFs
+cover current basis, changed historical context, restart, normal encrypted restore
+and damaged-workspace recovery. Persisted plans inherit Needs review after plan
+revision changes while steps/allocations remain immutable. Artifacts include
+`native-client-action-plan.png` and `client-action-plan-*.pdf`.

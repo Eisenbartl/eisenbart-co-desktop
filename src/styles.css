@@ -457,3 +457,10 @@ textarea { resize: vertical; min-height: 100px; }
 .saved-assessment-view > details { margin: 20px 0; font-size: .85rem; overflow-wrap: anywhere; }
 .saved-assessment-view table { font-size: .85rem; width: 100%; border-collapse: collapse; }
 .saved-assessment-view td, .saved-assessment-view th { text-align: left; vertical-align: top; padding: 10px; border-bottom: 1px solid #dce2df; }
+
+.client-action-plans { margin-top: 24px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; }
+.client-action-plans > summary { cursor: pointer; font-weight: 600; }
+.client-action-plans h4 { margin-top: 24px; }
+.client-action-plans .action-plan-basis, .saved-client-action-plan { margin-top: 20px; }
+.saved-client-action-plan > ol { padding-left: 24px; }
+.saved-client-action-plan > ol > li { margin: 16px 0; }

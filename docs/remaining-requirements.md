@@ -1,16 +1,16 @@
-# Remaining original requirements after 0.15.0
+# Remaining original requirements after 0.16.0
 
 The application has an encrypted offline desktop foundation, isolated clients and
 notes, exact entered budgets/debt/savings/cash-flow plans, encrypted recovery,
 CSV/selectable-text PDF review, recurring-payment review, balance reconciliation,
 approved-data dashboards, explicit classifications/dated inventories, and saved
-immutable internal counselor assessments with optional captured planning scenarios, entered terms/milestones and offline printable PDF export. The full master specification in
+immutable internal counselor assessments with optional captured planning scenarios, entered terms/milestones and offline printable PDF export. Immutable client action plans now record reviewed allocations, three to five priorities and follow-up, with client PDF export. The full master specification in
 [product-specification.md](product-specification.md) remains the governing scope.
 This is a development checkpoint, not a commercial release.
 
 | Work area | Main remaining work |
 |---|---|
-| Reports and client plans — next | Branded client action plan with agreed allocations, prioritized actions, selected milestones, follow-up and final review; expanded counselor report with recurring/session evidence and remaining models; direct application printing; savings-goal progress and final report validation |
+| Reports and client plans — next | Expanded counselor report with recurring/session evidence and remaining models; client-plan logo/contact branding and complete-basis final validation; direct application printing; savings-goal progress and final report validation |
 | Financial models | Additional budget methods, advanced daily/variable/promotional debt terms, broader combined saved scenarios, delayed transfer settlement, finer account reserve allocation, and meaningful gross-income underwriting metrics where verified data exists |
 | Documents/review | Scanned PDF/OCR, institution/card/loan/paystub adapters, broader supported input formats, category suggestions and document/account workflow refinements with provenance/review safeguards |
 | Client management/workflow | Full specified household/employment/financial intake fields, reminders/follow-up tracking, and remaining account/document/action-history views |

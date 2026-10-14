@@ -1,3 +1,4 @@
+mod action_plans;
 mod assessment_pdf;
 mod assessments;
 mod budget;
@@ -125,6 +126,101 @@ fn cancel_client_csv(state: State<'_, DesktopState>, token: String) -> Result<()
         w.cancel_client_csv(&token);
         Ok(())
     })
+}
+#[tauri::command]
+async fn review_client_action_plan(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    assessment_id: String,
+) -> Result<action_plans::Review, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.review_client_action_plan(&client_id, &assessment_id)
+        })
+    })
+    .await
+    .map_err(|_| "Action plan review could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn list_client_action_plans(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<action_plans::Directory, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.list_client_action_plans(&client_id))
+    })
+    .await
+    .map_err(|_| "Action plans could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn get_client_action_plan(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+) -> Result<action_plans::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_client_action_plan(&client_id, &id))
+    })
+    .await
+    .map_err(|_| "Action plan could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn save_client_action_plan(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: action_plans::Input,
+) -> Result<action_plans::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_client_action_plan(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Action plan could not be recorded.".to_owned())?
+}
+#[tauri::command]
+async fn export_client_action_plan(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+    path: String,
+) -> Result<assessment_pdf::Export, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.export_client_action_plan(&client_id, &id, &path)
+        })
+    })
+    .await
+    .map_err(|_| "Client PDF export could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn choose_action_plan_pdf(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_client_action_plan(&client_id, &id))?;
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("Client action plan PDF", &["pdf"])
+            .set_file_name("client-action-plan.pdf")
+            .blocking_save_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local PDF path.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "Client PDF destination selection could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn get_assessment_planning(
@@ -606,6 +702,12 @@ pub fn run() {
             review_financial_facts,
             list_assessment_records,
             get_assessment_planning,
+            review_client_action_plan,
+            list_client_action_plans,
+            get_client_action_plan,
+            save_client_action_plan,
+            export_client_action_plan,
+            choose_action_plan_pdf,
             get_assessment_record,
             save_assessment_record,
             choose_assessment_pdf,

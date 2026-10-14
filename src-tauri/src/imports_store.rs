@@ -2013,7 +2013,7 @@ mod tests {
             .review_financial_facts(&c.id, facts_input(&s, data))
             .unwrap();
         let conn = &mut w.session.as_mut().unwrap().connection;
-        conn.execute_batch("DROP TABLE client_assessment_records; PRAGMA user_version=13; CREATE TABLE audit_events_v14(collision TEXT);").unwrap();
+        conn.execute_batch("DROP TABLE client_action_plans; DROP TABLE client_assessment_records; PRAGMA user_version=13; CREATE TABLE audit_events_v14(collision TEXT);").unwrap();
         assert!(migrate(conn, false).is_err());
         assert_eq!(
             conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
@@ -2276,7 +2276,7 @@ mod tests {
         let s = facts_fixture(&mut w, &client.id, dir.path());
         let before = s.records[0].raw.clone();
         let c = &mut w.session.as_mut().unwrap().connection;
-        c.execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE financial_fact_reviews; PRAGMA user_version=12; CREATE TABLE audit_events_v13(collision TEXT);").unwrap();
+        c.execute_batch("DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE financial_fact_reviews; PRAGMA user_version=12; CREATE TABLE audit_events_v13(collision TEXT);").unwrap();
         assert!(migrate(c, false).is_err());
         assert_eq!(
             c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
@@ -2649,7 +2649,7 @@ mod tests {
             doc("Legacy checking"),
         );
         let connection = &mut w.session.as_mut().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE statement_balance_reviews; PRAGMA user_version=11; CREATE TABLE audit_events_v12(collision TEXT);").unwrap();
+        connection.execute_batch("DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE statement_balance_reviews; PRAGMA user_version=11; CREATE TABLE audit_events_v12(collision TEXT);").unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
             connection
@@ -2992,7 +2992,7 @@ mod tests {
             .review_recurring_payment(&c.id, recurring_input(&s))
             .unwrap();
         let connection = &mut w.session.as_mut().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
+        connection.execute_batch("DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
             connection
@@ -3001,7 +3001,7 @@ mod tests {
             10
         );
         connection
-            .execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations;")
+            .execute_batch("DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations;")
             .unwrap();
         migrate(connection, false).unwrap();
         let after = w.get_client_imports(&c.id).unwrap();
@@ -3033,7 +3033,7 @@ mod tests {
         let connection = &mut w.session.as_mut().unwrap().connection;
         connection
             .execute_batch(
-                "DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
+                "DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
             )
             .unwrap();
         connection
@@ -3799,7 +3799,7 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
         connection
-            .execute_batch("DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
+            .execute_batch("DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
             .unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
@@ -3870,5 +3870,299 @@ mod tests {
             )
             .is_err());
         assert!(w.get_client_imports(&client.id).unwrap().records.is_empty());
+    }
+
+    fn action_input(a: &crate::assessments::Record) -> crate::action_plans::Input {
+        use crate::action_plans::{Action, Data, Input, Owner};
+        Input {
+            assessment_id: a.payload.id.clone(),
+            expected_digest: a.digest.clone(),
+            title: "Fictional agreed plan – José".into(),
+            acknowledge: true,
+            data: Data {
+                budget_recommendations:
+                    "Agree on the selected model contributions; verify actual lender dates.".into(),
+                actions: [
+                    "Verify missing statements",
+                    "Confirm lender payment dates",
+                    "Arrange primary savings contributions",
+                ]
+                .into_iter()
+                .map(|s| Action {
+                    step: s.into(),
+                    owner: Owner::Client,
+                    due_date: None,
+                })
+                .collect(),
+                follow_up: "Arrange the next appointment after reviewing the records.".into(),
+                follow_up_date: None,
+                limitations: "Entered assumptions; statement coverage remains unverified.".into(),
+            },
+        }
+    }
+    #[test]
+    fn client_action_plan_exact_agreement_immutable_basis_and_client_pdf() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, dir.path());
+        saved_planning_fixture(&mut w, &c.id);
+        let input = scenario_input(&mut w, &s, &c);
+        let a = w.save_assessment_record(&c.id, input).unwrap();
+        let review = w.review_client_action_plan(&c.id, &a.payload.id).unwrap();
+        assert_eq!(review.allocations.monthly_income, "3250.00");
+        assert_eq!(review.allocations.surplus, "2550.00");
+        assert_eq!(review.allocations.debt, "100.00");
+        assert_eq!(review.allocations.savings, "250.00");
+        assert_eq!(review.allocations.unallocated, "2200.00");
+        assert!(review
+            .disclosures
+            .iter()
+            .any(|x| x.contains("debt USD 150.00")));
+        let r = w.save_client_action_plan(&c.id, action_input(&a)).unwrap();
+        let id = r.payload.id.clone();
+        let digest = r.digest.clone();
+        assert_eq!(r.payload.allocations, review.allocations);
+        assert_eq!(r.assessment.payload.assessment.operating_cashflow, "799.99");
+        assert_eq!(w.get_client_imports(&c.id).unwrap().revision, s.revision);
+        assert_eq!(w.get_client_budget(&c.id).unwrap().revision, 1);
+        let conn = &w.session.as_ref().unwrap().connection;
+        assert_eq!(
+            conn.query_row(
+                "SELECT COUNT(*) FROM audit_events WHERE event='action_plan_recorded'",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            1
+        );
+        assert!(conn
+            .execute("UPDATE client_action_plans SET title='changed'", [])
+            .is_err());
+        assert!(conn.execute("DELETE FROM client_action_plans", []).is_err());
+        let mut changed = budget_input(1);
+        changed.lines[0].amount = Some("2000.01".into());
+        w.save_client_budget(&c.id, changed).unwrap();
+        let old = w.get_client_action_plan(&c.id, &id).unwrap();
+        assert!(old.needs_review);
+        assert_eq!(old.digest, digest);
+        assert_eq!(old.payload.allocations.unallocated, "2200.00");
+        assert!(w.list_client_action_plans(&c.id).unwrap().records[0].needs_review);
+        assert!(w.review_client_action_plan(&c.id, &a.payload.id).is_err());
+        assert!(w.save_client_action_plan(&c.id, action_input(&a)).is_err());
+        let path = dir.path().join("client.pdf");
+        w.export_client_action_plan(&c.id, &id, path.to_str().unwrap())
+            .unwrap();
+        let doc = lopdf::Document::load(&path).unwrap();
+        let text = doc
+            .extract_text(&doc.get_pages().keys().copied().collect::<Vec<_>>())
+            .unwrap()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        for expected in [
+            "Your financial action plan",
+            "José",
+            "NEEDS REVIEW",
+            "Agreed debt allocation: USD 100.00",
+            "Agreed primary savings allocation: USD 250.00",
+            "Unallocated / buffer: USD 2200.00",
+            "Operating cash flow: USD 799.99",
+            "2027-01-31",
+            "USD 43.10",
+            "Follow-up",
+            "incomplete",
+        ] {
+            assert!(text.contains(expected), "Missing {expected}: {text}");
+        }
+        assert!(
+            text.find("Verify missing statements").unwrap()
+                < text.find("Confirm lender payment dates").unwrap()
+        );
+        assert!(!text.contains("INTERNAL / INCOMPLETE"));
+        let bytes = fs::read(&path).unwrap();
+        assert!(w
+            .export_client_action_plan(&c.id, &id, path.to_str().unwrap())
+            .is_err());
+        assert_eq!(fs::read(path).unwrap(), bytes);
+    }
+    #[test]
+    fn client_action_plan_rejects_invalid_steps_dates_scope_and_atomic_audit_failure() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, dir.path());
+        saved_planning_fixture(&mut w, &c.id);
+        let input = scenario_input(&mut w, &s, &c);
+        let a = w.save_assessment_record(&c.id, input).unwrap();
+        for case in 0..8 {
+            let mut input = action_input(&a);
+            match case {
+                0 => input.data.actions.truncate(2),
+                1 => input.data.actions = vec![input.data.actions[0].clone(); 6],
+                2 => input.data.actions[1].step = input.data.actions[0].step.to_uppercase(),
+                3 => input.data.actions[0].due_date = Some("2026-02-30".into()),
+                4 => input.data.follow_up_date = Some("2020-01-01".into()),
+                5 => input.acknowledge = false,
+                6 => input.expected_digest = "wrong".into(),
+                _ => input.data.limitations = " ".into(),
+            };
+            assert!(
+                w.save_client_action_plan(&c.id, input).is_err(),
+                "case {case}"
+            );
+        }
+        assert!(w
+            .save_client_action_plan(&other.id, action_input(&a))
+            .is_err());
+        let conn = &w.session.as_ref().unwrap().connection;
+        conn.execute_batch("CREATE TRIGGER reject_action_audit BEFORE INSERT ON audit_events WHEN NEW.event='action_plan_recorded' BEGIN SELECT RAISE(ABORT,'Synthetic failure'); END;").unwrap();
+        assert!(w.save_client_action_plan(&c.id, action_input(&a)).is_err());
+        assert!(w
+            .list_client_action_plans(&c.id)
+            .unwrap()
+            .records
+            .is_empty());
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TRIGGER reject_action_audit;")
+            .unwrap();
+        let saved = w.save_client_action_plan(&c.id, action_input(&a)).unwrap();
+        let id = &saved.payload.id;
+        assert!(w.get_client_action_plan(&other.id, id).is_err());
+        assert!(w
+            .export_client_action_plan(
+                &other.id,
+                id,
+                dir.path().join("wrong.pdf").to_str().unwrap()
+            )
+            .is_err());
+        assert!(w
+            .export_client_action_plan(&c.id, id, w.data_dir.join("bad.pdf").to_str().unwrap())
+            .is_err());
+        w.lock_workspace();
+        assert!(w.get_client_action_plan(&c.id, id).is_err());
+        assert!(w
+            .export_client_action_plan(&c.id, id, dir.path().join("locked.pdf").to_str().unwrap())
+            .is_err());
+    }
+    #[test]
+    fn client_action_plan_cannot_invent_unknown_or_excess_allocations() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, dir.path());
+        saved_planning_fixture(&mut w, &c.id);
+        let mut b = budget_input(1);
+        b.lines[0].amount = None;
+        w.save_client_budget(&c.id, b).unwrap();
+        let input = scenario_input(&mut w, &s, &c);
+        let a = w.save_assessment_record(&c.id, input).unwrap();
+        assert!(w.review_client_action_plan(&c.id, &a.payload.id).is_err());
+        let mut b = budget_input(2);
+        b.lines[0].amount = Some("100".into());
+        b.lines[0].frequency = crate::budget::Frequency::Monthly;
+        b.lines.push(crate::budget::BudgetLine {
+            label: "Necessary".into(),
+            kind: crate::budget::Kind::Necessary,
+            amount: Some("1".into()),
+            frequency: crate::budget::Frequency::Monthly,
+            estimated: true,
+        });
+        w.save_client_budget(&c.id, b).unwrap();
+        let input = scenario_input(&mut w, &s, &c);
+        let a = w.save_assessment_record(&c.id, input).unwrap();
+        assert!(w
+            .review_client_action_plan(&c.id, &a.payload.id)
+            .err()
+            .unwrap()
+            .contains("exceed"));
+        assert!(w
+            .list_client_action_plans(&c.id)
+            .unwrap()
+            .records
+            .is_empty());
+    }
+    #[test]
+    fn client_action_plan_schema_fourteen_upgrade_restart_and_encrypted_recovery() {
+        let (root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, dir.path());
+        saved_planning_fixture(&mut w, &c.id);
+        let input = scenario_input(&mut w, &s, &c);
+        let a = w.save_assessment_record(&c.id, input).unwrap();
+        let conn = &mut w.session.as_mut().unwrap().connection;
+        conn.execute_batch("DROP TABLE client_action_plans; DROP INDEX assessment_records_identity; PRAGMA user_version=14; CREATE TABLE audit_events_v15(collision TEXT);").unwrap();
+        assert!(migrate(conn, false).is_err());
+        assert_eq!(
+            conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            14
+        );
+        assert!(conn.prepare("SELECT * FROM client_action_plans").is_err());
+        conn.execute_batch("DROP TABLE audit_events_v15;").unwrap();
+        migrate(conn, false).unwrap();
+        let r = w.save_client_action_plan(&c.id, action_input(&a)).unwrap();
+        let id = r.payload.id;
+        let digest = r.digest;
+        let mut b = budget_input(1);
+        b.lines[0].amount = Some("2000".into());
+        w.save_client_budget(&c.id, b).unwrap();
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        drop(w);
+        let mut w = Workspace::new(root.path().to_path_buf());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let r = w.get_client_action_plan(&c.id, &id).unwrap();
+        assert_eq!(r.digest, digest);
+        assert!(r.needs_review);
+        w.lock_workspace();
+        let ready = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(ready.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let r = w.get_client_action_plan(&c.id, &id).unwrap();
+        assert_eq!(r.digest, digest);
+        assert!(r.needs_review);
+        assert_eq!(r.payload.allocations.unallocated, "2200.00");
+    }
+    #[test]
+    fn client_action_plan_forged_financial_output_is_rejected_even_with_rehashed_json() {
+        use sha2::{Digest, Sha256};
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = facts_fixture(&mut w, &c.id, dir.path());
+        saved_planning_fixture(&mut w, &c.id);
+        let input = scenario_input(&mut w, &s, &c);
+        let a = w.save_assessment_record(&c.id, input).unwrap();
+        let mut r = w.save_client_action_plan(&c.id, action_input(&a)).unwrap();
+        r.payload.allocations.unallocated = "999999.99".into();
+        assert!(crate::action_plans::validate(&r.payload, &r.assessment).is_err());
+        let json = serde_json::to_string(&r.payload).unwrap();
+        let digest = format!("{:x}", Sha256::digest(json.as_bytes()));
+        let conn = &w.session.as_ref().unwrap().connection;
+        conn.execute_batch("DROP TRIGGER action_plans_no_update;")
+            .unwrap();
+        conn.execute(
+            "UPDATE client_action_plans SET payload_json=?1,digest=?2 WHERE id=?3",
+            params![json, digest, r.payload.id],
+        )
+        .unwrap();
+        assert!(w.get_client_action_plan(&c.id, &r.payload.id).is_err());
+        let path = dir.path().join("forged.pdf");
+        assert!(w
+            .export_client_action_plan(&c.id, &r.payload.id, path.to_str().unwrap())
+            .is_err());
+        assert!(!path.exists());
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        assert!(w.prepare_restore(backup.path, PASSWORD.into()).is_err());
     }
 }

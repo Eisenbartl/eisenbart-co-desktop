@@ -262,3 +262,12 @@ export type PlanningDebtStrategy = 'none'|'snowball'|'avalanche';
 export interface AssessmentPlans {clientId:string;budget:ClientBudget;debt:ClientDebtPlan;savings:ClientSavingsPlan;cashflow:ClientCashflowPlan}
 export interface PlanningSelection {expectedRevisions:PlanningRevisions;label:string;assumptions:string;debtStrategy:PlanningDebtStrategy}
 export interface CapturedPlanning {calculator:string;label:string;assumptions:string;debtStrategy:PlanningDebtStrategy;revisions:PlanningRevisions;plans:AssessmentPlans}
+
+export interface ClientAction {step:string;owner:'client'|'counselor';dueDate:string|null}
+export interface ActionPlanData {budgetRecommendations:string;actions:ClientAction[];followUp:string;followUpDate:string|null;limitations:string}
+export interface ActionAllocations {monthlyIncome:string;necessary:string;discretionary:string;surplus:string;debt:string;savings:string;unallocated:string}
+export interface ActionPlanInput {assessmentId:string;expectedDigest:string;title:string;data:ActionPlanData;acknowledge:boolean}
+export interface ActionPlanReview {clientId:string;assessmentId:string;assessmentDigest:string;reportDate:string;allocations:ActionAllocations;disclosures:string[]}
+export interface ActionPlanPayload {format:number;calculator:string;id:string;clientId:string;assessmentId:string;assessmentDigest:string;createdAt:string;reportDate:string;appVersion:string;title:string;data:ActionPlanData;allocations:ActionAllocations;disclosures:string[]}
+export interface SavedActionPlan {clientId:string;payload:ActionPlanPayload;assessment:SavedAssessment;digest:string;needsReview:boolean;reviewReasons:string[]}
+export interface ActionPlanDirectory {clientId:string;records:{id:string;title:string;createdAt:string;reportDate:string;assessmentId:string;needsReview:boolean}[]}
