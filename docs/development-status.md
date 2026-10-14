@@ -38,7 +38,7 @@ are visible. Unknown values and missing optional models remain unavailable.
 | Interface suite | 102 passed; proposal input-only IPC, canonical outcomes/unknowns, preserved failures, dirty/concurrent guards, reload and client/lock/version isolation |
 | Linux backend / worker checks | Full 138-library + 2 worker run passed; subsequent five focused scenario tests passed, including two added retained-commitment/absent-model checks (140 unique library tests covered) |
 | Formatting / Clippy, warnings denied | Passed |
-| Native desktop compile / complete workflow | Validation in progress |
+| Native desktop compile / complete workflow | Standalone build passed; first workflow found locale-dependent date entry in the new proposal control. Changed to explicit YYYY-MM-DD text with Rust date validation; full rerun in progress |
 | Windows source CI | Validation in progress; installer packaging not requested |
 | Clean Windows installation/offline release acceptance | Not run |
 
