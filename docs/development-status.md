@@ -38,11 +38,44 @@ are visible. Unknown values and missing optional models remain unavailable.
 | Interface suite | 102 passed; proposal input-only IPC, canonical outcomes/unknowns, preserved failures, dirty/concurrent guards, reload and client/lock/version isolation |
 | Linux backend / worker checks | Full 138-library + 2 worker run passed; subsequent six focused scenario tests passed, including three added retained-commitment/absent-model/higher-reserve checks (141 unique library tests covered) |
 | Formatting / Clippy, warnings denied | Passed |
-| Native desktop compile / complete workflow | Standalone build passed; first workflow found locale-dependent date entry in the new proposal control. Changed to explicit YYYY-MM-DD text with Rust date validation; second run confirmed the control fix but exposed incorrect harness reserve/date expectations. The existing higher-budget/model reserve rule is retained, displayed and independently checked; corrected full rerun in progress |
-| Windows source CI | Validation in progress; installer packaging not requested |
+| Native desktop compile / feature workflows | Standalone build and all four new comparison checks passed: initial/restart/normal restore/damaged-workspace recovery. Complete native run remains incomplete: WebDriver disconnected on a click opening the older counselor-report panel after the fourth comparison |
+| Windows source CI | Passed b7fd415: [run 38641952017](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38641952017), 102 interface + 142 library + 2 worker tests (144 backend/process total). All installer/package/upload steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
 
-Next priority: **persistent combined scenarios and explicit selection for reports**,
+The first native run exposed a locale-dependent date control; proposals now use
+explicit YYYY-MM-DD text with Rust validation. The second exposed incorrect
+harness expectations: savings reserves the higher budget/model payment, yielding
+983.34, and the correct emergency date is November 30, 2027. The third passed all
+four new comparisons and unchanged-input checks, including both recovery paths,
+then the driver closed an uncertain POST click while opening Casey’s existing
+report panel. The final counselor-evidence export/dashboard checks and whole-run
+completion were not reached. No click or financial mutation was replayed. Following
+the original specification’s three-attempt limit, further full reruns are deferred
+and the blocker is preserved. Click errors now include their intended selector for
+future diagnosis without changing assertions or retrying mutations.
+
+Shipping application source is `b7fd4151061b86cba7df3d5a6d8b78909008f9ae`; final
+checkpoint changes only documentation and click-error diagnostics.
+
+Visual review confirmed both columns, 400.00 reserved debt, 766.67 → 983.34 buffer,
+35.35 → 23.01 interest, June 2028 → November 2027 emergency dates and three → zero
+cash-flow warning days. The full-run exit is 1; the four feature checks pass, but
+this must not be described as a completely passing native regression run.
+
+Logs under `/workspace/shared`: `scenario-comparison-setup.log`, `scenario-comparison-ui.log`,
+`scenario-comparison-backend.log`, `scenario-comparison-focused.log`,
+`scenario-comparison-fmt.log`, `scenario-comparison-clippy.log`,
+`scenario-comparison-native-build.log`, `scenario-comparison-native.log`/`.exit`,
+`scenario-comparison-windows-job.log`, `scenario-comparison-windows-result.json`
+and `scenario-comparison-windows-verified-validation.log`.
+Earlier failures are `scenario-comparison-native-first.log`/`.exit` and
+`scenario-comparison-native-second.log`/`.exit`; final artifacts are in
+`desktop-smoke-scenario-comparison-verified`. Source/full-history checkpoints are
+`checkpoints/eisenbart-combined-scenarios-source.tar.gz` and
+`checkpoints/eisenbart-combined-scenarios.bundle` under the same shared directory.
+
+Next priority: **diagnose the native-driver interruption and complete full workflow
+validation, then persistent combined scenarios and explicit selection for reports**,
 retaining input assumptions, versions, outcomes and uncertainty independently of
 approved history. Seven major roadmap work areas remain; this checkpoint advances
 the financial-model area without completing it or establishing release readiness.

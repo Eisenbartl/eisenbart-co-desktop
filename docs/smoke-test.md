@@ -154,3 +154,13 @@ and confirms the saved model inputs and 3,300.00 dated closing remain intact.
 Invalid precision is rejected with the proposal retained; a read-only reload resets
 it. A fresh client mount has no temporary baseline or draft. The same complete run
 retains all prior report, action-plan, source review and encrypted recovery checks.
+
+
+The latest 0.19.0 full run passed those four new feature checks but exited 1 when
+WebDriver closed a POST connection while opening Casey’s older counselor-report
+panel after damaged-workspace recovery. Its final evidence PDF/dashboard steps
+and whole-run completion are unverified for this checkpoint. See development
+status for logs and the three-attempt boundary. The intended click selector is
+now included in error diagnostics; uncertain clicks and financial mutations are
+never automatically retried. Do not treat individual PASS lines as a successful
+full run.

@@ -207,7 +207,11 @@ class WebDriver:
         # changes only the viewport and never invokes application commands.
         self.scroll_element(element)
         self.command("GET", f"/element/{element}/displayed")
-        self.command("POST", f"/element/{element}/click", {})
+        try:
+            self.command("POST", f"/element/{element}/click", {})
+        except DriverFailure as error:
+            # Add intent to diagnostics; never replay an uncertain click.
+            raise SmokeFailure(f"Native click failed for {selector}: {error}") from None
 
     def click_button(self, text: str) -> None:
         self.click(f"//button[normalize-space(.)={json.dumps(text)}]", "xpath")

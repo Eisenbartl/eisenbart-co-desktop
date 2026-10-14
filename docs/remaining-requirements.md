@@ -6,7 +6,11 @@ CSV/selectable-text PDF review, recurring-payment review, balance reconciliation
 approved-data dashboards, explicit classifications/dated inventories, and saved
 immutable internal counselor assessments with optional captured planning scenarios, entered terms/milestones and offline printable PDF export. Immutable client action plans now record reviewed allocations, three to five priorities and follow-up, with client PDF export. Internal reports now optionally capture selected session notes and latest recurring-review evidence with original provenance. Optional read-only zero-based/50-30-20/custom budget references now add exact targets, minimum-debt classification and unknown-data safeguards. Temporary combined previews now compare entered budget, debt, savings and explicit dated changes without writing plans. The full master specification in
 [product-specification.md](product-specification.md) remains the governing scope.
-This is a development checkpoint, not a commercial release.
+This is a development checkpoint, not a commercial release. The four new desktop
+comparison workflows passed, but the complete native regression stopped on an
+older report-panel click when WebDriver disconnected. Finish that verification
+after diagnosing the transport interruption before the next feature checkpoint;
+see [development-status.md](development-status.md).
 
 | Work area | Main remaining work |
 |---|---|
