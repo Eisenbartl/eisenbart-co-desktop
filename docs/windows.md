@@ -89,7 +89,7 @@ The expected installer output directory is `src-tauri\target\release\bundle\nsis
 
 Before sharing a release, install on a clean Windows 11 x64 machine, including one without WebView2 and without internet access. Test setup, wrong-password handling, client isolation, lock/unlock, persistence after a restart, and uninstall/reinstall data behavior. Record actual results and failures. Complete recovery, security, accessibility, licensing, signing, and broader product criteria in [roadmap.md](roadmap.md) before calling the application production-ready.
 
-The 0.9.0 source upgrades local workspaces to schema 10 for encrypted recurring-payment decision history. Recovered workspaces use the activation layout; use 0.9.0 or newer. Earlier applications cannot open schema 10. No new installer is created for this milestone.
+The 0.9.0 source upgrades local workspaces to schema 11 for encrypted recurring-payment decision history. Recovered workspaces use the activation layout; use 0.9.0 or newer. Earlier applications cannot open schema 11. No new installer is created for this milestone.
 
 Windows manual recovery acceptance: create a backup on local/removable storage; reject wrong passwords and damaged files; cancel review; verify whole-workspace restore with retained original files; repeat after app restart and simulated missing metadata; verify all client plans and immutable history offline. Use a disposable fictional workspace. See [backup-recovery.md](backup-recovery.md). This installed Windows GUI/drive acceptance is separate from CI source tests.
 

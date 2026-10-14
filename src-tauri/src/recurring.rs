@@ -37,6 +37,8 @@ pub struct Evidence {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Review {
+    #[serde(default)]
+    pub invalidated: bool,
     pub id: String,
     pub group_id: String,
     pub evidence_hash: String,
@@ -231,7 +233,7 @@ pub fn analyze(
     for evidence in buckets.into_values() {
         let mut g = group(evidence)?;
         if let Some(r) = history.iter().rev().find(|r| r.group_id == g.id) {
-            g.state = if r.evidence_hash != g.evidence_hash {
+            g.state = if r.invalidated || r.evidence_hash != g.evidence_hash {
                 "Needs review"
             } else if r.decision == Decision::Confirmed {
                 "Confirmed"
@@ -437,6 +439,7 @@ mod tests {
         let (mut rows, mut h) = records(&["2026-01-01", "2026-02-01", "2026-03-01"]);
         let g = analyze(&rows, &[], &h).unwrap().remove(0);
         let review = Review {
+            invalidated: false,
             id: "review".into(),
             group_id: g.id,
             evidence_hash: g.evidence_hash,

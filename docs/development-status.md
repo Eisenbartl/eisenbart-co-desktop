@@ -18,9 +18,12 @@ subscription classification, confirmation, fixed future charge or planning write
 Counselors explicitly choose/correct frequency and label, optionally classify a
 verified subscription, or dismiss/withdraw a pattern with a reason.
 
-Schema 10 captures append-only decision evidence, exact approval-history IDs,
+Schema 11 captures append-only decision evidence, exact approval-history IDs,
 reviewer/time/reason, revision/hash checks and atomic generic audit events in the
-encrypted workspace. Changed/reversed evidence requires new review; identical
+encrypted workspace. Changed evidence appends a permanent invalidation marker
+atomically with the source change. Withdrawing a newly added charge cannot revive
+an old decision when the remaining facts match again. Changed/reversed evidence
+requires new review; identical
 reapproval does not silently reactivate prior confirmation. Absent groups retain
 historical decisions. Authenticated client scope, failed-save retention, unsaved
 navigation/lock guards, restart, backup and restore validation remain active.
@@ -32,10 +35,10 @@ source limits apply. See [recurring-payment-review.md](recurring-payment-review.
 |---|---|
 | Locked setup, production frontend and native debug build | Passed |
 | Interface tests | 59 passed; explicit decisions/frequency correction, unchanged exact totals, failed draft/dirty retention, conflicting-operation guards and changed-evidence dismissal |
-| Linux Rust suite | 90 library + 2 executable worker tests passed (92 total); 6 new tests cover independent patterns, exclusions, duplicates, reversal/reapproval, scope, atomic audit failure, stale writes/hashes, lock/restart, backup restore and schema-9 rollback |
+| Linux Rust suite | 91 library + 2 executable worker tests passed (93 total); seven new tests cover independent patterns, exclusions, duplicates, reversal/reapproval, scope, atomic audit failure, stale writes/hashes, lock/restart, backup restore, permanent invalidation/write rollback, and schema-9/10 upgrades and rollback |
 | Independent Python Decimal example | 32.05 observed total; 22.04 after first payment is withdrawn |
 | Format / Clippy all targets, warnings denied | Passed |
-| Compiled native desktop workflow | Passed full existing financial/CSV/PDF workflow plus merchant patterns, subscription confirmation, source reversal/reapproval/reconfirmation, exact totals, client isolation, full-process restart and both encrypted recovery paths |
+| Compiled native desktop workflow | Earlier full financial/CSV/PDF/recurring workflows and both recovery paths passed; final schema-11 and permanent-invalidation recovery rerun pending |
 | Windows source CI | Pending source commit; packaging remains manual opt-in |
 | New Windows installer | Intentionally not built |
 | Clean installed Windows 11 offline acceptance | Not run |
@@ -46,7 +49,15 @@ was corrected and the complete suite rerun. A backup test fixture was corrected
 to use the existing lock-before-restore rule. An initial native run stopped after
 a WebDriver transport closure during the prior cash-flow workflow; no financial
 write was replayed or assertion weakened, and the complete run restarted in a
-fresh disposable workspace. Native visual review prompted using the existing compact table styles and a bordered decision form; the final styled build is undergoing the full native workflow again. Source/debug logs and fictional artifacts are under
+fresh disposable workspace. Native visual review prompted existing compact table
+styles and a bordered decision form; the styled build passed the full native
+workflow again. Final review found the added-then-withdrawn-charge edge case;
+permanent invalidation markers and regressions were added. Schema 11 preserves
+the initial schema-10 source checkpoint and flags those earlier decisions for
+explicit reconfirmation; upgrade failures preserve the original records.
+Intermittent native WebDriver closures also interrupted final checks; financial
+writes were never retried in place. Final source checks are rerunning.
+Source/debug logs and fictional artifacts are under
 `/workspace/shared/recurring-*` and `/workspace/shared/desktop-smoke-recurring-final`.
 
 Next priority: **row-level statement reconciliation** against known reported

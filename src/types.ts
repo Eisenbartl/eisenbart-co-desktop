@@ -216,6 +216,6 @@ export interface PdfPage {number:number;text:string}
 
 export type RecurringFrequency='weekly'|'fortnightly'|'monthly'|'quarterly'|'annual'|'irregular';
 export interface PaymentEvidence {recordId:string;approvalId:string;documentId:string;accountId:string;page:number|null;line:number;fields:TransactionFields;duplicateIds:string[]}
-export interface RecurringReview {id:string;groupId:string;evidenceHash:string;label:string;decision:'confirmed'|'dismissed';frequency:RecurringFrequency|null;subscription:boolean;reason:string;reviewedAt:string;counselorName:string;evidence:PaymentEvidence[]}
+export interface RecurringReview {invalidated:boolean;id:string;groupId:string;evidenceHash:string;label:string;decision:'confirmed'|'dismissed';frequency:RecurringFrequency|null;subscription:boolean;reason:string;reviewedAt:string;counselorName:string;evidence:PaymentEvidence[]}
 export interface MerchantGroup {id:string;merchant:string;usesDescription:boolean;accountId:string;kind:TransactionKind;evidenceHash:string;evidence:PaymentEvidence[];totalPaid:string;smallestPayment:string;largestPayment:string;suggestedFrequency:RecurringFrequency|null;canConfirm:boolean;warnings:string[];state:'Unreviewed'|'Confirmed'|'Dismissed'|'Needs review';review:RecurringReview|null}
 export interface RecurringReviewInput {expectedRevision:number;groupId:string;evidenceHash:string;label:string;decision:'confirmed'|'dismissed';frequency:RecurringFrequency|null;subscription:boolean;reason:string}

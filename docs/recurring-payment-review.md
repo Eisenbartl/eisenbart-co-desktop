@@ -59,7 +59,7 @@ Every decision captures the approved facts and their exact approval-history IDs,
 with counselor, time and reason. Changes to evidence, approvals, dates, amounts,
 merchant membership or duplicate warnings mark the previous decision **Needs
 review**. Reapproving an identical transaction still requires reconfirmation;
-old confirmations cannot silently revive. Groups without approved payments
+old confirmations cannot silently revive. Evidence changes also append a permanent invalidation marker in the same source transaction: approving a new payment and later rejecting it cannot revive an earlier decision when the remaining evidence matches again. Groups without approved payments
 leave the current list while their decisions remain in history. Expand **Payment
 pattern decision history** for captured evidence and previous reasons.
 
@@ -69,10 +69,10 @@ saves preserve the draft. Writes enforce authenticated client ownership,
 optimistic import revisions, matching evidence hashes, and atomic audit/history
 transactions in Rust. No caller-supplied evidence or organization is trusted.
 
-Schema 10 stores append-only history in the encrypted local workspace; encrypted
+Schema 11 stores append-only history in the encrypted local workspace; encrypted
 backups include it, and restore validates each captured approval and original
-source locator. Migration failures roll back. Older application versions cannot
-open schema 10. Local bounds are 1,000 decisions/client, 256 KiB/decision and
+source locator. Migration failures roll back. The earlier schema-10 source checkpoint is supported: its saved decisions are retained and flagged for one explicit reconfirmation because transient evidence changes were not tracked there. Older application versions cannot
+open schema 11. Local bounds are 1,000 decisions/client, 256 KiB/decision and
 8 MiB total captured decision JSON/client; exceeding a limit fails without
 saving or removing history. Existing import/workspace/backup limits still apply.
 This source checkpoint creates no new Windows installer. Scanned OCR,

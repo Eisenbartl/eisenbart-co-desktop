@@ -75,6 +75,6 @@ service payments ($10.01, $12.03, $10.01). It verifies pending exclusion,
 merchant evidence, a monthly suggestion and the independent $32.05 total;
 explicitly confirms a subscription; reverses an approval ($22.04 remains);
 checks **Needs review**, reapproves without reviving confirmation, and explicitly
-reconfirms. Both captured decisions must survive a complete process restart,
+reconfirms. It also approves then withdraws a new fourth charge, verifies old facts still require review, and reconfirms. All three captured decisions must survive a complete process restart,
 normal backup recovery and missing-metadata recovery, with client isolation and
 unchanged planning inputs. Artifacts include `native-recurring-review.png`.
