@@ -34,7 +34,7 @@ schema 5 workspace.
 | Independent Python Decimal examples | Confirmed remaining 3,899.99; 200/month requires 20 months with final 99.99; 100/month needs 39 months; 300/month needs 13; 200 over 3 eligible months requires 66.67/month; coverage floors to 0.61 |
 | Rust format and Clippy, all targets with warnings denied | Passed |
 | Final compiled native desktop workflow | Passed: visible savings/reserve/goal/scenario editing, known independent results, cap at final transfer, client isolation, lock/wrong password, and full process restart with saved savings |
-| Windows source checks | Pending normal tests-only CI after checkpoint upload |
+| Windows source checks | Run 38489872140 started from e3e06dc; frontend checks passed and backend tests were running. Final conclusion unavailable after GitHub began returning HTTP 401 |
 | New Windows installer/package | Intentionally not built, per request to save packaging time |
 | Clean Windows 11 installed/offline savings acceptance | Not run |
 
@@ -54,6 +54,30 @@ for each milestone. The 0.3.0 installer remains the earlier download and does
 not contain the savings feature. This milestone remains for fictional records,
 with no interest/returns, inflation, withdrawals, changing savings expenses,
 automatic funding redistribution, recovery, or independent security certification.
+
+### Preserved checkpoint and remaining CI confirmation
+
+Source commit `e3e06dc84a031fdc8e98605ee3d410e323db408e` was successfully pushed
+before authentication stopped working. Windows source-check run
+[38489872140](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38489872140)
+was observed with successful frontend checks and the backend step in progress.
+Later authenticated API reads returned `HTTP 401: Bad credentials`; a fresh
+uncached request also failed, and normal Git remote access could no longer
+authenticate. Runtime status exposed no configured credential refresh capability.
+No credential values were inspected or printed, no alternate identity was used,
+and no interactive login or replacement token was requested.
+
+The final Windows result and skipped-package step records therefore remain
+unverified; this is not a reported build/test failure. The workflow definition
+makes installer/package upload steps conditional on manual opt-in, and no such
+run was requested. Local checks passed and the complete source was already
+uploaded. Final validation notes are committed locally for later synchronization.
+
+Recoverable source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-savings-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-savings.bundle`. They are development
+source archives, not backups of client workspace data. Recheck CI and synchronize
+any local documentation commits when GitHub authentication is available again.
 
 ## Stage 3B: monthly debt payoff planning — 0.3.0
 
@@ -409,8 +433,9 @@ clone.
 
 ## Next development priority
 
-The savings source checkpoint is implemented and locally validated. Complete
-normal Windows source checks without creating an installer. The next application
+The savings source checkpoint is implemented and locally validated. Recheck
+the Windows source-check conclusion when GitHub access is available; no installer
+is needed for this checkpoint. The next application
 milestone is the paycheck-based cash-flow calendar, with dated inflows/bills,
 running balances, and warnings for cash shortfalls despite positive monthly
 averages. Preserve budgets, debt plans, and savings allocations as separate
