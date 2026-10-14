@@ -648,6 +648,168 @@ fn planning_pdf(l: &mut Layout, s: &crate::planning::Snapshot) -> Result<(), Str
     }
     Ok(())
 }
+fn chicago_time(value: &str) -> Result<String, String> {
+    Ok(chrono::DateTime::parse_from_rfc3339(value)
+        .map_err(|_| "Invalid captured evidence time.")?
+        .with_timezone(&chrono_tz::America::Chicago)
+        .format("%Y-%m-%d %H:%M %Z")
+        .to_string())
+}
+fn report_evidence_pdf(l: &mut Layout, p: &crate::assessments::Payload) -> Result<(), String> {
+    let Some(e) = &p.supporting else {
+        return Ok(());
+    };
+    l.section("Selected counseling session notes / counselor-authored context")?;
+    l.text("Selected saved notes are counseling context, not approved financial facts. Their dates may fall outside the historical assessment period. Unselected and later notes are excluded. No note amount changes the financial calculations.",10.0)?;
+    l.value(
+        "Selected / available notes at capture",
+        &format!("{} / {}", e.notes.len(), e.notes_count),
+    )?;
+    if e.notes.is_empty() {
+        l.text("No session notes selected.", 10.0)?;
+    }
+    for n in &e.notes {
+        l.value(
+            "Session note (America/Chicago)",
+            &format!("{} / {}", chicago_time(&n.created_at)?, n.counselor_name),
+        )?;
+        l.text(&n.body, 10.0)?;
+        l.value("Original note ID", &n.id)?;
+    }
+    l.section("Captured merchant and recurring-payment review / all imported dates")?;
+    l.text("Approved historical payments only, grouped across the captured client's imported dates, independently of the assessment period. Pattern suggestions remain advisory. Counselor-confirmed frequency/subscription describes reviewed historical evidence, not guaranteed future obligations or an automatically budgeted payment. Needs review is not a current confirmation.",10.0)?;
+    if p.basis.merchant_groups.is_empty() {
+        l.text("No current approved payment groups captured.", 10.0)?;
+    }
+    for g in &p.basis.merchant_groups {
+        l.value(
+            "Merchant / captured state",
+            &format!("{} / {}", g.merchant, g.state),
+        )?;
+        l.value(
+            "Account",
+            p.basis
+                .accounts
+                .iter()
+                .find(|a| a.id == g.account_id)
+                .map(|a| a.label.as_str())
+                .unwrap_or("Unknown"),
+        )?;
+        l.value(
+            "Historical total / smallest / largest",
+            &format!(
+                "{} / {} / {}",
+                usd(&g.total_paid),
+                usd(&g.smallest_payment),
+                usd(&g.largest_payment)
+            ),
+        )?;
+        l.value(
+            "Source payment dates",
+            &format!(
+                "{} to {} ({} payments)",
+                g.evidence
+                    .first()
+                    .and_then(|x| x.fields.date.as_deref())
+                    .unwrap_or("Unknown"),
+                g.evidence
+                    .last()
+                    .and_then(|x| x.fields.date.as_deref())
+                    .unwrap_or("Unknown"),
+                g.evidence.len()
+            ),
+        )?;
+        l.value(
+            "Suggested cadence (advisory)",
+            &g.suggested_frequency
+                .as_ref()
+                .map(plan_term)
+                .unwrap_or("Not established".into()),
+        )?;
+        for w in &g.warnings {
+            l.text(w, 10.0)?;
+        }
+        for x in &g.evidence {
+            l.value(
+                "Approved payment binding",
+                &format!(
+                    "Record {} / approval {} / source {} / page {} / line {}",
+                    x.record_id,
+                    x.approval_id,
+                    x.document_id,
+                    x.page
+                        .map(|v| v.to_string())
+                        .unwrap_or("Not applicable".into()),
+                    x.line
+                ),
+            )?;
+        }
+    }
+    l.section("Latest captured counselor payment decisions and original evidence")?;
+    if p.basis.recurring_history.is_empty() {
+        l.text(
+            "No counselor payment decisions captured. Suggestions remain unreviewed.",
+            10.0,
+        )?;
+    }
+    for r in &p.basis.recurring_history {
+        let state = p
+            .basis
+            .merchant_groups
+            .iter()
+            .find(|g| g.id == r.group_id)
+            .map(|g| g.state.as_str())
+            .unwrap_or("No current approved group; historical decision only");
+        l.value(
+            "Reviewed label / decision",
+            &format!("{} / {}", r.label, plan_term(&r.decision)),
+        )?;
+        l.value("Captured applicability", state)?;
+        l.value(
+            "Reviewed cadence / subscription",
+            &format!(
+                "{} / {}",
+                r.frequency
+                    .as_ref()
+                    .map(plan_term)
+                    .unwrap_or("Not confirmed".into()),
+                if r.subscription {
+                    "Counselor recorded"
+                } else {
+                    "Not recorded"
+                }
+            ),
+        )?;
+        l.value(
+            "Reviewed at (America/Chicago) / counselor",
+            &format!("{} / {}", chicago_time(&r.reviewed_at)?, r.counselor_name),
+        )?;
+        l.value("Reason", &r.reason)?;
+        l.value(
+            "Decision ID / evidence digest",
+            &format!("{} / {}", r.id, r.evidence_hash),
+        )?;
+        for x in &r.evidence {
+            l.value(
+                "Original reviewed payment",
+                &format!(
+                    "{} / {} / {} / record {} / approval {} / source {} / page {} / line {}",
+                    x.fields.date.as_deref().unwrap_or("Unknown"),
+                    x.fields.description,
+                    optional(&x.fields.amount),
+                    x.record_id,
+                    x.approval_id,
+                    x.document_id,
+                    x.page
+                        .map(|v| v.to_string())
+                        .unwrap_or("Not applicable".into()),
+                    x.line
+                ),
+            )?;
+        }
+    }
+    Ok(())
+}
 pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String> {
     let p = &r.payload;
     crate::assessments::validate(p)?;
@@ -688,7 +850,10 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
         },
     )?;
     l.section("Basis, exclusions and missing information")?;
-    l.text(if p.planning.is_some(){"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply historical financial amounts. A separately labeled hypothetical saved planning scenario is captured below; its entered debt terms, allocations and forecasts do not change approved facts or establish a final budget agreement/client action plan. Saved session notes and recurring-review decisions are not included. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."}else{"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply financial amounts. Internal assessment only; no finalized client action plan, selected planning scenarios, debt APR/repayment terms, budget agreement or saved session notes are included. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."},10.0)?;
+    l.text(if p.planning.is_some(){"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply historical financial amounts. A separately labeled hypothetical saved planning scenario is captured below; its entered debt terms, allocations and forecasts do not change approved facts or establish a final budget agreement/client action plan. Session and recurring evidence is included only when explicitly selected, in a separately labeled section below. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."}else{"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply financial amounts. Internal assessment only; no finalized client action plan, selected planning scenarios, debt APR/repayment terms or budget agreement are included. Session and recurring evidence is included only when explicitly selected below. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."},10.0)?;
+    if p.supporting.is_some() {
+        l.text("Selected saved session notes and latest counselor payment decisions are captured separately below with their original evidence. They do not change approved financial totals or verify future commitments.",10.0)?;
+    }
     l.value(
         "Record counts within period",
         &format!(
@@ -809,6 +974,7 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
     if let Some(s) = &p.planning {
         planning_pdf(&mut l, s)?;
     }
+    report_evidence_pdf(&mut l, p)?;
     for (title, text) in [
         ("Counselor findings", &p.findings),
         ("Counselor recommendations", &p.recommendations),

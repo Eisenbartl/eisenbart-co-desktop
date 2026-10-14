@@ -252,10 +252,12 @@ export interface FactMetrics {
  debtBalances:{label:string;amount:string|null;scale:number}[];
 }
 
-export interface AssessmentRecordInput {planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
+export interface AssessmentEvidencePreview {clientId:string;sourceRevision:number;notesCount:number;notes:ClientNote[];groupCount:number;reviewCount:number}
+export interface CapturedReportEvidence {calculator:string;notesCount:number;notes:ClientNote[]}
+export interface AssessmentRecordInput {supporting?:{expectedNotesCount:number;noteIds:string[]}|null;planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
 export interface AssessmentRecordSummary {id:string;title:string;createdAt:string;periodStart:string;periodEnd:string;sourceRevision:number;needsReview:boolean}
 export interface AssessmentDirectory {clientId:string;records:AssessmentRecordSummary[]}
-export interface SavedAssessment {clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
+export interface SavedAssessment {clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{supporting?:CapturedReportEvidence|null;planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
 
 export interface PlanningRevisions {budget:number;debt:number;savings:number;cashflow:number}
 export type PlanningDebtStrategy = 'none'|'snowball'|'avalanche';

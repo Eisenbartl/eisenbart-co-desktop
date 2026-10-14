@@ -1327,6 +1327,7 @@ mod tests {
     }
     fn assessment_input(s: &Snapshot, c: &Client) -> crate::assessments::Input {
         crate::assessments::Input {
+            supporting: None,
             planning: None,
             expected_revision: s.revision,
             expected_profile_updated_at: c.updated_at.clone(),
@@ -4164,5 +4165,260 @@ mod tests {
             .unwrap();
         w.lock_workspace();
         assert!(w.prepare_restore(backup.path, PASSWORD.into()).is_err());
+    }
+
+    fn report_input(
+        w: &mut Workspace,
+        s: &Snapshot,
+        c: &Client,
+        ids: Vec<String>,
+    ) -> crate::assessments::Input {
+        let mut input = assessment_input(s, c);
+        input.from_month = "2026-01".into();
+        input.through_month = "2026-03".into();
+        input.supporting = Some(crate::report_evidence::Selection {
+            expected_notes_count: w.get_assessment_evidence(&c.id).unwrap().notes_count,
+            note_ids: ids,
+        });
+        input
+    }
+    #[test]
+    fn counselor_report_keeps_selected_notes_reviewed_payments_and_independent_financial_totals() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = recurring_fixture(&mut w, &c.id, dir.path());
+        let s = w
+            .review_recurring_payment(&c.id, recurring_input(&s))
+            .unwrap();
+        let n = w
+            .add_client_note(
+                &c.id,
+                "Fictional José discussion USD 9999.99; this narrative is not approved income.",
+            )
+            .unwrap();
+        let input = report_input(&mut w, &s, &c, vec![n.id.clone()]);
+        let a = w.save_assessment_record(&c.id, input).unwrap();
+        let id = a.payload.id.clone();
+        let digest = a.digest.clone();
+        assert_eq!(a.payload.format, 3);
+        assert_eq!(
+            a.payload.supporting.as_ref().unwrap().notes,
+            vec![n.clone()]
+        );
+        assert_eq!(a.payload.assessment.totals.income, "0.00");
+        assert_eq!(a.payload.assessment.totals.spending, "32.05");
+        assert_eq!(a.payload.assessment.operating_cashflow, "-32.05");
+        assert_eq!(a.payload.basis.merchant_groups[0].total_paid, "32.05");
+        assert_eq!(a.payload.basis.merchant_groups[0].state, "Confirmed");
+        assert_eq!(
+            a.payload.basis.recurring_history[0].evidence,
+            s.recurring_history[0].evidence
+        );
+        assert_eq!(w.get_client_imports(&c.id).unwrap().revision, s.revision);
+        w.add_client_note(&c.id, "Later fictional note, not part of the old report.")
+            .unwrap();
+        let old = w.get_assessment_record(&c.id, &id).unwrap();
+        assert!(old.needs_review);
+        assert_eq!(old.digest, digest);
+        assert_eq!(old.payload.supporting.as_ref().unwrap().notes, vec![n]);
+        assert!(w.list_assessment_records(&c.id).unwrap().records[0].needs_review);
+        let path = dir.path().join("internal.pdf");
+        w.export_assessment_pdf(&c.id, &id, path.to_str().unwrap())
+            .unwrap();
+        let doc = lopdf::Document::load(path).unwrap();
+        let text = doc
+            .extract_text(&doc.get_pages().keys().copied().collect::<Vec<_>>())
+            .unwrap()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        for word in [
+            "Selected counseling session notes",
+            "José discussion USD 9999.99",
+            "Historical total / smallest / largest: USD 32.05 / USD 10.01 / USD 12.03",
+            "Confirmed",
+            "Original reviewed payment",
+            "Operating cash flow: USD -32.05",
+            "NEEDS REVIEW",
+        ] {
+            assert!(text.contains(word), "Missing {word}");
+        }
+        assert!(!text.contains("Later fictional note, not part"));
+        assert!(text.contains(&s.recurring_history[0].evidence[0].approval_id));
+    }
+    #[test]
+    fn counselor_report_preserves_older_approval_bindings_after_payment_correction() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = recurring_fixture(&mut w, &c.id, dir.path());
+        let s = w
+            .review_recurring_payment(&c.id, recurring_input(&s))
+            .unwrap();
+        let original = s.recurring_history[0].evidence[0].approval_id.clone();
+        let mut input = crate::imports::ReviewInput {
+            expected_revision: s.revision,
+            record_id: s.records[0].id.clone(),
+            status: Status::Approved,
+            fields: s.records[0].fields.clone(),
+            reason: "Correct fictional payment".into(),
+            acknowledge_warnings: true,
+        };
+        input.fields.amount = Some("-9.99".into());
+        let s = w.review_transaction(&c.id, input).unwrap();
+        let input = report_input(&mut w, &s, &c, vec![]);
+        let a = w.save_assessment_record(&c.id, input).unwrap();
+        assert_eq!(a.payload.basis.merchant_groups[0].state, "Needs review");
+        assert_eq!(a.payload.basis.merchant_groups[0].total_paid, "32.03");
+        assert_eq!(a.payload.assessment.totals.spending, "32.03");
+        assert!(a.payload.basis.history.iter().any(|h| h.id == original));
+        assert_eq!(
+            a.payload.basis.recurring_history[0].evidence[0]
+                .fields
+                .amount
+                .as_deref(),
+            Some("-10.01")
+        );
+        crate::assessments::validate(&a.payload).unwrap();
+        let s = review(
+            &mut w,
+            &c.id,
+            &s.records[0].id,
+            Status::Rejected,
+            "Withdraw fictional payment",
+            true,
+        )
+        .unwrap();
+        let input = report_input(&mut w, &s, &c, vec![]);
+        let latest = w.save_assessment_record(&c.id, input).unwrap();
+        assert_eq!(latest.payload.basis.merchant_groups[0].total_paid, "22.04");
+        assert_eq!(
+            latest.payload.basis.recurring_history[0].evidence[0]
+                .fields
+                .amount
+                .as_deref(),
+            Some("-10.01")
+        );
+        assert!(
+            w.get_assessment_record(&c.id, &a.payload.id)
+                .unwrap()
+                .needs_review
+        );
+    }
+    #[test]
+    fn counselor_report_rejects_stale_notes_foreign_selection_and_forged_evidence_before_restore() {
+        use sha2::{Digest, Sha256};
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let s = recurring_fixture(&mut w, &c.id, dir.path());
+        let n = w
+            .add_client_note(&c.id, "Original fictional counseling context.")
+            .unwrap();
+        let foreign = w
+            .add_client_note(&other.id, "Other fictional client's context.")
+            .unwrap();
+        let mut input = report_input(&mut w, &s, &c, vec![n.id.clone()]);
+        input.supporting.as_mut().unwrap().expected_notes_count = 0;
+        assert!(w.save_assessment_record(&c.id, input).is_err());
+        for ids in [
+            vec![foreign.id],
+            vec![n.id.clone(), n.id.clone()],
+            vec![n.id.clone(); 11],
+        ] {
+            let input = report_input(&mut w, &s, &c, ids);
+            assert!(w.save_assessment_record(&c.id, input).is_err());
+        }
+        assert!(w.list_assessment_records(&c.id).unwrap().records.is_empty());
+        let input = report_input(&mut w, &s, &c, vec![n.id]);
+        let mut a = w.save_assessment_record(&c.id, input).unwrap();
+        let id = a.payload.id.clone();
+        a.payload.basis.merchant_groups[0].total_paid = "9999.99".into();
+        assert!(crate::assessments::validate(&a.payload).is_err());
+        a.payload.basis.merchant_groups[0].total_paid = "32.05".into();
+        a.payload.supporting.as_mut().unwrap().notes[0].body =
+            "Forged counselor note with matching hash.".into();
+        crate::assessments::validate(&a.payload).unwrap();
+        let json = serde_json::to_string(&a.payload).unwrap();
+        let digest = format!("{:x}", Sha256::digest(json.as_bytes()));
+        let conn = &w.session.as_ref().unwrap().connection;
+        conn.execute_batch("DROP TRIGGER assessment_records_no_update;")
+            .unwrap();
+        conn.execute(
+            "UPDATE client_assessment_records SET payload_json=?1,digest=?2 WHERE id=?3",
+            params![json, digest, id],
+        )
+        .unwrap();
+        assert!(w.get_assessment_record(&c.id, &id).is_err());
+        let path = dir.path().join("forged.pdf");
+        assert!(w
+            .export_assessment_pdf(&c.id, &id, path.to_str().unwrap())
+            .is_err());
+        assert!(!path.exists());
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        assert!(w.prepare_restore(backup.path, PASSWORD.into()).is_err());
+        assert!(w.get_assessment_evidence(&c.id).is_err());
+    }
+    #[test]
+    fn counselor_report_restart_and_recovery_preserve_format_three_and_legacy_records() {
+        let (root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = recurring_fixture(&mut w, &c.id, dir.path());
+        let n = w
+            .add_client_note(
+                &c.id,
+                "Fictional selected follow-up, unchanged after recovery.",
+            )
+            .unwrap();
+        let legacy = w
+            .save_assessment_record(&c.id, assessment_input(&s, &c))
+            .unwrap();
+        assert_eq!(legacy.payload.format, 2);
+        assert!(legacy.payload.supporting.is_none());
+        let input = report_input(&mut w, &s, &c, vec![n.id]);
+        let report = w.save_assessment_record(&c.id, input).unwrap();
+        let id = report.payload.id.clone();
+        let digest = report.digest;
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        drop(w);
+        let mut w = Workspace::new(root.path().to_path_buf());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(w.get_assessment_record(&c.id, &id).unwrap().digest, digest);
+        w.add_client_note(
+            &c.id,
+            "Later context that recovery will remove from active workspace.",
+        )
+        .unwrap();
+        assert!(w.get_assessment_record(&c.id, &id).unwrap().needs_review);
+        assert!(
+            !w.get_assessment_record(&c.id, &legacy.payload.id)
+                .unwrap()
+                .needs_review
+        );
+        w.lock_workspace();
+        let ready = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(ready.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let restored = w.get_assessment_record(&c.id, &id).unwrap();
+        assert_eq!(restored.digest, digest);
+        assert!(!restored.needs_review);
+        assert_eq!(
+            restored.payload.supporting.as_ref().unwrap().notes[0].body,
+            "Fictional selected follow-up, unchanged after recovery."
+        );
+        assert_eq!(
+            w.get_assessment_record(&c.id, &legacy.payload.id)
+                .unwrap()
+                .digest,
+            legacy.digest
+        );
     }
 }

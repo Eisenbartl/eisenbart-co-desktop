@@ -464,3 +464,8 @@ textarea { resize: vertical; min-height: 100px; }
 .client-action-plans .action-plan-basis, .saved-client-action-plan { margin-top: 20px; }
 .saved-client-action-plan > ol { padding-left: 24px; }
 .saved-client-action-plan > ol > li { margin: 16px 0; }
+
+.report-evidence-selection { margin: 20px 0; padding: 18px; background: #f5f8f7; border-radius: 8px; }
+.report-evidence-selection .assessment-note { display: block; margin-top: 8px; }
+.captured-report-evidence { margin-top: 24px; }
+.captured-report-evidence h4 { margin-top: 24px; }

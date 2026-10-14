@@ -24,6 +24,16 @@ fn texts(p: &Payload) -> Result<(), String> {
     }
     Ok(())
 }
+fn notes_count(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<u32, String> {
+    let count:i64=c.query_row("SELECT COUNT(*) FROM client_notes WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3",params![client,w.organization_id,w.counselor_id],|r|r.get(0)).map_err(storage_error)?;
+    if !(0..=10_000).contains(&count) {
+        return Err("Session notes exceed the report evidence safety limit.".into());
+    }
+    Ok(count as u32)
+}
+fn note(c: &Connection, w: &WorkspaceInfo, client: &str, id: &str) -> Result<ClientNote, String> {
+    c.query_row("SELECT id,client_id,counselor_id,counselor_name,body,created_at FROM client_notes WHERE id=?1 AND client_id=?2 AND organization_id=?3 AND counselor_id=?4",params![id,client,w.organization_id,w.counselor_id],|r|Ok(ClientNote{id:r.get(0)?,client_id:r.get(1)?,counselor_id:r.get(2)?,counselor_name:r.get(3)?,body:r.get(4)?,created_at:r.get(5)?})).optional().map_err(storage_error)?.ok_or("A selected session note is unavailable for this client.".into())
+}
 fn decode(
     c: &Connection,
     w: &WorkspaceInfo,
@@ -60,6 +70,16 @@ fn decode(
     }
     texts(&p)?;
     assessments::validate(&p).map_err(|_| STORAGE_ERROR.to_owned())?;
+    if let Some(e) = &p.supporting {
+        if e.notes_count > notes_count(c, w, client)? {
+            return Err(STORAGE_ERROR.into());
+        }
+        for n in &e.notes {
+            if note(c, w, client, &n.id)? != *n {
+                return Err(STORAGE_ERROR.into());
+            }
+        }
+    }
     Ok((p, digest))
 }
 pub(super) fn validate_records(
@@ -122,6 +142,11 @@ pub(super) fn record(
         review_reasons
             .push("Workspace identity details changed after this assessment was saved.".into());
     }
+    if let Some(e) = &payload.supporting {
+        if notes_count(c, w, client)? != e.notes_count {
+            review_reasons.push("Session notes were added after this report. Its selected original notes remain historical; review the later counseling context before relying on it.".into());
+        }
+    }
     if let Some(p) = &payload.planning {
         if plan_revisions(c, w, client)? != p.revisions {
             review_reasons.push("Saved budget, debt, savings or dated cash-flow plans changed after this scenario was captured. Its original assumptions and projections remain historical.".into());
@@ -136,6 +161,40 @@ pub(super) fn record(
     })
 }
 impl Workspace {
+    pub fn get_assessment_evidence(
+        &mut self,
+        client: &str,
+    ) -> Result<crate::report_evidence::Preview, String> {
+        let s = self.session()?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)
+            .map_err(storage_error)?;
+        scoped_client(&tx, &s.info, client)?;
+        let notes_count = notes_count(&tx, &s.info, client)?;
+        let source = imports_store::read_imports(&tx, &s.info, client)?;
+        let ids=tx.prepare("SELECT id FROM client_notes WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3 ORDER BY created_at DESC,id DESC LIMIT 100").map_err(storage_error)?.query_map(params![client,s.info.organization_id,s.info.counselor_id],|r|r.get::<_,String>(0)).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
+        let notes = ids
+            .iter()
+            .map(|id| note(&tx, &s.info, client, id))
+            .collect::<Result<Vec<_>, _>>()?;
+        let review_count = source
+            .recurring_history
+            .iter()
+            .map(|r| &r.group_id)
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        let result = crate::report_evidence::Preview {
+            client_id: client.into(),
+            source_revision: source.revision,
+            notes_count,
+            notes,
+            group_count: source.merchant_groups.len(),
+            review_count,
+        };
+        tx.commit().map_err(storage_error)?;
+        Ok(result)
+    }
     pub fn get_assessment_planning(
         &mut self,
         client: &str,
@@ -169,6 +228,7 @@ impl Workspace {
         let source = imports_store::read_imports(&s.connection, &s.info, client)?;
         let rows=s.connection.prepare("SELECT id,title,created_at,period_start,period_end,source_revision FROM client_assessment_records WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3 ORDER BY rowid DESC").map_err(storage_error)?.query_map(params![client,s.info.organization_id,s.info.counselor_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,i64>(5)?))).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
         let current_plans = plan_revisions(&s.connection, &s.info, client)?;
+        let current_notes = notes_count(&s.connection, &s.info, client)?;
         let mut records = Vec::new();
         for (id, title, created_at, period_start, period_end, source_revision) in rows {
             required_text(&title, "Assessment title", 120)?;
@@ -187,6 +247,7 @@ impl Workspace {
                 })
                 .transpose()?
                 .unwrap_or(false);
+            let recorded_notes:Option<u32>=s.connection.query_row("SELECT json_extract(payload_json,'$.supporting.notesCount') FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
             records.push(Summary {
                 id,
                 title,
@@ -196,7 +257,8 @@ impl Workspace {
                 source_revision,
                 needs_review: source_revision != source.revision
                     || profile_at_save != current.updated_at
-                    || plans_changed,
+                    || plans_changed
+                    || recorded_notes.is_some_and(|n| n != current_notes),
             });
         }
         Ok(Directory {
@@ -248,9 +310,26 @@ impl Workspace {
                 crate::planning::capture(read_plans(&tx, &s.info, client)?, selection)
             })
             .transpose()?;
+        let supporting=input.supporting.map(|selection| -> Result<crate::report_evidence::Snapshot,String>{
+            let count=notes_count(&tx,&s.info,client)?;
+            if count!=selection.expected_notes_count {return Err("Session notes changed since evidence review. Reload report evidence and review your selection; nothing was saved.".into());}
+            if selection.note_ids.len()>crate::report_evidence::MAX_NOTES || selection.note_ids.iter().collect::<std::collections::HashSet<_>>().len()!=selection.note_ids.len() {return Err("Select at most ten distinct session notes.".into());}
+            let notes=selection.note_ids.iter().map(|id|note(&tx,&s.info,client,id)).collect::<Result<Vec<_>,_>>()?;
+            Ok(crate::report_evidence::Snapshot{calculator:"counselor-evidence-v1".into(),notes_count:count,notes})
+        }).transpose()?;
+        let basis = if supporting.is_some() {
+            assessments::capture_report(source, true)
+        } else {
+            assessments::capture(source)
+        };
         let payload = Payload {
             planning,
-            format: assessments::FORMAT,
+            format: if supporting.is_some() {
+                assessments::FORMAT
+            } else {
+                2
+            },
+            supporting,
             calculator: assessments::CALCULATOR.into(),
             app_version: env!("CARGO_PKG_VERSION").into(),
             id: Uuid::new_v4().to_string(),
@@ -262,7 +341,7 @@ impl Workspace {
             recommendations: optional_text(&input.recommendations, "Recommendations", 4000, true)?,
             follow_up: optional_text(&input.follow_up, "Follow-up", 4000, true)?,
             assessment,
-            basis: assessments::capture(source),
+            basis,
         };
         assessments::validate(&payload)?;
         let json = serde_json::to_string(&payload).map_err(|_| STORAGE_ERROR.to_owned())?;

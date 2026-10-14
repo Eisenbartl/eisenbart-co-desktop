@@ -671,6 +671,69 @@ def open_original_counselor_assessment(driver: WebDriver) -> None:
     driver.wait_text(".saved-assessment-view","Verify remaining sources before changing the fictional household plan.","preserved counselor recommendation")
 
 
+def export_counselor_evidence_pdf(driver: WebDriver, artifacts: Path, label: str) -> None:
+    destination = artifacts / f"counselor-evidence-{label}.pdf"
+    if destination.exists():
+        raise SmokeFailure("Counselor evidence PDF destination must be new")
+    driver.fill("#assessment-pdf-path", str(destination))
+    driver.click_button("Export saved assessment PDF")
+    driver.wait_text(".saved-assessments > .success-message", str(destination), "exact counselor evidence export completion")
+    text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
+    text = " ".join(text.split())
+    for expected in ["Casey captured counseling evidence", "Selected counseling session notes", "Casey fictional discussion USD 9999.99", "Historical total / smallest / largest: USD 32.05 / USD 10.01 / USD 12.03", "Fictional household service", "Needs review", "Reconfirmed all three source decisions after reversal", "Original reviewed payment", "Operating cash flow: USD -32.05", "Selected / available notes at capture: 1 / 1", "NEEDS REVIEW"]:
+        if expected not in text:
+            raise SmokeFailure(f"Counselor evidence PDF missing independently expected text: {expected}")
+    if "Later Casey context excluded" in text or "Income receipts: USD 9999.99" in text:
+        raise SmokeFailure("Later narrative replaced immutable evidence or financial amounts")
+    status(f"counselor PDF preserves selected notes, original approval references, reviewed payment status and exact independent totals ({label})")
+
+
+def save_counselor_evidence(driver: WebDriver, artifacts: Path) -> None:
+    driver.fill("#new-note", "Casey fictional discussion USD 9999.99 is narrative only; verify future service obligations.")
+    driver.click_button("Save session note")
+    driver.wait_text(".notes-history", "Casey fictional discussion USD 9999.99", "saved counselor context before report")
+    driver.click(".saved-assessments > summary")
+    driver.interactive("#saved-assessment")
+    driver.fill("#record-from", "2026-01")
+    driver.fill("#record-through", "2026-03")
+    driver.fill("#record-title", "Casey captured counseling evidence")
+    driver.fill("#record-findings", "Fictional counseling context; payment confirmation needs renewed source review.")
+    driver.click("#record-include-evidence")
+    driver.click_button("Review report evidence")
+    driver.wait_text(".report-evidence-context", "1 saved notes", "scoped saved notes before selection")
+    driver.click(".report-evidence-selection .check-label input")
+    driver.click("#record-ack")
+    driver.click_button("Save assessment record")
+    driver.wait_text(".saved-assessment-view h3", "Casey captured counseling evidence", "expanded counselor record saved")
+    driver.wait_text(".captured-report-evidence", "Casey fictional discussion USD 9999.99", "immutable selected narrative")
+    driver.wait_text(".captured-payment-group", "Fictional service · Needs review", "historical review stays invalidated after identical evidence returns")
+    driver.wait_text(".captured-payment-group", "Total $32.05", "exact historical approved service total")
+    driver.wait_text(".saved-assessment-view .assessment-totals", "Operating cash flow-$32.05", "narrative money does not enter approved totals")
+    driver.fill("#new-note", "Later Casey context excluded from the original report.")
+    driver.click_button("Save session note")
+    driver.wait_text(".notes-history", "Later Casey context excluded", "additional immutable context")
+    driver.wait_text(".saved-assessment-status", "Needs review", "new counseling note flags original report")
+    if "Later Casey context excluded" in driver.text(".captured-report-evidence"):
+        raise SmokeFailure("New note rewrote captured report context")
+    export_counselor_evidence_pdf(driver, artifacts, "before-restart")
+    driver.scroll_to(".captured-report-evidence", "start")
+    driver.screenshot(artifacts / "native-counselor-report-evidence.png")
+    driver.click(".saved-assessments > summary")
+
+
+def assert_counselor_evidence_restored(driver: WebDriver, artifacts: Path, label: str) -> None:
+    driver.open_client("Casey Pattern")
+    if driver.command("GET", f"/element/{driver.element('.saved-assessments')}/property/open") is not True:
+        driver.click(".saved-assessments > summary")
+    driver.select("#saved-assessment", "Casey captured counseling evidence — 2026-01-01 to 2026-03-31 — Needs review")
+    driver.wait_text(".captured-report-evidence", "Casey fictional discussion USD 9999.99", "restored immutable counseling context")
+    driver.wait_text(".captured-payment-group", "Fictional service · Needs review", "restored historical decision applicability")
+    driver.wait_text(".saved-assessment-status", "Needs review", "retained later-note context warning")
+    driver.wait_text(".saved-assessment-view .assessment-totals", "Operating cash flow-$32.05", "restored approved figures remain independent")
+    export_counselor_evidence_pdf(driver, artifacts, label)
+    driver.click(".saved-assessments > summary")
+
+
 def export_original_assessment_pdf(driver: WebDriver, artifacts: Path, label: str) -> None:
     destination = artifacts / f"saved-assessment-{label}.pdf"
     if destination.exists():
@@ -709,6 +772,8 @@ def export_client_action_pdf(driver: WebDriver, artifacts: Path, label: str, nee
     for expected in ["Your financial action plan", "Alex agreed client plan", "America/Chicago", "Agreed debt allocation: USD 100.00", "Agreed primary savings allocation: USD 250.00", "Unallocated / buffer: USD 1066.67", "Operating cash flow: USD 1820.02", "Strategy: Avalanche", "Projected total interest: USD 35.35", "Projected emergency completion: 2028-06-30", "Incomplete", "Follow-up arrangements"]:
         if expected.lower() not in text.lower():
             raise SmokeFailure(f"Client action plan PDF missing expected text: {expected}")
+    if "Selected counseling session notes" in text or "Casey fictional discussion" in text:
+        raise SmokeFailure("Internal counselor note evidence entered a client PDF")
     if needs_review and "NEEDS REVIEW" not in text:
         raise SmokeFailure("Historical client plan omitted its review flag")
     if text.index("Verify missing statements") > text.index("Confirm lender payment dates"):
@@ -765,6 +830,8 @@ def export_captured_planning_pdf(driver: WebDriver, artifacts: Path, label: str)
     for expected in ["Alex saved planning scenario","Captured planning scenario / hypothetical","Monthly income: USD 3250.00","Unallocated: USD 716.67","Selected strategy: Avalanche","Projected total interest: USD 35.35","Emergency target: USD 4899.99","Primary emergency completion: 2028-06-30","Projected combined closing balance: USD 3300.00","Operating cash flow: USD 1820.02","NEEDS REVIEW"]:
         if expected not in text:
             raise SmokeFailure(f"Captured planning PDF missing expected text: {expected}")
+    if "Selected counseling session notes" not in text or "Selected / available notes at capture: 1 / 1" not in text or "Casey fictional discussion" in text:
+        raise SmokeFailure("Captured planning report lost its selected note or mixed clients")
     if "Monthly income: USD 3466.67" in text:
         raise SmokeFailure("Later plan income replaced captured PDF assumptions")
     status(f"native planning PDF preserves original assumptions and independently expected milestones ({label})")
@@ -803,6 +870,10 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.fill("#record-scenario-label","Alex primary saved plan")
     driver.fill("#record-scenario-assumptions","Entered hypothetical plans; verify lender dates and all financial coverage before commitments.")
     driver.select("#record-debt-strategy","Avalanche")
+    driver.click("#record-include-evidence")
+    driver.click_button("Review report evidence")
+    driver.wait_text(".report-evidence-context", "1 saved notes", "Alex current counselor context stays scoped")
+    driver.click(".report-evidence-selection .check-label input")
     driver.click("#record-ack")
     driver.click_button("Save assessment record")
     driver.wait_text(".saved-assessment-view h3","Alex saved planning scenario","saved scenario-backed assessment")
@@ -1215,6 +1286,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_pdf_imports(driver, artifacts, data_root)
     create_client("Casey","Pattern","Review fictional recurring payments")
     check_recurring_imports(driver,artifacts,data_root)
+    save_counselor_evidence(driver, artifacts)
     create_client("Taylor","Balance","Verify fictional statement running balances")
     check_statement_balances(driver,artifacts,data_root)
     save_captured_planning_assessment(driver,artifacts)
@@ -1225,6 +1297,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver, artifacts, "restart")
     assert_captured_planning_restored(driver, artifacts, "restart")
+    assert_counselor_evidence_restored(driver, artifacts, "restart")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     driver.scroll_to(".financial-dashboard", "start")
@@ -1315,6 +1388,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver, artifacts, "encrypted-restore")
     assert_captured_planning_restored(driver, artifacts, "encrypted-restore")
+    assert_counselor_evidence_restored(driver, artifacts, "encrypted-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     driver.open_client("Alex Fictional")
@@ -1348,6 +1422,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver, artifacts, "error-screen-restore")
     assert_captured_planning_restored(driver, artifacts, "error-screen-restore")
+    assert_counselor_evidence_restored(driver, artifacts, "error-screen-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")

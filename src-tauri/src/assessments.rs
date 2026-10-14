@@ -6,11 +6,13 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 pub const MAX_PAYLOAD: usize = 8 * 1024 * 1024;
-pub const FORMAT: u32 = 2;
+pub const FORMAT: u32 = 3;
 pub const CALCULATOR: &str = "approved-assessment-v1";
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Input {
+    #[serde(default)]
+    pub supporting: Option<crate::report_evidence::Selection>,
     #[serde(default)]
     pub planning: Option<crate::planning::Selection>,
     pub expected_revision: i64,
@@ -26,6 +28,8 @@ pub struct Input {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Payload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supporting: Option<crate::report_evidence::Snapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub planning: Option<crate::planning::Snapshot>,
     pub format: u32,
@@ -69,7 +73,18 @@ pub struct Record {
     pub review_reasons: Vec<String>,
 }
 
-pub fn capture(mut source: imports::Snapshot) -> imports::Snapshot {
+pub fn capture(source: imports::Snapshot) -> imports::Snapshot {
+    capture_report(source, false)
+}
+pub fn capture_report(mut source: imports::Snapshot, supporting: bool) -> imports::Snapshot {
+    if supporting {
+        let mut seen = HashSet::new();
+        source.recurring_history.reverse();
+        source
+            .recurring_history
+            .retain(|r| seen.insert(r.group_id.clone()));
+        source.recurring_history.reverse();
+    }
     // Keep exact current decisions plus older approved bindings needed by facts.
     let mut latest = HashMap::new();
     for h in &source.history {
@@ -82,19 +97,30 @@ pub fn capture(mut source: imports::Snapshot) -> imports::Snapshot {
     if let Some(data) = &source.financial_facts.data {
         ids.extend(data.classifications.iter().map(|c| c.approval_id.clone()));
     }
+    if supporting {
+        ids.extend(
+            source
+                .recurring_history
+                .iter()
+                .flat_map(|r| r.evidence.iter().map(|e| e.approval_id.clone())),
+        );
+    }
     source.history.retain(|h| ids.contains(&h.id));
     source.financial_facts.history = source.financial_facts.history.pop().into_iter().collect();
     for d in &mut source.documents {
         d.balance_history = d.balance_history.pop().into_iter().collect();
     }
-    source.merchant_groups.clear();
-    source.recurring_history.clear();
+    if !supporting {
+        source.merchant_groups.clear();
+        source.recurring_history.clear();
+    }
     source
 }
 pub fn validate(payload: &Payload) -> Result<(), String> {
     let bad = || "The saved assessment evidence is invalid or unsupported.".to_owned();
-    if !matches!(payload.format, 1 | FORMAT)
+    if !matches!(payload.format, 1 | 2 | FORMAT)
         || (payload.format == 1 && payload.planning.is_some())
+        || (payload.supporting.is_some() != (payload.format == FORMAT))
         || payload.calculator != CALCULATOR
         || payload.app_version.is_empty()
         || payload.id.is_empty()
@@ -118,10 +144,15 @@ pub fn validate(payload: &Payload) -> Result<(), String> {
     if s.records.len() > 5000
         || s.documents.len() > 50
         || s.accounts.len() > 20
-        || s.history.len() > 5500
+        || s.history.len()
+            > if payload.supporting.is_some() {
+                15500
+            } else {
+                5500
+            }
         || s.financial_facts.history.len() > 1
-        || !s.merchant_groups.is_empty()
-        || !s.recurring_history.is_empty()
+        || (payload.supporting.is_none()
+            && (!s.merchant_groups.is_empty() || !s.recurring_history.is_empty()))
     {
         return Err(bad());
     }
@@ -216,6 +247,9 @@ pub fn validate(payload: &Payload) -> Result<(), String> {
         crate::financial_facts::validate_bindings(data, &s.records, &s.history, &docs)?;
     } else if !s.financial_facts.history.is_empty() {
         return Err(bad());
+    }
+    if payload.supporting.is_some() {
+        crate::report_evidence::validate(payload)?;
     }
     imports::iso_date(&payload.assessment.period_start)?;
     imports::iso_date(&payload.assessment.period_end)?;

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { ActionPlanReview, ActionPlanInput, SavedActionPlan, ActionPlanDirectory, AssessmentPlans, AssessmentDirectory, SavedAssessment, AssessmentRecordInput, FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
+import type { AssessmentEvidencePreview, ActionPlanReview, ActionPlanInput, SavedActionPlan, ActionPlanDirectory, AssessmentPlans, AssessmentDirectory, SavedAssessment, AssessmentRecordInput, FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
 
 export function desktopAvailable(): boolean {
   return '__TAURI_INTERNALS__' in window;
@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getAssessmentEvidence:(clientId:string)=>command<AssessmentEvidencePreview>('get_assessment_evidence',{clientId}),
   reviewClientActionPlan: (clientId:string,assessmentId:string)=>command<ActionPlanReview>('review_client_action_plan',{clientId,assessmentId}),
   listClientActionPlans: (clientId:string)=>command<ActionPlanDirectory>('list_client_action_plans',{clientId}),
   getClientActionPlan: (clientId:string,id:string)=>command<SavedActionPlan>('get_client_action_plan',{clientId,id}),

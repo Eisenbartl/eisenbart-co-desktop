@@ -126,3 +126,12 @@ cover current basis, changed historical context, restart, normal encrypted resto
 and damaged-workspace recovery. Persisted plans inherit Needs review after plan
 revision changes while steps/allocations remain immutable. Artifacts include
 `native-client-action-plan.png` and `client-action-plan-*.pdf`.
+
+The 0.17.0 workflow captures Casey's selected narrative note and latest invalidated
+payment decision with original source bindings in a counselor report. A narrative
+9999.99 remains separate from approved historical total 32.05 / cash flow -32.05.
+A later note flags context without entering the saved report. Four counselor PDFs
+verify before-restart, restart, encrypted restore and damaged-workspace recovery
+evidence. Alex's planning report also captures only his selected note; client PDFs
+exclude internal counseling evidence. Artifacts include
+`native-counselor-report-evidence.png` and `counselor-evidence-*.pdf`.

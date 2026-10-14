@@ -16,6 +16,7 @@ pub mod pdf_process;
 mod planning;
 mod reconciliation;
 mod recurring;
+mod report_evidence;
 mod savings;
 mod storage;
 
@@ -126,6 +127,18 @@ fn cancel_client_csv(state: State<'_, DesktopState>, token: String) -> Result<()
         w.cancel_client_csv(&token);
         Ok(())
     })
+}
+#[tauri::command]
+async fn get_assessment_evidence(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<report_evidence::Preview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_assessment_evidence(&client_id))
+    })
+    .await
+    .map_err(|_| "Report evidence could not be loaded.".to_owned())?
 }
 #[tauri::command]
 async fn review_client_action_plan(
@@ -702,6 +715,7 @@ pub fn run() {
             review_financial_facts,
             list_assessment_records,
             get_assessment_planning,
+            get_assessment_evidence,
             review_client_action_plan,
             list_client_action_plans,
             get_client_action_plan,

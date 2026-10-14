@@ -1,5 +1,58 @@
 # Development status
 
+## Stage 5G: expanded counselor report evidence — 0.17.0 source
+
+Internal assessments can now optionally capture selected saved session notes and
+current merchant/payment groups with the latest counselor decision per reviewed
+group. Notes retain their author, original time and ID; decisions retain label,
+reason, cadence/subscription, applicability and original evidence digest with
+record/approval/source/page/line bindings. Capture retains older approvals needed
+by a reviewed payment after later corrections. All imported dates are labeled
+separately from the financial assessment period. Narrative money, suggested cadence
+and historical subscription decisions never enter approved totals or active plans.
+
+The report viewer and offline internal PDF show these sections separately from
+approved activity and hypothetical planning. Evidence times use America/Chicago;
+UTC timestamps remain stored. Latest decisions without a current approved group
+are explicitly historical. An invalidated decision stays Needs review even when
+identical source values return. Client PDFs exclude internal note/payment evidence.
+See [counselor-report-evidence.md](counselor-report-evidence.md).
+
+Payload format 3 uses optional supporting context `counselor-evidence-v1`; formats
+1/2 remain supported and unchanged. Records without this option continue to save
+format 2. Schema stays 15. The existing scoped append-only assessment transaction
+and audit check source/profile/plan versions and expected note count, then read up
+to ten selected original notes by scoped IDs. Preview shows the latest 100 notes.
+Reads/export/recovery recheck note identity against original append-only storage,
+canonical text/time and recomputed payment groups/totals/states. New notes flag
+supporting report context without replacing selected notes; legacy reports do not
+claim notes or gain that new warning. Linked action plans inherit review state.
+No new dependency or installer is added.
+
+Independent example: historical payments 10.01 + 12.03 + 10.01 = 32.05 and operating
+cash flow -32.05. A selected note mentioning 9999.99 remains narrative only.
+Correcting the first payment to 9.99 yields current total 32.03 while retaining the
+original reviewed 10.01 approval; withdrawal yields 22.04 without deleting it.
+
+| Check | Result |
+|---|---|
+| Locked setup / production frontend build | Passed |
+| Interface suite | 91 passed; new selection-only IPC, historical context/escaped notes, unchanged figures, failed draft/renewed acknowledgment, note cap, mismatched source/client and late reply tests |
+| Linux backend / worker suite | 130 library + 2 worker tests passed (132 total); four new report/PDF/provenance/scope/forgery/restart/recovery checks; relevant PDF checks repeated after adding Chicago evidence timestamps |
+| Formatting / Clippy, warnings denied | Passed |
+| Native desktop compile / expanded report workflow | Standalone debug build passed; full expanded-report and recovery workflow running |
+| Windows source CI | Pending; installer/package steps remain disabled |
+| Clean Windows installation/offline release acceptance | Not run |
+
+Complete coverage/final certification, remaining financial models and combined
+scenario comparisons, branding/logo/contact details, direct print commands,
+reminders/action completion and commercial/security/release acceptance remain open.
+This is a tested development checkpoint, not a commercial release.
+
+Next priority: **optional budget method comparisons** — zero-based, 50/30/20 and
+custom percentage frameworks using exact arithmetic and non-writing comparisons.
+See [remaining-requirements.md](remaining-requirements.md).
+
 ## Stage 5F: immutable client action plans — 0.16.0 source
 
 Client action plans now record three to five ordered agreed steps, responsible
