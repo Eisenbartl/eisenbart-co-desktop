@@ -74,3 +74,15 @@ give **518.90** total account movement. October income 200.01 and spending 0.02
 give **199.99** operating cash flow. The combined operating figure is **918.89**;
 combined account movement is **718.89**. Out-of-period, rejected, undecided and
 undated examples never enter these amounts.
+
+## Validation checkpoint
+
+Version 0.11.0 implementation b6d5eae passed 66 interface tests, 103 Linux library
+plus 2 executable worker tests, formatting/Clippy and the compiled native
+workflow including dashboard corrections/reversals, full restart, normal backup
+restore and missing-metadata recovery. The focused dashboard suite passed after
+the aggregate-limit example was added. Windows source CI [38587770252](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38587770252)
+passed 104 library plus 2 worker tests and all 66 interface tests. Installer
+creation, installer acceptance and uploads were skipped. Native diagnostics and
+validation logs remain outside the repository; see development-status.md for
+the interrupted driver attempt and completed fresh run.

@@ -22,8 +22,8 @@ See [financial-dashboard.md](financial-dashboard.md) for formulas and limits.
 | Linux backend / worker suite | 103 library + 2 executable worker tests passed (105 total); focused dashboard/scoped-storage tests also passed after adding the aggregate-limit example |
 | Independent Python Decimal examples | Passed: 918.89 operating flow versus 718.89 account movement across two months |
 | Formatting / Clippy, warnings denied | Passed |
-| Compiled native application | Built successfully; extended UI/restart/recovery workflow pending |
-| Windows source CI | Pending push; packaging remains manual and will not run |
+| Compiled native application | Passed full financial/import workflows, explicit dashboard periods, approved CSV/PDF totals, pending exclusions, local chart tables, automatic correction/reversal updates, full-process restart and both encrypted recovery paths |
+| Windows source CI | Passed implementation b6d5eae: [run 38587770252](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38587770252), 66 interface + 104 library + 2 worker tests (106 backend/process tests); all installer/package/upload steps skipped |
 | New installer / clean Windows offline acceptance | Not run |
 
 The first synthetic engine fixture incorrectly used an empty category on an
@@ -33,6 +33,21 @@ The outdated-period example now selects June, which is more than 90 days before
 the fixed October reference date. Per-transaction input limits do not cap derived
 assessment totals; an independently expected 2,000,000,000.00 aggregate verifies
 exact calculation and integer chart scales.
+
+The first native launch lacked the cloud toolchain path; sourcing the existing
+cloud environment fixed the launch without application changes. The first full
+UI attempt lost its WebDriver connection while selecting an existing CSV mapping
+option. A captured screenshot confirmed the application was responsive; no
+financial operation was retried. A fresh isolated run completed the entire
+workflow from the same committed implementation. Native visual inspection
+confirmed the displayed assessment period, approved basis and independently
+expected income/spending/refund/cash-flow totals.
+
+Implementation `b6d5eae0b1e120d291a083e6ac4546749293b259` is uploaded and Windows-validated.
+Final source and full-history Git checkpoints are saved outside the repository as
+`/workspace/shared/checkpoints/eisenbart-dashboard-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-dashboard.bundle`. No installer was created.
+Clean installed Windows 11 offline acceptance and commercial release remain open.
 
 Next priority: **approved expense classifications and dated verified balance facts**
 for the remaining dashboard metrics, before counselor reports and action plans.
