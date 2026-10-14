@@ -43,15 +43,15 @@ independent security review remain unrun. Continue using fictional records.
 | Independent Python Decimal example | Confirmed net spending 1,179.99; checking activity 620.01; savings 200; combined 820.01; source checking closes 1,610 before fee rejection |
 | Rust format and Clippy all targets, warnings denied | Passed |
 | Full compiled Linux native desktop workflow | Passed: existing plans; explicit CSV mapping/retention; no automatic approval; bulk approval, individual refund, fee reversal/history, transfer pairing, repeated-source rejection; two-client isolation; lock/wrong password; full restart; backup interruption, restored CSV decisions/history/links and missing-metadata recovery |
-| Native visual inspection | Review/history inspected; final table-scrolling adjustment compiled and awaiting final native layout rerun |
-| Windows source CI | Runs on this source commit; results recorded below when complete |
+| Native visual inspection | Passed: review/history readable, checkboxes correctly sized, wide tables scroll inside their own wrapper; final compiled layout/recovery rerun passed |
+| Windows source CI | Passed: run [38509546704](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38509546704) from 8054f12; production frontend, 54 interface tests and 78 Rust tests, including the Windows-only SQLCipher memory-lock regression |
 | New Windows installer | Intentionally not built |
 | Clean installed Windows 11 offline workflows/native pickers | Not run |
 
-Native full-workflow artifacts: `/workspace/shared/desktop-smoke-imports-final-verified`.
+Native full-workflow artifacts: `/workspace/shared/desktop-smoke-imports-final-verified`; final exact-source layout/recovery artifacts: `/workspace/shared/desktop-smoke-imports-layout`.
 Final logs: `import-backend-complete.log`, `import-bounded-tests.log`,
 `import-frontend-final.log`, `import-frontend-build-final.log`,
-`import-clippy-final.log`, and `import-native-final-verified.log` under
+`import-clippy-final.log`, `import-native-final-verified.log`, and `import-native-layout.log` under
 `/workspace/shared`. Negative SQLCipher fixtures reject altered/wrong-key data;
 expected authentication diagnostics do not indicate failed checks.
 
@@ -65,10 +65,21 @@ and retries one explicit read-only DOM/runtime observation on connection closure
 Early driver interruptions were discarded and rerun in fresh temporary workspaces;
 financial writes, clicks, typing, and general scripts are never replayed. No
 security verification or assertion was disabled. The final CSV table scrolls
-inside its wrapper; final native layout verification is recorded separately.
+inside its wrapper; the final exact-source layout/recovery rerun passed.
 
-Windows source validation and source/history checkpoints are finalized after the
-source commit. Normal pushes run source checks; installer packaging stays skipped.
+Source commit `8054f12e9a8bb60dcd9f3b2ba8c945e43ee94037` is uploaded to
+main. Windows run [38509546704](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38509546704)
+passed; the full log is retained at `/workspace/shared/import-windows-validation.log`.
+Installer creation, installed launch/uninstall, download metadata, installer upload,
+and installer-log upload were explicitly skipped. No manual package run occurred.
+These Windows results verify source compilation/tests, not installed GUI/native
+pickers or clean Windows 11 offline acceptance.
+
+Recoverable tracked-source and full-history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-imports-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-imports.bundle`, refreshed and verified
+after these final validation notes. They are development source checkpoints;
+client workspace recovery uses the separate encrypted `.ebcbackup` format.
 
 Next priority: selected **text-based PDF statement extraction**, retaining source
 locators and uncertainty and feeding this same review queue. Scanned OCR,
