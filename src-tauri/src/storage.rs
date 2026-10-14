@@ -5,6 +5,7 @@ use crate::debt::{self, ClientDebtPlan, PlanInput};
 use crate::models::{
     Client, ClientInput, ClientNote, SetupStatus, SetupWorkspaceInput, WorkspaceInfo,
 };
+use crate::savings::{self, ClientSavingsPlan};
 use argon2::{Algorithm, Argon2, Block, Params, Version};
 use chrono::{SecondsFormat, Utc};
 use rand::{rngs::OsRng, RngCore};
@@ -21,7 +22,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 4;
+const SCHEMA_VERSION: i32 = 5;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -485,6 +486,60 @@ impl Workspace {
         Ok(result)
     }
 
+    pub fn get_client_savings_plan(
+        &mut self,
+        client_id: &str,
+    ) -> Result<ClientSavingsPlan, String> {
+        let session = self.session()?;
+        scoped_client(&session.connection, &session.info, client_id)?;
+        read_savings_plan(&session.connection, &session.info, client_id)
+    }
+
+    pub fn save_client_savings_plan(
+        &mut self,
+        client_id: &str,
+        input: savings::PlanInput,
+    ) -> Result<ClientSavingsPlan, String> {
+        let session = self.session()?;
+        scoped_client(&session.connection, &session.info, client_id)?;
+        if !(0..i64::from(i32::MAX)).contains(&input.expected_revision) {
+            return Err("Invalid savings plan revision. Close and reopen the client.".to_owned());
+        }
+        let transaction = session
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(storage_error)?;
+        scoped_client(&transaction, &session.info, client_id)?;
+        let current = read_savings_plan(&transaction, &session.info, client_id)?;
+        if current.revision != input.expected_revision {
+            return Err("This savings plan changed in another window. Close and reopen the client before saving again.".to_owned());
+        }
+        let (data, _) = savings::calculate(input.data, &current.context)?;
+        let json = serde_json::to_string(&data).map_err(|_| STORAGE_ERROR.to_owned())?;
+        if json.len() > 65536 {
+            return Err("The savings plan is too large.".to_owned());
+        }
+        let changed=transaction.execute(
+            "INSERT INTO client_savings_plans (client_id,organization_id,counselor_id,revision,plan_json,updated_at)
+             VALUES (?1,?2,?3,?4,?5,?6)
+             ON CONFLICT(client_id) DO UPDATE SET revision=excluded.revision,plan_json=excluded.plan_json,updated_at=excluded.updated_at
+             WHERE client_savings_plans.organization_id=excluded.organization_id AND client_savings_plans.counselor_id=excluded.counselor_id",
+            params![client_id,session.info.organization_id,session.info.counselor_id,current.revision+1,json,timestamp()],
+        ).map_err(storage_error)?;
+        if changed != 1 {
+            return Err(STORAGE_ERROR.to_owned());
+        }
+        audit(
+            &transaction,
+            &session.info,
+            "savings_plan_saved",
+            Some(client_id),
+        )?;
+        let result = read_savings_plan(&transaction, &session.info, client_id)?;
+        transaction.commit().map_err(storage_error)?;
+        Ok(result)
+    }
+
     fn session(&mut self) -> Result<&mut Session, String> {
         self.expire_if_idle();
         let session = self.session.as_mut().ok_or_else(|| LOCKED.to_owned())?;
@@ -769,9 +824,159 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
                 BEGIN SELECT RAISE(ABORT, 'Audit events are append-only'); END;
              PRAGMA user_version = 4;",
         ).map_err(storage_error)?;
+        version = 4;
+    }
+    if version == 4 {
+        transaction.execute_batch(
+            "CREATE TABLE client_savings_plans (
+                client_id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
+                revision INTEGER NOT NULL CHECK(revision BETWEEN 1 AND 2147483647),
+                plan_json TEXT NOT NULL CHECK(length(plan_json)<=65536), updated_at TEXT NOT NULL,
+                FOREIGN KEY(client_id,organization_id) REFERENCES clients(id,organization_id),
+                FOREIGN KEY(counselor_id,organization_id) REFERENCES counselors(id,organization_id)
+             );
+             CREATE TABLE audit_events_v5 (
+                id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
+                event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved')),
+                entity_id TEXT, created_at TEXT NOT NULL,
+                FOREIGN KEY(organization_id) REFERENCES organizations(id),
+                FOREIGN KEY(counselor_id,organization_id) REFERENCES counselors(id,organization_id)
+             );
+             INSERT INTO audit_events_v5 SELECT * FROM audit_events;
+             DROP TABLE audit_events;
+             ALTER TABLE audit_events_v5 RENAME TO audit_events;
+             CREATE INDEX audit_events_scope ON audit_events(organization_id,counselor_id,created_at);
+             CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events
+                BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
+             CREATE TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events
+                BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
+             PRAGMA user_version=5;",
+        ).map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;
     integrity_check(connection)
+}
+
+fn read_savings_plan(
+    connection: &Connection,
+    info: &WorkspaceInfo,
+    client_id: &str,
+) -> Result<ClientSavingsPlan, String> {
+    let budget = read_budget(connection, info, client_id)?;
+    let debt = read_debt_plan(connection, info, client_id)?;
+    let has_necessary = budget
+        .lines
+        .iter()
+        .any(|line| line.kind == budget::Kind::Necessary && line.amount.is_some());
+    let necessary_missing = budget
+        .lines
+        .iter()
+        .any(|line| line.kind == budget::Kind::Necessary && line.amount.is_none());
+    let cash_missing = budget.lines.iter().any(|line| {
+        matches!(
+            line.kind,
+            budget::Kind::Income | budget::Kind::Necessary | budget::Kind::Discretionary
+        ) && line.amount.is_none()
+    });
+    let has_income = budget
+        .lines
+        .iter()
+        .any(|line| line.kind == budget::Kind::Income && line.amount.is_some());
+    let savings_missing = budget
+        .lines
+        .iter()
+        .any(|line| line.kind == budget::Kind::Savings && line.amount.is_none());
+    let debt_missing = budget
+        .lines
+        .iter()
+        .any(|line| line.kind == budget::Kind::DebtPayment && line.amount.is_none());
+    let mut warnings = Vec::new();
+    if budget.revision == 0 {
+        warnings.push(
+            "No saved budget is available for emergency expenses or allocation checks.".to_owned(),
+        );
+    }
+    if !budget.summary.warnings.is_empty() {
+        warnings.push("Review missing, estimated, or deficit warnings in the saved budget; these projections use only entered values.".to_owned());
+    }
+    if debt.revision == 0 {
+        warnings.push("No saved debt plan: using the budget's debt allocation. Confirm that all obligations are included.".to_owned());
+    }
+    if debt
+        .comparison
+        .as_ref()
+        .is_some_and(|c| c.snowball.is_none() || c.avalanche.is_none())
+    {
+        warnings.push("The saved debt plan has incomplete or unmodeled terms; its entered payment budget does not verify required lender payments.".to_owned());
+    }
+    if debt.comparison.as_ref().is_some_and(|c| {
+        [c.snowball.as_ref(), c.avalanche.as_ref()]
+            .into_iter()
+            .flatten()
+            .any(|p| {
+                p.status != debt::Status::PaidOff || !p.negative_amortization_accounts.is_empty()
+            })
+    }) {
+        warnings.push("Review the debt plan's payment shortfall, growth, or horizon warnings; savings projections do not resolve those issues.".to_owned());
+    }
+    let debt_data = debt.data;
+    let context = savings::Context {
+        budget_revision: budget.revision,
+        debt_revision: debt.revision,
+        necessary_expenses: if has_necessary && !necessary_missing {
+            Some(budget.summary.necessary_expenses)
+        } else {
+            None
+        },
+        monthly_surplus: if budget.revision > 0 && has_income && has_necessary && !cash_missing {
+            Some(budget.summary.surplus_before_allocations)
+        } else {
+            None
+        },
+        budget_savings: if budget.revision > 0 && !savings_missing {
+            Some(budget.summary.proposed_savings)
+        } else {
+            None
+        },
+        budget_debt_payments: if budget.revision > 0 && !debt_missing {
+            Some(budget.summary.planned_debt_payments)
+        } else {
+            None
+        },
+        debt_start_month: debt_data.as_ref().map(|d| d.start_month.clone()),
+        debt_monthly_payment: debt_data.as_ref().and_then(|d| d.monthly_payment.clone()),
+        debt_changes: debt_data
+            .as_ref()
+            .map(|d| d.payment_changes.clone())
+            .unwrap_or_default(),
+        debt_extras: debt_data.map(|d| d.extras).unwrap_or_default(),
+        warnings,
+    };
+    let saved: Option<(i64,String,String)>=connection.query_row(
+        "SELECT revision,plan_json,updated_at FROM client_savings_plans WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3",
+        params![client_id,info.organization_id,info.counselor_id],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
+    ).optional().map_err(storage_error)?;
+    let (revision, data, summary, updated_at) = match saved {
+        Some((revision, json, updated_at)) => {
+            if json.len() > 65536 {
+                return Err(STORAGE_ERROR.to_owned());
+            }
+            let data: savings::PlanData =
+                serde_json::from_str(&json).map_err(|_| STORAGE_ERROR.to_owned())?;
+            let (data, summary) =
+                savings::calculate(data, &context).map_err(|_| STORAGE_ERROR.to_owned())?;
+            (revision, Some(data), Some(summary), Some(updated_at))
+        }
+        None => (0, None, None, None),
+    };
+    Ok(ClientSavingsPlan {
+        client_id: client_id.to_owned(),
+        revision,
+        updated_at,
+        data,
+        summary,
+        context,
+    })
 }
 
 fn read_debt_plan(
@@ -1360,6 +1565,16 @@ mod tests {
         assert!(workspace.list_client_notes(&local.id).unwrap().is_empty());
         for foreign_id in [&other_org_client, &other_counselor_client] {
             assert_eq!(
+                workspace.get_client_savings_plan(foreign_id).unwrap_err(),
+                UNAVAILABLE_CLIENT
+            );
+            assert_eq!(
+                workspace
+                    .save_client_savings_plan(foreign_id, savings_input(0))
+                    .unwrap_err(),
+                UNAVAILABLE_CLIENT
+            );
+            assert_eq!(
                 workspace.get_client_debt_plan(foreign_id).unwrap_err(),
                 UNAVAILABLE_CLIENT
             );
@@ -1472,6 +1687,231 @@ mod tests {
         );
         drop(statement);
         assert_eq!(workspace.list_client_notes(&client.id).unwrap(), vec![note]);
+    }
+
+    fn savings_input(revision: i64) -> savings::PlanInput {
+        savings::PlanInput {
+            expected_revision: revision,
+            data: savings::tests::fixture(),
+        }
+    }
+
+    #[test]
+    fn savings_plans_persist_and_recheck_context_without_rewriting_other_plans() {
+        let (directory, mut workspace, _info) = configured();
+        let client = workspace.save_client(client_input()).unwrap();
+        let other = workspace
+            .save_client(ClientInput {
+                first_name: "Other".to_owned(),
+                ..client_input()
+            })
+            .unwrap();
+        let mut input = budget_input(0);
+        input.lines.push(BudgetLine {
+            label: "Necessary cost".to_owned(),
+            kind: budget::Kind::Necessary,
+            amount: Some("1000".to_owned()),
+            frequency: budget::Frequency::Monthly,
+            estimated: false,
+        });
+        let budget = workspace.save_client_budget(&client.id, input).unwrap();
+        let debt = workspace
+            .save_client_debt_plan(&client.id, debt_input(0))
+            .unwrap();
+        let saved = workspace
+            .save_client_savings_plan(&client.id, savings_input(0))
+            .unwrap();
+        assert_eq!(saved.revision, 1);
+        assert_eq!(
+            saved.summary.as_ref().unwrap().emergency_target.as_deref(),
+            Some("3000.00")
+        );
+        assert_eq!(
+            saved
+                .summary
+                .as_ref()
+                .unwrap()
+                .accessible_emergency
+                .as_deref(),
+            Some("1000.00")
+        );
+        assert_eq!(
+            saved.summary.as_ref().unwrap().emergency.months_needed,
+            Some(10)
+        );
+        assert_eq!(workspace.get_client_budget(&client.id).unwrap(), budget);
+        assert_eq!(
+            workspace.get_client_debt_plan(&client.id).unwrap().data,
+            debt.data
+        );
+        assert!(workspace
+            .get_client_savings_plan(&other.id)
+            .unwrap()
+            .data
+            .is_none());
+        assert!(workspace
+            .save_client_savings_plan(&client.id, savings_input(0))
+            .unwrap_err()
+            .contains("another window"));
+        let mut invalid = savings_input(1);
+        invalid.data.liquid_savings = Some("100".to_owned());
+        assert!(workspace
+            .save_client_savings_plan(&client.id, invalid)
+            .is_err());
+        assert_eq!(
+            workspace.get_client_savings_plan(&client.id).unwrap().data,
+            saved.data
+        );
+        workspace.lock_workspace();
+        assert_eq!(
+            workspace.get_client_savings_plan(&client.id).unwrap_err(),
+            LOCKED
+        );
+        assert_eq!(
+            workspace
+                .save_client_savings_plan(&client.id, savings_input(1))
+                .unwrap_err(),
+            LOCKED
+        );
+        drop(workspace);
+        let mut reopened = Workspace::new(directory.path().to_path_buf());
+        reopened.unlock_workspace(PASSWORD.to_owned()).unwrap();
+        assert_eq!(reopened.get_client_savings_plan(&client.id).unwrap(), saved);
+        let mut update = budget_input(1);
+        update.lines.push(BudgetLine {
+            label: "Necessary cost".to_owned(),
+            kind: budget::Kind::Necessary,
+            amount: Some("2000".to_owned()),
+            frequency: budget::Frequency::Monthly,
+            estimated: false,
+        });
+        reopened.save_client_budget(&client.id, update).unwrap();
+        let checked = reopened.get_client_savings_plan(&client.id).unwrap();
+        assert_eq!(checked.context.budget_revision, 2);
+        assert_eq!(checked.revision, 1);
+        assert_eq!(
+            checked.summary.unwrap().emergency_target.as_deref(),
+            Some("6000.00")
+        );
+        let event_count: i64 = reopened
+            .session
+            .as_ref()
+            .unwrap()
+            .connection
+            .query_row(
+                "SELECT COUNT(*) FROM audit_events WHERE event='savings_plan_saved'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(event_count, 1);
+    }
+
+    #[test]
+    fn competing_savings_writes_and_failed_audit_preserve_the_saved_plan() {
+        let (directory, mut workspace, _info) = configured();
+        let client = workspace.save_client(client_input()).unwrap();
+        let mut other = Workspace::new(directory.path().to_path_buf());
+        other.unlock_workspace(PASSWORD.to_owned()).unwrap();
+        assert_eq!(
+            other.get_client_savings_plan(&client.id).unwrap().revision,
+            0
+        );
+        let saved = workspace
+            .save_client_savings_plan(&client.id, savings_input(0))
+            .unwrap();
+        assert!(other
+            .save_client_savings_plan(&client.id, savings_input(0))
+            .unwrap_err()
+            .contains("another window"));
+        workspace.session.as_ref().unwrap().connection.execute_batch("CREATE TRIGGER reject_savings_audit BEFORE INSERT ON audit_events WHEN NEW.event='savings_plan_saved' BEGIN SELECT RAISE(ABORT,'Synthetic write failure'); END;").unwrap();
+        let mut changed = savings_input(1);
+        changed.data.emergency_contribution = Some("300".to_owned());
+        assert!(workspace
+            .save_client_savings_plan(&client.id, changed)
+            .is_err());
+        assert_eq!(other.get_client_savings_plan(&client.id).unwrap(), saved);
+    }
+
+    fn restore_version_four_schema(connection: &Connection) {
+        connection.execute_batch(
+            "DROP TABLE client_savings_plans;
+             CREATE TABLE audit_events_v4 (
+                id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
+                event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved')),
+                entity_id TEXT,created_at TEXT NOT NULL,
+                FOREIGN KEY(organization_id) REFERENCES organizations(id),
+                FOREIGN KEY(counselor_id,organization_id) REFERENCES counselors(id,organization_id)
+             );
+             INSERT INTO audit_events_v4 SELECT * FROM audit_events;
+             DROP TABLE audit_events;
+             ALTER TABLE audit_events_v4 RENAME TO audit_events;
+             CREATE INDEX audit_events_scope ON audit_events(organization_id,counselor_id,created_at);
+             CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
+             CREATE TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
+             PRAGMA user_version=4;"
+        ).unwrap();
+    }
+
+    #[test]
+    fn savings_schema_upgrade_and_rollback_preserve_all_previous_records() {
+        let (_directory, mut workspace, _info) = configured();
+        let client = workspace.save_client(client_input()).unwrap();
+        let note = workspace
+            .add_client_note(&client.id, "Synthetic prior note")
+            .unwrap();
+        let budget = workspace
+            .save_client_budget(&client.id, budget_input(0))
+            .unwrap();
+        let debt = workspace
+            .save_client_debt_plan(&client.id, debt_input(0))
+            .unwrap();
+        let connection = &mut workspace.session.as_mut().unwrap().connection;
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
+            .unwrap();
+        restore_version_four_schema(connection);
+        connection
+            .execute_batch("CREATE TABLE audit_events_v5(collision TEXT);")
+            .unwrap();
+        assert!(migrate(connection, false).is_err());
+        assert_eq!(
+            connection
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            4
+        );
+        assert!(connection
+            .prepare("SELECT * FROM client_savings_plans")
+            .is_err());
+        assert!(connection.execute("DELETE FROM audit_events", []).is_err());
+        connection
+            .execute("DROP TABLE audit_events_v5", [])
+            .unwrap();
+        workspace.lock_workspace();
+        workspace.unlock_workspace(PASSWORD.to_owned()).unwrap();
+        assert_eq!(workspace.get_client(&client.id).unwrap(), client);
+        assert_eq!(workspace.list_client_notes(&client.id).unwrap(), vec![note]);
+        assert_eq!(workspace.get_client_budget(&client.id).unwrap(), budget);
+        assert_eq!(
+            workspace.get_client_debt_plan(&client.id).unwrap().data,
+            debt.data
+        );
+        let after: i64 = workspace
+            .session
+            .as_ref()
+            .unwrap()
+            .connection
+            .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(after, count);
+        assert_eq!(
+            workspace
+                .save_client_savings_plan(&client.id, savings_input(0))
+                .unwrap()
+                .revision,
+            1
+        );
     }
 
     fn debt_input(revision: i64) -> PlanInput {
@@ -1624,7 +2064,7 @@ mod tests {
 
     fn restore_version_three_schema(connection: &Connection) {
         connection.execute_batch(
-            "DROP TABLE client_debt_plans;
+            "DROP TABLE client_savings_plans; DROP TABLE client_debt_plans;
              CREATE TABLE audit_events_v3 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added', 'budget_saved')),
@@ -1811,7 +2251,7 @@ mod tests {
     fn restore_version_two_schema(connection: &Connection) {
         // Recreate the actual old audit constraint, not just its version number.
         connection.execute_batch(
-            "DROP TABLE client_debt_plans; DROP TABLE client_budgets;
+            "DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets;
              CREATE TABLE audit_events_v2 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added')),
@@ -1944,7 +2384,7 @@ mod tests {
             .unwrap()
             .connection
             .execute_batch(
-                "DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
+                "DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
             )
             .unwrap();
         workspace.lock_workspace();

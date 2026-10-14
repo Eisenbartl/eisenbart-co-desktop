@@ -1,8 +1,8 @@
 # Windows evaluation guide
 
 This development build provides a local workspace, client profiles, counseling
-statuses, dated session notes, client budgets, and debt payoff comparisons. Use fictional records only. Advanced financial
-calculations, statement imports, savings goal plans, PDF reports, and
+statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.4.0 source) savings planning. Use fictional records only. Advanced financial
+calculations, statement imports, dated cash-flow planning, PDF reports, and
 commercial licensing are still being developed. Password recovery and tested
 backup/restore are not available.
 
@@ -128,6 +128,47 @@ editing again. Use **Retry loading debt plan** if loading fails. See
 
 Version 0.3.0 upgrades the database to schema 4. The older 0.1.0 and 0.2.0 apps
 cannot open it afterward; keep using the newer version.
+
+## Plan savings and sinking funds — current source version
+
+This feature is in the 0.4.0 source checkpoint; the earlier 0.3.0 download does
+not include it. No new installer is being prepared for this milestone.
+
+Open a saved client and scroll to **Savings planning**.
+
+1. Use **Refresh budget and debt references** after saving those plans. It keeps
+   your unsaved savings edits. Choose **First contribution month** and a 1-, 3-,
+   6-, or custom-month emergency target.
+2. Enter **Total accessible savings before earmarks**. This is the entire liquid
+   pool before separating bill and sinking-fund reserves. Enter restricted
+   savings separately; it will be excluded. Enter the amount **Reserved for
+   upcoming bills** and a **Monthly emergency contribution**. Blank means
+   unknown; enter `0` for a known zero.
+3. Choose **Add sinking fund**. Enter its name, target amount/date, money already
+   reserved from the liquid pool, and selected monthly contribution. Do not
+   count the same money in more than one reserve bucket.
+4. Optionally open **Compare emergency contributions** to enter alternatives.
+   Record agreed **Funding priorities and notes**, then choose **Save savings
+   plan and calculate**.
+5. Review emergency coverage, target, estimated dates, suggested goal
+   contributions, and funding warnings. Choose an **Allocation month** to inspect
+   capped transfers, reserved debt payments, and the remainder or deficit.
+
+Contributions arrive at month end in this model. A goal due before month end
+cannot use that month's contribution. Suggested contributions round upward to
+cents; emergency coverage rounds down. Dates assume no interest, withdrawals,
+inflation, or changed expenses and do not guarantee actual funding.
+
+Saving rechecks the latest budget/debt references and keeps those plans separate.
+Adjust and reconcile their allocations yourself, including any annual bill
+already budgeted as an expense. A scenario marked **Unavailable** has incomplete
+funding information. A negative remainder or **Exceeds entered funds** needs
+reduced allocations or verified additional funding.
+
+If a savings plan changed in another window, reopen the client before saving.
+Use **Retry loading savings plan** on a loading error. Version 0.4.0 upgrades to
+schema 5 when run; older apps cannot open that upgraded database. See
+[savings-calculations.md](savings-calculations.md) for exact rules and examples.
 
 ## Lock and return
 

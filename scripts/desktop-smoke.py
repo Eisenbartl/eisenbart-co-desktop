@@ -105,7 +105,17 @@ class WebDriver:
         return self.command("POST", "/execute/sync", {"script": script, "args": args or []})
 
     def find(self, selector: str, using: str = "css selector") -> str:
-        value = self.command("POST", "/element", {"using": using, "value": selector})
+        # Finding an element is read-only. WebKitWebDriver can occasionally
+        # close a locator connection during native startup/teardown. Retry one
+        # such read; never replay typing, clicks, saves, or other mutations.
+        for attempt in range(2):
+            try:
+                value = self.command("POST", "/element", {"using": using, "value": selector})
+                break
+            except DriverFailure as error:
+                if error.code != "connection error" or attempt == 1:
+                    raise
+                time.sleep(0.25)
         if not isinstance(value, dict) or ELEMENT_KEY not in value:
             raise SmokeFailure(f"Invalid element response for {selector}")
         return str(value[ELEMENT_KEY])
@@ -365,6 +375,40 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.screenshot(artifacts / "native-debt-comparison.png")
     status("saved debt strategies and monthly account schedules match independent examples")
 
+    driver.wait_text(".savings-panel", "No saved savings plan yet", "first client's empty savings plan")
+    driver.click_button("Refresh budget and debt references")
+    driver.wait_text(".savings-panel .debt-budget-reference", "$1,633.33", "latest necessary expense reference")
+    driver.fill("#savings-start-month", "2026-11")
+    driver.fill("#savings-target-months", "3")
+    driver.fill("#savings-liquidSavings", "2600")
+    driver.fill("#savings-restrictedSavings", "5000")
+    driver.fill("#savings-obligationsReserved", "600")
+    driver.fill("#savings-emergencyContribution", "200")
+    driver.fill("#savings-priorities", "Alex synthetic reserve priority")
+    driver.click_button("Add sinking fund")
+    driver.fill("#savings-goal-label-0", "Alex synthetic insurance reserve")
+    driver.fill("#savings-goal-date-0", "2027-02-28")
+    driver.fill("#savings-goal-targetAmount-0", "1200")
+    driver.fill("#savings-goal-reservedAmount-0", "1000")
+    driver.fill("#savings-goal-monthlyContribution-0", "50")
+    driver.click(".savings-panel details summary")
+    for index, amount in enumerate(["100", "300", "1500"]):
+        driver.click_button("Add alternative contribution")
+        driver.fill(f"#savings-alternative-{index}", amount)
+    driver.click_button("Save savings plan and calculate")
+    driver.wait_text(".savings-panel", "Savings plan saved and calculated.", "saved savings plan")
+    for value in ["$1,000.00", "0.61 months", "$4,899.99", "$3,899.99", "2028-06-30", "$766.67"]:
+        driver.wait_text(".savings-results", value, f"independent savings result {value}")
+    driver.wait_text("table[aria-label='Sinking fund forecasts']", "$50.00", "deadline-based contribution")
+    driver.wait_text("table[aria-label='Emergency contribution scenarios']", "2030-01-31", "lower contribution scenario")
+    driver.wait_text("table[aria-label='Emergency contribution scenarios']", "2027-11-30", "higher contribution scenario")
+    driver.wait_text("table[aria-label='Emergency contribution scenarios']", "Exceeds entered funds", "overallocated scenario warning")
+    driver.select("#savings-schedule-month", "2028-06")
+    driver.wait_text(".savings-schedule", "$99.99", "capped final emergency contribution")
+    driver.script("document.querySelector('.savings-results').scrollIntoView({block: 'start'})")
+    driver.screenshot(artifacts / "native-savings.png")
+    status("savings buckets, exact coverage/targets/deadlines, contribution scenarios, and allocation checks")
+
     create_client(second_name, second_last, "Create a fictional spending plan")
     driver.wait_text(".notes-history", "No session notes yet.", "second client's empty note history")
     if note in driver.text(".notes-history"):
@@ -375,7 +419,10 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".debt-panel", "No saved debt plan yet", "second client's empty debt plan")
     if driver.visible("#debt-label-0"):
         raise SmokeFailure("The first client's debt plan appeared in the second client's record")
-    status("two clients with isolated notes, budgets, and debts")
+    driver.wait_text(".savings-panel", "No saved savings plan yet", "second client's empty savings plan")
+    if driver.visible("#savings-goal-label-0"):
+        raise SmokeFailure("The first client's sinking fund appeared in the second client's plan")
+    status("two clients with isolated notes, budgets, debts, and savings")
 
     driver.open_client("Alex Fictional")
     driver.wait_text(".notes-history", note, "first client's note after selection")
@@ -390,7 +437,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click_button("Lock workspace")
     driver.element("#password")
     private_values = [f"{first_name} {first_last}", f"{second_name} {second_last}",
-                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt"]
+                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve"]
 
     def assert_locked() -> None:
         markup = str(driver.script("return document.documentElement.outerHTML"))
@@ -415,6 +462,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".budget-totals", "$716.67", "correct budget totals after unlocking")
     driver.wait_value("#debt-label-0", "Alex synthetic small debt", "debt plan after unlocking")
     driver.wait_text(".debt-comparison", "$35.35", "debt comparison after unlocking")
+    driver.wait_value("#savings-priorities", "Alex synthetic reserve priority", "savings after unlocking")
+    driver.wait_text(".savings-results", "2028-06-30", "savings forecast after unlocking")
     status("manual lock clears private data; incorrect password rejected; correct unlock")
 
     # Verify the application is responsive before a deliberate process stop.
@@ -441,6 +490,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".budget-totals", "$716.67", "persisted calculated budget")
     driver.wait_value("#debt-label-0", "Alex synthetic small debt", "persisted debt account")
     driver.wait_text(".debt-comparison", "$35.35", "persisted exact debt comparison")
+    driver.wait_value("#savings-goal-label-0", "Alex synthetic insurance reserve", "persisted sinking fund")
+    driver.wait_text(".savings-results", "2028-06-30", "persisted emergency forecast")
     driver.open_client("Robin Synthetic")
     driver.wait_text(".editor-panel", "Robin Synthetic", "persisted second client")
     driver.wait_text(".notes-history", "No session notes yet.", "persisted second client's empty note history")
@@ -452,7 +503,10 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".debt-panel", "No saved debt plan yet", "persisted second client's empty debt plan")
     if driver.visible("#debt-label-0"):
         raise SmokeFailure("Persisted debts crossed client boundaries after relaunch")
-    status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets/debts")
+    driver.wait_text(".savings-panel", "No saved savings plan yet", "persisted second client's empty savings plan")
+    if driver.visible("#savings-goal-label-0"):
+        raise SmokeFailure("Persisted savings crossed client boundaries after relaunch")
+    status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets/debts/savings")
 
 
 def main() -> int:

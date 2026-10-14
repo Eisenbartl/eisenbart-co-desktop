@@ -354,3 +354,13 @@ textarea { resize: vertical; min-height: 100px; }
 .debt-schedule { margin-top: 28px; }
 .debt-month-table th span { display: block; font-size: 10px; }
 @media (max-width: 700px) { .debt-event { grid-template-columns: 1fr; } }
+
+.savings-section-title { margin-top: 24px; }
+.savings-alternative { display: flex; align-items: end; gap: 14px; margin: 14px 0; }
+.savings-alternative > label { flex: 1; }
+.savings-alternative .text-button { padding: 12px 0; }
+.savings-results { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 20px; }
+.savings-results .budget-totals dd { white-space: normal; text-align: right; max-width: 60%; }
+.savings-schedule { margin-top: 24px; }
+
+.savings-results .debt-table-scroll td { white-space: normal; }

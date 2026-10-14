@@ -8,7 +8,8 @@ The test creates a temporary workspace containing fictional clients. It verifies
 first-run organization and counselor setup, client creation and editing, session
 notes and saved budgets belonging to the correct client, independently checked
 monthly budget totals and allocations, snowball/avalanche interest totals and
-account payment schedules, saved debt isolation, workspace locking, rejection of an
+account payment schedules, emergency/sinking-fund forecasts and contribution
+scenarios, saved debt/savings isolation, workspace locking, rejection of an
 incorrect password, unlocking, and persistence after stopping and relaunching the
 application and its native driver. It confirms the app responds before stopping
 its entire private process group, verifies no live process remains in that group,
@@ -58,6 +59,9 @@ driver remains reachable. Artifacts must be outside the repository and contain
 only the test's fictional records. Ports default to `4444` and `4445`; use
 `--port` and `--native-port` if needed. A missing executable, display, or occupied
 port fails before the test changes any application data.
+
+Read-only element locators retry one transient native-driver connection closure;
+typing, clicks, and saves are never replayed. Assertions remain required.
 
 This test checks desktop behavior and persistence. It does not audit encryption,
 prove the absence of outbound network traffic, or certify production security.

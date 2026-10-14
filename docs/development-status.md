@@ -1,5 +1,60 @@
 # Development status
 
+## Stage 3C: emergency savings and sinking funds — 0.4.0 source
+
+Implemented persistent client savings plans: emergency targets for 1/3/6/custom
+whole months of necessary expenses; liquid/restricted/bill/sinking-fund reserve
+separation; current emergency coverage; remaining amounts; capped monthly
+contributions and estimated completion dates; dated sinking funds with suggested
+contributions rounded upward; alternative emergency contributions; and monthly
+budget/debt funding review. The counselor can record priorities and adjust
+allocations; the application never moves money or silently rewrites other plans.
+
+Reserve buckets partition one liquid pool, preventing double counting. Unknown
+inputs remain unknown; missing expense bases or zero contributions do not invent
+goal dates. Month-end contributions respect actual deadline days and leap years.
+The last transfer is capped and stops at the target. Joint funding checks reserve
+the higher of budget/debt payments and include future debt changes/extras, even
+after savings finish. Overallocations and conflicting/missing references are
+flagged. Scenario affordability is unavailable when it cannot be checked.
+See [savings-calculations.md](savings-calculations.md) for assumptions and examples.
+
+Encrypted schema 5 preserves clients, notes, budgets, debts, and immutable audit
+history. Writes/audit are atomic, optimistic revisions reject competing windows,
+failed loads cannot replace a plan, and locking removes private UI state.
+Refreshing budget/debt references keeps unsaved savings drafts and cannot adopt
+another window's changed revision. The older versions cannot open an upgraded
+schema 5 workspace.
+
+| Check | Result |
+|---|---|
+| Locked setup and production frontend build | Passed |
+| Frontend tests | 32 passed: exact inputs, native forecasts, target choices, goals/scenarios, safe reference refresh, failed loads/saves, missing affordability, stale responses, and lock/leave guards |
+| Linux Rust tests | 42 passed: independent reserve/coverage/rounding/deadline/last-cent/scenario examples, zero/missing/funded states, leap days, past dates, caps/horizon, debt events, scope, competing writes, audit rollback, and schema 1/2/3/4 migrations |
+| Independent Python Decimal examples | Confirmed remaining 3,899.99; 200/month requires 20 months with final 99.99; 100/month needs 39 months; 300/month needs 13; 200 over 3 eligible months requires 66.67/month; coverage floors to 0.61 |
+| Rust format and Clippy, all targets with warnings denied | Passed |
+| Final compiled native desktop workflow | Passed: visible savings/reserve/goal/scenario editing, known independent results, cap at final transfer, client isolation, lock/wrong password, and full process restart with saved savings |
+| Windows source checks | Pending normal tests-only CI after checkpoint upload |
+| New Windows installer/package | Intentionally not built, per request to save packaging time |
+| Clean Windows 11 installed/offline savings acceptance | Not run |
+
+Native artifacts: `/workspace/shared/desktop-smoke-savings-final`. The initial
+run passed financial checks but lost one read-only native-driver locator connection
+at relaunch. The harness now retries that read once; typing, clicks, and saves
+are never replayed and all workflow assertions remain required. The final run
+passed fully. An incorrect expected last-transfer value in one fixture was
+corrected to 99.99 after independent Decimal verification; the calculator already
+returned that correct value.
+
+The Windows workflow now always runs frontend/backend checks on normal pushes
+and pull requests. Installer creation, installer smoke checks, metadata, and
+artifact upload require a manual dispatch with `package_installer: true`.
+The default is false. This preserves source validation without creating downloads
+for each milestone. The 0.3.0 installer remains the earlier download and does
+not contain the savings feature. This milestone remains for fictional records,
+with no interest/returns, inflation, withdrawals, changing savings expenses,
+automatic funding redistribution, recovery, or independent security certification.
+
 ## Stage 3B: monthly debt payoff planning — 0.3.0
 
 Implemented saved client debt accounts and exact fixed-monthly APR payoff
@@ -354,16 +409,17 @@ clone.
 
 ## Next development priority
 
-The debt checkpoint and its verified 0.3.0 Windows development package are
-complete. The next application milestone is emergency savings coverage and sinking-fund
-goals, with exact contributions/targets and explicit budget/debt allocation
-coordination. Keep development scoped to fictional records. Clean Windows 11
-offline acceptance and encrypted backup/restore remain prerequisites for real
-client use.
+The savings source checkpoint is implemented and locally validated. Complete
+normal Windows source checks without creating an installer. The next application
+milestone is the paycheck-based cash-flow calendar, with dated inflows/bills,
+running balances, and warnings for cash shortfalls despite positive monthly
+averages. Preserve budgets, debt plans, and savings allocations as separate
+planning inputs. Keep fixtures fictional; recovery and clean Windows 11 offline
+acceptance remain prerequisites for real client use.
 
 Encrypted backup/restore and a tested recovery procedure must be implemented
 before using actual client records. Broader financial calculations, document import and
-review, advanced debt models, savings/cash-flow planning, scenarios, PDFs, multiple accounts/roles,
+review, advanced debt models, dated cash-flow planning, scenarios, PDFs, multiple accounts/roles,
 password change/recovery, exports, licensing, installer signing, and commercial
 readiness remain incomplete. See [roadmap.md](roadmap.md) for staged criteria and
 [windows.md](windows.md) for Windows build and manual acceptance instructions.
@@ -376,7 +432,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 
 | Specification stage | Remaining work |
 |---|---|
-| 3: Financial core | Exact budgets and fixed-monthly debt schedules implemented; optional budget methods, advanced debt terms, savings goals, paycheck cash flow, and scenario engines remain |
+| 3: Financial core | Exact budgets, fixed-monthly debt schedules, and savings goals implemented; optional budget methods, advanced debt terms, paycheck cash flow, and broader scenario engines remain |
 | 4: Document processing | Local CSV/text-PDF imports, extraction, provenance, reconciliation, review and approval |
 | 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
 | 6: Security/commercial | Backup/restore, password safeguards, accounts/roles, branding, licensing and independent review |

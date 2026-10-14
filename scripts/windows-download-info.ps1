@@ -60,7 +60,8 @@ INSTALL ON YOUR WINDOWS DESKTOP
 This development build provides local password sign-in, encrypted local
 storage, client profiles, notes, statuses, locking, and exact monthly budget
 planning with savings/debt payment allocations, saved debt accounts, and monthly
-snowball/avalanche payoff estimates. The full financial
+snowball/avalanche payoff estimates, emergency savings, sinking-fund goals,
+and savings contribution/affordability comparisons. The full financial
 application is still being developed. There is no supported password recovery
 or tested backup/restore yet. Do not store real client financial information.
 
@@ -70,7 +71,7 @@ This is not a complete Windows client-workflow or security test. A clean Windows
 11 offline installation without preinstalled WebView2 still requires testing.
 The installer is configured to include the WebView2 offline redistributable.
 
-Version 0.3.0 upgrades the local database to schema 4. The old 0.1.0/0.2.0 apps
+Version 0.4.0 upgrades the local database to schema 5. Older application versions
 cannot open it afterward. Keep using the newer app; do not delete the data folder.
 
 VERIFY THE DOWNLOAD (optional)
