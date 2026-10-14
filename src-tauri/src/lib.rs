@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use storage::Workspace;
 use tauri::{Emitter, Manager, State};
+use tauri_plugin_dialog::DialogExt;
 
 #[derive(Clone)]
 struct DesktopState {
@@ -29,6 +30,94 @@ fn access<T>(
         let _ = state.handle.emit("workspace-locked", ());
     }
     operation(&mut workspace)
+}
+
+#[tauri::command]
+async fn choose_backup_folder(state: State<'_, DesktopState>) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.workspace_info())?;
+        state
+            .handle
+            .dialog()
+            .file()
+            .blocking_pick_folder()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local or external-drive folder.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "Folder selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn choose_restore_file(state: State<'_, DesktopState>) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("Encrypted workspace backup", &["ebcbackup"])
+            .blocking_pick_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local encrypted backup file.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "Backup selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn create_workspace_backup(
+    state: State<'_, DesktopState>,
+    directory: String,
+    password: String,
+) -> Result<storage::backup::BackupResult, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.create_backup(directory, password))
+    })
+    .await
+    .map_err(|_| "Backup creation could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn prepare_workspace_restore(
+    state: State<'_, DesktopState>,
+    path: String,
+    password: String,
+) -> Result<storage::backup::RestoreReview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.prepare_restore(path, password))
+    })
+    .await
+    .map_err(|_| "Backup verification could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn confirm_workspace_restore(
+    state: State<'_, DesktopState>,
+    token: String,
+    confirmation: String,
+) -> Result<storage::backup::RestoreResult, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = access(&state, |w| w.confirm_restore(token, confirmation))?;
+        Ok(result)
+    })
+    .await
+    .map_err(|_| "Recovery could not finish.".to_owned())?
+}
+#[tauri::command]
+fn cancel_workspace_restore(state: State<'_, DesktopState>, token: String) -> Result<(), String> {
+    access(&state, |w| {
+        w.cancel_restore(&token);
+        Ok(())
+    })
 }
 
 #[tauri::command]
@@ -202,6 +291,7 @@ fn save_client_savings_plan(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let directory = app.path().app_local_data_dir()?;
             let state = DesktopState {
@@ -220,6 +310,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            choose_backup_folder,
+            choose_restore_file,
+            create_workspace_backup,
+            prepare_workspace_restore,
+            confirm_workspace_restore,
+            cancel_workspace_restore,
             setup_status,
             setup_workspace,
             unlock_workspace,

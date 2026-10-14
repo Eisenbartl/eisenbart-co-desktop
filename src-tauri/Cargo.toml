@@ -1,6 +1,6 @@
 [package]
 name = "eisenbart-counseling-suite"
-version = "0.5.0"
+version = "0.6.0"
 description = "Offline financial counseling desktop foundation"
 edition = "2021"
 rust-version = "1.90"
@@ -23,6 +23,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 zeroize = "1"
 chrono = { version = "0.4", features = ["clock"] }
+hmac = "0.12.1"
+sha2 = "0.10.9"
+tauri-plugin-dialog = "2"
+fs2 = "0.4.3"
 
 [dev-dependencies]
 tempfile = "3"
@@ -32,3 +36,6 @@ debug = 0
 
 [profile.test]
 debug = 0
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }

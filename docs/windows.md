@@ -2,14 +2,14 @@
 
 ## What is available now
 
-The current 0.5.0 cash-flow milestone is source-only, per the request to avoid another download. The existing 0.3.0 installer below does not include savings or cash flow. Normal Windows CI now builds/tests the code without packaging; an installer requires a manual workflow run with **package_installer** enabled.
+The current 0.6.0 backup/recovery milestone is source-only, per the request to avoid another download. The existing 0.3.0 installer below does not include savings, cash flow, or backup/recovery. Normal Windows CI now builds/tests the code without packaging; an installer requires a manual workflow run with **package_installer** enabled.
 
 
 The verified **0.3.0 Windows x64 development installer is available**, including client budgets and fixed-monthly debt payoff comparisons, from [build 38485910521](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521). Its 25 frontend and 32 backend tests, installation, responsive native-window launch, uninstall, and isolated cleanup passed on a disposable Windows Server 2025 runner. See [development-status.md](development-status.md) for evidence and remaining acceptance work.
 
 [Download windows-installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521/artifacts/11859772481), sign in to GitHub if prompted, and choose **Extract All** for the ZIP. Read `README.txt` and run `Eisenbart Counseling Suite_0.3.0_x64-setup.exe`. Open **Eisenbart Counseling Suite** from the Start menu afterward. The download expires October 27, 2026. The [evaluation guide](user-guide.md) explains setup, fictional clients, budgets, debt plans, notes, locking, and troubleshooting. Version 0.3.0 upgrades the database to schema 4; do not switch back to older versions afterward.
 
-The first target is Windows 11 x64. This is a development application for fictional data, not a production financial-record system. There is no password recovery or tested backup/restore yet.
+The first target is Windows 11 x64. This is a development application for fictional data, not a production financial-record system. Encrypted backup and verified restore are implemented in current source. Forgotten-password reset and clean installed Windows recovery acceptance remain unavailable.
 
 ## Get an installer from GitHub
 
@@ -89,4 +89,6 @@ The expected installer output directory is `src-tauri\target\release\bundle\nsis
 
 Before sharing a release, install on a clean Windows 11 x64 machine, including one without WebView2 and without internet access. Test setup, wrong-password handling, client isolation, lock/unlock, persistence after a restart, and uninstall/reinstall data behavior. Record actual results and failures. Complete recovery, security, accessibility, licensing, signing, and broader product criteria in [roadmap.md](roadmap.md) before calling the application production-ready.
 
-The 0.5.0 source upgrades local workspaces to schema 6. Earlier applications cannot reopen them. No new installer is created for this milestone.
+The 0.6.0 source upgrades local workspaces to schema 7. Recovered workspaces use the new activation layout; use 0.6.0 or newer. Earlier applications cannot open schema 7 and do not understand that layout. No new installer is created for this milestone.
+
+Windows manual recovery acceptance: create a backup on local/removable storage; reject wrong passwords and damaged files; cancel review; verify whole-workspace restore with retained original files; repeat after app restart and simulated missing metadata; verify all client plans and immutable history offline. Use a disposable fictional workspace. See [backup-recovery.md](backup-recovery.md). This installed Windows GUI/drive acceptance is separate from CI source tests.

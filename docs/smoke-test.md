@@ -11,7 +11,7 @@ monthly budget totals and allocations, snowball/avalanche interest totals and
 account payment schedules, emergency/sinking-fund forecasts and contribution
 scenarios, dated account balances, paired transfers, calendar/ledger reviews, non-writing date previews, saved debt/savings/cash-flow isolation, workspace locking, rejection of an
 incorrect password, unlocking, and persistence after stopping and relaunching the
-application and its native driver. It confirms the app responds before stopping
+application and its native driver. It additionally creates an encrypted backup, rejects the wrong backup password, interrupts a verified review by stopping the entire process group, confirms original records still open, explicitly restores the backup, verifies the original files remain, and recovers from missing metadata through the storage-error screen. All mutations target temporary fictional records. It confirms the app responds before stopping
 its entire private process group, verifies no live process remains in that group,
 and launches a fresh driver against the same temporary data directory. This
 avoids WebKitGTK session teardown/reuse races and checks storage across a complete

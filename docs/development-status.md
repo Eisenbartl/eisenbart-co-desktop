@@ -1,5 +1,66 @@
 # Development status
 
+## Recovery hardening: encrypted backup and restore — 0.6.0 source
+
+Following the original staged specification, implemented manual encrypted local
+backups and verified whole-workspace restore. The user selects a local/external
+folder; unique, exclusively created `.ebcbackup` files never replace existing
+backups. SQLCipher transaction snapshots include committed WAL records. The
+container authenticates its header and ciphertext with domain-separated
+HMAC-SHA256 derived from the workspace key; no password or raw key is persisted.
+
+Restore is available on locked, first-setup, and storage-error screens. It verifies
+the password/container, SQLCipher and SQLite integrity, relationships, schema,
+and saved plan inputs, then displays the organization/counselor/client count.
+An explicit RESTORE confirmation activates a new private generation through
+one atomically replaced pointer. Previous files remain intact; records are not
+merged. Candidate cancellation/expiry, conflicting operations, source changes,
+invalid files, and migration/audit/activation failures preserve the active source.
+Existing sessions lock if another instance changes the active generation.
+
+Schema 7 preserves all earlier records and immutable audit history, adding
+backup/restore events. Older backups migrate only in the recovery copy. Limits:
+256 MiB database, 4 KiB header, and 1,000 clients. Backups require the original
+password; there is no password reset. See [backup-recovery.md](backup-recovery.md)
+for user steps, exact format, file layout, retained-copy limits, and durability.
+
+| Check | Result |
+|---|---|
+| Locked setup/dependency fetch and production frontend build | Passed |
+| Interface tests | 47 passed: backup folder selection, password clearing, warnings/errors, verified review/confirmation/cancellation, stale responses, and storage-error recovery to a clean locked screen |
+| Linux Rust tests | Full suite 63 passed; final recovery-only rerun 10 passed after exclusive-staging/publication safeguards were tightened |
+| Rust format and Clippy all targets with warnings denied | Passed |
+| Compiled native desktop workflow | Passed: full existing client/financial workflows; encrypted backup; wrong backup password; process stop during verified review leaves original active; explicit restore retains original database bytes and all saved plans; fresh process detects missing metadata and recovers through the error screen |
+| Native visual inspection | Passed for backup controls and authenticated restore review; native OS picker dialogs themselves were not exercised by WebDriver |
+| Deferred Windows download metadata | Parsed successfully with PowerShell; packaging not invoked |
+| Windows source checks | Pending source push/CI |
+| New Windows installer | Intentionally not built, as requested |
+| Clean Windows 11 installed/offline recovery and physical removable-drive/power-loss drill | Not run |
+
+Native artifacts: `/workspace/shared/desktop-smoke-recovery`; logs:
+`/workspace/shared/recovery-native-smoke.log`, `recovery-backend-final.log`,
+`recovery-backend-final-recovery.log`, and `recovery-frontend-final.log`.
+Negative fixtures deliberately cause SQLCipher page-authentication diagnostics;
+those checks passed by rejecting damaged data. No verification was disabled.
+During implementation, compile errors in type inference/audit transaction usage
+and fixture error formatting were corrected before tests passed. Final review
+also tightened exclusive staging and ensured a failed temporary-pointer claim
+cannot delete a pre-existing file. Snapshot sync handles have write access for
+Windows FlushFileBuffers compatibility; Windows source validation is recorded separately.
+
+A durable backup survives a subsequent audit-write failure and reports that
+warning; its snapshot contains prior audit history. A post-activation directory
+sync failure reports an applied restore with a durability warning. Interruption
+can leave incomplete backup files or unreferenced encrypted staging folders,
+which are never selected automatically. Previous generations are retained;
+supported retained-copy selection/pruning is future work. Future document/report
+attachments will need inclusion in an extended format; none are stored yet.
+
+Fictional data remains required while independent security review and clean
+Windows acceptance are unfinished. The earlier 0.3.0 download does not include
+this feature. Installer creation remains manual opt-in. Next: scoped synthetic
+CSV import and explicit review/approval, preserving planning inputs separately.
+
 ## Stage 3D: paycheck-based cash-flow calendar — 0.5.0 source
 
 Implemented persistent cash-flow plans with up to 20 separate accounts; exact
@@ -504,19 +565,19 @@ clone.
 
 ## Next development priority
 
-The dated cash-flow source checkpoint is implemented. The next priority is
-**encrypted backup/restore with a tested recovery procedure**, before importing
-or using actual client records. Recovery must preserve encrypted workspace
-metadata and client plans, verify integrity, reject incorrect credentials and
-corruption, and safely restore without destroying the existing workspace on a
-failure. This is a prerequisite for reliable professional use.
+Encrypted backup/restore is implemented with authenticated files, retained
+previous workspaces, and tested interrupted/failure recovery. Clean installed
+Windows acceptance and independent security review remain prerequisites for
+actual client use. The next application priority is **local CSV statement import
+with provenance, duplicate checks, and explicit review/approval**. Approved
+historical facts must remain distinct from planning estimates and rejected data.
+Begin with synthetic CSVs, bounded parsing, exact amounts, a review queue, and
+client-scoped encrypted records; add PDF extraction in a later checkpoint.
 
-Advanced financial models, approved document imports, broader scenarios, PDFs,
-multiple accounts/roles for counselors, password change/recovery, exports,
-licensing, installer signing, and commercial readiness remain incomplete.
-Clean Windows 11 offline acceptance and independent security review remain open.
-See [roadmap.md](roadmap.md) for staged criteria and [windows.md](windows.md)
-for Windows build and manual acceptance instructions.
+Advanced financial models, broader scenarios, PDFs, multiple counselor roles,
+password change/reset, exports, licensing, signing, retained-copy selection,
+scheduled backups, and commercial readiness remain incomplete. See
+[roadmap.md](roadmap.md) and [windows.md](windows.md) for staged criteria.
 
 ## Distance to the complete product
 
@@ -529,7 +590,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 | 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
 | 4: Document processing | Local CSV/text-PDF imports, extraction, provenance, reconciliation, review and approval |
 | 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
-| 6: Security/commercial | Backup/restore, password safeguards, accounts/roles, branding, licensing and independent review |
+| 6: Security/commercial | Encrypted backup/restore implemented; clean Windows recovery, password safeguards, accounts/roles, branding, licensing and independent review remain |
 | 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |
 | 8: Final verification | Complete installed workflows, clean Windows 11 offline tests, usability and release acceptance |
 

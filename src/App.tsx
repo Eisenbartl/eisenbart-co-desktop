@@ -1,3 +1,4 @@
+import {BackupPanel,RestorePanel} from './RecoveryPanel';
 import CashflowEditor from './CashflowEditor';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import SavingsEditor from './SavingsEditor';
@@ -5,7 +6,7 @@ import DebtEditor from './DebtEditor';
 import BudgetEditor from './BudgetEditor';
 import { listen } from '@tauri-apps/api/event';
 import { api, desktopAvailable, resetApiSession } from './api';
-import { CLIENT_STATUSES, type Client, type ClientInput, type ClientNote, type SetupInput, type WorkspaceInfo } from './types';
+import { CLIENT_STATUSES, type Client, type ClientInput, type ClientNote, type SetupInput, type RestoreResult, type WorkspaceInfo } from './types';
 
 type View = 'Dashboard' | 'Clients' | 'Settings';
 type Phase = 'checking' | 'setup' | 'locked' | 'unlocked' | 'error';
@@ -55,8 +56,8 @@ function DevelopmentNotice() {
   return <div className="development-notice"><span className="development-dot" aria-hidden="true" /><strong>Development build</strong><span>Use fictional records only. This version is not ready for confidential client information.</span></div>;
 }
 
-function AuthForm({ setup, busy, error, onSubmit }: {
-  setup: boolean; busy: boolean; error: string;
+function AuthForm({ setup, busy, error, notice, onSubmit, onRestored }: {
+  setup: boolean; busy: boolean; error: string; notice: string; onRestored:(result:RestoreResult)=>void;
   onSubmit: (input: SetupInput) => Promise<void>;
 }) {
   const [organizationName, setOrganizationName] = useState('Eisenbart & Co.');
@@ -102,6 +103,7 @@ function AuthForm({ setup, busy, error, onSubmit }: {
         <p className="eyebrow">{setup ? 'GETTING STARTED' : 'YOUR LOCAL WORKSPACE'}</p>
         <h2>{setup ? 'Set up your workspace' : 'Welcome back'}</h2>
         <p className="muted">{setup ? 'Create a workspace on this computer and choose a password to protect access.' : 'Enter your password to unlock the workspace on this computer.'}</p>
+        {notice && <p className="success-message" role="status">{notice}</p>}
         <form onSubmit={submit} noValidate>
           <fieldset disabled={busy}>
             {setup && <>
@@ -114,6 +116,7 @@ function AuthForm({ setup, busy, error, onSubmit }: {
             <button type="submit" className="button primary auth-submit">{busy ? (setup ? 'Creating workspace…' : 'Unlocking…') : (setup ? 'Create workspace' : 'Unlock workspace')}<Icon name="arrow" size={17} /></button>
           </fieldset>
         </form>
+        <RestorePanel onRestored={onRestored}/>
         <p className="auth-storage"><Icon name="lock" size={14} />Your workspace data stays on this computer.</p>
       </div>
       <DevelopmentNotice />
@@ -285,6 +288,7 @@ export default function App() {
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [recoveryNotice,setRecoveryNotice]=useState('');
   const [statusAttempt, setStatusAttempt] = useState(0);
   const [view, setView] = useState<View>('Dashboard');
   const [clients, setClients] = useState<Client[]>([]);
@@ -400,6 +404,11 @@ export default function App() {
     }
   }
 
+  function restored(result:RestoreResult) {
+    clearWorkspace();setAuthError('');setAuthBusy(false);setPhase('locked');
+    setRecoveryNotice(`Workspace restored. Unlock it using the password from this backup.${result.durabilityWarning?' The disk did not confirm directory synchronization; keep your backup available.':''}`);
+  }
+
   function canLeave(): boolean {
     if (editorBusy.current) return false;
     return !dirty.current || window.confirm('You have unsaved client changes. Discard them and continue?');
@@ -463,8 +472,8 @@ export default function App() {
   }
 
   if (!desktopAvailable()) return <main className="standalone"><Brand /><div className="panel standalone-panel"><Icon name="lock" size={32} /><h1>Open the desktop application</h1><p className="muted">This workspace runs inside the Eisenbart & Co. desktop application. A browser preview cannot access your local database.</p></div><DevelopmentNotice /></main>;
-  if (phase === 'checking' || phase === 'error') return <main className="standalone"><Brand /><div className="panel standalone-panel"><h1>{phase === 'checking' ? 'Opening your workspace…' : 'Unable to open the workspace'}</h1>{phase === 'checking' ? <p className="muted" role="status">Checking local storage.</p> : <><ErrorMessage>{authError}</ErrorMessage><button className="button primary" onClick={() => setStatusAttempt(previous => previous + 1)}>Try again</button></>}</div></main>;
-  if (phase !== 'unlocked' || !workspace) return <AuthForm key={phase} setup={phase === 'setup'} busy={authBusy} error={authError} onSubmit={authenticate} />;
+  if (phase === 'checking' || phase === 'error') return <main className="standalone"><Brand /><div className="panel standalone-panel"><h1>{phase === 'checking' ? 'Opening your workspace…' : 'Unable to open the workspace'}</h1>{phase === 'checking' ? <p className="muted" role="status">Checking local storage.</p> : <><ErrorMessage>{authError}</ErrorMessage><button className="button primary" onClick={() => setStatusAttempt(previous => previous + 1)}>Try again</button><RestorePanel onRestored={restored}/></>}</div></main>;
+  if (phase !== 'unlocked' || !workspace) return <AuthForm key={phase} setup={phase === 'setup'} busy={authBusy} error={authError} notice={recoveryNotice} onSubmit={authenticate} onRestored={restored} />;
 
   const activeClients = clients.filter(client => client.status !== 'Archived');
   const newIntakes = clients.filter(client => client.status === 'New Intake');
@@ -500,7 +509,7 @@ export default function App() {
           {selectionLoading ? <div className="panel selection-loading" role="status">Opening client record…</div> : editing ? <ClientEditor key={selected?.id ?? 'new'} client={selected} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onCancel={() => { if (canLeave()) clearSelection(); }} /> : clients.length > 0 && <div className="panel client-selection-hint"><Icon name="file" size={34} /><h2>A complete client picture</h2><p className="muted">Select a client to review intake details, update their counseling stage, and add a session note.</p></div>}
           {selectionError && <ErrorMessage>{selectionError}</ErrorMessage>}
         </div>}
-        {view === 'Settings' && <div className="settings-grid"><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">WORKSPACE IDENTITY</p><h2>Organization & counselor</h2></div><Icon name="settings" size={22} /></div><dl className="details-list"><div><dt>Organization</dt><dd>{workspace.organizationName}</dd></div><div><dt>Counselor</dt><dd>{workspace.counselorName}</dd></div><div><dt>Workspace type</dt><dd>Single counselor · Local desktop</dd></div></dl><p className="field-help">These names were set when the workspace was created. Identity editing and additional counselor accounts are planned for a later milestone.</p></section><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">LOCAL DATA & ACCESS</p><h2>Storage & security</h2></div><Icon name="shield" size={22} /></div><dl className="details-list"><div><dt>Storage</dt><dd>Persistent local SQLite database</dd></div><div><dt>Internet connection</dt><dd>Not required for this milestone</dd></div><div><dt>Workspace access</dt><dd>Password protected</dd></div></dl><p className="field-help">Lock the workspace when stepping away. Password protection controls application access; confidential production use requires further security review and safeguards.</p><button className="button secondary" onClick={lock}><Icon name="lock" size={16} />Lock workspace</button></section><section className="panel settings-development"><Icon name="file" size={24} /><div><h2>A working counseling workspace</h2><p className="muted">Workspace setup, password access, persistent client records, counseling stages, session notes, monthly budgets, debt comparisons, savings goals, and cash-flow calendars are available. Backup and restore, reports, and production security remain development priorities.</p></div></section></div>}
+        {view === 'Settings' && <div className="settings-grid"><BackupPanel/><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">WORKSPACE IDENTITY</p><h2>Organization & counselor</h2></div><Icon name="settings" size={22} /></div><dl className="details-list"><div><dt>Organization</dt><dd>{workspace.organizationName}</dd></div><div><dt>Counselor</dt><dd>{workspace.counselorName}</dd></div><div><dt>Workspace type</dt><dd>Single counselor · Local desktop</dd></div></dl><p className="field-help">These names were set when the workspace was created. Identity editing and additional counselor accounts are planned for a later milestone.</p></section><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">LOCAL DATA & ACCESS</p><h2>Storage & security</h2></div><Icon name="shield" size={22} /></div><dl className="details-list"><div><dt>Storage</dt><dd>Persistent local SQLite database</dd></div><div><dt>Internet connection</dt><dd>Not required for this milestone</dd></div><div><dt>Workspace access</dt><dd>Password protected</dd></div></dl><p className="field-help">Lock the workspace when stepping away. Password protection controls application access; confidential production use requires further security review and safeguards.</p><button className="button secondary" onClick={lock}><Icon name="lock" size={16} />Lock workspace</button></section><section className="panel settings-development"><Icon name="file" size={24} /><div><h2>A working counseling workspace</h2><p className="muted">Workspace setup, password access, persistent client records, counseling stages, session notes, monthly budgets, debt comparisons, savings goals, and cash-flow calendars are available. Encrypted backup and verified recovery are available. Reports and production security remain development priorities.</p></div></section></div>}
       </main>
       <footer className="app-footer"><span>Eisenbart & Co. Financial Counseling Suite</span><span>Financial planning · Development build</span></footer>
     </div>

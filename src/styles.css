@@ -383,3 +383,12 @@ textarea { resize: vertical; min-height: 100px; }
 .cashflow-panel > .muted { margin-bottom:20px; }
 .cashflow-panel label { display:flex; flex-direction:column; gap:7px; font-size:12px; }
 .cashflow-panel label.savings-section-title { margin-bottom:18px; }
+
+.recovery-panel { padding:26px; }
+.recovery-panel label,.restore-panel label { display:flex; flex-direction:column; gap:7px; margin:16px 0; font-size:12px; }
+.restore-panel { margin-top:24px; padding-top:18px; border-top:1px solid var(--line); }
+.restore-panel > summary { cursor:pointer; font-weight:600; font-size:13px; color:#316950; }
+.restore-panel .field-help { margin-top:14px; }
+.backup-success { margin-top:20px; padding:15px; background:#edf7f1; border:1px solid #b6d7c2; border-radius:9px; font-size:12px; }
+.backup-file-path { overflow-wrap:anywhere; }
+.restore-review h3 { margin:20px 0 14px; }

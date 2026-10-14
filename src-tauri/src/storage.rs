@@ -1,5 +1,8 @@
 //! The encrypted local workspace. All authorization decisions happen here,
 //! using the authenticated organization and counselor, never IDs from the UI.
+#[path = "backup.rs"]
+pub mod backup;
+
 use crate::budget::{self, BudgetInput, BudgetLine, ClientBudget};
 use crate::cashflow::{self, ClientCashflowPlan};
 use crate::debt::{self, ClientDebtPlan, PlanInput};
@@ -23,7 +26,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 6;
+const SCHEMA_VERSION: i32 = 7;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -34,7 +37,7 @@ const STORAGE_ERROR: &str =
 const OPEN_ERROR: &str = "The password is incorrect, or the workspace cannot be opened.";
 const UNAVAILABLE_CLIENT: &str = "The client is unavailable in this workspace.";
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Metadata {
     version: u32,
@@ -49,23 +52,35 @@ struct Session {
 
 pub struct Workspace {
     data_dir: PathBuf,
+    active_dir: PathBuf,
     session: Option<Session>,
+    pending_restore: Option<backup::Candidate>,
 }
 
 impl Workspace {
     pub fn new(data_dir: PathBuf) -> Self {
         Self {
+            active_dir: data_dir.clone(),
             data_dir,
             session: None,
+            pending_restore: None,
         }
     }
 
     /// Called by the application timer; it must not extend the session.
     pub fn expire_if_idle(&mut self) -> bool {
-        let expired = self
-            .session
-            .as_ref()
-            .is_some_and(|session| session.last_activity.elapsed() >= AUTO_LOCK_AFTER);
+        if self.pending_restore.as_ref().is_some_and(|p| p.expired()) {
+            self.pending_restore = None;
+        }
+        let changed = self.session.is_some()
+            && backup::resolve_directory(&self.data_dir)
+                .map(|p| p != self.active_dir)
+                .unwrap_or(true);
+        let expired = changed
+            || self
+                .session
+                .as_ref()
+                .is_some_and(|session| session.last_activity.elapsed() >= AUTO_LOCK_AFTER);
         if expired {
             self.session = None;
         }
@@ -74,14 +89,16 @@ impl Workspace {
 
     pub fn setup_status(&mut self) -> Result<SetupStatus, String> {
         self.expire_if_idle();
+        self.active_dir = backup::resolve_directory(&self.data_dir)?;
         let database_exists = regular_file_exists(&self.database_path())?;
         let metadata_exists = regular_file_exists(&self.metadata_path())?;
         match (database_exists, metadata_exists) {
             (false, false) => {
+                if self.active_dir!=self.data_dir { return Err("The restored workspace files are incomplete. Preserve them and restore a verified backup.".to_owned()); }
                 // SQLite recovery files can be the last surviving part of an
                 // interrupted workspace. Do not let fresh setup overwrite them.
                 for suffix in ["-journal", "-wal", "-shm"] {
-                    if regular_file_exists(&self.data_dir.join(format!("{DATABASE_NAME}{suffix}")))? {
+                    if regular_file_exists(&self.active_dir.join(format!("{DATABASE_NAME}{suffix}")))? {
                         return Err("The workspace setup is incomplete. Preserve the existing files and contact support before trying setup again.".to_owned());
                     }
                 }
@@ -96,6 +113,8 @@ impl Workspace {
     }
 
     pub fn setup_workspace(&mut self, input: SetupWorkspaceInput) -> Result<WorkspaceInfo, String> {
+        self.pending_restore = None;
+        let _activation = backup::activation_lock(&self.data_dir)?;
         let password = Zeroizing::new(input.password);
         validate_password(&password)?;
         let organization_name = required_text(&input.organization_name, "Organization name", 120)?;
@@ -231,6 +250,7 @@ impl Workspace {
     pub fn lock_workspace(&mut self) {
         // Dropping the only connection releases SQLCipher's in-memory key.
         self.session = None;
+        self.pending_restore = None;
     }
 
     pub fn workspace_info(&mut self) -> Result<WorkspaceInfo, String> {
@@ -625,10 +645,10 @@ impl Workspace {
     }
 
     fn database_path(&self) -> PathBuf {
-        self.data_dir.join(DATABASE_NAME)
+        self.active_dir.join(DATABASE_NAME)
     }
     fn metadata_path(&self) -> PathBuf {
-        self.data_dir.join(METADATA_NAME)
+        self.active_dir.join(METADATA_NAME)
     }
 
     fn read_metadata(&self) -> Result<Metadata, String> {
@@ -956,6 +976,22 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
              CREATE TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events
                 BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
              PRAGMA user_version=6;",
+        ).map_err(storage_error)?;
+        version = 6;
+    }
+    if version == 6 {
+        transaction.execute_batch(
+            "CREATE TABLE audit_events_v7 (
+                id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
+                event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved','cashflow_plan_saved','backup_created','workspace_restored')),
+                entity_id TEXT,created_at TEXT NOT NULL,
+                FOREIGN KEY(organization_id) REFERENCES organizations(id),FOREIGN KEY(counselor_id,organization_id) REFERENCES counselors(id,organization_id));
+            INSERT INTO audit_events_v7 SELECT * FROM audit_events; DROP TABLE audit_events;
+            ALTER TABLE audit_events_v7 RENAME TO audit_events;
+            CREATE INDEX audit_events_scope ON audit_events(organization_id,counselor_id,created_at);
+            CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
+            CREATE TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
+            PRAGMA user_version=7;"
         ).map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;
@@ -1346,9 +1382,9 @@ mod tests {
     use super::*;
     use tempfile::{tempdir, TempDir};
 
-    const PASSWORD: &str = "Synthetic-test-passphrase-42";
+    pub(super) const PASSWORD: &str = "Synthetic-test-passphrase-42";
 
-    fn configured() -> (TempDir, Workspace, WorkspaceInfo) {
+    pub(super) fn configured() -> (TempDir, Workspace, WorkspaceInfo) {
         let directory = tempdir().unwrap();
         let mut workspace = Workspace::new(directory.path().to_path_buf());
         let info = workspace
@@ -1361,7 +1397,7 @@ mod tests {
         (directory, workspace, info)
     }
 
-    fn client_input() -> ClientInput {
+    pub(super) fn client_input() -> ClientInput {
         ClientInput {
             id: None,
             first_name: " Synthetic ".to_owned(),
@@ -1856,7 +1892,7 @@ mod tests {
         assert_eq!(workspace.list_client_notes(&client.id).unwrap(), vec![note]);
     }
 
-    fn cashflow_input(revision: i64) -> cashflow::PlanInput {
+    pub(super) fn cashflow_input(revision: i64) -> cashflow::PlanInput {
         cashflow::PlanInput {
             expected_revision: revision,
             data: cashflow::tests::fixture(),
@@ -2092,7 +2128,7 @@ mod tests {
         );
     }
 
-    fn savings_input(revision: i64) -> savings::PlanInput {
+    pub(super) fn savings_input(revision: i64) -> savings::PlanInput {
         savings::PlanInput {
             expected_revision: revision,
             data: savings::tests::fixture(),
@@ -2317,7 +2353,7 @@ mod tests {
         );
     }
 
-    fn debt_input(revision: i64) -> PlanInput {
+    pub(super) fn debt_input(revision: i64) -> PlanInput {
         PlanInput {
             expected_revision: revision,
             data: debt::tests::fixture(),
@@ -2544,7 +2580,7 @@ mod tests {
         );
     }
 
-    fn budget_input(revision: i64) -> BudgetInput {
+    pub(super) fn budget_input(revision: i64) -> BudgetInput {
         BudgetInput {
             expected_revision: revision,
             lines: vec![BudgetLine {

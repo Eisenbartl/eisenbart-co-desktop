@@ -1,14 +1,14 @@
 # Eisenbart & Co. Financial Counseling Suite
 
-A Windows desktop application for offline financial counseling, built in tested stages. The first milestone establishes the desktop shell, local counselor sign-in, encrypted local storage, and client records. Version 0.5.0 source adds dated cash-flow calendars, separate account balances, internal transfers, and date previews alongside emergency savings, sinking-fund goals, client budgets, and debt payoff plans; broader financial planning, document processing, and reports follow in later checkpoints.
+A Windows desktop application for offline financial counseling, built in tested stages. The first milestone establishes the desktop shell, local counselor sign-in, encrypted local storage, and client records. Version 0.6.0 source adds encrypted local backups and verified whole-workspace recovery alongside dated cash-flow calendars, separate account balances, internal transfers, and date previews alongside emergency savings, sinking-fund goals, client budgets, and debt payoff plans; broader financial planning, document processing, and reports follow in later checkpoints.
 
-**Development build: use fictional data only.** Recovery, encrypted backups, clean Windows 11 offline acceptance, and independent security review are required before real client use or commercial distribution. Losing the counselor password can make the current local database permanently inaccessible.
+**Development build: use fictional data only.** Backup/recovery is now implemented and locally tested. Clean Windows 11 offline recovery acceptance and independent security review are required before real client use or commercial distribution. Losing the counselor password can make the current local database permanently inaccessible.
 
 ## Project status
 
 The source specification is preserved in [docs/product-specification.md](docs/product-specification.md). [Development status](docs/development-status.md) records the checks actually executed and the milestone checkpoint. The Windows development installer was built and passed automated installation, native-window launch, and uninstall checks on Windows Server 2025. Full Windows 11 offline acceptance remains pending.
 
-[Earlier 0.3.0 Windows installer (without savings or cash flow)](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521/artifacts/11859772481). The current source cash-flow milestone has no new downloadable installer, as requested. GitHub sign-in with repository access may be required. Extract the ZIP, read `README.txt`, and run the installer. This build passed 25 frontend and 32 Windows backend tests, installation, native-window launch, uninstall, and isolated cleanup. The download expires October 27, 2026. Follow the [Windows guide](docs/windows.md) and [evaluation guide](docs/user-guide.md). Version 0.3.0 upgrades the database to schema 4; older versions cannot reopen it afterward.
+[Earlier 0.3.0 Windows installer (without savings, cash flow, or backup/recovery)](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521/artifacts/11859772481). The current source backup/recovery milestone has no new downloadable installer, as requested. GitHub sign-in with repository access may be required. Extract the ZIP, read `README.txt`, and run the installer. This build passed 25 frontend and 32 Windows backend tests, installation, native-window launch, uninstall, and isolated cleanup. The download expires October 27, 2026. Follow the [Windows guide](docs/windows.md) and [evaluation guide](docs/user-guide.md). Version 0.3.0 upgrades the database to schema 4; older versions cannot reopen it afterward.
 
 The original Google Sheets workbook and supporting documents were not available for inspection. No spreadsheet behavior or financial formula is treated as verified. No real client records are included.
 
@@ -25,7 +25,7 @@ The foundation is scoped to:
 
 One organization and one counselor are supported per local installation initially. The schema retains organization and counselor identifiers to support future accounts and permissions. Shared access to a SQLite file over a network is unsupported.
 
-Client budgets now calculate income, expenses, savings/debt allocations, and signed surplus/deficit using exact cents. Debt plans now compare fixed monthly APR snowball/avalanche schedules, extra payments, and payment changes, with missing-term and capacity warnings. Savings now separates liquid/restricted/earmarked funds, calculates emergency targets and sinking-fund deadlines, and compares contributions against entered cash/debt commitments. The application does not yet provide daily/variable/promotional interest models, statement imports, transaction approvals, charts of financial results, PDF reports, backup/restore, password recovery, or commercial licensing. These are tracked in [the roadmap](docs/roadmap.md); the first screen does not present unfinished financial tools as usable features.
+Client budgets now calculate income, expenses, savings/debt allocations, and signed surplus/deficit using exact cents. Debt plans now compare fixed monthly APR snowball/avalanche schedules, extra payments, and payment changes, with missing-term and capacity warnings. Savings now separates liquid/restricted/earmarked funds, calculates emergency targets and sinking-fund deadlines, and compares contributions against entered cash/debt commitments. The application does not yet provide daily/variable/promotional interest models, statement imports, transaction approvals, charts of financial results, PDF reports, forgotten-password reset, or commercial licensing. These are tracked in [the roadmap](docs/roadmap.md); the first screen does not present unfinished financial tools as usable features.
 
 ## Run from source
 
@@ -63,3 +63,5 @@ On Ubuntu/Debian development hosts, Tauri also requires the platform packages li
 Each stage should end with passing relevant checks, updated status documentation, and a Git commit. Preserve the last working checkpoint before starting the next feature group.
 
 Exact dated cash-flow assumptions and independently checked examples: [cash-flow calculations](docs/cash-flow-calculations.md).
+
+Backup creation, restore, password consequences, and failure behavior: [backup and recovery guide](docs/backup-recovery.md).

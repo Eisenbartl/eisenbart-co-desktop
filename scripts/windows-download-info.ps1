@@ -63,8 +63,8 @@ planning with savings/debt payment allocations, saved debt accounts, and monthly
 snowball/avalanche payoff estimates, emergency savings, sinking-fund goals,
 savings contribution/affordability comparisons, and a paycheck-based cash-flow
 calendar with separate account balances, transfers, and chronological ledgers. The full financial
-application is still being developed. There is no supported password recovery
-or tested backup/restore yet. Do not store real client financial information.
+application is still being developed. Encrypted backup and verified whole-workspace recovery are available. There is
+no supported forgotten-password reset. Do not store real client financial information.
 
 The Windows workflow runs frontend/backend tests and checks silent installation,
 the installed x64 program displaying a responsive native window, and uninstall.
@@ -72,8 +72,8 @@ This is not a complete Windows client-workflow or security test. A clean Windows
 11 offline installation without preinstalled WebView2 still requires testing.
 The installer is configured to include the WebView2 offline redistributable.
 
-Version 0.5.0 upgrades the local database to schema 6. Older application versions
-cannot open it afterward. Keep using the newer app; do not delete the data folder.
+Version 0.6.0 upgrades the local database to schema 7. Restored workspaces use
+a new activation layout. Keep using 0.6.0 or newer; do not delete the data folder.
 
 VERIFY THE DOWNLOAD (optional)
 In PowerShell in this extracted folder:

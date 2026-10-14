@@ -1,10 +1,9 @@
 # Windows evaluation guide
 
 This development build provides a local workspace, client profiles, counseling
-statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.5.0 source) savings planning and cash-flow calendars. Use fictional records only. Advanced financial
+statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.6.0 source) savings planning, cash-flow calendars, encrypted backups, and verified restore. Use fictional records only. Advanced financial
 calculations, statement imports, advanced cash-flow models, PDF reports, and
-commercial licensing are still being developed. Password recovery and tested
-backup/restore are not available.
+commercial licensing are still being developed. Password reset and independent security review remain unavailable.
 
 ## Install and open
 
@@ -234,3 +233,8 @@ monthly amounts do not provide verified transaction dates. Enter all dated
 obligations once, including variable expenses, future debt extras, and intended
 savings transfers. No budget, debt, or savings plan is changed automatically.
 See [cash-flow-calculations.md](cash-flow-calculations.md) for exact assumptions.
+
+
+## Back up and recover (0.6.0 source)
+
+Open **Settings**, choose a backup folder outside the app data folder, enter your current password, and choose **Create encrypted backup**. Keep multiple copies, preferably on a separate drive. To recover, lock the workspace and expand **Restore an encrypted backup**. Verify the selected file using its password, review the workspace, type **RESTORE**, and confirm. The app keeps prior files separately and does not merge newer records into the backup. Use the [backup and recovery guide](backup-recovery.md) for the complete procedure and password-loss consequences. The earlier 0.3.0 download does not contain these controls.

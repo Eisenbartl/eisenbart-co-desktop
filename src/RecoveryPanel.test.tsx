@@ -1,0 +1,40 @@
+import {act,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {beforeEach,describe,expect,it,vi} from 'vitest';
+import {BackupPanel,RestorePanel} from './RecoveryPanel';
+import type {BackupResult,RestoreReview} from './types';
+const mocks=vi.hoisted(()=>({chooseBackupFolder:vi.fn(),chooseRestoreFile:vi.fn(),createWorkspaceBackup:vi.fn(),prepareWorkspaceRestore:vi.fn(),confirmWorkspaceRestore:vi.fn(),cancelWorkspaceRestore:vi.fn()}));
+vi.mock('./api',()=>({api:mocks}));
+const result:BackupResult={path:'D:\\Backups\\Eisenbart-fictional.ebcbackup',createdAt:'2026-10-14T01:00:00Z',auditRecorded:true,durabilityWarning:false};
+const review:RestoreReview={token:'fictional-review-capability',organizationName:'Synthetic counseling',counselorName:'Synthetic counselor',clientCount:2,createdAt:result.createdAt,sourceSchema:7,currentWorkspacePresent:true};
+function deferred<T>(){let resolve!:(v:T)=>void;const promise=new Promise<T>(r=>{resolve=r;});return{promise,resolve};}
+function restorePanel(){const onRestored=vi.fn();const view=render(<RestorePanel onRestored={onRestored}/>);fireEvent.click(screen.getByText('Restore an encrypted backup'));return{view,onRestored};}
+async function verified(){fireEvent.change(screen.getByLabelText('Encrypted backup file'),{target:{value:result.path}});fireEvent.change(screen.getByLabelText('Password when backup was created'),{target:{value:'Synthetic-password-42'}});fireEvent.click(screen.getByRole('button',{name:'Verify backup for recovery'}));await screen.findByText('Verified backup — review before restoring');}
+beforeEach(()=>{vi.clearAllMocks();mocks.chooseBackupFolder.mockResolvedValue('D:\\Backups');mocks.chooseRestoreFile.mockResolvedValue(result.path);mocks.createWorkspaceBackup.mockResolvedValue(result);mocks.prepareWorkspaceRestore.mockResolvedValue(review);mocks.confirmWorkspaceRestore.mockResolvedValue({previousWorkspacePreserved:true,durabilityWarning:false});mocks.cancelWorkspaceRestore.mockResolvedValue(undefined);});
+describe('encrypted backup and recovery controls',()=>{
+  it('selects a folder, clears password before the write, and reports a durable backup',async()=>{
+    render(<BackupPanel/>);fireEvent.click(screen.getByRole('button',{name:'Choose backup folder'}));await screen.findByDisplayValue('D:\\Backups');
+    fireEvent.change(screen.getByLabelText('Current workspace password'),{target:{value:'Synthetic-password-42'}});const pending=deferred<BackupResult>();mocks.createWorkspaceBackup.mockReturnValueOnce(pending.promise);
+    fireEvent.click(screen.getByRole('button',{name:'Create encrypted backup'}));expect(screen.getByLabelText('Current workspace password')).toHaveValue('');expect(screen.getByRole('button',{name:'Creating encrypted backup…'})).toBeDisabled();
+    await act(async()=>pending.resolve(result));expect(screen.getByRole('status')).toHaveTextContent('Encrypted backup saved.');expect(screen.getByRole('status')).toHaveTextContent(result.path);expect(mocks.createWorkspaceBackup).toHaveBeenCalledWith('D:\\Backups','Synthetic-password-42');
+  });
+  it('keeps the destination on errors and distinguishes a saved file from audit/durability warnings',async()=>{
+    render(<BackupPanel/>);fireEvent.change(screen.getByLabelText('Backup folder'),{target:{value:'D:\\Backups'}});fireEvent.change(screen.getByLabelText('Current workspace password'),{target:{value:'Wrong-fictional-password'}});mocks.createWorkspaceBackup.mockRejectedValueOnce('The backup could not be verified.');fireEvent.click(screen.getByRole('button',{name:'Create encrypted backup'}));await screen.findByRole('alert');expect(screen.getByLabelText('Backup folder')).toHaveValue('D:\\Backups');expect(screen.getByLabelText('Current workspace password')).toHaveValue('');
+    mocks.createWorkspaceBackup.mockResolvedValueOnce({...result,auditRecorded:false,durabilityWarning:true});fireEvent.change(screen.getByLabelText('Current workspace password'),{target:{value:'Synthetic-password-42'}});fireEvent.click(screen.getByRole('button',{name:'Create encrypted backup'}));await screen.findByRole('status');expect(screen.getByRole('status')).toHaveTextContent('audit entry could not be recorded');expect(screen.getByRole('status')).toHaveTextContent('drive did not confirm');
+  });
+  it('requires authenticated verification then explicit confirmation before replacing the workspace view',async()=>{
+    const {onRestored}=restorePanel();fireEvent.click(screen.getByRole('button',{name:'Choose backup file'}));await screen.findByDisplayValue(result.path);await verified();expect(mocks.confirmWorkspaceRestore).not.toHaveBeenCalled();expect(screen.queryByLabelText('Password when backup was created')).not.toBeInTheDocument();expect(screen.getByText('Synthetic counseling')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Restore verified workspace'}));await screen.findByRole('alert');expect(mocks.confirmWorkspaceRestore).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Type RESTORE to confirm'),{target:{value:'RESTORE'}});fireEvent.click(screen.getByRole('button',{name:'Restore verified workspace'}));await waitFor(()=>expect(onRestored).toHaveBeenCalledWith({previousWorkspacePreserved:true,durabilityWarning:false}));expect(mocks.confirmWorkspaceRestore).toHaveBeenCalledWith(review.token,'RESTORE');expect(screen.queryByText('Synthetic counseling')).not.toBeInTheDocument();
+  });
+  it('cancels a reviewed candidate without activation and removes private preview fields',async()=>{
+    restorePanel();await verified();fireEvent.click(screen.getByRole('button',{name:'Cancel recovery'}));await screen.findByRole('button',{name:'Verify backup for recovery'});expect(mocks.cancelWorkspaceRestore).toHaveBeenCalledWith(review.token);expect(mocks.confirmWorkspaceRestore).not.toHaveBeenCalled();expect(screen.queryByText('Synthetic counseling')).not.toBeInTheDocument();
+  });
+  it('does not show a review for an invalid backup and makes failed activation require a new review',async()=>{
+    restorePanel();mocks.prepareWorkspaceRestore.mockRejectedValueOnce('Backup is damaged or the password is incorrect.');fireEvent.change(screen.getByLabelText('Encrypted backup file'),{target:{value:result.path}});fireEvent.change(screen.getByLabelText('Password when backup was created'),{target:{value:'Wrong-fictional-password'}});fireEvent.click(screen.getByRole('button',{name:'Verify backup for recovery'}));await screen.findByRole('alert');expect(screen.queryByText('Verified backup — review before restoring')).not.toBeInTheDocument();expect(screen.getByLabelText('Password when backup was created')).toHaveValue('');
+    await verified();mocks.confirmWorkspaceRestore.mockRejectedValueOnce('Your previous workspace files have been preserved.');fireEvent.change(screen.getByLabelText('Type RESTORE to confirm'),{target:{value:'RESTORE'}});fireEvent.click(screen.getByRole('button',{name:'Restore verified workspace'}));await screen.findByText('Your previous workspace files have been preserved.');expect(screen.queryByText('Synthetic counseling')).not.toBeInTheDocument();expect(screen.getByRole('button',{name:'Verify backup for recovery'})).toBeInTheDocument();
+  });
+  it('cancels late verification results and pending reviewed candidates after unmount',async()=>{
+    const pending=deferred<RestoreReview>();mocks.prepareWorkspaceRestore.mockReturnValueOnce(pending.promise);const {view}=restorePanel();fireEvent.change(screen.getByLabelText('Encrypted backup file'),{target:{value:result.path}});fireEvent.change(screen.getByLabelText('Password when backup was created'),{target:{value:'Synthetic-password-42'}});fireEvent.click(screen.getByRole('button',{name:'Verify backup for recovery'}));view.unmount();await act(async()=>pending.resolve(review));expect(mocks.cancelWorkspaceRestore).toHaveBeenCalledWith(review.token);expect(document.documentElement.outerHTML).not.toContain('Synthetic counseling');
+    mocks.cancelWorkspaceRestore.mockClear();const second=restorePanel();await verified();second.view.unmount();expect(mocks.cancelWorkspaceRestore).toHaveBeenCalledWith(review.token);
+  });
+});

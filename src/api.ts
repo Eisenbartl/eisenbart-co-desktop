@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
+import type { BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
 
 export function desktopAvailable(): boolean {
   return '__TAURI_INTERNALS__' in window;
@@ -22,6 +22,12 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  chooseBackupFolder: () => command<string | null>('choose_backup_folder'),
+  chooseRestoreFile: () => command<string | null>('choose_restore_file'),
+  createWorkspaceBackup: (directory: string, password: string) => command<BackupResult>('create_workspace_backup', {directory,password}),
+  prepareWorkspaceRestore: (path: string, password: string) => command<RestoreReview>('prepare_workspace_restore', {path,password}),
+  confirmWorkspaceRestore: (token: string, confirmation: string) => command<RestoreResult>('confirm_workspace_restore', {token,confirmation}),
+  cancelWorkspaceRestore: (token: string) => command<void>('cancel_workspace_restore', {token}),
   getClientCashflowPlan: (clientId: string) => command<ClientCashflowPlan>('get_client_cashflow_plan', {clientId}),
   previewClientCashflowPlan: (clientId: string, input: CashflowPlanInput) => command<ClientCashflowPlan>('preview_client_cashflow_plan', {clientId,input}),
   saveClientCashflowPlan: (clientId: string, input: CashflowPlanInput) => command<ClientCashflowPlan>('save_client_cashflow_plan', {clientId,input}),

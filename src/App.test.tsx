@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   setupStatus: vi.fn(), setupWorkspace: vi.fn(), unlockWorkspace: vi.fn(),
   lockWorkspace: vi.fn(), workspaceInfo: vi.fn(), listClients: vi.fn(),
   getClient: vi.fn(), saveClient: vi.fn(), addClientNote: vi.fn(), listClientNotes: vi.fn(),
+  chooseBackupFolder:vi.fn(), chooseRestoreFile:vi.fn(), createWorkspaceBackup:vi.fn(), prepareWorkspaceRestore:vi.fn(), confirmWorkspaceRestore:vi.fn(), cancelWorkspaceRestore:vi.fn(),
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
 }));
@@ -39,6 +40,9 @@ function deferred<T>() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.cancelWorkspaceRestore.mockResolvedValue(undefined);
+  mocks.prepareWorkspaceRestore.mockResolvedValue({token:'synthetic-review',organizationName:'Recovered firm',counselorName:'Recovered counselor',clientCount:2,createdAt:'2026-10-14T00:00:00Z',sourceSchema:7,currentWorkspacePresent:true});
+  mocks.confirmWorkspaceRestore.mockResolvedValue({previousWorkspacePreserved:true,durabilityWarning:false});
   mocks.desktop = true;
   mocks.lockHandler = undefined;
   mocks.setupStatus.mockResolvedValue({ configured: true });
@@ -73,6 +77,18 @@ async function selectClient(name: string) {
 }
 
 describe('desktop workspace', () => {
+  it('permits verified recovery when damaged workspace setup fails and returns to a clean locked screen',async()=>{
+    mocks.setupStatus.mockRejectedValueOnce('Workspace files are incomplete.');render(<App/>);await screen.findByText('Unable to open the workspace');
+    fireEvent.click(screen.getByText('Restore an encrypted backup'));
+    fireEvent.change(screen.getByLabelText('Encrypted backup file'),{target:{value:'D:\\Backups\\synthetic.ebcbackup'}});
+    fireEvent.change(screen.getByLabelText('Password when backup was created'),{target:{value:'Synthetic-password-42'}});
+    fireEvent.click(screen.getByRole('button',{name:'Verify backup for recovery'}));await screen.findByText('Recovered firm');
+    fireEvent.change(screen.getByLabelText('Type RESTORE to confirm'),{target:{value:'RESTORE'}});
+    fireEvent.click(screen.getByRole('button',{name:'Restore verified workspace'}));await screen.findByRole('heading',{name:'Welcome back'});
+    expect(screen.getByRole('status')).toHaveTextContent('Workspace restored.');expect(screen.getByLabelText('Workspace password')).toHaveValue('');
+    expect(screen.queryByText('Recovered firm')).not.toBeInTheDocument();expect(mocks.listClients).not.toHaveBeenCalled();
+  });
+
   it('guards cash-flow edits and removes private account data on lock',async()=>{
     render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No saved cash-flow plan yet');
     fireEvent.click(screen.getByRole('button',{name:'Add cash-flow account'}));

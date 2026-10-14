@@ -279,7 +279,7 @@ def status(message: str) -> None:
 
 
 def run_checks(driver: WebDriver, binary: Path, password: str,
-               wrong_password: str, artifacts: Path, restart_driver: Callable[[], None]) -> None:
+               wrong_password: str, artifacts: Path, restart_driver: Callable[[], None], data_root: Path) -> None:
     organization = "Smoke Test Counseling — Fictional"
     counselor = "Morgan Example"
     first_name = "Alex"
@@ -575,6 +575,105 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets/debts/savings/cash-flow plans")
 
 
+    # Exercise recovery only in this synthetic app-data directory. No native
+    # commands are invoked directly; passwords and paths use visible controls.
+    backup_folder=data_root / "external-backups"
+    backup_folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button:nth-child(3)")
+    driver.fill("#backup-folder", str(backup_folder))
+    driver.fill("#backup-password", password)
+    driver.click_button("Create encrypted backup")
+    driver.wait_text(".backup-success", "Encrypted backup saved.", "encrypted backup created")
+    driver.wait_value("#backup-password", "", "backup password cleared from interface")
+    backup_path=Path(driver.text(".backup-file-path"))
+    backup_bytes=backup_path.read_bytes()
+    if not backup_bytes.startswith(b"EBCBACK1") or note.encode() in backup_bytes or password.encode() in backup_bytes:
+        raise SmokeFailure("Backup format or encrypted-data boundary was not preserved")
+    driver.screenshot(artifacts / "native-encrypted-backup.png")
+    driver.open_client("Alex Fictional")
+    after_note="Synthetic note added after backup, retained in the previous workspace only."
+    private_values.append(after_note)
+    driver.fill("#new-note", after_note)
+    driver.click_button("Save session note")
+    driver.wait_text(".notes-history", after_note, "post-backup historical note")
+    driver.click_button("Lock workspace")
+    driver.element("#password")
+    originals=list((data_root / "data").rglob("workspace.db"))
+    if len(originals)!=1:
+        raise SmokeFailure("Unexpected original synthetic database count")
+    original_path=originals[0]
+    original_bytes=original_path.read_bytes()
+    driver.click(".restore-panel > summary")
+    driver.fill("#restore-file", str(backup_path))
+    driver.fill("#restore-password", wrong_password)
+    driver.click_button("Verify backup for recovery")
+    driver.wait_text(".restore-panel [role=alert]", "could not be verified", "incorrect backup password rejected")
+    driver.fill("#restore-password", password)
+    driver.click_button("Verify backup for recovery")
+    driver.wait_text(".restore-review", organization, "authenticated recovery review")
+    driver.wait_text(".restore-review", counselor, "verified counselor identity")
+    driver.screenshot(artifacts / "native-restore-review.png")
+    # Stop the complete application and driver while a verified candidate awaits
+    # confirmation. A fresh process must still open the original workspace.
+    restart_driver()
+    driver.open(binary)
+    driver.element("#password")
+    assert_locked()
+    driver.fill("#password", password)
+    driver.click_button("Unlock workspace")
+    driver.open_client("Alex Fictional")
+    driver.wait_text(".notes-history", after_note, "interrupted restore preserves the original workspace")
+    driver.click_button("Lock workspace")
+    driver.element("#password")
+    driver.click(".restore-panel > summary")
+    driver.fill("#restore-file", str(backup_path))
+    driver.fill("#restore-password", password)
+    driver.click_button("Verify backup for recovery")
+    driver.wait_text(".restore-review", organization, "new verified recovery review")
+    driver.fill("#restore-confirmation", "RESTORE")
+    driver.click_button("Restore verified workspace")
+    driver.wait_text(".auth-card", "Workspace restored. Unlock it", "explicit confirmed restore completed")
+    assert_locked()
+    if original_path.read_bytes()!=original_bytes:
+        raise SmokeFailure("Restoring changed the retained original database")
+    driver.fill("#password", password)
+    driver.click_button("Unlock workspace")
+    driver.open_client("Alex Fictional")
+    driver.wait_text(".notes-history", note, "original backed-up note restored")
+    if after_note in driver.text(".notes-history"):
+        raise SmokeFailure("Restore unexpectedly merged newer records into the backup")
+    driver.wait_text(".budget-totals", "$716.67", "restored budget")
+    driver.wait_text(".savings-results", "2028-06-30", "restored savings plan")
+    driver.wait_text(".cashflow-results .budget-totals", "$3,300.00", "restored cash-flow plan")
+    status("encrypted backup, wrong-password rejection, interrupted review, explicit restore, retained source, and restored plans")
+    # Simulate missing metadata only after stopping every synthetic app process.
+    # The error-screen recovery flow must work without opening the damaged vault.
+    pointer=original_path.parent / "workspace-active.json"
+    active=json.loads(pointer.read_text())["generation"]
+    damaged_directory=original_path.parent / "recovery-generations" / active
+    restart_driver()
+    (damaged_directory / "workspace.json").unlink()
+    damaged_bytes=(damaged_directory / "workspace.db").read_bytes()
+    driver.open(binary)
+    driver.wait_text(".standalone-panel", "Unable to open the workspace", "simulated missing metadata error")
+    driver.click(".restore-panel > summary")
+    driver.fill("#restore-file", str(backup_path))
+    driver.fill("#restore-password", password)
+    driver.click_button("Verify backup for recovery")
+    driver.wait_text(".restore-review", organization, "backup reviewed from storage error screen")
+    driver.fill("#restore-confirmation", "RESTORE")
+    driver.click_button("Restore verified workspace")
+    driver.wait_text(".auth-card", "Workspace restored. Unlock it", "damaged workspace recovered")
+    if (damaged_directory / "workspace.db").read_bytes()!=damaged_bytes:
+        raise SmokeFailure("Recovery changed the retained damaged database")
+    driver.fill("#password", password)
+    driver.click_button("Unlock workspace")
+    driver.open_client("Alex Fictional")
+    driver.wait_text(".notes-history", note, "restored records after simulated metadata loss")
+    driver.wait_value("#cashflow-date-0", "2026-11-03", "restored original cash-flow dates after recovery")
+    status("fresh-process activation and error-screen recovery after simulated metadata loss")
+
+
 def main() -> int:
     repository = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
@@ -646,7 +745,7 @@ def main() -> int:
 
                 try:
                     driver.wait(ready, "native WebDriver readiness", seconds=25)
-                    run_checks(driver, binary, password, wrong_password, artifacts, restart_driver)
+                    run_checks(driver, binary, password, wrong_password, artifacts, restart_driver, root)
                 except (SmokeFailure, OSError, ValueError):
                     if driver.session_id:
                         try:

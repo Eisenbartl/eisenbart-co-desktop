@@ -188,3 +188,7 @@ export interface CashflowEntry {
 export interface CashflowDay { date: string; balances: CashflowBalance[]; combinedBalance: string | null; entryIndices: number[]; warnings: string[] }
 export interface CashflowSummary { ledger: CashflowEntry[]; days: CashflowDay[]; closingBalances: CashflowBalance[]; combinedClosing: string | null; warnings: string[] }
 export interface ClientCashflowPlan { clientId: string; revision: number; updatedAt: string | null; data: CashflowPlanData | null; summary: CashflowSummary | null; context: CashflowContext }
+
+export interface BackupResult { path: string; createdAt: string; auditRecorded: boolean; durabilityWarning: boolean }
+export interface RestoreReview { token: string; organizationName: string; counselorName: string; clientCount: number; createdAt: string; sourceSchema: number; currentWorkspacePresent: boolean }
+export interface RestoreResult { previousWorkspacePreserved: boolean; durabilityWarning: boolean }
