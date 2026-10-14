@@ -36,9 +36,16 @@ are independently checked.
 | Interface suite | 96 passed; lazy/input-only comparison, canonical figures, failed assumptions, unknowns, client/version mismatch/late replies, dirty/concurrent guards and read-only budget reload |
 | Linux backend / worker suite | 135 library + 2 worker tests passed (137 total); four pure framework checks plus scoped/stale/locked/no-audit-write storage verification |
 | Formatting / Clippy, warnings denied | Passed |
-| Native desktop compile / complete workflow | Standalone debug build passed; full native comparison/report/recovery workflow running |
+| Native desktop compile / complete workflow | Passed standalone debug build and full native run, exit 0: exact comparisons/unknowns/failed assumptions with unchanged plans, all report/client workflows, restart and both recovery paths |
 | Windows source CI | Pending; installer/package/upload steps disabled |
 | Clean Windows installation/offline release acceptance | Not run |
+
+The initial Windows run stopped during frontend checks: the first application
+CSV-lock test and an assessment test hit the existing five-second deadline, then
+pending application work interfered with later test isolation. Vitest now limits
+concurrent DOM workers to two; no timeout or financial/privacy assertion is
+removed or relaxed. The source application is unchanged by this runner adjustment.
+A corrected Windows validation run will verify the full suite.
 
 Seven major work areas remain in the roadmap: further financial models/scenarios,
 document/OCR review, fuller intake/workflow, security/permissions, commercial

@@ -3,5 +3,6 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
+  // Bound concurrent DOM workers on Windows CI; preserve per-test deadlines.
+  test: { maxWorkers: 2, environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
 });
