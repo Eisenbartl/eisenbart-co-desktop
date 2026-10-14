@@ -129,9 +129,9 @@ cannot encrypt or remove an original outside its private workspace.
 Limits: 2 MiB/file, 2,000 rows/file, 64 columns, 120 bytes/header, 2,048 bytes/cell;
 20 accounts, 50 documents, 5,000 rows, and 10,000 history entries/client. Limits
 fail visibly, preserving prior records. Whole-workspace backup limits also apply.
-Earlier applications cannot open upgraded schema 8; use 0.7.0 or newer.
+Earlier applications cannot open upgraded schema 8; use 0.8.0 or newer after the PDF upgrade.
 
-Text-PDF extraction is the next priority. Institution adapters, card-specific
+Selectable-text PDF extraction is now implemented in the 0.8.0 source; see [PDF steps and limits](pdf-import-review.md). Institution adapters, card-specific
 parsers, inferred recurring-payment groups, scanned-document OCR, multi-currency,
 source deletion/export, row-level running-balance checks, finalized reports,
 clean installed Windows acceptance, and independent security review remain open.

@@ -13,6 +13,7 @@ pub(super) struct PendingCsv {
     file_name: String,
     sha256: String,
     created: Instant,
+    pdf_pages: Option<Vec<crate::pdf::Page>>,
 }
 impl PendingCsv {
     pub(super) fn expired(&self) -> bool {
@@ -162,11 +163,27 @@ pub(super) fn read_imports(
             .iter()
             .find(|d| d.id == document_id)
             .ok_or(STORAGE_ERROR)?;
+        let raw: Raw = decode(&raw)?;
+        if let Some(selected) = &d.input.pdf_selection {
+            if raw.extraction_method != "pdf-text-lines-v1"
+                || !selected
+                    .iter()
+                    .any(|v| Some(v.page) == raw.page && u64::from(v.line) == raw.line)
+                || raw.reported_line.is_none()
+            {
+                return Err(STORAGE_ERROR.into());
+            }
+        } else if raw.page.is_some()
+            || raw.reported_line.is_some()
+            || raw.extraction_method != "csv-utf8-v1"
+        {
+            return Err(STORAGE_ERROR.into());
+        }
         records.push(Record {
             id,
             document_id,
             account_id: d.account_id.clone(),
-            raw: decode(&raw)?,
+            raw,
             fields: decode(&fields)?,
             status: decode_status(&st)?,
             linked_id,
@@ -181,6 +198,9 @@ pub(super) fn read_imports(
         return Err(STORAGE_ERROR.into());
     }
     for d in &mut documents {
+        if d.input.pdf_selection.is_some() {
+            d.warnings.push("PDF statement checks include only the explicitly selected lines. Verify the original statement for completeness; headers and unselected lines were not imported.".into());
+        }
         let rs = records
             .iter()
             .filter(|r| r.document_id == d.id)
@@ -408,6 +428,7 @@ impl Workspace {
             return Err("Use a shorter file name.".into());
         }
         let result = Preview {
+            pdf_pages: None,
             client_id: client.clone(),
             token: token.clone(),
             file_name: file_name.clone(),
@@ -424,6 +445,72 @@ impl Workspace {
             file_name,
             sha256,
             created: Instant::now(),
+            pdf_pages: None,
+        });
+        Ok(result)
+    }
+    pub fn inspect_client_pdf(&mut self, client: String, path: String) -> Result<Preview, String> {
+        let s = self.session()?;
+        scoped_client(&s.connection, &s.info, &client)?;
+        if Path::new(&path)
+            .extension()
+            .and_then(|v| v.to_str())
+            .is_none_or(|v| !v.eq_ignore_ascii_case("pdf"))
+            || !regular_file_exists(Path::new(&path))?
+        {
+            return Err("Choose an existing local .pdf file.".into());
+        }
+        let mut bytes = Zeroizing::new(Vec::new());
+        File::open(&path)
+            .map_err(|_| "The PDF could not be opened.")?
+            .take(MAX_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| "The PDF could not be read.")?;
+        let pages = crate::pdf_process::extract(&bytes)?;
+        self.capture_pdf(client, Path::new(&path), bytes, pages)
+    }
+    fn capture_pdf(
+        &mut self,
+        client: String,
+        path: &Path,
+        bytes: Zeroizing<Vec<u8>>,
+        pages: Vec<crate::pdf::Page>,
+    ) -> Result<Preview, String> {
+        let s = self.session()?;
+        scoped_client(&s.connection, &s.info, &client)?;
+        crate::pdf::validate_pages(&pages)?;
+        let file_name = path
+            .file_name()
+            .and_then(|v| v.to_str())
+            .ok_or("Use a UTF-8 file name.")?
+            .to_owned();
+        if file_name.len() > 255 || file_name.chars().any(char::is_control) {
+            return Err("Use a shorter file name.".into());
+        }
+        let token = Uuid::new_v4().to_string();
+        let sha256 = format!("{:x}", Sha256::digest(&*bytes));
+        let result = Preview {
+            client_id: client.clone(),
+            token: token.clone(),
+            file_name: file_name.clone(),
+            sha256: sha256.clone(),
+            byte_count: bytes.len(),
+            headers: vec![],
+            sample_rows: vec![],
+            row_count: pages
+                .iter()
+                .map(|p| p.text.lines().filter(|l| !l.trim().is_empty()).count())
+                .sum(),
+            pdf_pages: Some(pages.clone()),
+        };
+        self.pending_csv = Some(PendingCsv {
+            client_id: client,
+            token,
+            bytes,
+            file_name,
+            sha256,
+            created: Instant::now(),
+            pdf_pages: Some(pages),
         });
         Ok(result)
     }
@@ -448,8 +535,28 @@ impl Workspace {
         }
         let pending=self.pending_csv.as_ref().filter(|p|p.token==input.token&&p.client_id==client&&!p.expired()).ok_or("Select and inspect this client's CSV again; the preview is unavailable or expired.")?;
         let mut document = normalize_document(input.document)?;
-        let csv = read_csv(&pending.bytes)?;
-        let rows = extract(&csv, &document.mapping)?;
+        let is_pdf = pending.pdf_pages.is_some();
+        let rows = if let Some(pages) = &pending.pdf_pages {
+            if document.mapping.amount_mode != AmountMode::Signed {
+                return Err("PDF extraction currently supports one signed amount at the end of each selected line.".into());
+            }
+            let selection = document
+                .pdf_selection
+                .as_ref()
+                .ok_or("Select the PDF transaction lines explicitly.")?;
+            crate::pdf::records(
+                pages,
+                selection,
+                &document.mapping.date_format,
+                document.mapping.signed_is_debit,
+            )?
+        } else {
+            if document.pdf_selection.is_some() {
+                return Err("A CSV preview cannot be staged as a PDF.".into());
+            }
+            let csv = read_csv(&pending.bytes)?;
+            extract(&csv, &document.mapping)?
+        };
         let bytes = if document.retain_source {
             Some(Zeroizing::new(pending.bytes.to_vec()))
         } else {
@@ -523,7 +630,16 @@ impl Workspace {
             )
             .map_err(storage_error)?;
         }
-        audit(&tx, &s.info, "csv_imported", Some(&id))?;
+        audit(
+            &tx,
+            &s.info,
+            if is_pdf {
+                "pdf_imported"
+            } else {
+                "csv_imported"
+            },
+            Some(&id),
+        )?;
         let result = read_imports(&tx, &s.info, client)?;
         tx.commit().map_err(storage_error)?;
         self.pending_csv = None;
@@ -738,6 +854,7 @@ mod tests {
     pub(super) const CHECKING:&str="Date,Description,Amount,Category,Type\n2026-09-01,Synthetic wages,2000,Wages,income\n2026-09-02,Synthetic rent,-1200,Housing,expense\n2026-09-03,Synthetic fee,-10.01,Fees,fee\n2026-09-04,Synthetic refund,20.01,Housing,refund\n2026-09-05,Synthetic reserve transfer,-200,Savings,transfer\n";
     fn doc(label: &str) -> DocumentInput {
         DocumentInput {
+            pdf_selection: None,
             account_id: None,
             account_label: label.into(),
             account_kind: "checking".into(),
@@ -1354,6 +1471,215 @@ mod tests {
             .iter()
             .all(|r| !r.bulk_eligible && r.duplicate_ids.len() == 20));
         assert!(serde_json::to_vec(&snapshot).unwrap().len() < 6 * 1024 * 1024);
+    }
+    #[test]
+    fn pdf_sources_need_individual_decisions_are_atomic_and_recover_with_original_locators() {
+        let (root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let client = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let bytes = crate::pdf_fixture::statement();
+        let pages = crate::pdf::extract_pages(&bytes).unwrap();
+        let selections = pages
+            .iter()
+            .flat_map(|p| {
+                p.text
+                    .lines()
+                    .enumerate()
+                    .filter(|(_, line)| line.starts_with("2026-"))
+                    .map(|(i, _)| crate::pdf::Locator {
+                        page: p.number,
+                        line: i as u32 + 1,
+                    })
+            })
+            .collect::<Vec<_>>();
+        let preview = w
+            .capture_pdf(
+                client.id.clone(),
+                Path::new("synthetic.pdf"),
+                Zeroizing::new(bytes.clone()),
+                pages,
+            )
+            .unwrap();
+        assert!(w.get_client_imports(&client.id).unwrap().records.is_empty());
+        let mut input = doc("PDF checking");
+        input.pdf_selection = Some(selections);
+        input.retain_source = true;
+        input.opening_balance = None;
+        input.closing_balance = None;
+        assert!(w
+            .stage_client_csv(
+                &other.id,
+                StageInput {
+                    expected_revision: 0,
+                    token: preview.token.clone(),
+                    document: input.clone()
+                }
+            )
+            .is_err());
+        w.session.as_ref().unwrap().connection.execute_batch("CREATE TRIGGER fail_pdf_audit BEFORE INSERT ON audit_events WHEN NEW.event='pdf_imported' BEGIN SELECT RAISE(ABORT,'test failure'); END;").unwrap();
+        assert!(w
+            .stage_client_csv(
+                &client.id,
+                StageInput {
+                    expected_revision: 0,
+                    token: preview.token.clone(),
+                    document: input.clone()
+                }
+            )
+            .is_err());
+        assert!(w
+            .get_client_imports(&client.id)
+            .unwrap()
+            .accounts
+            .is_empty());
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .execute("DROP TRIGGER fail_pdf_audit", [])
+            .unwrap();
+        let saved = w
+            .stage_client_csv(
+                &client.id,
+                StageInput {
+                    expected_revision: 0,
+                    token: preview.token,
+                    document: input,
+                },
+            )
+            .unwrap();
+        assert_eq!(saved.summary.needs_clarification, 4);
+        assert!(saved.records.iter().all(|r| !r.bulk_eligible));
+        assert!(w
+            .bulk_approve_transactions(
+                &client.id,
+                BulkInput {
+                    expected_revision: saved.revision,
+                    record_ids: vec![saved.records[0].id.clone()]
+                }
+            )
+            .is_err());
+        let mut fields = saved.records[0].fields.clone();
+        fields.kind = Kind::Income;
+        fields.category = "Wages".into();
+        let decide = |ack| ReviewInput {
+            expected_revision: saved.revision,
+            record_id: saved.records[0].id.clone(),
+            fields: fields.clone(),
+            status: Status::Approved,
+            reason: "Verified PDF page and currency against original synthetic source".into(),
+            acknowledge_warnings: ack,
+        };
+        assert!(w.review_transaction(&client.id, decide(false)).is_err());
+        let accepted = w.review_transaction(&client.id, decide(true)).unwrap();
+        assert_eq!(accepted.summary.income, "1000.01");
+        assert_eq!(accepted.history.len(), 1);
+        assert!(w.get_client_imports(&other.id).unwrap().records.is_empty());
+        let source: Vec<u8> = w
+            .session
+            .as_ref()
+            .unwrap()
+            .connection
+            .query_row(
+                "SELECT source_blob FROM import_documents WHERE id=?1",
+                [&accepted.documents[0].id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(source, bytes);
+        let mut overlap_input = doc("unused");
+        overlap_input.account_id = Some(accepted.accounts[0].id.clone());
+        overlap_input.opening_balance = None;
+        overlap_input.closing_balance = None;
+        let overlaps=stage(&mut w,&client.id,dir.path(),"overlap.csv","Date,Description,Amount,Category,Type\n2026-10-01,Fictional payroll,1000.01,Wages,income\n",overlap_input);
+        let overlapping = overlaps.records.last().unwrap();
+        assert!(!overlapping.bulk_eligible);
+        assert!(overlapping.duplicate_ids.contains(&accepted.records[0].id));
+        let backup = w
+            .create_backup(dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        let encrypted = fs::read(root.path().join(DATABASE_NAME)).unwrap();
+        assert!(!encrypted.windows(17).any(|v| v == b"Fictional payroll"));
+        let prepared = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(prepared.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let restored = w.get_client_imports(&client.id).unwrap();
+        assert_eq!(restored.summary.income, "1000.01");
+        assert_eq!(restored.records[0].raw, accepted.records[0].raw);
+        assert_eq!(restored.history.len(), 1);
+        assert!(restored.documents[0].source_retained);
+        let withdrawn = review(
+            &mut w,
+            &client.id,
+            &restored.records[0].id,
+            Status::Rejected,
+            "Withdraw synthetic PDF approval",
+            false,
+        )
+        .unwrap();
+        assert_eq!(withdrawn.summary.income, "0.00");
+        assert_eq!(withdrawn.history.len(), 2);
+    }
+    #[test]
+    fn pdf_schema_eight_upgrade_failure_preserves_csv_sources_and_approval_history() {
+        let (_root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let client = w.save_client(client_input()).unwrap();
+        let saved = stage(
+            &mut w,
+            &client.id,
+            dir.path(),
+            "before.csv",
+            CHECKING,
+            doc("Checking"),
+        );
+        let before = review(
+            &mut w,
+            &client.id,
+            &saved.records[0].id,
+            Status::Approved,
+            "CSV verified before PDF upgrade",
+            false,
+        )
+        .unwrap();
+        let connection = &mut w.session.as_mut().unwrap().connection;
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
+            .unwrap();
+        connection
+            .execute_batch("PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
+            .unwrap();
+        assert!(migrate(connection, false).is_err());
+        assert_eq!(
+            connection
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            8
+        );
+        assert!(connection.execute("DELETE FROM audit_events", []).is_err());
+        connection
+            .execute("DROP TABLE audit_events_v9", [])
+            .unwrap();
+        migrate(connection, false).unwrap();
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            count
+        );
+        assert_eq!(
+            connection
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            SCHEMA_VERSION
+        );
+        let after = w.get_client_imports(&client.id).unwrap();
+        assert_eq!(after.summary.income, before.summary.income);
+        assert_eq!(after.records[0].raw, before.records[0].raw);
+        assert_eq!(after.history.len(), before.history.len());
     }
     #[test]
     fn expiry_wrong_tokens_and_client_scope_never_stage_uninspected_data() {

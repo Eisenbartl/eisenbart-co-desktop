@@ -412,3 +412,6 @@ textarea { resize: vertical; min-height: 100px; }
 .imports-panel input[type="checkbox"] { width:16px; height:16px; padding:0; flex:0 0 16px; }
 
 .imports-panel .budget-table-wrap { max-width:100%; overflow-x:auto; margin:16px 0; }
+
+.pdf-line-selection { max-height:420px; overflow:auto; border:1px solid var(--line); padding:12px; border-radius:6px; }
+.pdf-source-line span { white-space:pre-wrap; overflow-wrap:anywhere; font-family:ui-monospace,monospace; }

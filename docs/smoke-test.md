@@ -67,3 +67,5 @@ This test checks desktop behavior and persistence. It does not audit encryption,
 prove the absence of outbound network traffic, or certify production security.
 
 The harness centers visible controls before a native click to avoid WebKit partial-viewport coordinate errors. Unicode labels are preserved in XPath literals. Explicit read-only DOM/runtime observations, locator reads, and GET observations retry one connection closure; clicks, typing, financial writes, and general scripts are never replayed. Source-retention and acknowledgment checkboxes must be observed selected before submission.
+
+The PDF checkpoint extends the same visible native workflow with a generated fictional text PDF, separate parser execution, damaged-file rejection, explicit transaction-line selection, page/line provenance, individual source approval, pending-expense exclusion, original retention, and backup/error-screen recovery of PDF decisions/history. The standard-library fixture generator is `scripts/synthetic_pdf.py`; it is a development helper, not part of the shipped application.

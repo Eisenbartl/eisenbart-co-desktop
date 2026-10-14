@@ -3,6 +3,11 @@ mod cashflow;
 mod debt;
 mod imports;
 mod models;
+mod pdf;
+#[cfg(test)]
+mod pdf_fixture;
+#[doc(hidden)]
+pub mod pdf_process;
 mod savings;
 mod storage;
 
@@ -56,6 +61,43 @@ async fn choose_client_csv(
     })
     .await
     .map_err(|_| "CSV selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn choose_client_pdf(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_client(&client_id))?;
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("Selectable-text PDF statements", &["pdf"])
+            .blocking_pick_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local PDF file.".into())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "PDF selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn inspect_client_pdf(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    path: String,
+) -> Result<imports::Preview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.inspect_client_pdf(client_id, path))
+    })
+    .await
+    .map_err(|_| "PDF inspection could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn inspect_client_csv(
@@ -416,6 +458,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             choose_client_csv,
+            choose_client_pdf,
+            inspect_client_pdf,
             inspect_client_csv,
             cancel_client_csv,
             get_client_imports,
@@ -451,4 +495,9 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("Desktop application could not start");
+}
+
+/// Private parser process entry: exits before workspace/Tauri initialization.
+pub fn pdf_worker_entry() {
+    pdf::worker();
 }

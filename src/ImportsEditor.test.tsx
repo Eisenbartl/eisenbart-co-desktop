@@ -2,7 +2,7 @@ import {act,fireEvent,render,screen,waitFor,within} from '@testing-library/react
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 import ImportsEditor from './ImportsEditor';
 import type {Client,ClientImports,CsvPreview,ImportedRecord} from './types';
-const mocks=vi.hoisted(()=>({getClientImports:vi.fn(),chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn()}));
+const mocks=vi.hoisted(()=>({getClientImports:vi.fn(),chooseClientPdf:vi.fn(),inspectClientPdf:vi.fn(),chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn()}));
 vi.mock('./api',()=>({api:mocks}));
 const client:Client={id:'client-a',organizationId:'org-a',firstName:'Alex',lastName:'Synthetic',email:'',phone:'',householdSize:1,status:'Planning',goals:'',createdAt:'',updatedAt:''};
 const summary={pending:0,needsClarification:0,approved:0,rejected:0,income:'0.00',spending:'0.00',refunds:'0.00',netSpending:'0.00',netCash:'0.00',accountNet:[] as [string,string][],warnings:['Approved rows only; all imported dates.']};
@@ -16,6 +16,27 @@ const approved:ClientImports={...staged,revision:2,records:[{...record,status:'A
 function open(){return render(<ImportsEditor client={client} onDirty={vi.fn()} onBusy={vi.fn()} otherSaving={false}/>);}
 function deferred<T>(){let resolve!:(v:T)=>void;const promise=new Promise<T>(r=>{resolve=r;});return{promise,resolve};}
 beforeEach(()=>{vi.clearAllMocks();mocks.getClientImports.mockResolvedValue(empty);mocks.chooseClientCsv.mockResolvedValue('D:\\Synthetic\\synthetic.csv');mocks.inspectClientCsv.mockResolvedValue(preview);mocks.cancelClientCsv.mockResolvedValue(undefined);mocks.stageClientCsv.mockResolvedValue(staged);mocks.reviewTransaction.mockResolvedValue(approved);mocks.bulkApproveTransactions.mockResolvedValue(approved);});
+describe('PDF inspection and review',()=>{
+ it('selects only explicit page lines, preserves unknown metadata, and requires individual review',async()=>{
+  mocks.chooseClientPdf.mockResolvedValue('D:\\Synthetic\\statement.pdf');
+  const pdfPreview:CsvPreview={...preview,fileName:'statement.pdf',headers:[],sampleRows:[],pdfPages:[{number:1,text:'Synthetic statement\n2026-10-01 Payroll 1000.01\n<img src=x onerror=alert(1)>'}]};
+  mocks.inspectClientPdf.mockResolvedValue(pdfPreview);
+  mocks.stageClientCsv.mockResolvedValue({...staged,records:[{...record,status:'Needs Clarification',bulkEligible:false,raw:{...record.raw,page:1,line:2,reportedLine:'2026-10-01 Payroll 1000.01',extractionMethod:'pdf-text-lines-v1'}}],summary:{...summary,needsClarification:1}});
+  open();await screen.findByText('No imported transactions yet');fireEvent.change(screen.getByLabelText('Statement file format'),{target:{value:'pdf'}});
+  fireEvent.click(screen.getByRole('button',{name:'Choose PDF file'}));await screen.findByDisplayValue('D:\\Synthetic\\statement.pdf');fireEvent.click(screen.getByRole('button',{name:'Inspect PDF'}));await screen.findByText('Inspected source: statement.pdf');
+  expect(screen.getByText('Selected PDF lines: 0 / 500')).toBeInTheDocument();expect(document.querySelector('.pdf-line-selection img')).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Import into review queue'}));await screen.findByRole('alert');expect(mocks.stageClientCsv).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('checkbox',{name:'Select PDF page 1 line 2'}));fireEvent.change(screen.getByLabelText('New statement account label'),{target:{value:'Synthetic PDF checking'}});
+  fireEvent.click(screen.getByRole('button',{name:'Import into review queue'}));await screen.findByText('PDF lines imported into the review queue. Every PDF record needs individual verification.');
+  const input=mocks.stageClientCsv.mock.calls[0][1];expect(input.document.pdfSelection).toEqual([{page:1,line:2}]);expect(input.document.retainSource).toBe(false);expect(input.document.periodStart).toBeNull();expect(input.document.openingBalance).toBeNull();expect(mocks.bulkApproveTransactions).not.toHaveBeenCalled();expect(document.querySelector('.imports-table')).toHaveTextContent('page 1, extracted line 2');
+ });
+ it('keeps failed PDF selection retryable and cancels its captured token without writes',async()=>{
+  mocks.inspectClientPdf.mockResolvedValue({...preview,fileName:'retry.pdf',pdfPages:[{number:1,text:'2026-10-01 Merchant 1.00'}]});mocks.stageClientCsv.mockRejectedValueOnce('Import interrupted; nothing was saved.');
+  open();await screen.findByText('No imported transactions yet');fireEvent.change(screen.getByLabelText('Statement file format'),{target:{value:'pdf'}});fireEvent.change(screen.getByLabelText('Local PDF file'),{target:{value:'D:\\Synthetic\\retry.pdf'}});fireEvent.click(screen.getByRole('button',{name:'Inspect PDF'}));await screen.findByText('Inspected source: retry.pdf');
+  fireEvent.click(screen.getByRole('checkbox',{name:'Select PDF page 1 line 1'}));fireEvent.change(screen.getByLabelText('New statement account label'),{target:{value:'Synthetic PDF'}});fireEvent.click(screen.getByRole('button',{name:'Import into review queue'}));await screen.findByText('Import interrupted; nothing was saved.');expect(screen.getByRole('checkbox',{name:'Select PDF page 1 line 1'})).toBeChecked();
+  fireEvent.click(screen.getByRole('button',{name:'Cancel PDF preview'}));await waitFor(()=>expect(mocks.cancelClientCsv).toHaveBeenCalledWith(preview.token));expect(mocks.reviewTransaction).not.toHaveBeenCalled();
+ });
+});
 describe('CSV import and review editor',()=>{
  it('requires explicit columns, preserves unknowns, stages provenance, and never auto-approves',async()=>{
   open();await screen.findByText('No imported transactions yet');fireEvent.click(screen.getByRole('button',{name:'Choose CSV file'}));await screen.findByDisplayValue('D:\\Synthetic\\synthetic.csv');fireEvent.click(screen.getByRole('button',{name:'Inspect CSV'}));await screen.findByText('Inspected source: synthetic.csv');

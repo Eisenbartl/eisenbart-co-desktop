@@ -1,5 +1,79 @@
 # Development status
 
+## Stage 4B: selectable-text PDF import and review — 0.8.0 source
+
+Implemented bounded local PDF inspection in a supervised child of the desktop
+executable before workspace/Tauri initialization. Only source bytes pass through
+stdin; no workspace key, password, path, source filename, authentication, or proxy
+variables are supplied. No PDF renderer, JavaScript evaluator, attachment
+extraction, OCR, or network service is invoked. CPU/data/core limits on Linux,
+Windows memory Job Objects, 15-second wall deadlines, and bounded input/output
+keep parser failures apart from the active workspace. These are process/resource
+boundaries, not a complete operating-system sandbox or security certification.
+
+Counselors explicitly choose page/text lines, actual date style, account, known
+period/balances, sign convention, and optional original retention. Supported
+starting layout is full date first, description middle, one signed amount last.
+Multiple numeric columns or invalid/missing amounts remain unknown; wrapped text
+and glyph/ordering uncertainty require human correction. All PDF rows begin as
+Needs Clarification, never bulk eligible, and require classification/category,
+source acknowledgment and a reason before individual approval. No account number,
+transaction type, missing date/amount, merchant, or statement metadata is guessed.
+
+Immutable reported text retains document hash/ID, account, selected page/line,
+original date/amount, extraction method and uncertainty. Corrections/reversals
+preserve the existing immutable before/after decision history. Approved-only
+exact-cent totals, duplicate advisories across CSV/PDF sources, paired transfers,
+client scope, optimistic revisions, atomic audit/rollback, lock/cancel/expiry,
+and planning separation reuse the CSV foundation. Authorized original PDFs are
+SQLCipher BLOBs included in existing authenticated backups. Restore validates
+PDF locators and imported decisions/transfer links. Schema 9 preserves previous
+records/CSV JSON and adds PDF audit events; older applications cannot reopen it.
+
+See [pdf-import-review.md](pdf-import-review.md) for actual user steps, format,
+parser boundaries, completeness limits, and independent examples. Limits: 2 MiB,
+100 pages, 1 MiB extracted text, 2,000 nonempty/4,000 total lines, 2,048 bytes/line,
+and 500 selected lines/source; existing client/backup limits remain unchanged.
+Scanned/image-only or protected PDFs, including owner-protected files with an
+empty user password, are rejected. Mixed image/text PDFs require checking every
+original page for missing transactions. Selected-line totals cannot prove completeness.
+
+| Check | Result |
+|---|---|
+| Locked setup/dependency fetch, production frontend, native debug build | Passed |
+| Interface tests | 56 passed, including explicit PDF selection/unknown metadata, inert markup, no automatic/bulk approval, failed-draft retention and cancel/no-write |
+| Linux Rust full suite | 84 library tests + 2 executable worker integration tests passed (86 total); final focused PDF rerun 7 + worker rerun 2 passed after core-dump/original-encryption safeguards |
+| Independent Python Decimal example | Original PDF net 974.90; only approved payroll adds income to 3,000.01 and combined CSV/PDF activity to 1,820.02; pending expense contributes zero |
+| Format and Clippy all targets, warnings denied | Passed |
+| Compiled native desktop workflow | Passed existing client/planning/CSV workflows, separate PDF parser, damaged rejection, explicit line selection, source locators, individual approval, pending exclusion, authorized retention, whole-process restart/backup interruption, PDF decisions/history restored through normal and missing-metadata recovery |
+| Native visual inspection | Passed for reported-text provenance, warnings, and corrected verified fields; final exact-source rerun in progress |
+| Windows source CI | Runs on the committed source; results recorded when complete |
+| New Windows installer | Intentionally not built |
+| Clean installed Windows 11 offline PDF workflow/native OS pickers | Not run |
+
+Initial full native artifacts: `/workspace/shared/desktop-smoke-pdf`; exact-source
+final artifacts will be `/workspace/shared/desktop-smoke-pdf-final`. Logs are under
+`/workspace/shared`: `pdf-backend-full.log`, `pdf-focused-final.log`,
+`pdf-process-final.log`, `pdf-frontend-tests.log`, `pdf-frontend-build.log`,
+`pdf-clippy.log`, `pdf-native-smoke.log`, and `pdf-native-final.log`.
+Existing negative SQLCipher fixtures produce expected authentication diagnostics;
+no verification or assertion was disabled. During implementation, a form fragment
+boundary and a Unix unit-valued binding were corrected before checks passed.
+Final review rejects original encryption even after a library decrypts an empty
+user password, and disables Linux parser core dumps. Synthetic worker tests
+exercise the actual desktop executable/protocol, including deadline termination.
+The worker process is not claimed as a complete OS filesystem/network sandbox.
+
+Source commit, Windows validation, and verified source/history checkpoints are
+recorded after completion. No manual installer workflow is requested. The earlier
+0.3.0 installer contains neither this PDF stage nor the later source-only features.
+
+Next priority: **merchant grouping and recurring-payment review** on imported
+records, with advisory suggestions and explicit counselor decisions. Institution
+adapters, scanned OCR, automatic table reconstruction, advanced models, dashboard
+charts, finalized reports/PDF action plans, accounts/roles, licensing/signing,
+clean Windows acceptance, and commercial release review remain unfinished.
+
 ## Stage 4A: local CSV import and transaction review — 0.7.0 source
 
 Following the original staged specification, implemented explicit, bounded local
@@ -669,7 +743,7 @@ clone.
 Encrypted backup/restore is implemented with authenticated files, retained
 previous workspaces, and tested interrupted/failure recovery. Clean installed
 Windows acceptance and independent security review remain prerequisites for
-actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. The next application priority is **selected text-based PDF statement extraction** feeding the same review workflow; keep scanned OCR and broad institution adapters in later checkpoints.
+actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. The next application priority is **merchant grouping and recurring-payment review**; keep scanned OCR and broad institution adapters in later checkpoints.
 
 Advanced financial models, broader scenarios, PDFs, multiple counselor roles,
 password change/reset, exports, licensing, signing, retained-copy selection,
@@ -685,7 +759,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 | Specification stage | Remaining work |
 |---|---|
 | 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
-| 4: Document processing | CSV review implemented; selected text-PDF extraction, scanned OCR, institution adapters, recurring/grouped review, and row-level reconciliation remain |
+| 4: Document processing | CSV and selected text-PDF review implemented; scanned OCR, institution adapters, recurring/grouped review, and row-level reconciliation remain |
 | 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
 | 6: Security/commercial | Encrypted backup/restore implemented; clean Windows recovery, password safeguards, accounts/roles, branding, licensing and independent review remain |
 | 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |

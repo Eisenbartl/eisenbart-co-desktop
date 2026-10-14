@@ -1,8 +1,8 @@
 # Windows evaluation guide
 
 This development build provides a local workspace, client profiles, counseling
-statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.7.0 source) savings planning, cash-flow calendars, encrypted backups, verified restore, and CSV transaction review. Use fictional records only. Advanced financial
-calculations, PDF statement extraction, advanced cash-flow models, PDF reports, and
+statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.8.0 source) savings planning, cash-flow calendars, encrypted backups, verified restore, and CSV/selectable-text PDF transaction review. Use fictional records only. Advanced financial
+calculations, scanned-document OCR, institution adapters, advanced cash-flow models, PDF reports, and
 commercial licensing are still being developed. Password reset and independent security review remain unavailable.
 
 ## Install and open
@@ -244,3 +244,9 @@ Open **Settings**, choose a backup folder outside the app data folder, enter you
 Open a saved client, choose a synthetic USD checking/savings CSV, and click **Inspect CSV**. Select the actual date, description, amount, and optional classification columns; select the account and enter only known statement metadata. The complete original file is retained only if you check its authorization box. Click **Import into review queue**, then review and explicitly approve eligible rows. Nothing is approved by importing.
 
 Refunds offset spending; paired internal transfers avoid extra income/expense. Corrections, conflicting rows, and reversals need individual review and reasons. Totals use only approved records and do not alter the client's planning inputs. See [CSV steps, supported formats, examples, and limits](csv-import-review.md). The old 0.3.0 installer does not contain this feature; no new download was created.
+
+## Import selectable-text PDF statements (0.8.0 source)
+
+Choose **Selectable-text PDF** in the client statement panel, inspect a synthetic PDF, expand its pages, and select only transaction lines. Choose the account and actual date format; leave unknown metadata blank. Original-file retention requires its checkbox. Import, then verify each record against its original page, classify/category it, enter a reason, and explicitly approve or reject it. Every PDF row starts as Needs Clarification; bulk approval is unavailable.
+
+[PDF instructions, supported layout, examples, and limits](pdf-import-review.md) explain wrapped/ambiguous text, protected/scanned files, exact totals, and recovery. The older installer lacks this source checkpoint; no new download was created.

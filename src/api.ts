@@ -22,6 +22,8 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  chooseClientPdf: (clientId:string) => command<string|null>('choose_client_pdf',{clientId}),
+  inspectClientPdf: (clientId:string,path:string) => command<CsvPreview>('inspect_client_pdf',{clientId,path}),
   chooseClientCsv: (clientId:string) => command<string|null>('choose_client_csv',{clientId}),
   inspectClientCsv: (clientId:string,path:string) => command<CsvPreview>('inspect_client_csv',{clientId,path}),
   cancelClientCsv: (token:string) => command<void>('cancel_client_csv',{token}),

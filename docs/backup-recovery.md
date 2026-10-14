@@ -109,7 +109,7 @@ Limits are 4 KiB header, 256 MiB database, and 1,000 clients in this milestone.
 The parser bounds allocations and streams encrypted data. HMAC verification uses
 the cryptographic library's constant-time verifier. It then checks SQLCipher page
 integrity, SQLite integrity and foreign keys, application identity, supported
-schema, current client financial inputs, approved imported records, and reciprocal transfer links. Older schemas migrate only in the
+schema, current client financial inputs, approved imported records, and reciprocal transfer links and PDF source locators. Older schemas migrate only in the
 private candidate. The original files are not migrated or repaired by restore.
 
 Snapshot creation uses `sqlcipher_export` with an explicit encryption key inside
@@ -118,7 +118,7 @@ file alone could miss that data and is not the backup method. A completed backup
 precedes its live `backup_created` audit entry; the snapshot therefore contains
 prior audit history, not that backup's later audit event. A `workspace_restored`
 event linking the backup UUID is written to the candidate before activation.
-Audit tables remain immutable; schema 8 preserves preceding events and adds CSV/review events.
+Audit tables remain immutable; schema 9 preserves preceding events and adds CSV/PDF/review events.
 
 Publication uses exclusive file creation for backups. Restore uses a flushed
 candidate database/metadata pair and a single atomically replaced pointer on the
@@ -153,4 +153,4 @@ See [development-status.md](development-status.md) for completed results.
 Unrun or future work includes actual removable-drive/power-loss drills, a clean
 installed Windows 11 recovery workflow, independent crypto/security review,
 scheduled backups, retained-copy selection/pruning, password change/recovery,
-and inclusion of future document/report file attachments. Authorized original CSVs are stored inside SQLCipher, so current backups include their BLOBs, provenance, decisions, and immutable history. There are no separate file attachments yet; the format covers the whole existing database.
+and inclusion of future document/report file attachments. Authorized original CSVs and PDFs are stored inside SQLCipher, so current backups include their BLOBs, provenance, decisions, and immutable history. There are no separate file attachments yet; the format covers the whole existing database.

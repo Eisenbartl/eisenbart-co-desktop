@@ -28,7 +28,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 8;
+const SCHEMA_VERSION: i32 = 9;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -1008,6 +1008,12 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
         transaction
             .execute_batch(include_str!("imports-schema.sql"))
             .map_err(storage_error)?;
+        version = 8;
+    }
+    if version == 8 {
+        transaction
+            .execute_batch(include_str!("pdf-schema.sql"))
+            .map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;
     integrity_check(connection)
@@ -1768,6 +1774,13 @@ mod tests {
         for foreign_id in [&other_org_client, &other_counselor_client] {
             assert_eq!(
                 workspace.get_client_imports(foreign_id).err().unwrap(),
+                UNAVAILABLE_CLIENT
+            );
+            assert_eq!(
+                workspace
+                    .inspect_client_pdf(foreign_id.to_string(), "never-read.pdf".into())
+                    .err()
+                    .unwrap(),
                 UNAVAILABLE_CLIENT
             );
             assert_eq!(

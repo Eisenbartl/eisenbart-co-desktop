@@ -68,6 +68,10 @@ pub struct Fields {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Raw {
+    #[serde(default)]
+    pub page: Option<u32>,
+    #[serde(default)]
+    pub reported_line: Option<String>,
     pub extraction_method: String,
     pub record_number: u32,
     pub line: u64,
@@ -94,6 +98,8 @@ pub struct CsvData {
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DocumentInput {
+    #[serde(default)]
+    pub pdf_selection: Option<Vec<crate::pdf::Locator>>,
     pub account_id: Option<String>,
     pub account_label: String,
     pub account_kind: String,
@@ -138,6 +144,7 @@ pub struct PairInput {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Preview {
+    pub pdf_pages: Option<Vec<crate::pdf::Page>>,
     pub client_id: String,
     pub token: String,
     pub file_name: String,
@@ -250,7 +257,7 @@ pub fn signed_money(value: &str) -> Result<i64, String> {
     let n = parse_money(if negative { &text[1..] } else { text })?;
     Ok(if negative { -n } else { n })
 }
-fn reported_money(value: &str) -> Result<i64, String> {
+pub(crate) fn reported_money(value: &str) -> Result<i64, String> {
     let mut text = value.trim();
     let mut negative = false;
     if text.starts_with('(') && text.ends_with(')') {
@@ -407,7 +414,7 @@ pub fn validate_mapping(m: &Mapping, columns: usize) -> Result<(), String> {
     }
     Ok(())
 }
-fn source_date(value: &str, format: &DateFormat) -> Option<String> {
+pub(crate) fn source_date(value: &str, format: &DateFormat) -> Option<String> {
     let text = value.trim();
     if *format == DateFormat::Iso {
         return iso_date(text).ok().map(|d| d.to_string());
@@ -545,6 +552,8 @@ pub fn extract(csv: &CsvData, m: &Mapping) -> Result<Vec<Raw>, String> {
             );
         }
         extracted.push(Raw {
+            page: None,
+            reported_line: None,
             extraction_method: "csv-utf8-v1".into(),
             record_number: index as u32 + 2,
             line: *line,

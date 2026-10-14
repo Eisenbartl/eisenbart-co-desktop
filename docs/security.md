@@ -30,7 +30,7 @@ SQLCipher protects the database at rest. It does not protect against malware, a 
 
 Audit records live inside the same encrypted database. The application appends operational history, but this does not make the history tamper-proof against someone with the key and direct database access. Avoid sensitive values in logs and audit descriptions.
 
-Bounded synthetic UTF-8 CSV imports now use explicit mapping, no active-content execution, immutable provenance/history, client-scoped encrypted storage, authorized optional original-file BLOBs, atomic decisions, duplicate warnings, and approved-only exact totals. Lock clears transient previews. Existing encrypted backups include imported sources/history; restore checks approved records and reciprocal transfer links. See [csv-import-review.md](csv-import-review.md) for resource limits and unimplemented parser/review features. This does not establish installed Windows or independent security acceptance. PDF/OCR components remain unselected.
+Bounded synthetic UTF-8 CSV imports now use explicit mapping, no active-content execution, immutable provenance/history, client-scoped encrypted storage, authorized optional original-file BLOBs, atomic decisions, duplicate warnings, and approved-only exact totals. Lock clears transient previews. Existing encrypted backups include imported sources/history; restore checks approved records and reciprocal transfer links. See [csv-import-review.md](csv-import-review.md) for resource limits and unimplemented parser/review features. This does not establish installed Windows or independent security acceptance. OCR remains unselected; PDF parser dependencies are inventoried separately.
 
 ## Windows memory-lock diagnostics
 
@@ -57,3 +57,5 @@ production requirement.
 - Perform independent security and privacy review before using or selling a production release.
 
 Never place real passwords, signing keys, tokens, or client records in Git, test fixtures, documentation, or issue reports.
+
+Selectable-text PDFs now run in a supervised child process before workspace initialization, with sanitized environment and bounded stdin/stdout, text/page/line, memory and time limits. No PDF renderer, JavaScript evaluator, attachment extraction, OCR, or network service is invoked. This is a process/resource boundary, not a complete OS sandbox or completed independent security review. PDF source locators and authorized original BLOBs use SQLCipher and authenticated backup; every PDF record requires individual approval with source acknowledgment and a reason. See [pdf-import-review.md](pdf-import-review.md).

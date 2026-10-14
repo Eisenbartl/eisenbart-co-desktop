@@ -197,9 +197,9 @@ export type TransactionKind='unclassified'|'income'|'expense'|'transfer'|'refund
 export type ReviewStatus='Pending'|'Needs Clarification'|'Approved'|'Rejected';
 export interface CsvMapping {date:number;description:number;amountMode:'signed'|'debitCredit';amount:number|null;debit:number|null;credit:number|null;signedIsDebit:boolean;dateFormat:'iso'|'mdy'|'dmy';merchant:number|null;category:number|null;kind:number|null;reference:number|null;balance:number|null}
 export interface TransactionFields {date:string|null;amount:string|null;description:string;merchant:string;category:string;kind:TransactionKind}
-export interface RawCsvRecord {extractionMethod:string;recordNumber:number;line:number;reportedDate:string;reportedAmount:string|null;reportedDebit:string|null;reportedCredit:string|null;reportedDescription:string;reportedMerchant:string|null;reportedCategory:string|null;reportedKind:string|null;reportedReference:string|null;reportedBalance:string|null;extracted:TransactionFields;reference:string|null;balance:string|null;issues:string[]}
-export interface CsvDocumentInput {accountId:string|null;accountLabel:string;accountKind:string;periodStart:string|null;periodEnd:string|null;openingBalance:string|null;closingBalance:string|null;retainSource:boolean;mapping:CsvMapping}
-export interface CsvPreview {clientId:string;token:string;fileName:string;sha256:string;byteCount:number;headers:string[];sampleRows:string[][];rowCount:number}
+export interface RawCsvRecord {page?:number|null;reportedLine?:string|null;extractionMethod:string;recordNumber:number;line:number;reportedDate:string;reportedAmount:string|null;reportedDebit:string|null;reportedCredit:string|null;reportedDescription:string;reportedMerchant:string|null;reportedCategory:string|null;reportedKind:string|null;reportedReference:string|null;reportedBalance:string|null;extracted:TransactionFields;reference:string|null;balance:string|null;issues:string[]}
+export interface CsvDocumentInput {pdfSelection?:PdfLocator[]|null;accountId:string|null;accountLabel:string;accountKind:string;periodStart:string|null;periodEnd:string|null;openingBalance:string|null;closingBalance:string|null;retainSource:boolean;mapping:CsvMapping}
+export interface CsvPreview {pdfPages?:PdfPage[]|null;clientId:string;token:string;fileName:string;sha256:string;byteCount:number;headers:string[];sampleRows:string[][];rowCount:number}
 export interface StatementAccount {id:string;label:string;kind:string}
 export interface CsvDocument {id:string;accountId:string;fileName:string;sha256:string;byteCount:number;importedAt:string;sourceRetained:boolean;input:CsvDocumentInput;rowCount:number;sourceExpectedClosing:string|null;sourceDifference:string|null;approvedDifference:string|null;warnings:string[]}
 export interface ImportedRecord {id:string;documentId:string;accountId:string;raw:RawCsvRecord;fields:TransactionFields;status:ReviewStatus;linkedId:string|null;reason:string;warnings:string[];duplicateIds:string[];bulkEligible:boolean}
@@ -210,3 +210,6 @@ export interface CsvStageInput {expectedRevision:number;token:string;document:Cs
 export interface TransactionReviewInput {expectedRevision:number;recordId:string;status:ReviewStatus;fields:TransactionFields;reason:string;acknowledgeWarnings:boolean}
 export interface TransactionBulkInput {expectedRevision:number;recordIds:string[]}
 export interface TransactionPairInput {expectedRevision:number;leftId:string;rightId:string;reason:string}
+
+export interface PdfLocator {page:number;line:number}
+export interface PdfPage {number:number;text:string}

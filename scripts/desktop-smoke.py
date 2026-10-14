@@ -25,6 +25,7 @@ from typing import Callable, TypeVar
 import urllib.error
 import urllib.parse
 import urllib.request
+from synthetic_pdf import build_pdf
 
 
 ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf"
@@ -383,6 +384,52 @@ def check_csv_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> No
     status("CSV provenance, explicit bulk/individual decisions, refund, reversal, transfer pairing, duplicate rejection and encrypted retention")
 
 
+def check_pdf_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> None:
+    source = data_root / "external-pdf"
+    source.mkdir()
+    path = source / "statement.pdf"
+    path.write_bytes(build_pdf([["Synthetic checking statement", "2026-10-01 Fictional payroll 1000.01", "2026-10-02 Fictional groceries -25.11"]]))
+    damaged = source / "damaged.pdf"
+    damaged.write_bytes(b"%PDF-1.4\ndamaged")
+    driver.open_client("Alex Fictional")
+    driver.select("#statement-format", "Selectable-text PDF")
+    driver.fill("#csv-path", str(damaged))
+    driver.click_button("Inspect PDF")
+    driver.wait_text(".imports-panel [role=alert]", "could not be extracted safely", "damaged PDF rejected without an import")
+    driver.fill("#csv-path", str(path))
+    driver.click_button("Inspect PDF")
+    driver.wait_text(".pdf-line-selection", "Fictional payroll 1000.01", "real PDF parser process returns selectable source text")
+    driver.wait_text(".pdf-line-selection", "Selected PDF lines: 0 / 500", "no automatic PDF line selection")
+    for date in ["2026-10-01", "2026-10-02"]:
+        driver.click(f"//label[contains(@class,'pdf-source-line')][contains(.,'{date}')]/input", "xpath")
+    driver.fill("#csv-account-label", "Synthetic PDF checking")
+    driver.fill("#csv-openingBalance", "0")
+    driver.fill("#csv-closingBalance", "974.90")
+    driver.click("//label[contains(.,'Authorize retaining the complete original PDF')]/input", "xpath")
+    driver.click_button("Import into review queue")
+    driver.wait_text(".imports-panel", "Every PDF record needs individual verification.", "selected PDF rows staged for clarification")
+    driver.wait_text(".imports-progress", "Needs Clarification 2", "all PDF rows require individual review")
+    driver.click_button("Review statement.pdf record 1")
+    driver.wait_text(".transaction-review", "page 1, extracted line", "page/line provenance displayed")
+    driver.select("#review-kind", "Income")
+    driver.fill("#review-category", "Wages")
+    driver.select("#review-status", "Approved")
+    driver.fill("#review-reason", "Individually verified synthetic PDF payroll, USD currency, amount and date")
+    driver.click("#review-ack")
+    driver.wait(lambda: driver.command("GET", f"/element/{driver.find('#review-ack')}/property/checked") is True,
+                "PDF individual acknowledgment selected")
+    driver.click_button("Save transaction decision")
+    driver.wait_text(".imports-totals", "$3,000.01", "only approved PDF income joins prior approved CSV income")
+    driver.wait_text(".imports-totals", "$1,820.02", "pending PDF expense stays excluded from exact combined account activity")
+    driver.wait_text(".imports-progress", "Needs Clarification 1", "unapproved PDF expense remains unresolved")
+    driver.click_button("Review statement.pdf record 1")
+    driver.click(".transaction-review > details > summary")
+    driver.wait_text(".transaction-review", "2026-10-01 Fictional payroll 1000.01", "original PDF text remains immutable")
+    driver.script("document.querySelector('.transaction-review').scrollIntoView({block:'center'})")
+    driver.screenshot(artifacts / "native-pdf-review.png")
+    status("bounded separate PDF parser, damaged-file rejection, explicit source-line selection, page provenance, individual approval, and pending-data exclusion")
+
+
 def run_checks(driver: WebDriver, binary: Path, password: str,
                wrong_password: str, artifacts: Path, restart_driver: Callable[[], None], data_root: Path) -> None:
     organization = "Smoke Test Counseling — Fictional"
@@ -604,7 +651,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click_button("Lock workspace")
     driver.element("#password")
     private_values = [f"{first_name} {first_last}", f"{second_name} {second_last}",
-                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve", "Alex synthetic checking", "Alex synthetic cash-flow priority", "Alex synthetic dated pay", "Synthetic reserve transfer", "Synthetic incoming transfer", "Synthetic checking", "checking.csv"]
+                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve", "Alex synthetic checking", "Alex synthetic cash-flow priority", "Alex synthetic dated pay", "Synthetic reserve transfer", "Synthetic incoming transfer", "Synthetic checking", "checking.csv", "Fictional payroll", "Synthetic PDF checking"]
 
     def assert_locked() -> None:
         markup = str(driver.observe_script("return document.documentElement.outerHTML"))
@@ -686,6 +733,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     status("full app relaunch preserves profiles, clients, edits, and isolated notes/budgets/debts/savings/cash-flow plans")
 
 
+    check_pdf_imports(driver, artifacts, data_root)
+
     # Exercise recovery only in this synthetic app-data directory. No native
     # commands are invoked directly; passwords and paths use visible controls.
     backup_folder=data_root / "external-backups"
@@ -756,11 +805,15 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".budget-totals", "$716.67", "restored budget")
     driver.wait_text(".savings-results", "2028-06-30", "restored savings plan")
     driver.wait_text(".cashflow-results .budget-totals", "$3,300.00", "restored cash-flow plan")
-    driver.wait_text(".imports-progress", "Approved 5 · Rejected 1", "backup restores CSV decisions and reciprocal links")
-    driver.wait_text(".imports-totals", "$820.01", "backup restores exact imported totals")
+    driver.wait_text(".imports-progress", "Approved 6 · Rejected 1", "backup restores CSV/PDF decisions and reciprocal links")
+    driver.wait_text(".imports-totals", "$1,820.02", "backup restores exact imported totals")
     driver.click_button("Review checking.csv record 4")
     driver.click(".review-history > summary")
     driver.wait_text(".review-history", "Approved → Rejected", "backup restores immutable review history")
+    driver.click_button("Review statement.pdf record 1")
+    driver.wait_text(".transaction-review", "page 1, extracted line", "restored PDF provenance")
+    driver.click(".review-history > summary")
+    driver.wait_text(".review-history", "Needs Clarification → Approved", "restored immutable PDF approval history")
     status("encrypted backup, wrong-password rejection, interrupted review, explicit restore, retained source, and restored plans")
     # Simulate missing metadata only after stopping every synthetic app process.
     # The error-screen recovery flow must work without opening the damaged vault.
@@ -787,7 +840,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.open_client("Alex Fictional")
     driver.wait_text(".notes-history", note, "restored records after simulated metadata loss")
     driver.wait_value("#cashflow-date-0", "2026-11-03", "restored original cash-flow dates after recovery")
-    driver.wait_text(".imports-progress", "Approved 5 · Rejected 1", "storage-error recovery includes imported records")
+    driver.wait_text(".imports-progress", "Approved 6 · Rejected 1", "storage-error recovery includes imported records")
     status("fresh-process activation and error-screen recovery after simulated metadata loss")
 
 
