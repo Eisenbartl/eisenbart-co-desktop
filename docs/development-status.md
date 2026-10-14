@@ -47,6 +47,10 @@ focused storage rerun passed all three tests without weakening either safeguard.
 Native UI testing found a selected statement panel closing on a saved revision;
 the panel now retains its source selection and displays fresh results. An
 interface regression checks results remain visible after a successful setting save.
+A second native check found source-record navigation also cleared the source
+selection; navigation now retains the statement alongside the transaction editor,
+with an interface regression for that context. The selector placeholder closes
+the view explicitly.
 Logs and fictional artifacts are under `/workspace/shared/reconciliation-*`.
 
 Next priority: **client financial dashboard** built from approved imported facts,
