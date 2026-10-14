@@ -68,6 +68,7 @@ fn decode(
     if end != p.assessment.period_end {
         return Err(STORAGE_ERROR.into());
     }
+    scenarios_store::validate_link(c, w, client, &p)?;
     texts(&p)?;
     assessments::validate(&p).map_err(|_| STORAGE_ERROR.to_owned())?;
     if let Some(e) = &p.supporting {
@@ -94,7 +95,7 @@ pub(super) fn validate_records(
     }
     Ok(())
 }
-fn plan_revisions(
+pub(super) fn plan_revisions(
     c: &Connection,
     w: &WorkspaceInfo,
     client: &str,
@@ -109,7 +110,7 @@ fn plan_revisions(
         cashflow: get("client_cashflow_plans")?,
     })
 }
-fn read_plans(
+pub(super) fn read_plans(
     c: &Connection,
     w: &WorkspaceInfo,
     client: &str,
@@ -152,7 +153,12 @@ pub(super) fn record(
             review_reasons.push("Saved budget, debt, savings or dated cash-flow plans changed after this scenario was captured. Its original assumptions and projections remain historical.".into());
         }
     }
+    let scenario = scenarios_store::validate_link(c, w, client, &payload)?;
+    if let Some(r) = &scenario {
+        review_reasons.extend(r.review_reasons.clone());
+    }
     Ok(Record {
+        scenario,
         client_id: client.into(),
         needs_review: !review_reasons.is_empty(),
         review_reasons,
@@ -301,6 +307,14 @@ impl Workspace {
             },
             calculation_date,
         )?;
+        if input.selected_scenario.is_some() && input.planning.is_some() {
+            return Err("Select either a saved combined scenario or the current saved planning models, not both.".into());
+        }
+        let selected_scenario = input.selected_scenario;
+        let chosen = selected_scenario
+            .as_ref()
+            .map(|selection| scenarios_store::select(&tx, &s.info, client, selection))
+            .transpose()?;
         let planning = input
             .planning
             .map(|mut selection| {
@@ -310,6 +324,11 @@ impl Workspace {
                 crate::planning::capture(read_plans(&tx, &s.info, client)?, selection)
             })
             .transpose()?;
+        let planning = if let Some(r) = &chosen {
+            Some(crate::saved_scenarios::planning(&r.payload)?)
+        } else {
+            planning
+        };
         let supporting=input.supporting.map(|selection| -> Result<crate::report_evidence::Snapshot,String>{
             let count=notes_count(&tx,&s.info,client)?;
             if count!=selection.expected_notes_count {return Err("Session notes changed since evidence review. Reload report evidence and review your selection; nothing was saved.".into());}
@@ -323,8 +342,11 @@ impl Workspace {
             assessments::capture(source)
         };
         let payload = Payload {
+            selected_scenario,
             planning,
-            format: if supporting.is_some() {
+            format: if chosen.is_some() {
+                4
+            } else if supporting.is_some() {
                 assessments::FORMAT
             } else {
                 2
@@ -354,6 +376,9 @@ impl Workspace {
             return Err("Saved assessments reached their local safety limit (50 records, 8 MiB per record, 32 MiB per client). Nothing was saved.".into());
         }
         tx.execute("INSERT INTO client_assessment_records(id,client_id,organization_id,counselor_id,title,created_at,period_start,period_end,source_revision,payload_json,digest) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",params![payload.id,client,s.info.organization_id,s.info.counselor_id,payload.title,payload.created_at,payload.assessment.period_start,payload.assessment.period_end,payload.assessment.revision,json,digest]).map_err(storage_error)?;
+        if let Some(selection) = &payload.selected_scenario {
+            tx.execute("INSERT INTO assessment_scenario_links(assessment_id,scenario_id,client_id,organization_id,counselor_id,digest) VALUES(?1,?2,?3,?4,?5,?6)",params![payload.id,selection.id,client,s.info.organization_id,s.info.counselor_id,selection.digest]).map_err(storage_error)?;
+        }
         audit(&tx, &s.info, "assessment_recorded", Some(&payload.id))?;
         let result = record(&tx, &s.info, client, &payload.id)?;
         tx.commit().map_err(storage_error)?;

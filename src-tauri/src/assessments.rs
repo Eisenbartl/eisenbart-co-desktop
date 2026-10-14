@@ -14,6 +14,8 @@ pub struct Input {
     #[serde(default)]
     pub supporting: Option<crate::report_evidence::Selection>,
     #[serde(default)]
+    pub selected_scenario: Option<crate::saved_scenarios::Selection>,
+    #[serde(default)]
     pub planning: Option<crate::planning::Selection>,
     pub expected_revision: i64,
     pub expected_profile_updated_at: String,
@@ -30,6 +32,8 @@ pub struct Input {
 pub struct Payload {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supporting: Option<crate::report_evidence::Snapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_scenario: Option<crate::saved_scenarios::Selection>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub planning: Option<crate::planning::Snapshot>,
     pub format: u32,
@@ -71,6 +75,8 @@ pub struct Record {
     pub digest: String,
     pub needs_review: bool,
     pub review_reasons: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scenario: Option<crate::saved_scenarios::Record>,
 }
 
 pub fn capture(source: imports::Snapshot) -> imports::Snapshot {
@@ -118,9 +124,12 @@ pub fn capture_report(mut source: imports::Snapshot, supporting: bool) -> import
 }
 pub fn validate(payload: &Payload) -> Result<(), String> {
     let bad = || "The saved assessment evidence is invalid or unsupported.".to_owned();
-    if !matches!(payload.format, 1 | 2 | FORMAT)
+    if !matches!(payload.format, 1 | 2 | FORMAT | 4)
         || (payload.format == 1 && payload.planning.is_some())
-        || (payload.supporting.is_some() != (payload.format == FORMAT))
+        || (payload.supporting.is_some() && payload.format < FORMAT)
+        || (payload.format == FORMAT && payload.supporting.is_none())
+        || (payload.selected_scenario.is_some() != (payload.format == 4))
+        || (payload.selected_scenario.is_some() && payload.planning.is_none())
         || payload.calculator != CALCULATOR
         || payload.app_version.is_empty()
         || payload.id.is_empty()
@@ -130,6 +139,14 @@ pub fn validate(payload: &Payload) -> Result<(), String> {
         || payload.basis.revision != payload.assessment.revision
     {
         return Err(bad());
+    }
+    if let Some(selection) = &payload.selected_scenario {
+        if uuid::Uuid::parse_str(&selection.id).is_err()
+            || selection.digest.len() != 64
+            || !selection.digest.bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            return Err(bad());
+        }
     }
     if let Some(p) = &payload.planning {
         crate::planning::validate(p, &payload.client.id)?;

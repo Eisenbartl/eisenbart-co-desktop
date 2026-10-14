@@ -1,7 +1,7 @@
 # Native desktop smoke test
 
 `scripts/desktop-smoke.py` launches the compiled Tauri application through
-`tauri-driver` and a native WebDriver. It uses Python 3's standard library;
+the native WebKit WebDriver directly on Linux. It uses Python 3's standard library;
 Selenium and a development web server are not needed.
 
 The test creates a temporary workspace containing fictional clients. It verifies
@@ -24,12 +24,11 @@ generated and never printed. Temporary application data is removed on completion
 Build the frontend and native application with the repository's documented
 toolchain first. A built application with embedded frontend assets is required;
 this test does not start Vite. Provide an X display (a desktop or Xvfb),
-`tauri-driver`, and the `WebKitWebDriver` matching the installed WebKitGTK runtime.
+the `WebKitWebDriver` matching the installed WebKitGTK runtime.
 
 ```bash
 python3 scripts/desktop-smoke.py \
   --binary src-tauri/target/release/eisenbart-counseling-suite \
-  --driver /path/to/tauri-driver \
   --native-driver /path/to/WebKitWebDriver \
   --artifacts /tmp/eisenbart-desktop-smoke
 ```
@@ -164,3 +163,19 @@ status for logs and the three-attempt boundary. The intended click selector is
 now included in error diagnostics; uncertain clicks and financial mutations are
 never automatically retried. Do not treat individual PASS lines as a successful
 full run.
+
+
+Direct native transport is now the default. It uses the same
+`webkitgtk:browserOptions` binary/arguments and Tauri automation environment flags
+as tauri-driver 2.1.0, removing only that intermediary's pooled forwarding hop.
+`--transport tauri --driver /path/to/tauri-driver` retains the older path for
+transport diagnosis. Assertions, UI interactions and no-replay rules are unchanged.
+The pre-stage 0.19.0 full workflow passed with direct transport (exit 0), resolving
+the previously documented final report-panel disconnect.
+
+The 0.20.0 workflow additionally saves Alex’s reviewed combined proposal, explicitly
+selects it in a format 4 report, exports its selected baseline/proposed PDF and
+verifies it after restart and both recovery paths. Later budget revisions flag
+both records Needs review while their 983.34 proposal buffer and separate 1,820.02
+approved report figures remain frozen. All historical report/client-plan checks
+continue in the same full workflow.

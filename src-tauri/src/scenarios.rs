@@ -34,15 +34,15 @@ pub struct Input {
     pub emergency_contribution: Option<AmountChange>,
     pub cash_changes: Vec<CashChange>,
 }
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Outcome {
     pub strategy: planning::Strategy,
     pub first_month_buffer: Option<String>,
     pub plans: planning::Plans,
 }
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Comparison {
     pub calculator: String,
     pub client_id: String,

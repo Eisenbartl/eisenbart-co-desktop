@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   chooseBackupFolder:vi.fn(), chooseRestoreFile:vi.fn(), createWorkspaceBackup:vi.fn(), prepareWorkspaceRestore:vi.fn(), confirmWorkspaceRestore:vi.fn(), cancelWorkspaceRestore:vi.fn(),
   chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),getClientImports:vi.fn(),reviewRecurringPayment:vi.fn(),reviewStatementBalances:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn(),
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
-  getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
+  listClientScenarios:vi.fn(),getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
 }));
 
@@ -42,6 +42,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.listClientScenarios.mockImplementation(async(clientId:string)=>({clientId,records:[]}));
   mocks.getClientImports.mockImplementation(async (clientId:string)=>({clientId,revision:0,accounts:[],documents:[],records:[],history:[],merchantGroups:[],recurringHistory:[],summary:{pending:0,needsClarification:0,approved:0,rejected:0,income:'0.00',spending:'0.00',refunds:'0.00',netSpending:'0.00',netCash:'0.00',accountNet:[],warnings:[]}}));
   mocks.cancelClientCsv.mockResolvedValue(undefined);
   mocks.cancelWorkspaceRestore.mockResolvedValue(undefined);

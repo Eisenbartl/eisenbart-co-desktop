@@ -251,6 +251,19 @@ impl Layout {
         Ok((bytes, count))
     }
 }
+fn scenario_income(p: &crate::planning::Plans) -> Option<&str> {
+    let income = p
+        .budget
+        .lines
+        .iter()
+        .filter(|l| l.kind == crate::budget::Kind::Income)
+        .collect::<Vec<_>>();
+    if !income.is_empty() && income.iter().all(|l| l.amount.is_some()) {
+        Some(&p.budget.summary.monthly_income)
+    } else {
+        None
+    }
+}
 fn usd(v: &str) -> String {
     format!("USD {v}")
 }
@@ -971,6 +984,57 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
             .unwrap_or("Unavailable"),
     )?;
     l.text("Coverage uses accessible savings only. Payment ratio uses recorded take-home pay, not gross lender income or underwriting DTI. Estimates depend on completeness, dates and active approved classifications; missing values remain unknown.",10.0)?;
+    if let Some(r) = &r.scenario {
+        let c = &r.payload.comparison;
+        l.section("Selected saved combined scenario / hypothetical")?;
+        l.value("Scenario label", &c.input.label)?;
+        l.value("Scenario record", &r.payload.id)?;
+        l.value("Scenario digest", &r.digest)?;
+        l.value(
+            "Originally recorded (America/Chicago)",
+            &chicago_time(&c.created_at)?,
+        )?;
+        l.text("Original baseline and proposal are preserved in the encrypted scenario record. This selection does not change approved financial facts, live plans or client agreements. The planning section below uses the selected proposal, not the live baseline.",10.0)?;
+        for (label, a, b) in [
+            (
+                "Entered monthly income",
+                scenario_income(&c.baseline.plans),
+                scenario_income(&c.proposed.plans),
+            ),
+            (
+                "Savings model first-month buffer",
+                c.baseline.first_month_buffer.as_deref(),
+                c.proposed.first_month_buffer.as_deref(),
+            ),
+            (
+                "Dated cash-flow closing",
+                c.baseline
+                    .plans
+                    .cashflow
+                    .summary
+                    .as_ref()
+                    .and_then(|s| s.combined_closing.as_deref()),
+                c.proposed
+                    .plans
+                    .cashflow
+                    .summary
+                    .as_ref()
+                    .and_then(|s| s.combined_closing.as_deref()),
+            ),
+        ] {
+            l.value(
+                label,
+                &format!(
+                    "Baseline {} / proposed {}",
+                    a.map(usd).unwrap_or_else(|| "Unavailable".into()),
+                    b.map(usd).unwrap_or_else(|| "Unavailable".into())
+                ),
+            )?;
+        }
+        for warning in &c.warnings {
+            l.text(warning, 10.0)?;
+        }
+    }
     if let Some(s) = &p.planning {
         planning_pdf(&mut l, s)?;
     }

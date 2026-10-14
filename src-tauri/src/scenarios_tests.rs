@@ -12,7 +12,7 @@ fn audit_count(w: &super::Workspace) -> i64 {
         .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
         .unwrap()
 }
-fn fixture() -> (tempfile::TempDir, crate::storage::Workspace, String) {
+pub(super) fn fixture() -> (tempfile::TempDir, crate::storage::Workspace, String) {
     let (dir, mut w, _) = configured();
     let client = w.save_client(client_input()).unwrap();
     let mut budget = budget_input(0);
@@ -38,7 +38,7 @@ fn fixture() -> (tempfile::TempDir, crate::storage::Workspace, String) {
         .unwrap();
     (dir, w, client.id)
 }
-fn input() -> Input {
+pub(super) fn input() -> Input {
     Input {
         expected_revisions: planning::Revisions {
             budget: 1,

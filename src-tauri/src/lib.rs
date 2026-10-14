@@ -18,6 +18,7 @@ mod planning;
 mod reconciliation;
 mod recurring;
 mod report_evidence;
+mod saved_scenarios;
 mod savings;
 mod scenarios;
 mod storage;
@@ -597,6 +598,46 @@ fn list_client_notes(
 }
 
 #[tauri::command]
+async fn list_client_scenarios(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<saved_scenarios::Directory, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.list_client_scenarios(&client_id))
+    })
+    .await
+    .map_err(|_| "Scenario history could not load.".to_owned())?
+}
+#[tauri::command]
+async fn get_client_scenario(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+) -> Result<saved_scenarios::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_client_scenario(&client_id, &id))
+    })
+    .await
+    .map_err(|_| "Saved scenario could not load.".to_owned())?
+}
+#[tauri::command]
+async fn save_client_scenario(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: saved_scenarios::Input,
+) -> Result<saved_scenarios::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_client_scenario(&client_id, input))
+    })
+    .await
+    .map_err(|_| {
+        "Scenario save could not finish. Reload scenario history before recording again.".to_owned()
+    })?
+}
+#[tauri::command]
 async fn compare_financial_scenarios(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -778,6 +819,9 @@ pub fn run() {
             list_client_notes,
             compare_budget_methods,
             compare_financial_scenarios,
+            list_client_scenarios,
+            get_client_scenario,
+            save_client_scenario,
             get_client_budget,
             save_client_budget,
             get_client_debt_plan,

@@ -1,5 +1,66 @@
 # Development status
 
+## Stage 3G: saved combined scenarios and report selection — 0.20.0 source
+
+Reviewed combined proposals can now be recorded independently of live plans and
+reopened as immutable baseline/proposed comparisons. Records retain client/time,
+all four baseline versions, canonical changes/assumptions, complete model results
+and warnings. Later live-plan revisions flag history Needs review without
+rewriting values. Counselor assessments can explicitly select a current saved
+scenario by ID/digest, capture its proposed model set and export selected
+comparison context and milestones as an offline internal PDF. Approved activity
+remains separate. See [saved-combined-scenarios.md](saved-combined-scenarios.md).
+
+Schema 16 adds append-only owned scenario records and compound report links. A
+scoped immediate transaction checks history count and baseline versions, performs
+Rust calculations, and records payload/digest/audit atomically. The count guards
+uncertain save responses; mutations are never automatically retried. Read/recovery
+recompute captured models and verify scope/metadata/digest/arithmetic/linkage.
+Failed audit, stale context or invalid selections leave no partial record/link.
+Format 4 reports support selected proposals and optional session/payment evidence;
+formats 1–3 and existing client agreements remain unchanged. Unknown projections
+stay unavailable; unsupported selected repayment projections cannot enter reports.
+No dependency or installer is introduced.
+
+The earlier native blocker is resolved: a direct WebKit driver connection uses
+the same binary capabilities and automation flags as tauri-driver, removing its
+pooled forwarding hop. The complete pre-stage 0.19.0 workflow passed once, exit 0,
+including the formerly interrupted final report check and both recovery paths.
+Assertions and no-replay rules remain intact; the older forwarding mode stays
+available only for diagnosis. Its previous failure logs are preserved.
+
+Independent backend example: income 3,250.00 → 3,466.67; buffers 1,700.00 →
+1,816.67; proposed snowball interest 23.01/payoff February 2027/emergency
+completion May 2027, while approved report activity stays 0.00. Native data has
+budget debt reserve 400.00, preserving 766.67 → 983.34 buffers and 35.35 → 23.01
+interest, with November 2027 emergency completion and 3,300.00 dated closing.
+The selected report retains separate approved operating activity 1,820.02.
+
+| Check | Result |
+|---|---|
+| Locked setup / production frontend build | Passed |
+| Interface suite | 107 passed; five new history/save/selection/stale/client-isolation checks plus prior financial/private-data guards |
+| New backend checks | Eight scenario store/report/PDF/recovery/upgrade/corruption/audit/limits checks and nine migration-focused checks passed |
+| Complete Linux backend / worker suite | 149 library + 2 worker tests passed (151 total); new scenarios, report/PDF, recovery, schema 1–16 compatibility and all earlier financial workflows |
+| Formatting / Clippy, warnings denied | Passed |
+| Native compile / complete new workflow | Standalone debug compile passed; complete new workflow in progress |
+| Windows source CI | Validation in progress; installer packaging not requested |
+| Clean Windows installation/offline release acceptance | Not run |
+
+Initial complete backend validation found 15 legacy migration fixtures that still
+held schema 16 tables while declaring an older version. Fixtures now remove both
+new tables before simulated downgrades; collision/rollback, original-data and
+append-only assertions are unchanged. The failed run is preserved separately.
+The frontend global-lock fixture now mocks the added history read, and an existing
+statement-review fixture awaits its asynchronous mount before editing, matching
+the file’s established setup helper. No financial assertion or timeout is relaxed.
+
+Next priority after this checkpoint: **further scenario proposal controls**,
+including extra payments, new recurring expenses, goal contributions and temporary
+income changes, preserving exact calculations and immutable report provenance.
+Seven major roadmap areas remain; this advances financial models/reports without
+completing the original specification or establishing commercial readiness.
+
 ## Stage 3F: temporary combined scenario comparisons — 0.19.0 source
 
 Counselors can now explicitly load all four saved models and compare them side by

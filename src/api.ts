@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { ScenarioInput, ScenarioComparison, BudgetMethodInput, BudgetMethodComparison, AssessmentEvidencePreview, ActionPlanReview, ActionPlanInput, SavedActionPlan, ActionPlanDirectory, AssessmentPlans, AssessmentDirectory, SavedAssessment, AssessmentRecordInput, FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
+import type { SavedScenario, ScenarioDirectory, ScenarioInput, ScenarioComparison, BudgetMethodInput, BudgetMethodComparison, AssessmentEvidencePreview, ActionPlanReview, ActionPlanInput, SavedActionPlan, ActionPlanDirectory, AssessmentPlans, AssessmentDirectory, SavedAssessment, AssessmentRecordInput, FinancialFactsInput, FinancialAssessment, StatementBalanceInput,RecurringReviewInput,ClientImports,CsvPreview,CsvStageInput,TransactionReviewInput,TransactionBulkInput,TransactionPairInput, BackupResult, RestoreReview, RestoreResult, ClientCashflowPlan, CashflowPlanInput, ClientSavingsPlan, SavingsPlanInput, ClientDebtPlan, DebtPlanInput, BudgetInput, ClientBudget, Client, ClientInput, ClientNote, SetupInput, WorkspaceInfo } from './types';
 
 export function desktopAvailable(): boolean {
   return '__TAURI_INTERNALS__' in window;
@@ -22,6 +22,9 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  listClientScenarios:(clientId:string)=>command<ScenarioDirectory>('list_client_scenarios',{clientId}),
+  getClientScenario:(clientId:string,id:string)=>command<SavedScenario>('get_client_scenario',{clientId,id}),
+  saveClientScenario:(clientId:string,input:{expectedCount:number;proposal:ScenarioInput})=>command<SavedScenario>('save_client_scenario',{clientId,input}),
   compareFinancialScenarios:(clientId:string,input:ScenarioInput)=>command<ScenarioComparison>('compare_financial_scenarios',{clientId,input}),
   compareBudgetMethods:(clientId:string,input:BudgetMethodInput)=>command<BudgetMethodComparison>('compare_budget_methods',{clientId,input}),
   getAssessmentEvidence:(clientId:string)=>command<AssessmentEvidencePreview>('get_assessment_evidence',{clientId}),

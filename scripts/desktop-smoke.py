@@ -43,11 +43,12 @@ class DriverFailure(SmokeFailure):
 
 
 class WebDriver:
-    def __init__(self, port: int, protected_values: list[str]):
+    def __init__(self, port: int, protected_values: list[str], transport: str = "direct"):
         self.base = f"http://127.0.0.1:{port}"
         # Local WebDriver traffic must stay on loopback, independent of outbound
         # HTTP proxy configuration. No external connections use this opener.
         self.http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        self.transport = transport
         self.session_id: str | None = None
         self.protected_values = protected_values
 
@@ -97,7 +98,8 @@ class WebDriver:
     def open(self, binary: Path) -> None:
         value = self.request("POST", "/session", {
             "capabilities": {"alwaysMatch": {
-                "tauri:options": {"application": str(binary)},
+                **({"webkitgtk:browserOptions": {"binary": str(binary), "args": []}}
+               if self.transport == "direct" else {"tauri:options": {"application": str(binary)}}),
             }},
         }, timeout=90)
         if not isinstance(value, dict) or not value.get("sessionId"):
@@ -754,6 +756,7 @@ def check_combined_scenarios(driver: WebDriver, artifacts: Path, label: str) -> 
     driver.click(".scenario-cash-changes > summary")
     driver.fill("#scenario-cash-date-0", "2026-11-08")
     driver.wait_value("#scenario-cash-date-0", "2026-11-08", "explicit ISO proposal date")
+    driver.fill("#scenario-label", "Alex reviewed combined proposal")
     driver.fill("#scenario-assumptions", "Temporary synthetic proposal; retain saved plans")
     driver.click_button("Compare temporary proposal")
     driver.wait_text(".combined-scenario-results", "$983.34", "independent combined proposal allocation buffer")
@@ -766,6 +769,10 @@ def check_combined_scenarios(driver: WebDriver, artifacts: Path, label: str) -> 
     driver.wait_value("#cashflow-date-0", "2026-11-03", "combined preview does not write saved dated schedules")
     driver.scroll_to(".combined-scenario-results table", "start")
     driver.screenshot(artifacts / f"native-combined-scenarios-{label}.png")
+    if label == "initial":
+        driver.click_button("Save reviewed combined scenario")
+        driver.wait_text(".saved-scenario-history article", "$983.34", "immutable combined scenario recorded")
+        driver.wait_text(".saved-scenario-status", "Saved baseline unchanged", "current baseline at scenario save")
     driver.fill("#scenario-debt", "12.345")
     driver.click_button("Compare temporary proposal")
     driver.wait_text(".combined-scenarios [role=alert]", "two decimal", "invalid proposal precision is rejected")
@@ -774,6 +781,59 @@ def check_combined_scenarios(driver: WebDriver, artifacts: Path, label: str) -> 
     driver.wait_value("#scenario-debt", "100.00", "read-only reload restores original baseline")
     driver.click(".combined-scenarios > details > summary")
     status("combined exact what-if comparison, separate dated edits, unchanged saved models, rejected assumptions and temporary input reset")
+
+
+def export_saved_combined_pdf(driver: WebDriver, artifacts: Path, label: str) -> None:
+    destination = artifacts / f"saved-combined-{label}.pdf"
+    if destination.exists():
+        raise SmokeFailure("Saved combined PDF destination must be new")
+    driver.fill("#assessment-pdf-path", str(destination))
+    driver.click_button("Export saved assessment PDF")
+    driver.wait_text(".saved-assessments > .success-message", str(destination), "selected combined scenario PDF completion")
+    text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
+    text = " ".join(text.split())
+    for value in ["Selected saved combined scenario / hypothetical", "Alex reviewed combined proposal", "Baseline USD 3250.00 / proposed USD 3466.67", "Baseline USD 766.67 / proposed USD 983.34", "Projected total interest: USD 23.01", "Primary emergency completion: 2027-11-30", "Operating cash flow: USD 1820.02"]:
+        if value not in text:
+            raise SmokeFailure(f"Selected scenario PDF missing {value}")
+    status(f"saved combined report PDF preserves baseline, proposed milestones and separate approved activity ({label})")
+
+
+def save_combined_report(driver: WebDriver, artifacts: Path) -> None:
+    driver.click(".saved-assessments > summary")
+    driver.wait(lambda: driver.visible("#saved-assessment") is not None, "combined report directory")
+    driver.fill("#record-from", "2026-09")
+    driver.fill("#record-through", "2026-10")
+    driver.fill("#record-title", "Alex selected combined report")
+    driver.fill("#record-findings", "Review hypothetical proposals; live plans remain unchanged.")
+    driver.click("#record-include-saved-scenario")
+    driver.click_button("Review saved combined scenarios")
+    driver.select("#record-saved-scenario", "Alex reviewed combined proposal — Baseline unchanged")
+    driver.wait_text(".report-saved-scenario", "$983.34", "explicit reviewed saved proposal selection")
+    driver.click("#record-ack")
+    driver.click_button("Save assessment record")
+    driver.wait_text(".saved-assessment-view h3", "Alex selected combined report", "selected saved scenario report recorded")
+    driver.wait_text(".selected-combined-scenario", "$983.34", "immutable comparison attached by server")
+    driver.wait_text(".saved-assessment-view .scenario-budget-totals", "Income$3,466.67", "report uses selected proposal")
+    export_saved_combined_pdf(driver, artifacts, "initial")
+    driver.click(".saved-assessments > summary")
+
+
+def assert_saved_combined_restored(driver: WebDriver, artifacts: Path, label: str) -> None:
+    driver.open_client("Alex Fictional")
+    driver.click(".combined-scenarios > details > summary")
+    driver.click_button("Reload saved scenario history")
+    driver.select("#saved-scenario", "Alex reviewed combined proposal — Needs review")
+    driver.wait_text(".saved-scenario-status", "historical baseline", "later versions flag immutable saved comparison")
+    driver.wait_text(".saved-scenario-history article", "$983.34", "original combined outcome after recovery")
+    driver.wait_value("#budget-amount-0", "1500.00", "reopened proposal never applies live income")
+    driver.click(".combined-scenarios > details > summary")
+    driver.click(".saved-assessments > summary")
+    driver.select("#saved-assessment", "Alex selected combined report — 2026-09-01 to 2026-10-31 — Needs review")
+    driver.wait_text(".selected-combined-scenario", "$983.34", "linked comparison restored and verified")
+    driver.wait_text(".saved-assessment-view .scenario-budget-totals", "Income$3,466.67", "original proposed model set retained")
+    export_saved_combined_pdf(driver, artifacts, label)
+    driver.click(".saved-assessments > summary")
+    status(f"saved scenarios and report relationships persist without rewriting plans ({label})")
 
 
 def check_budget_methods(driver: WebDriver, artifacts: Path, label: str) -> None:
@@ -926,6 +986,7 @@ def assert_captured_planning_restored(driver: WebDriver, artifacts: Path, label:
 def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> None:
     driver.open_client("Alex Fictional")
     check_combined_scenarios(driver, artifacts, "initial")
+    save_combined_report(driver, artifacts)
     driver.click(".saved-assessments > summary")
     driver.wait(lambda:driver.visible("#saved-assessment") is not None,"saved assessment directory before scenario")
     driver.fill("#record-from","2026-09")
@@ -1367,6 +1428,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_captured_planning_restored(driver, artifacts, "restart")
     check_budget_methods(driver, artifacts, "restart")
     check_combined_scenarios(driver, artifacts, "restart")
+    assert_saved_combined_restored(driver, artifacts, "restart")
     assert_counselor_evidence_restored(driver, artifacts, "restart")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
@@ -1460,6 +1522,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_captured_planning_restored(driver, artifacts, "encrypted-restore")
     check_budget_methods(driver, artifacts, "encrypted-restore")
     check_combined_scenarios(driver, artifacts, "encrypted-restore")
+    assert_saved_combined_restored(driver, artifacts, "encrypted-restore")
     assert_counselor_evidence_restored(driver, artifacts, "encrypted-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
@@ -1496,6 +1559,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_captured_planning_restored(driver, artifacts, "error-screen-restore")
     check_budget_methods(driver, artifacts, "error-screen-restore")
     check_combined_scenarios(driver, artifacts, "error-screen-restore")
+    assert_saved_combined_restored(driver, artifacts, "error-screen-restore")
     assert_counselor_evidence_restored(driver, artifacts, "error-screen-restore")
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
@@ -1506,6 +1570,8 @@ def main() -> int:
     repository = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", default=str(repository / "src-tauri/target/debug/eisenbart-counseling-suite"))
+    parser.add_argument("--transport", choices=("direct", "tauri"), default="direct",
+                        help="Linux native driver directly (default), or the Tauri forwarding layer for diagnosis")
     parser.add_argument("--driver", default="tauri-driver")
     parser.add_argument("--native-driver", help="Path to WebKitWebDriver for the installed WebKitGTK runtime")
     parser.add_argument("--port", type=int, default=4444)
@@ -1520,13 +1586,13 @@ def main() -> int:
     artifacts.mkdir(parents=True, exist_ok=True)
     password = "Smoke-" + secrets.token_urlsafe(24)
     wrong_password = "Wrong-" + secrets.token_urlsafe(24)
-    driver = WebDriver(options.port, [password, wrong_password])
+    driver = WebDriver(options.port, [password, wrong_password], options.transport)
     process: subprocess.Popen[bytes] | None = None
     try:
         if not sys.platform.startswith("linux"):
             raise SmokeFailure("This smoke test requires Linux XDG storage isolation; use the documented Windows manual checks on Windows")
         binary = executable(options.binary, "Built desktop application")
-        intermediary = executable(options.driver, "tauri-driver")
+        intermediary = executable(options.driver, "tauri-driver") if options.transport == "tauri" else None
         native = executable(options.native_driver or "WebKitWebDriver", "Native WebDriver")
         ensure_available(options.port)
         ensure_available(options.native_port)
@@ -1540,17 +1606,23 @@ def main() -> int:
                 destination = root / directory
                 destination.mkdir()
                 environment[variable] = str(destination)
+            # Same native capability mapping and automation flags used by Tauri's
+            # driver. Direct mode removes its pooled forwarding connection only.
+            environment["TAURI_AUTOMATION"] = "true"
+            environment["TAURI_WEBVIEW_AUTOMATION"] = "true"
             with (artifacts / "driver.log").open("wb") as log:
                 def launch_driver() -> None:
                     nonlocal process
-                    process = subprocess.Popen([
-                        str(intermediary), "--port", str(options.port),
-                        "--native-port", str(options.native_port), "--native-driver", str(native),
-                    ], env=environment, stdout=log, stderr=log, start_new_session=True)
+                    command = ([str(native), f"--port={options.port}", "--host=127.0.0.1"]
+                               if options.transport == "direct" else
+                               [str(intermediary), "--port", str(options.port),
+                                "--native-port", str(options.native_port), "--native-driver", str(native)])
+                    process = subprocess.Popen(command, env=environment, stdout=log,
+                                               stderr=log, start_new_session=True)
 
                 def ready() -> bool:
                     if process is None or process.poll() is not None:
-                        raise SmokeFailure(f"tauri-driver exited; see {artifacts / 'driver.log'}")
+                        raise SmokeFailure(f"Native test driver exited; see {artifacts / 'driver.log'}")
                     try:
                         value = driver.request("GET", "/status", timeout=2)
                         return isinstance(value, dict) and bool(value.get("ready"))
