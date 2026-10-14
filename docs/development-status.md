@@ -39,7 +39,7 @@ source limits apply. See [recurring-payment-review.md](recurring-payment-review.
 | Independent Python Decimal example | 32.05 observed total; 22.04 after first payment is withdrawn |
 | Format / Clippy all targets, warnings denied | Passed |
 | Compiled native desktop workflow | Passed final schema-11 full financial/CSV/PDF/recurring workflow, explicit subscription/reconfirmation, permanent invalidation after an added-then-withdrawn charge, exact totals, client isolation, whole-process restart, normal backup restore and missing-metadata recovery, including captured history and invalidation flags |
-| Windows source CI | Schema-11 source 6c59a5a passed run [38517216980](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38517216980), with 92 library + 2 worker tests (94 total); final character-length patch CI pending. Installer steps skipped |
+| Windows source CI | Passed final source 92891dd: run [38517928152](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38517928152), production frontend, 59 interface tests, 92 library + 2 worker tests (94 backend/process tests total). All installer/package/upload steps skipped |
 | New Windows installer | Intentionally not built |
 | Clean installed Windows 11 offline acceptance | Not run |
 
@@ -56,15 +56,26 @@ permanent invalidation markers and regressions were added. Schema 11 preserves
 the initial schema-10 source checkpoint and flags those earlier decisions for
 explicit reconfirmation; upgrade failures preserve the original records.
 Intermittent native WebDriver closures also interrupted final checks; financial
-writes were never retried in place. The final exact-source native workflow passed after the full backend suite finished; no assertion or financial-write retry policy was weakened. Windows source validation passed for schema 11; the final character-length patch is being checked separately.
+writes were never retried in place. The final exact-source native workflow passed after the full backend suite
+finished, and passed again after the text-validation patch; no assertion or
+financial-write retry policy was weakened. Windows source validation passed for
+schema 11 and the final character-length patch.
 Source/debug logs and fictional artifacts are under
 `/workspace/shared/recurring-*`; final exact-source native artifacts are
-`/workspace/shared/desktop-smoke-recurring-verified`. Full backend logs are
+`/workspace/shared/desktop-smoke-recurring-complete`. Full backend logs are
 `recurring-schema11-backend.log`, interface logs `recurring-frontend-release-final.log`,
-and native logs `recurring-native-verified.log`. The final text validation uses
+and native logs `recurring-native-complete.log`. The final text validation uses
 character counts consistently with existing input limits; seven focused tests
 passed again, including 120-character accented labels and 500-character accented
 reasons surviving lock/restart and encrypted recovery, with over-limit rejection.
+
+Final implementation commit `92891dd0924e420cc528c084c002e1d7d23ee5a6` is uploaded
+to main. Windows source CI passed run [38517928152](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38517928152);
+full log: `/workspace/shared/recurring-windows-final-validation.log`. Final native
+workflow and visual review passed from the same implementation source. Source-only
+recovery checkpoints are saved as `/workspace/shared/checkpoints/eisenbart-recurring-source.tar.gz`
+and `/workspace/shared/checkpoints/eisenbart-recurring.bundle`; these preserve
+tracked development source/Git history, not encrypted client records or an installer.
 
 Next priority: **row-level statement reconciliation** against known reported
 running balances, with explicit source/order/sign checks and unresolved exceptions.
