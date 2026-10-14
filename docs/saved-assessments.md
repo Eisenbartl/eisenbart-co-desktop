@@ -96,3 +96,17 @@ Backend examples independently verify **799.99** before withdrawing rent,
 stale context, foreign client IDs, missing acknowledgment, failed atomic audit,
 append-only history, malformed figures/dates, migration rollback and corrupt
 snapshot rejection before recovery activation.
+
+## Validation checkpoint
+
+Version 0.13.0 implementation d2b0ab5 passed 78 interface tests, 112 Linux library
+plus 2 executable worker tests, formatting/Clippy, production frontend and the
+compiled native workflow. Windows source CI [38600293809](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38600293809)
+passed 113 library plus 2 worker tests and all 78 interface tests. All installer,
+installation-acceptance and package/upload steps were skipped. Native validation
+verified original/new records and source-change flags through full restart and
+both encrypted recovery paths. The first transport interruption and successful
+fresh run are recorded in development-status.md. No financial write was replayed.
+Schema 14 requires a compatible executable; older applications reject newer
+workspaces. Complete Windows offline installation/release acceptance and maximum
+data-volume performance remain open.

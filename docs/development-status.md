@@ -23,14 +23,30 @@ source decisions/revisions or plans. See [saved-assessments.md](saved-assessment
 | Interface suite | 78 passed, including five saved-assessment tests for scoped lazy load/save, canonical display, failed-draft retention, explicit changed-context review, late-client replies and conflicting-operation guards |
 | Linux backend / worker suite | 112 library + 2 executable worker tests passed (114 total); four new tests cover immutable old figures versus new approved results, source/profile changes, scope, stale context, acknowledgment, atomic audit rollback, immutable SQL, malformed figures/dates, schema-13 upgrade/rollback, restart/recovery and corrupted snapshot rejection |
 | Formatting / Clippy, warnings denied | Passed |
-| Compiled desktop application | Built; extended assessment/correction/restart/recovery workflow pending |
-| Windows source CI | Pending push; installer/package/upload remains manual |
+| Compiled native desktop workflow | Passed full finance/CSV/PDF/recurring/balance workflows, immutable original/new counselor assessments, source-change review flags and preserved original amounts/recommendations, full restart and both encrypted recovery paths |
+| Windows source CI | Passed implementation d2b0ab5: [run 38600293809](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38600293809), 78 interface + 113 library + 2 worker tests (115 backend/process total); all installer/package/upload steps skipped |
 | New installer / clean Windows offline acceptance | Not run |
 
 Financial examples preserve 799.99 / net worth 4,000.06 before a source withdrawal;
 a new record shows 2,000.01 while the original still retains 799.99. Existing
 native examples preserve original 199.98 while live/current records change to
 500.00. No financial amounts are accepted from the report form.
+
+The first native attempt lost its WebDriver transport while typing an existing
+cash-flow input before reaching assessments. A screenshot confirmed the app still
+responded. A fresh isolated run completed the full workflow from the same
+implementation, with no replayed financial write or weakened assertion. Native
+visual review confirmed the saved client/firm/counselor identity, America/Chicago
+record time, captured period/approved/incomplete basis, Needs review status and
+original independently expected figures after later source withdrawal.
+
+Final implementation `d2b0ab526737bc8ddf7d5a25b4c36c4690717a49` is uploaded and
+Windows-validated. Source/full-history checkpoints are saved outside the checkout:
+`/workspace/shared/checkpoints/eisenbart-assessments-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-assessments.bundle`. Logs/native artifacts
+remain under `/workspace/shared`: `assessment-backend-tests.log`,
+`assessment-ui-tests.log`, `assessment-clippy.log`, `assessment-native-complete.log`,
+`assessment-windows-validation.log` and `desktop-smoke-assessments-complete`.
 
 Next priority: **offline PDF report export and scenario-backed client action plans**.
 The complete original Counselor Report, selected scenarios, saved plan assumptions
