@@ -35,8 +35,8 @@ completeness claims remain outside this checkpoint. See
 | Linux backend/process suite | 98 library + 2 executable worker tests passed (100 total); seven new engine/storage tests cover exact cents, both source orders, date conflicts, missing/zero/negative figures, pending/rejected exclusion, corrected fields, intermediate discrepancies, scope, stale/audit rollback, Unicode reason limits, immutability, restart/recovery and schema-11 migration rollback |
 | Independent Python Decimal examples | Original closing 1,199.98; corrected closing 1,199.99; rejecting rent gives approved movement 500.00, expected 1,500.00 and 300.02 difference |
 | Format / Clippy all targets, warnings denied | Passed |
-| Compiled native desktop workflow | Pending final isolated run |
-| Windows source CI | Pending source commit; installer creation remains manual opt-in |
+| Compiled native desktop workflow | Passed full existing client/financial/CSV/PDF/recurring workflows, explicit source order and conflict correction, validated bulk approval, one-cent correction, rejection exclusion, immutable settings, client isolation, full-process restart, normal backup restore and missing-metadata recovery |
+| Windows source CI | Passed final implementation c052453: run [38525998374](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38525998374), production frontend, 62 interface tests, 99 library + 2 worker tests (101 backend/process tests total). All installer/package/upload steps skipped |
 | New installer | Intentionally not built |
 | Clean installed Windows 11 offline acceptance | Not run |
 
@@ -51,7 +51,21 @@ A second native check found source-record navigation also cleared the source
 selection; navigation now retains the statement alongside the transaction editor,
 with an interface regression for that context. The selector placeholder closes
 the view explicitly.
-Logs and fictional artifacts are under `/workspace/shared/reconciliation-*`.
+The final complete native run passed from the final implementation after both
+context-preservation fixes. Native visual inspection confirmed the separate
+source/approved comparisons and source-record navigation. No financial write was
+replayed or required assertion disabled.
+
+Final implementation `c0524535e9b21618dd65f91ed8b775a6f2f94bb7` is uploaded to
+main and passed Windows run [38525998374](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38525998374).
+Logs: `/workspace/shared/reconciliation-backend-verified.log`,
+`reconciliation-frontend-tests.log`, `reconciliation-clippy.log`,
+`reconciliation-native-complete.log`, and `reconciliation-windows-validation.log`.
+Final native artifacts: `/workspace/shared/desktop-smoke-reconciliation-complete`.
+Verified source/Git recovery checkpoints are
+`/workspace/shared/checkpoints/eisenbart-reconciliation-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-reconciliation.bundle`; these preserve
+development source/history, not client records or a Windows installer.
 
 Next priority: **client financial dashboard** built from approved imported facts,
 with explicit assessment dates, missing/outdated-data indicators and locally
