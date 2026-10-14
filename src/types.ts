@@ -227,3 +227,11 @@ export interface StatementBalanceRow {recordId:string;reported:string|null;sourc
 export interface StatementBalanceReport {order:BalanceOrder|null;sourceSequence:'Valid'|'Unknown'|'Conflict'|'NotConfigured';approvedSequence:'Valid'|'Unknown'|'Conflict'|'NotConfigured';rows:StatementBalanceRow[];sourceMatched:number;sourceDifferences:number;approvedMatched:number;approvedDifferences:number;reportedClosing:BalanceComparison;warnings:string[]}
 export interface StatementBalanceHistory {id:string;documentId:string;order:BalanceOrder|null;reason:string;reviewedAt:string;counselorName:string}
 export interface StatementBalanceInput {expectedRevision:number;documentId:string;order:BalanceOrder|null;reason:string}
+
+export interface FinancialAssessment {
+ clientId:string;revision:number;periodStart:string;periodEnd:string;calculatedOnUtc:string;
+ latestApprovedDate:string|null;outdated:boolean;totals:ClientImports['summary'];operatingCashflow:string;
+ months:{month:string;totals:ClientImports['summary'];operatingCashflow:string;incomeScale:number;spendingScale:number;cashflowScale:number}[];
+ categories:{label:string;spending:string;scale:number}[];undatedRecords:number;reviewedPercent:number|null;
+ documentIds:string[];warnings:string[];
+}

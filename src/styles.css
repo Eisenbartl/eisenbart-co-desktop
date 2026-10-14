@@ -422,3 +422,18 @@ textarea { resize: vertical; min-height: 100px; }
 .statement-balance-details { padding:18px; margin:18px 0; border:1px solid var(--line); border-radius:10px; }
 .balance-check-table { min-width:640px; }
 .balance-progress { font-size:12px; font-weight:600; margin:18px 0; }
+
+.financial-dashboard { margin: 28px 0; padding: 22px; border: 1px solid var(--border, #dce2df); border-radius: 12px; background: #f7faf8; }
+.financial-dashboard fieldset { border: 0; padding: 0; margin: 0; }
+.financial-dashboard form button { margin-top: 12px; }
+.assessment-basis { font-weight: 600; line-height: 1.6; }
+.assessment-review { font-size: .85rem; line-height: 1.6; }
+.financial-charts { display: grid; gap: 22px; }
+.financial-charts table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .83rem; }
+.financial-charts th, .financial-charts td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #dce2df; overflow-wrap: anywhere; vertical-align: top; }
+.financial-charts small { display: block; font-weight: normal; margin-top: 4px; }
+.financial-bar { display: block; width: 100%; height: 12px; margin-top: 8px; fill: #438071; }
+.financial-bar .track { fill: #e2e8e5; }
+.financial-bar.spending { fill: #a37144; }
+.financial-bar.deficit { fill: #b14d4d; }
+@media(max-width:600px) { .financial-dashboard { padding: 12px; } }

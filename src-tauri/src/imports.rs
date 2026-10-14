@@ -656,6 +656,13 @@ pub fn fingerprint(fields: &Fields) -> Option<String> {
     )
 }
 pub fn summarize(records: &[Record], accounts: &[Account]) -> Result<Summary, String> {
+    summarize_selected(&records.iter().collect::<Vec<_>>(), accounts)
+}
+
+pub(crate) fn summarize_selected(
+    records: &[&Record],
+    accounts: &[Account],
+) -> Result<Summary, String> {
     let mut s = Summary {
         pending: 0,
         needs_clarification: 0,

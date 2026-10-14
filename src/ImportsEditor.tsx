@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {api} from './api';
+import FinancialDashboard from './FinancialDashboard';
 import RecurringReview from './RecurringReview';
 import StatementBalanceReview from './StatementBalanceReview';
 import {usd} from './BudgetEditor';
@@ -81,6 +82,7 @@ export default function ImportsEditor({client,onDirty,onBusy,otherSaving}:{clien
     <div className="budget-add"><button className="button secondary" type="button" onClick={()=>void cancelCsv()}>Cancel {sourceFormat.toUpperCase()} preview</button><button className="button primary" type="submit">Import into review queue</button></div></fieldset></form>
    </div>}
    {error&&<div role="alert" className="alert error">{error}</div>}{notice&&<p role="status" className="success-message">{notice}</p>}{busy&&<p role="status">Working on CSV/review data…</p>}
+   <FinancialDashboard source={saved} disabled={busy||otherSaving}/>
    <h3 className="savings-section-title">Approved statement totals — all imported dates</h3>
    <dl className="budget-totals imports-totals">{([['Income',saved.summary.income],['Spending before refunds',saved.summary.spending],['Refunds (not income)',saved.summary.refunds],['Net spending',saved.summary.netSpending],['Net account activity including movements',saved.summary.netCash]] as const).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{cash(value)}</dd></div>)}{saved.summary.accountNet.map(([id,value])=><div key={id}><dt>{accountName(id)} net activity</dt><dd>{cash(value)}</dd></div>)}</dl>
    <p className="imports-progress">Pending {saved.summary.pending} · Needs Clarification {saved.summary.needsClarification} · Approved {saved.summary.approved} · Rejected {saved.summary.rejected}</p>

@@ -1,5 +1,42 @@
 # Development status
 
+## Stage 5A: approved transaction dashboard — 0.11.0 source
+
+Implemented a client-specific read-only assessment for explicit 1–24 calendar-month
+periods. Rust calculates approved-only income receipts, gross spending, refunds,
+net spending, operating cash flow and all account movement in exact cents. Locally
+bundled charts show approved categories, monthly income/spending and cash-flow
+trends. Every view labels period, revision, approved basis, incomplete coverage,
+undated exclusions, review decisions and outdated periods. Source corrections and
+reversals recalculate results; stale/client-mismatched replies are hidden.
+
+No new schema, financial writes or dependencies. Planning remains separate.
+Verified take-home pay, necessary/discretionary classifications, balance facts,
+asset/debt metrics, debt/savings charts and immutable final reports remain pending.
+See [financial-dashboard.md](financial-dashboard.md) for formulas and limits.
+
+| Check | Result |
+|---|---|
+| Locked setup / production frontend | Passed |
+| Interface suite | 66 passed, including four dashboard interaction tests |
+| Linux backend / worker suite | 103 library + 2 executable worker tests passed (105 total); focused dashboard/scoped-storage tests also passed after adding the aggregate-limit example |
+| Independent Python Decimal examples | Passed: 918.89 operating flow versus 718.89 account movement across two months |
+| Formatting / Clippy, warnings denied | Passed |
+| Compiled native application | Built successfully; extended UI/restart/recovery workflow pending |
+| Windows source CI | Pending push; packaging remains manual and will not run |
+| New installer / clean Windows offline acceptance | Not run |
+
+The first synthetic engine fixture incorrectly used an empty category on an
+approved row; approval requires a verified category. The fixture now uses Food,
+and the corrected focused tests pass without relaxing approval validation.
+The outdated-period example now selects June, which is more than 90 days before
+the fixed October reference date. Per-transaction input limits do not cap derived
+assessment totals; an independently expected 2,000,000,000.00 aggregate verifies
+exact calculation and integer chart scales.
+
+Next priority: **approved expense classifications and dated verified balance facts**
+for the remaining dashboard metrics, before counselor reports and action plans.
+
 ## Stage 4D: statement running-balance reconciliation — 0.10.0 source
 
 Implemented exact integer-cent comparisons for explicitly mapped after-transaction
@@ -912,7 +949,7 @@ clone.
 Encrypted backup/restore is implemented with authenticated files, retained
 previous workspaces, and tested interrupted/failure recovery. Clean installed
 Windows acceptance and independent security review remain prerequisites for
-actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. Statement running-balance reconciliation now adds source/approved comparisons and immutable order settings. The next application priority is **a client financial dashboard**; keep scanned OCR and broad institution adapters in later checkpoints.
+actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. Statement running-balance reconciliation now adds source/approved comparisons and immutable order settings. The approved-transaction dashboard now provides explicit periods, local category/monthly/cash-flow charts and completeness flags. The next application priority is **approved expense classifications and dated verified balance facts**; keep scanned OCR and broad institution adapters in later checkpoints.
 
 Advanced financial models, broader scenarios, finalized PDF reports, multiple counselor roles,
 password change/reset, exports, licensing, signing, retained-copy selection,
@@ -929,7 +966,7 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 |---|---|
 | 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
 | 4: Document processing | CSV, selected text-PDF review, recurring/grouped payment review and running-balance reconciliation implemented; scanned OCR and broader institution adapters remain |
-| 5: Dashboard and reports | Financial charts, counselor reports, client action plans, reproducible offline PDFs |
+| 5: Dashboard and reports | Approved activity charts implemented; verified balance/classification metrics, debt/savings charts, counselor reports, client action plans and reproducible offline PDFs remain |
 | 6: Security/commercial | Encrypted backup/restore implemented; clean Windows recovery, password safeguards, accounts/roles, branding, licensing and independent review remain |
 | 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |
 | 8: Final verification | Complete installed workflows, clean Windows 11 offline tests, usability and release acceptance |

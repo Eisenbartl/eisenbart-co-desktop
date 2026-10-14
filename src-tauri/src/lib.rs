@@ -1,5 +1,6 @@
 mod budget;
 mod cashflow;
+mod dashboard;
 mod debt;
 mod imports;
 mod models;
@@ -120,6 +121,14 @@ fn cancel_client_csv(state: State<'_, DesktopState>, token: String) -> Result<()
         w.cancel_client_csv(&token);
         Ok(())
     })
+}
+#[tauri::command]
+fn get_client_dashboard(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: dashboard::Input,
+) -> Result<dashboard::Assessment, String> {
+    access(&state, |w| w.get_client_dashboard(&client_id, input))
 }
 #[tauri::command]
 fn get_client_imports(
@@ -491,6 +500,7 @@ pub fn run() {
             inspect_client_csv,
             cancel_client_csv,
             get_client_imports,
+            get_client_dashboard,
             stage_client_csv,
             review_transaction,
             review_recurring_payment,

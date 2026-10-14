@@ -414,6 +414,15 @@ impl Workspace {
             .map_err(storage_error)
     }
 
+    pub fn get_client_dashboard(
+        &mut self,
+        client_id: &str,
+        input: crate::dashboard::Input,
+    ) -> Result<crate::dashboard::Assessment, String> {
+        let snapshot = self.get_client_imports(client_id)?;
+        crate::dashboard::assess(&snapshot, input, chrono::Utc::now().date_naive())
+    }
+
     pub fn get_client_budget(&mut self, client_id: &str) -> Result<ClientBudget, String> {
         let session = self.session()?;
         scoped_client(&session.connection, &session.info, client_id)?;
@@ -1447,6 +1456,40 @@ mod tests {
             status: "New Intake".to_owned(),
             goals: "SYNTHETIC_PRIVATE_GOAL_812767".to_owned(),
         }
+    }
+
+    #[test]
+    fn dashboard_requires_authenticated_client_scope_and_reopens_from_encrypted_sources() {
+        let (directory, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let period = || crate::dashboard::Input {
+            from_month: "2026-09".into(),
+            through_month: "2026-10".into(),
+        };
+        assert!(w.get_client_dashboard("other-client", period()).is_err());
+        assert_eq!(
+            w.get_client_dashboard(&client.id, period())
+                .unwrap()
+                .client_id,
+            client.id
+        );
+        w.lock_workspace();
+        assert!(w
+            .get_client_dashboard(&client.id, period())
+            .err()
+            .unwrap()
+            .contains("locked"));
+        drop(w);
+        let mut reopened = Workspace::new(directory.path().to_path_buf());
+        reopened.unlock_workspace(PASSWORD.to_owned()).unwrap();
+        assert_eq!(
+            reopened
+                .get_client_dashboard(&client.id, period())
+                .unwrap()
+                .totals
+                .income,
+            "0.00"
+        );
     }
 
     #[test]

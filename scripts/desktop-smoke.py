@@ -553,6 +553,8 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
         driver.click(f".imports-table tbody tr:nth-child({index}) input[type=checkbox]")
     driver.click_button("Approve selected validated rows (3)")
     driver.wait_text(".imports-totals","$199.98","independent approved source net")
+    view_financial_dashboard(driver,"2026-09","2026-09")
+    driver.wait_text(".assessment-totals","Operating cash flow$199.98", "initial exact approved assessment")
     choose_balance_statement(driver)
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 3 matched · 0 differences.","exact original and approved balance steps")
     driver.click_button("Review balance source record 3")
@@ -561,6 +563,7 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.click("#review-ack")
     driver.click_button("Save transaction decision")
     driver.wait_text(".imports-totals","$199.99","one-cent corrected approved net")
+    driver.wait_text(".assessment-totals","Operating cash flow$199.99", "dashboard automatically recalculates corrected approval")
     choose_balance_statement(driver)
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 2 differences.","source arithmetic remains intact while corrected approved steps diverge")
     driver.wait_text(".balance-check-table","Difference $0.01","independent corrected balance difference")
@@ -569,6 +572,7 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.fill("#review-reason","Withdraw corrected payment from approved movement")
     driver.click_button("Save transaction decision")
     driver.wait_text(".imports-totals","$500.00","rejected expense excluded from approved totals")
+    driver.wait_text(".assessment-totals","Operating cash flow$500.00", "dashboard automatically excludes reversed expense")
     choose_balance_statement(driver)
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 1 differences.","rejection preserves source checks and updates approved comparisons")
     driver.wait_text(".balance-check-table","Excluded","rejected balance is not an approved anchor")
@@ -578,6 +582,31 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.script("document.querySelector('.balance-check-table').scrollIntoView({block:'center',behavior:'instant'})")
     driver.screenshot(artifacts / "native-statement-balances.png")
     status("explicit source order, exact row balances, wrong-order conflicts, separate approved data, one-cent corrections, rejected exclusion, and setting history")
+
+
+def view_financial_dashboard(driver: WebDriver, start: str, end: str) -> None:
+    driver.fill("#assessment-from", start)
+    driver.fill("#assessment-through", end)
+    driver.click_button("View financial dashboard")
+    driver.wait_text(".assessment-basis", f"{start}-01 through", "explicit approved assessment period")
+    driver.wait_text(".assessment-basis", "Approved records only · Incomplete", "honest dashboard basis")
+
+
+def assert_alex_dashboard(driver: WebDriver) -> None:
+    view_financial_dashboard(driver,"2026-09","2026-10")
+    driver.wait_text(".assessment-totals","Approved income receipts$3,000.01", "approved CSV and PDF income assessment")
+    driver.wait_text(".assessment-totals","Operating cash flow$1,820.02", "approved net spending after refunds")
+    driver.wait_text(".assessment-review","Needs Clarification 1", "pending PDF expense excluded")
+    driver.wait_text("table[aria-label='Monthly approved income and spending']","2026-09", "local monthly comparison chart")
+    driver.wait_text("table[aria-label='Monthly approved income and spending']","$2,000.00", "exact September receipts")
+    driver.wait_text("table[aria-label='Monthly approved income and spending']","$1,000.01", "exact October approved payroll")
+    driver.wait_text("table[aria-label='Monthly operating cash flow']","$820.01", "September operating cashflow")
+    driver.wait_text("table[aria-label='Approved spending categories']","Housing", "approved category chart")
+    view_financial_dashboard(driver,"2026-10","2026-10")
+    driver.wait_text(".assessment-totals","Approved income receipts$1,000.01", "assessment dates exclude September")
+    driver.wait_text(".assessment-totals","Gross spending$0.00", "unapproved October spending stays absent")
+    driver.wait_text(".financial-dashboard","No approved spending in this period.", "no invented category chart")
+    view_financial_dashboard(driver,"2026-09","2026-10")
 
 
 def assert_statement_balances_restored(driver: WebDriver) -> None:
@@ -590,6 +619,8 @@ def assert_statement_balances_restored(driver: WebDriver) -> None:
     driver.click(".statement-balance-history > summary")
     driver.wait_text(".statement-balance-history","Statement balance setting history (2)","persisted balance setting history")
     driver.wait_text(".statement-balance-history","Verified original source is oldest first","persisted source-order review reason")
+    view_financial_dashboard(driver,"2026-09","2026-09")
+    driver.wait_text(".assessment-totals","Operating cash flow$500.00", "recomputed dashboard from persisted approved decisions")
 
 
 def run_checks(driver: WebDriver, binary: Path, password: str,
@@ -907,6 +938,9 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver)
     driver.open_client("Alex Fictional")
+    assert_alex_dashboard(driver)
+    driver.script("document.querySelector('.financial-dashboard').scrollIntoView({block:'start',behavior:'instant'})")
+    driver.screenshot(artifacts / "native-financial-dashboard.png")
     driver.wait_text(".recurring-review","Synthetic rent","Alex has his own payment groups")
     if "Fictional household service" in driver.text(".recurring-review"):
         raise SmokeFailure("Recurring decisions crossed client boundaries")
@@ -993,6 +1027,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver)
     driver.open_client("Alex Fictional")
+    assert_alex_dashboard(driver)
+    driver.open_client("Alex Fictional")
     status("encrypted backup, wrong-password rejection, interrupted review, explicit restore, retained source, restored plans and recurring decisions")
     # Simulate missing metadata only after stopping every synthetic app process.
     # The error-screen recovery flow must work without opening the damaged vault.
@@ -1022,6 +1058,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".imports-progress", "Approved 6 · Rejected 1", "storage-error recovery includes imported records")
     assert_recurring_restored(driver)
     assert_statement_balances_restored(driver)
+    driver.open_client("Alex Fictional")
+    assert_alex_dashboard(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")
 
 
