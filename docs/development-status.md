@@ -37,7 +37,7 @@ cannot reopen schema 6. See [cash-flow-calculations.md](cash-flow-calculations.m
 | Final calendar visual inspection | Passed after widening cells and adding horizontal scrolling to keep amounts readable in narrow client panels |
 | Deferred Windows download metadata | Parsed with PowerShell; packaging not invoked |
 | New Windows installer | Intentionally not built, as requested |
-| Current Windows source checks | Pending source push/CI; final conclusion recorded separately when available |
+| Windows source checks | Run [38492199152](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38492199152) succeeded from 75d3934: production frontend build, 40 interface tests and 54 Rust tests passed, including the Windows-only SQLCipher memory-lock regression |
 | Clean Windows 11 offline installed cash-flow workflow | Not run |
 
 Final native artifacts: `/workspace/shared/desktop-smoke-cashflow-verified`.
@@ -48,6 +48,19 @@ existing one-retry locator handling; typing, clicks, saves, and JavaScript are
 never replayed. The rerun and final layout run passed the full required workflow.
 An initially incomplete TypeScript test fixture was corrected before the successful
 production build; one ambiguous test locator was narrowed to the account-name field.
+
+Source commit `75d393425d5db79b10913aa14abf70e5dd619048` is uploaded to main.
+Windows CI explicitly skipped installer build, install/launch/uninstall checks,
+metadata preparation, installer upload, and validation-log artifact upload.
+No manual package run was requested. The full Windows test log is preserved at
+`/workspace/shared/cashflow-windows-validation.log`. This confirms Windows source
+build/tests, not a newly installed Windows GUI or clean-machine offline acceptance.
+
+Recoverable source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-cashflow-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-cashflow.bundle`; the archive contents
+and full-history bundle are verified and refreshed after the final notes commit.
+These are development source checkpoints, not backups of client workspace data.
 
 Source-only checkpoint; no installer, bank integration, actual transaction
 reconciliation, overdraft fees, holds, holiday shifts, or delayed transfer
