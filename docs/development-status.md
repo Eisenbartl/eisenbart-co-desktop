@@ -43,8 +43,8 @@ The selected report retains separate approved operating activity 1,820.02.
 | New backend checks | Eight scenario store/report/PDF/recovery/upgrade/corruption/audit/limits checks and nine migration-focused checks passed |
 | Complete Linux backend / worker suite | 149 library + 2 worker tests passed (151 total); new scenarios, report/PDF, recovery, schema 1–16 compatibility and all earlier financial workflows |
 | Formatting / Clippy, warnings denied | Passed |
-| Native compile / complete new workflow | Standalone debug compile passed; complete new workflow in progress |
-| Windows source CI | Validation in progress; installer packaging not requested |
+| Native compile / complete new workflow | Passed standalone debug build and complete direct native run, exit 0: saved scenario/report/PDF selection, unchanged live/approved data, historical flags, restart and both recovery paths, with all previous workflows |
+| Windows source CI | [Run 38648010362](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38648010362) passed: production frontend build, 107 interface tests, 150 library + 2 worker tests (152 total); all installer/package/upload steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
 
 Initial complete backend validation found 15 legacy migration fixtures that still
@@ -54,6 +54,34 @@ append-only assertions are unchanged. The failed run is preserved separately.
 The frontend global-lock fixture now mocks the added history read, and an existing
 statement-review fixture awaits its asynchronous mount before editing, matching
 the file’s established setup helper. No financial assertion or timeout is relaxed.
+
+Native verification created four selected-scenario PDFs (initial/restart/normal
+restore/damaged-workspace recovery), preserving 766.67 → 983.34 buffers and the
+separate 1,820.02 approved report basis. Saved comparisons reopened with original
+versions/outcomes and Needs review after live budget changes. All prior source,
+report, agreement, lock and recovery workflows passed in the same complete run.
+Rendered PDF inspection confirmed readable selected identity, comparison values,
+Chicago time, preserved warnings and separate planning assumptions.
+
+All application checks validate source commit
+`02dfd5b83c2104c0796c9d71176e584235e5b5b5`. Windows source CI completed successfully
+on that exact commit; it includes the Windows-specific library check. The final
+checkpoint only updates this verification documentation. No installer was built,
+uploaded or downloaded, and clean Windows installation acceptance remains open.
+
+Logs under `/workspace/shared`: `saved-scenarios-setup.log`,
+`saved-scenarios-baseline-native.log`/`.exit` (complete pre-stage check),
+`saved-scenarios-ui.log`, `saved-scenarios-ui-tests.log`,
+`saved-scenarios-backend.log`, `saved-scenarios-new-tests.log`,
+`saved-scenarios-migration-focused.log`, `saved-scenarios-fmt.log`,
+`saved-scenarios-clippy.log`, `saved-scenarios-native-build.log`,
+`saved-scenarios-native.log`/`.exit`, `saved-scenarios-windows-validation.log`,
+`saved-scenarios-windows-job.log` and `saved-scenarios-windows-result.json`.
+The initial fixture failure run is
+`saved-scenarios-backend-first.log`. Native artifacts are in
+`desktop-smoke-direct-baseline` and `desktop-smoke-saved-scenarios`.
+Source/full-history checkpoints are `checkpoints/eisenbart-saved-scenarios-source.tar.gz`
+and `checkpoints/eisenbart-saved-scenarios.bundle` under that same shared directory.
 
 Next priority after this checkpoint: **further scenario proposal controls**,
 including extra payments, new recurring expenses, goal contributions and temporary
