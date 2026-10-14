@@ -650,9 +650,12 @@ def export_original_assessment_pdf(driver: WebDriver, artifacts: Path, label: st
     if not original.startswith(b"%PDF-"):
         raise SmokeFailure("Native export did not create a PDF")
     text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
-    for expected in ["Taylor original assessment", "Taylor Balance", "Smoke Test Counseling", "NEEDS REVIEW", "Operating cash flow: USD 199.98", "Estimated net worth at balance date: USD 525.05", "Verify remaining sources", "Captured transaction evidence", "INTERNAL / INCOMPLETE"]:
+    text = " ".join(text.split())
+    for expected in ["Later decisions do not rewrite them", "Taylor original assessment", "Taylor Balance", "Smoke Test Counseling", "NEEDS REVIEW", "Operating cash flow: USD 199.98", "Estimated net worth at balance date: USD 525.05", "Verify remaining sources", "Captured transaction evidence", "INTERNAL / INCOMPLETE"]:
         if expected not in text:
             raise SmokeFailure(f"Native PDF missing independently expected text: {expected}")
+    if "This live view is recalculated" in text:
+        raise SmokeFailure("Live-dashboard wording appeared in a saved historical PDF")
     if "Operating cash flow: USD 500.00" in text:
         raise SmokeFailure("Live figures replaced the immutable historical PDF")
     driver.click_button("Export saved assessment PDF")

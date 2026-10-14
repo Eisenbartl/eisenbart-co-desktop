@@ -25,8 +25,8 @@ limits fail without truncation or changing the saved record.
 | Linux backend / worker suite | 116 library + 2 executable worker tests passed (118 total); four new tests cover historical 799.99/net worth 4,000.06 vs live 2,000.01, Unicode/font embedding, measured wrapping/page limits, unsupported glyph/no partial file, scoped/locked access and unsafe destinations; corrupt-record export rejection extends existing coverage |
 | Formatting / Clippy, warnings denied | Passed |
 | Native desktop compile | Passed debug build with no bundle |
-| Native full desktop/recovery/export workflow | Pending this checkpoint's run |
-| Windows source CI | Pending upload/run; no installer requested |
+| Native full desktop/recovery/export workflow | Passed implementation 52dee12, including four actual PDF exports and unchanged files on rejected overwrites; visual review prompted historical warning wording correction, final native run pending |
+| Windows source CI | First run 38604263280: 79 interface tests passed, one recurring-review test failed before backend checks. Added deterministic initial-load/effect settling and enabled-button check without weakening assertions; corrected source run pending. All installer steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
 
 Direct in-app printing, complete scenario-backed counselor reports, final client

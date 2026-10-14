@@ -314,6 +314,11 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
     )?;
     l.value("Outdated period", if a.outdated { "Yes" } else { "No" })?;
     for warning in a.warnings.iter().chain(a.totals.warnings.iter()) {
+        let warning = if warning == crate::dashboard::LIVE_VIEW_WARNING {
+            "These figures and the assessment period were captured when the record was saved. Later decisions do not rewrite them. Review percentages measure decisions on dated imported rows, not statement coverage."
+        } else {
+            warning
+        };
         l.text(warning, 10.0)?;
     }
     l.section("Approved income, spending and cash flow")?;

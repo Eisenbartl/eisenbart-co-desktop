@@ -50,6 +50,7 @@ pub struct Assessment {
     pub document_ids: Vec<String>,
     pub warnings: Vec<String>,
 }
+pub const LIVE_VIEW_WARNING: &str = "This live view is recalculated from current decisions; it is not a saved final report. Period choices are not saved. Review percentages measure decisions on dated imported rows, not statement coverage.";
 fn month(value: &str) -> Result<NaiveDate, String> {
     if value.len() != 7 {
         return Err("Choose assessment months as YYYY-MM.".into());
@@ -189,7 +190,7 @@ pub fn assess(source: &Snapshot, input: Input, today: NaiveDate) -> Result<Asses
         "Income receipts include positive interest. Take-home pay and necessary/discretionary spending use separate, explicit classifications bound to exact approved source decisions.".into(),
         "Refunds reduce net spending and are shown separately from gross spending categories. Transfers and balance movements are excluded from operating cash flow, but included in account movement.".into(),
         "Dated counselor-verified balance facts and source classifications supply additional metrics only when sufficient. Missing facts stay unavailable. Manual plans remain separate estimates.".into(),
-        "This live view is recalculated from current decisions; it is not a saved final report. Period choices are not saved. Review percentages measure decisions on dated imported rows, not statement coverage.".into(),
+        LIVE_VIEW_WARNING.into(),
     ];
     if totals.pending + totals.needs_clarification > 0 {
         warnings.push("Undecided records within this period are excluded from the amounts.".into());

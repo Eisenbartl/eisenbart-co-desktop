@@ -1376,6 +1376,12 @@ mod tests {
             assert!(text.contains(expected), "Missing {expected}");
         }
         assert!(!text.contains("NEEDS REVIEW:"));
+        assert!(!text.contains("This live view is recalculated"));
+        assert!(text
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .contains("Later decisions do not rewrite them"));
         assert!(doc
             .objects
             .values()
