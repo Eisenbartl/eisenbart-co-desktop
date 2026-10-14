@@ -46,13 +46,13 @@ original page for missing transactions. Selected-line totals cannot prove comple
 | Independent Python Decimal example | Original PDF net 974.90; only approved payroll adds income to 3,000.01 and combined CSV/PDF activity to 1,820.02; pending expense contributes zero |
 | Format and Clippy all targets, warnings denied | Passed |
 | Compiled native desktop workflow | Passed existing client/planning/CSV workflows, separate PDF parser, damaged rejection, explicit line selection, source locators, individual approval, pending exclusion, authorized retention, whole-process restart/backup interruption, PDF decisions/history restored through normal and missing-metadata recovery |
-| Native visual inspection | Passed for reported-text provenance, warnings, and corrected verified fields; final exact-source rerun in progress |
-| Windows source CI | Runs on the committed source; results recorded when complete |
+| Native visual inspection | Passed for reported-text provenance, warnings, and corrected verified fields; final exact-source desktop/recovery rerun passed |
+| Windows source CI | Passed: run [38513471590](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38513471590) from 5b6bcbf; production frontend, 56 interface tests, 85 library tests + 2 desktop-worker tests (87 backend/process tests total), including Windows Job Object handling and SQLCipher memory-lock regression |
 | New Windows installer | Intentionally not built |
 | Clean installed Windows 11 offline PDF workflow/native OS pickers | Not run |
 
 Initial full native artifacts: `/workspace/shared/desktop-smoke-pdf`; exact-source
-final artifacts will be `/workspace/shared/desktop-smoke-pdf-final`. Logs are under
+final artifacts are `/workspace/shared/desktop-smoke-pdf-final`. Logs are under
 `/workspace/shared`: `pdf-backend-full.log`, `pdf-focused-final.log`,
 `pdf-process-final.log`, `pdf-frontend-tests.log`, `pdf-frontend-build.log`,
 `pdf-clippy.log`, `pdf-native-smoke.log`, and `pdf-native-final.log`.
@@ -64,9 +64,21 @@ user password, and disables Linux parser core dumps. Synthetic worker tests
 exercise the actual desktop executable/protocol, including deadline termination.
 The worker process is not claimed as a complete OS filesystem/network sandbox.
 
-Source commit, Windows validation, and verified source/history checkpoints are
-recorded after completion. No manual installer workflow is requested. The earlier
-0.3.0 installer contains neither this PDF stage nor the later source-only features.
+Source commit `5b6bcbf9343c829f074a87ff7ff5f9da1d0f84d3` is uploaded to
+main. Windows run [38513471590](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38513471590)
+passed; its full log is `/workspace/shared/pdf-windows-validation.log`. The final
+compiled exact-source native workflow passed at `/workspace/shared/desktop-smoke-pdf-final`.
+Installer creation, installed launch/uninstall, download metadata, installer upload,
+and installer-log upload were explicitly skipped. No manual package run occurred.
+Windows checks establish source/debug worker compilation/protocol/resource handling;
+clean Windows 11 GUI/offline acceptance and release-package verification remain unrun.
+
+Verified tracked-source and full-history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-pdf-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-pdf.bundle`, refreshed after these final
+notes. They are development source checkpoints; application-data backups use
+`.ebcbackup`. The earlier 0.3.0 installer contains neither this PDF stage nor the
+later source-only features. No new download was created.
 
 Next priority: **merchant grouping and recurring-payment review** on imported
 records, with advisory suggestions and explicit counselor decisions. Institution
