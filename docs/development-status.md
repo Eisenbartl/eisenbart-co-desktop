@@ -10,14 +10,44 @@ PDFs render the supplement. Formats 1–7 retain their old bytes/digests. Bank c
 and card spending remain distinct, with unavailable combined figures for review
 issues. See [bank-card-review.md](bank-card-review.md).
 
-Validation is in progress. Locked setup, the production frontend, 193 UI tests,
-205 Linux library tests plus 2 PDF-worker tests, formatting and all-target Clippy
-with warnings denied have passed. Native and Windows source results and the
-checkpoint will be recorded before this stage is marked complete. The standalone
-native build and full native workflow have now passed (exit 0), including the new
-card account/repayment controls, independent figures, report/PDF capture, permanent
-stale bindings, restart, encrypted recovery and isolation. Native review/history
-screens were visually inspected. No installer is being created.
+Validated 2026-10-15 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing setup configuration reused |
+| Production frontend / complete UI suite | Passed build and 193 tests |
+| Complete Linux backend | Passed 205 library + 2 PDF-worker tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles |
+| Complete native workflow | Passed, exit 0: all earlier workflows plus durable card account/source/repayment controls, independent cash-versus-spending figures, format-8 report/PDF capture, permanent stale bindings, rename/archive, restart, encrypted recovery and isolation |
+| Windows source validation | Passed: 193 UI + 206 library + 2 PDF-worker tests; all five installer/checksum/upload steps skipped |
+| Installer | Not created, per user instruction |
+
+Feature commit: `040b8c7ee42a689ccbd57ebde9bc7c0d176f7fd3`.
+Windows source checks passed in
+[run 38791356512](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38791356512).
+The Windows Rust step rebuilt for 11m03s and then passed its library tests in
+657.37 seconds; its longer duration was not an unresolved test failure.
+
+The first full checks exposed an older migration test fixture that needed to drop
+the new table when simulating schema 22, and an existing budget navigation test
+clicking before the save/busy transition had finished. Both fixtures were corrected
+without weakening assertions; complete reruns passed. The focused PDF check uses
+real text extraction rather than searching encoded PDF bytes. No dependency was
+added. Native review and historical report screens were visually inspected.
+
+Native artifacts: `/workspace/shared/desktop-smoke-bank-card`; logs and explicit
+native exit file: `/workspace/shared/card-integration-`. The native exit is `0`.
+The clean source/history checkpoint is retained at
+`/workspace/shared/checkpoints/eisenbart-bank-card-review-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-bank-card-review-source.bundle`, verified
+against the final clean commit and remote main. An earlier native-verified
+checkpoint also preserves `dce59b62c5bd7a44918f8c1cbd20f206511c18e4` while Windows
+was still running. Subsequent commits change documentation/validation records only.
+
+This stage remains a development build. Its supplement is provisional; bank
+figures and planning assumptions keep their original basis and card-inclusive
+final approval stays blocked. The last downloadable preview remains 0.23.0.
 
 Next priority: card-inclusive household inventory, reviewed balance/fact mappings
 and a versioned completeness policy before final card approval. Keep v1 policy
