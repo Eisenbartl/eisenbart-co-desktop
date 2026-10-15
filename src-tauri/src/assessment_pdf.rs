@@ -995,6 +995,26 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
             &chicago_time(&c.created_at)?,
         )?;
         l.text("Original baseline and proposal are preserved in the encrypted scenario record. This selection does not change approved financial facts, live plans or client agreements. The planning section below uses the selected proposal, not the live baseline.",10.0)?;
+        for extra in &c.input.debt_extras {
+            l.value(
+                "Additional proposed debt payment",
+                &format!("{} / {}", extra.month, usd(&extra.amount)),
+            )?;
+        }
+        for change in &c.input.goal_contributions {
+            let goal = &c
+                .baseline
+                .plans
+                .savings
+                .data
+                .as_ref()
+                .and_then(|s| s.goals.get(change.index))
+                .ok_or("The captured goal baseline is unavailable.")?;
+            l.value(
+                "Proposed goal monthly contribution",
+                &format!("{} / {}", goal.label, optional(&change.amount)),
+            )?;
+        }
         for (label, a, b) in [
             (
                 "Entered monthly income",

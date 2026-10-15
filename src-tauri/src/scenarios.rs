@@ -23,6 +23,12 @@ pub struct CashChange {
 }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GoalContributionChange {
+    pub index: usize,
+    pub amount: Option<String>,
+}
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Input {
     pub expected_revisions: planning::Revisions,
     pub label: String,
@@ -33,6 +39,11 @@ pub struct Input {
     pub debt_payment: Option<AmountChange>,
     pub emergency_contribution: Option<AmountChange>,
     pub cash_changes: Vec<CashChange>,
+    // Empty extensions are omitted to preserve canonical historical v1 payloads.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub debt_extras: Vec<debt::DatedAmount>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub goal_contributions: Vec<GoalContributionChange>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -71,6 +82,9 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         return Err(
             "A comparison supports at most 100 budget and 100 dated schedule changes.".into(),
         );
+    }
+    if input.debt_extras.len() > 24 || input.goal_contributions.len() > 50 {
+        return Err("Use at most 24 extra payments and 50 goal contribution changes.".into());
     }
     input.label = input.label.trim().into();
     input.assumptions = input.assumptions.trim().into();
@@ -116,6 +130,15 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
             .ok_or("Save a debt plan before changing its monthly payment.")?
             .monthly_payment = change.amount.clone();
     }
+    if !input.debt_extras.is_empty() {
+        proposed
+            .debt
+            .data
+            .as_mut()
+            .ok_or("Save a debt plan before proposing extra payments.")?
+            .extras
+            .extend(input.debt_extras.iter().cloned());
+    }
     proposed.debt.budget_context = planning::debt_context(&proposed.budget);
     if let Some(data) = proposed.debt.data.take() {
         let (data, mut cmp) = debt::calculate(data)?;
@@ -123,6 +146,16 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         if let Some(change) = &mut input.debt_payment {
             change.amount = data.monthly_payment.clone();
         }
+        for extra in &mut input.debt_extras {
+            extra.amount = data
+                .extras
+                .iter()
+                .find(|e| e.month == extra.month)
+                .ok_or("Cannot verify the proposed extra payment.")?
+                .amount
+                .clone();
+        }
+        input.debt_extras.sort_by(|a, b| a.month.cmp(&b.month));
         proposed.debt.data = Some(data);
         proposed.debt.comparison = Some(cmp);
     }
@@ -134,11 +167,31 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
             .ok_or("Save a savings plan before changing its emergency contribution.")?
             .emergency_contribution = change.amount.clone();
     }
+    seen.clear();
+    for change in &input.goal_contributions {
+        if !seen.insert(change.index) {
+            return Err(
+                "A savings goal contribution can only be changed once per comparison.".into(),
+            );
+        }
+        proposed
+            .savings
+            .data
+            .as_mut()
+            .ok_or("Save a savings plan before changing goal contributions.")?
+            .goals
+            .get_mut(change.index)
+            .ok_or("The changed savings goal is outside the saved baseline.")?
+            .monthly_contribution = change.amount.clone();
+    }
     proposed.savings.context = planning::savings_context(&proposed.budget, &proposed.debt);
     if let Some(data) = proposed.savings.data.take() {
         let (data, summary) = savings::calculate(data, &proposed.savings.context)?;
         if let Some(change) = &mut input.emergency_contribution {
             change.amount = data.emergency_contribution.clone();
+        }
+        for change in &mut input.goal_contributions {
+            change.amount = data.goals[change.index].monthly_contribution.clone();
         }
         proposed.savings.data = Some(data);
         proposed.savings.summary = Some(summary);
@@ -180,7 +233,7 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         },
     )?
     .plans;
-    let warnings = vec![
+    let mut warnings = vec![
         "Hypothetical entered values only. This preview is temporary and does not save a scenario, change approved history, live plans, agreements, reports or audit events.".into(),
         "Baseline versions identify the saved inputs; proposed results are recalculations, not newly saved versions. Changed budget lines and dated entries are estimates.".into(),
         "Budget allocations, debt payments and savings contributions remain distinct. Compare the savings model's first-month buffer as well as the budget's unallocated amount; neither verifies all obligations.".into(),
@@ -188,6 +241,9 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         "Existing debt payment changes and extras, goal contributions, opening balances, reserve commitments and forecast periods remain in effect. A base payment change does not replace later dated payment changes.".into(),
         "Debt uses supported fixed monthly terms; savings assumes no investment yield. Unknown or unsupported terms remain unavailable; no outcome is guaranteed or automatically recommended.".into(),
     ];
+    if !input.debt_extras.is_empty() || !input.goal_contributions.is_empty() {
+        warnings.push("Proposed extra payments are added to the shared repayment budget and follow the selected strategy, not a named account, with one extra per month and at most 24 in total. Only explicitly changed goal contributions are replaced; targets, reserves, future base payment changes and other goals remain in effect. Extras reserve funding even if repayment finishes early. Funding sources are not verified and dated cash-flow schedules are unchanged.".into());
+    }
     Ok(Comparison {
         calculator: "combined-preview-v1".into(),
         client_id: baseline.client_id.clone(),

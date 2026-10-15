@@ -286,6 +286,7 @@ export interface ScenarioInput {
  baselineStrategy:PlanningDebtStrategy;proposedStrategy:PlanningDebtStrategy;
  budgetChanges:ScenarioBudgetChange[];debtPayment:ScenarioAmountChange|null;
  emergencyContribution:ScenarioAmountChange|null;cashChanges:ScenarioCashChange[];
+ debtExtras?:DatedAmount[];goalContributions?:ScenarioBudgetChange[];
 }
 export interface ScenarioOutcome {strategy:PlanningDebtStrategy;firstMonthBuffer:string|null;plans:AssessmentPlans}
 export interface ScenarioComparison {

@@ -1,5 +1,68 @@
 # Development status
 
+## Stage 3H: extra debt payments and savings-goal proposal controls — 0.21.0 source
+
+Combined proposals now support additive dated debt extras and explicit monthly
+contribution changes to existing savings goals. Rust validates original owned
+baselines and all four versions, retains saved debt events/goal targets/reserves,
+recalculates existing exact-cent models and returns canonical changes. Goal
+contributions, completion dates, forecast status and target applicability appear
+side by side. Saved scenarios and selected report PDFs retain those assumptions,
+including explicit added-payment/changed-goal descriptions. No live plan,
+approved fact, agreement or dated cash-flow schedule is changed.
+
+Schema 16 and existing payload/calculator versions remain compatible: new arrays
+default empty and are omitted when empty, preserving legacy field order and the
+original six warnings. Extended proposals append a funding/commitment warning.
+Extras follow the shared strategy budget, do not target a named account, and
+reserve funding conservatively even after an early projected payoff. Unknown
+contributions remain unknown; zero is explicit. See
+[scenario-payment-goal-controls.md](scenario-payment-goal-controls.md).
+
+Independent zero-interest example: income 3,250.00, spending 1,200.00, debt 100.00,
+emergency 200.00 and goal 50.00 yield a 1,700.00 first-month buffer. Adding a
+150.00 November extra and changing the goal to 100.00 yields 1,500.00. Retaining an
+existing 25.00 December extra, the 1,000.00 loan finishes in July instead of August;
+the goal's remaining 200.00 finishes in December instead of February. Target and
+reserve remain unchanged. The native fixture's higher 400.00 budget debt reserve
+produces 983.34 → 833.34 when a 300.00 extra makes model debt 500.00 and the goal
+changes to 100.00; proposed interest is 12.20 and payoff December 2026. Approved
+operating activity remains separately 1,820.02 and dated closing 3,300.00.
+
+| Check | Result |
+|---|---|
+| Locked setup | Passed; existing reusable setup remains sufficient, no new environment configuration or dependency |
+| Production frontend build / interface suite | Passed build and 110 tests; three added control/save/unknown/reset/limit checks |
+| Focused backend checks | Nine comparison and nine saved-record/report/recovery checks passed, including four new tests |
+| Complete Linux backend / worker suite | Passed: 153 library + 2 PDF worker tests (155 total) |
+| Formatting / Clippy, warnings denied | Passed |
+| Native compile / complete workflow | Standalone debug build passed; complete workflow running |
+| Windows source CI | Validation in progress; no installer requested |
+| Clean Windows installation/offline release acceptance | Not run |
+
+Initial focused checks exposed two fixture errors: the absent-plan test needed a
+saved budget to reach the intended validation branch, and the frontend mock
+needed canonical returned money strings rather than echoing unnormalized input.
+Both fixtures were corrected without changing assertions, timeouts or financial
+calculations. Their first failure logs remain available; focused reruns passed.
+
+Logs under `/workspace/shared`: `scenario-controls-setup.log`,
+`scenario-controls-ui.log`, `scenario-controls-ui-tests.log`,
+`scenario-controls-ui-focused.log`, `scenario-controls-backend-focused.log`,
+`scenario-controls-store-focused.log`, `scenario-controls-backend.log`,
+`scenario-controls-fmt.log`, `scenario-controls-clippy.log`,
+`scenario-controls-final-comparison.log`, `scenario-controls-final-compatibility.log`,
+`scenario-controls-ui-final.log` and `scenario-controls-native-build.log`. Final
+comparison/recovery tests were repeated after the last warning/PDF validation
+wording adjustment. No arithmetic or model limits changed.
+The two initial focused failures have the `-first.log` suffix. Native and Windows
+results and checkpoint details will be recorded when validation completes.
+
+Next priority: **new recurring-expense proposals**, then temporary income changes,
+with exact monthly/datetime scope and unchanged historical facts. Seven major
+roadmap areas remain; this checkpoint does not finish the original specification
+or establish commercial readiness. No installer is built during feature work.
+
 ## Stage 3G: saved combined scenarios and report selection — 0.20.0 source
 
 Reviewed combined proposals can now be recorded independently of live plans and

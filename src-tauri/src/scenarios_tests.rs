@@ -54,10 +54,226 @@ pub(super) fn input() -> Input {
         debt_payment: None,
         emergency_contribution: None,
         cash_changes: vec![],
+        debt_extras: vec![],
+        goal_contributions: vec![],
     }
 }
 fn json<T: Serialize>(v: &T) -> serde_json::Value {
     serde_json::to_value(v).unwrap()
+}
+#[test]
+fn extra_payments_and_goal_contributions_recalculate_exactly_without_replacing_saved_commitments() {
+    let (_dir, mut w, id) = fixture();
+    let mut debt = debt_input(1);
+    debt.data.accounts.truncate(1);
+    debt.data.accounts[0].balance = Some("1000".into());
+    debt.data.extras = vec![crate::debt::DatedAmount {
+        month: "2026-12".into(),
+        amount: "25".into(),
+    }];
+    w.save_client_debt_plan(&id, debt).unwrap();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let audits = audit_count(&w);
+    let mut i = input();
+    i.expected_revisions.debt = 2;
+    i.debt_extras = vec![crate::debt::DatedAmount {
+        month: "2026-11".into(),
+        amount: " 150 ".into(),
+    }];
+    i.goal_contributions = vec![GoalContributionChange {
+        index: 0,
+        amount: Some("100".into()),
+    }];
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    let p = &r.proposed.plans;
+    let debt = p
+        .debt
+        .comparison
+        .as_ref()
+        .unwrap()
+        .snowball
+        .as_ref()
+        .unwrap();
+    // Zero-interest 1000: Nov 250, Dec 125, Jan-Jun 100 each, Jul 25.
+    assert_eq!(debt.total_paid, "1000.00");
+    assert_eq!(debt.total_interest, "0.00");
+    assert_eq!(debt.payoff_month.as_deref(), Some("2027-07"));
+    assert_eq!(debt.schedule[0].remaining_balance, "750.00");
+    assert_eq!(debt.schedule[1].available_payment, "125.00");
+    assert_eq!(p.debt.data.as_ref().unwrap().extras.len(), 2);
+    assert_eq!(r.input.debt_extras[0].amount, "150.00");
+    assert_eq!(
+        r.input.goal_contributions[0].amount.as_deref(),
+        Some("100.00")
+    );
+    // Remaining goal 1200 - reserved 1000: 4 * 50 versus 2 * 100.
+    assert_eq!(
+        r.baseline.plans.savings.summary.as_ref().unwrap().goals[0]
+            .forecast
+            .completion_date
+            .as_deref(),
+        Some("2027-02-28")
+    );
+    let s = p.savings.summary.as_ref().unwrap();
+    assert_eq!(
+        s.goals[0].forecast.completion_date.as_deref(),
+        Some("2026-12-31")
+    );
+    assert_eq!(
+        p.savings.data.as_ref().unwrap().goals[0]
+            .reserved_amount
+            .as_deref(),
+        Some("1000.00")
+    );
+    assert_eq!(s.requested_monthly_savings.as_deref(), Some("300.00"));
+    assert_eq!(r.baseline.first_month_buffer.as_deref(), Some("1700.00"));
+    // 3250 - 1000 - 200 - (100 + 150 extra) - (200 + 100 goal).
+    assert_eq!(r.proposed.first_month_buffer.as_deref(), Some("1500.00"));
+    assert_eq!(
+        p.cashflow
+            .summary
+            .as_ref()
+            .unwrap()
+            .combined_closing
+            .as_deref(),
+        Some("3300.00")
+    );
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    assert_eq!(audit_count(&w), audits);
+}
+
+#[test]
+fn new_proposal_controls_preserve_unknown_zero_and_overallocated_funding() {
+    let (_dir, mut w, id) = fixture();
+    for (value, status, buffer) in [
+        (None, crate::savings::ForecastStatus::Unknown, None),
+        (
+            Some("0"),
+            crate::savings::ForecastStatus::NoContribution,
+            Some("1750.00"),
+        ),
+        // Actual first-month goal funding is capped at the remaining 200.
+        (
+            Some("2000"),
+            crate::savings::ForecastStatus::Projected,
+            Some("1550.00"),
+        ),
+    ] {
+        let mut i = input();
+        i.goal_contributions = vec![GoalContributionChange {
+            index: 0,
+            amount: value.map(str::to_owned),
+        }];
+        let r = w.compare_financial_scenarios(&id, i).unwrap();
+        assert_eq!(
+            r.proposed.plans.savings.summary.as_ref().unwrap().goals[0]
+                .forecast
+                .status,
+            status
+        );
+        assert_eq!(r.proposed.first_month_buffer.as_deref(), buffer);
+    }
+    let mut i = input();
+    i.debt_extras = vec![crate::debt::DatedAmount {
+        month: "2026-11".into(),
+        amount: "3000".into(),
+    }];
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    assert_eq!(r.proposed.first_month_buffer.as_deref(), Some("-1300.00"));
+    assert!(r
+        .proposed
+        .plans
+        .debt
+        .comparison
+        .as_ref()
+        .unwrap()
+        .warnings
+        .iter()
+        .any(|w| w.contains("capacity")));
+    assert_eq!(
+        r.proposed.plans.savings.summary.as_ref().unwrap().schedule[0]
+            .debt_reserved
+            .as_deref(),
+        Some("3100.00")
+    );
+}
+
+#[test]
+fn new_proposal_controls_reject_conflicts_bounds_and_forged_values_without_writing() {
+    let (_dir, mut w, id) = fixture();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let audits = audit_count(&w);
+    let extra = |month: &str, amount: &str| crate::debt::DatedAmount {
+        month: month.into(),
+        amount: amount.into(),
+    };
+    for extras in [
+        vec![extra("2026-11", "1"), extra("2026-11", "2")],
+        vec![extra("2026-10", "1")],
+        vec![extra("2076-11", "1")],
+        vec![extra("2026-13", "1")],
+        vec![extra("2026-11", "12.345")],
+        vec![extra("2026-11", "-1")],
+        vec![extra("2026-11", "")],
+        (0..25).map(|_| extra("2026-11", "1")).collect(),
+    ] {
+        let mut i = input();
+        i.debt_extras = extras;
+        assert!(w.compare_financial_scenarios(&id, i).is_err());
+    }
+    for (index, amount) in [(1, Some("1")), (0, Some("12.345")), (0, Some("-1"))] {
+        let mut i = input();
+        i.goal_contributions = vec![GoalContributionChange {
+            index,
+            amount: amount.map(str::to_owned),
+        }];
+        assert!(w.compare_financial_scenarios(&id, i).is_err());
+    }
+    for count in [2, 51] {
+        let mut i = input();
+        i.goal_contributions = (0..count)
+            .map(|_| GoalContributionChange {
+                index: 0,
+                amount: None,
+            })
+            .collect();
+        assert!(w.compare_financial_scenarios(&id, i).is_err());
+    }
+    let mut raw = json(&input());
+    raw["debtExtras"] = serde_json::json!([{"month":"2026-11","amount":"1","totalInterest":"0"}]);
+    assert!(serde_json::from_value::<Input>(raw).is_err());
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    assert_eq!(audit_count(&w), audits);
+    let mut d = debt_input(1);
+    d.data.extras = vec![extra("2026-11", "25")];
+    w.save_client_debt_plan(&id, d).unwrap();
+    let mut i = input();
+    i.expected_revisions.debt = 2;
+    i.debt_extras = vec![extra("2026-11", "50")];
+    assert!(w
+        .compare_financial_scenarios(&id, i)
+        .unwrap_err()
+        .contains("one event"));
+    let other = w.save_client(client_input()).unwrap();
+    w.save_client_budget(&other.id, budget_input(0)).unwrap();
+    let empty = w.get_assessment_planning(&other.id).unwrap();
+    let mut i = input();
+    i.expected_revisions = empty.revisions();
+    i.debt_extras = vec![extra("2026-11", "1")];
+    assert!(w
+        .compare_financial_scenarios(&other.id, i)
+        .unwrap_err()
+        .contains("Save a debt plan"));
+    let mut i = input();
+    i.expected_revisions = empty.revisions();
+    i.goal_contributions = vec![GoalContributionChange {
+        index: 0,
+        amount: None,
+    }];
+    assert!(w
+        .compare_financial_scenarios(&other.id, i)
+        .unwrap_err()
+        .contains("Save a savings plan"));
 }
 #[test]
 fn combines_exact_budget_debt_savings_and_explicit_dated_changes_without_writes() {

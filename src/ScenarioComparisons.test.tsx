@@ -7,6 +7,7 @@ vi.mock('./api',()=>({api:mocks}));
 const plans:AssessmentPlans={clientId:'client-a',budget:{clientId:'client-a',revision:2,updatedAt:'2026-10-14T14:00:00Z',lines:[{label:'Entered wages',kind:'income',amount:'1500.00',frequency:'biweekly',estimated:false}],summary:{monthlyIncome:'3250.00',necessaryExpenses:'0.00',discretionaryExpenses:'0.00',totalSpending:'0.00',surplusBeforeAllocations:'3250.00',proposedSavings:'0.00',availableForDebt:'3250.00',plannedDebtPayments:'0.00',unallocated:'3250.00',monthlyAmounts:['3250.00'],missingCount:0,estimatedCount:0,warnings:['Entered estimates only']}},debt:{clientId:'client-a',revision:0,updatedAt:null,data:null,comparison:null,budgetContext:{revision:2,monthlyCapacity:'3250.00',plannedDebtPayments:'0.00',warnings:[]}},savings:{clientId:'client-a',revision:0,updatedAt:null,data:null,summary:null,context:{budgetRevision:2,debtRevision:0,necessaryExpenses:null,monthlySurplus:null,budgetSavings:'0.00',budgetDebtPayments:'0.00',debtStartMonth:null,debtMonthlyPayment:null,debtChanges:[],debtExtras:[],warnings:[]}},cashflow:{clientId:'client-a',revision:0,updatedAt:null,data:null,summary:null,context:{budgetRevision:2,debtRevision:0,savingsRevision:0,monthlySurplus:null,budgetDebt:'0.00',budgetSavings:'0.00',debtMonthlyPayment:null,savingsMonthlyContribution:null}}};
 plans.debt.data={startMonth:'2026-11',monthlyPayment:'100.00',accounts:[],extras:[],paymentChanges:[]};plans.debt.revision=1;
 plans.savings.data={startMonth:'2026-11',targetMonths:3,liquidSavings:'2600.00',restrictedSavings:'5000.00',obligationsReserved:'600.00',emergencyContribution:'200.00',alternativeContributions:[],goals:[],prioritiesNote:''};plans.savings.revision=1;
+plans.savings.data.goals=[{label:'Car repair',targetAmount:'1200.00',targetDate:'2027-02-28',reservedAmount:'1000.00',monthlyContribution:'50.00'}];
 plans.cashflow.data={startDate:'2026-11-01',endDate:'2026-11-30',accounts:[{id:'checking',label:'Checking',openingBalance:'500.00'}],schedules:[{label:'Rent',kind:'bill',accountId:'checking',destinationId:null,amount:'1200.00',firstDate:'2026-11-03',frequency:'once',secondDay:null,untilDate:null,certainty:'confirmed'}],notes:''};plans.cashflow.revision=1;
 const initial:ScenarioInput={expectedRevisions:{budget:2,debt:1,savings:1,cashflow:1},label:'Temporary combined proposal',assumptions:'',baselineStrategy:'avalanche',proposedStrategy:'avalanche',budgetChanges:[],debtPayment:null,emergencyContribution:null,cashChanges:[]};
 const comparison:ScenarioComparison={clientId:'client-a',calculator:'combined-preview-v1',createdAt:'2026-10-14T16:00:00Z',revisions:initial.expectedRevisions,input:initial,baseline:{strategy:'avalanche',firstMonthBuffer:'3000.00',plans},proposed:{strategy:'avalanche',firstMonthBuffer:'2866.67',plans:{...plans,budget:{...plans.budget,summary:{...plans.budget.summary,monthlyIncome:'3466.67'}}}},warnings:['Temporary assumptions only; no saved plans changed']};
@@ -40,4 +41,67 @@ it('reopens history without loading a live baseline and displays stale records a
 it('preserves failed saves without retry and drops late saved-history replies across clients',async()=>{
  const p=props(),view=render(<ScenarioComparisons {...p}/>);await load();fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));await screen.findByRole('region',{name:'Combined scenario comparison'});mocks.saveClientScenario.mockRejectedValueOnce(new Error('History changed. Check for an existing save.'));fireEvent.click(screen.getByRole('button',{name:'Save reviewed combined scenario'}));expect(await screen.findByRole('alert')).toHaveTextContent('Check for an existing save');expect(mocks.saveClientScenario).toHaveBeenCalledTimes(1);expect(screen.getByLabelText('Proposal label')).toHaveValue(initial.label);
  const pending=deferred<typeof saved>();mocks.saveClientScenario.mockReturnValueOnce(pending.promise);fireEvent.click(screen.getByRole('button',{name:'Save reviewed combined scenario'}));view.rerender(<ScenarioComparisons {...p} clientId="client-b"/>);await act(async()=>pending.resolve(saved));expect(screen.queryByRole('article',{name:'Saved combined scenario'})).not.toBeInTheDocument();
+});
+
+it('sends extra payment and indexed goal assumptions only and records the reviewed proposal',async()=>{
+ const canonical={...initial,debtExtras:[{month:'2026-11',amount:'300.00'}],goalContributions:[{index:0,amount:'100.00'}]};
+ mocks.compareFinancialScenarios.mockResolvedValueOnce({...comparison,input:canonical});
+ mocks.saveClientScenario.mockResolvedValueOnce({...saved,payload:{...saved.payload,comparison:{...saved.payload.comparison,input:canonical}}});
+ render(<ScenarioComparisons {...props()}/>);await load();
+ fireEvent.click(screen.getByText('Propose extra debt payments'));
+ fireEvent.click(screen.getByRole('button',{name:'Add proposed extra payment'}));
+ fireEvent.change(screen.getByLabelText('Extra payment 1 month (YYYY-MM)'),{target:{value:'2026-11'}});
+ fireEvent.change(screen.getByLabelText('Extra payment 1 amount (USD)'),{target:{value:'300'}});
+ fireEvent.click(screen.getByText('Change savings-goal contributions'));
+ fireEvent.change(screen.getByLabelText('Proposed Car repair monthly contribution (USD)'),{target:{value:'100'}});
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));
+ const region=await screen.findByRole('region',{name:'Combined scenario comparison'});
+ const proposal={...initial,debtExtras:[{month:'2026-11',amount:'300'}],goalContributions:[{index:0,amount:'100'}]};
+ expect(mocks.compareFinancialScenarios).toHaveBeenCalledWith('client-a',proposal);
+ expect(region).toHaveTextContent('Additional debt payment: $300.00 in 2026-11');
+ expect(region).toHaveTextContent('Car repair monthly contribution: $100.00');
+ expect(within(region).getByRole('table')).toHaveTextContent('Car repair completion date');
+ fireEvent.click(screen.getByRole('button',{name:'Save reviewed combined scenario'}));
+ expect(await screen.findByRole('article',{name:'Saved combined scenario'})).toHaveTextContent('Additional debt payment');
+ expect(mocks.saveClientScenario).toHaveBeenCalledWith('client-a',{expectedCount:0,proposal});
+ expect(proposal).not.toHaveProperty('plans');
+});
+
+it('retains rejected extras, clears a stale preview on removal, and distinguishes unknown from zero goal contributions',async()=>{
+ render(<ScenarioComparisons {...props()}/>);await load();
+ fireEvent.click(screen.getByText('Propose extra debt payments'));fireEvent.click(screen.getByRole('button',{name:'Add proposed extra payment'}));
+ fireEvent.change(screen.getByLabelText('Extra payment 1 month (YYYY-MM)'),{target:{value:'2026-11'}});
+ fireEvent.change(screen.getByLabelText('Extra payment 1 amount (USD)'),{target:{value:'12.345'}});
+ fireEvent.click(screen.getByText('Change savings-goal contributions'));
+ fireEvent.change(screen.getByLabelText('Proposed Car repair monthly contribution (USD)'),{target:{value:''}});
+ mocks.compareFinancialScenarios.mockRejectedValueOnce(new Error('Use at most two decimal places'));
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('two decimal places');
+ expect(mocks.compareFinancialScenarios).toHaveBeenCalledTimes(1);
+ expect(screen.getByLabelText('Extra payment 1 amount (USD)')).toHaveValue('12.345');
+ expect(mocks.compareFinancialScenarios.mock.calls[0][1].goalContributions).toEqual([{index:0,amount:null}]);
+ fireEvent.change(screen.getByLabelText('Extra payment 1 amount (USD)'),{target:{value:'100'}});
+ fireEvent.change(screen.getByLabelText('Proposed Car repair monthly contribution (USD)'),{target:{value:'0'}});
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));await screen.findByRole('region',{name:'Combined scenario comparison'});
+ expect(mocks.compareFinancialScenarios.mock.calls[1][1].goalContributions).toEqual([{index:0,amount:'0'}]);
+ fireEvent.click(screen.getByRole('button',{name:'Remove proposed extra payment 1'}));
+ expect(screen.queryByRole('region',{name:'Combined scenario comparison'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Save reviewed combined scenario'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));await screen.findByRole('region',{name:'Combined scenario comparison'});
+ expect(mocks.compareFinancialScenarios.mock.calls[2][1]).not.toHaveProperty('debtExtras');
+ fireEvent.click(screen.getByRole('button',{name:'Reload saved scenario baseline'}));
+ await waitFor(()=>expect(screen.getByLabelText('Proposed Car repair monthly contribution (USD)')).toHaveValue('50.00'));
+ expect(screen.queryByLabelText('Extra payment 1 amount (USD)')).not.toBeInTheDocument();
+});
+
+it('limits proposed extras using the saved event count and discards all new inputs across clients',async()=>{
+ const loaded=structuredClone(plans);loaded.debt.data!.extras=Array.from({length:24},(_,i)=>({month:`2027-${String(i%12+1).padStart(2,'0')}`,amount:'1.00'}));
+ mocks.getAssessmentPlanning.mockResolvedValueOnce(loaded);
+ const p=props(),view=render(<ScenarioComparisons {...p}/>);await load();
+ fireEvent.click(screen.getByText('Propose extra debt payments'));
+ expect(screen.getByRole('button',{name:'Add proposed extra payment'})).toBeDisabled();
+ view.rerender(<ScenarioComparisons {...p} clientId="client-b"/>);
+ expect(screen.queryByLabelText('Proposed Car repair monthly contribution (USD)')).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Add proposed extra payment'})).not.toBeInTheDocument();
+ expect(mocks.compareFinancialScenarios).not.toHaveBeenCalled();
 });

@@ -58,6 +58,131 @@ fn json<T: Serialize>(v: &T) -> serde_json::Value {
     serde_json::to_value(v).unwrap()
 }
 #[test]
+fn extended_and_legacy_scenarios_keep_canonical_history_reports_and_encrypted_recovery() {
+    let (root, mut w, id) = fixture();
+    let legacy = save(&mut w, &id);
+    let old_report = report(&mut w, &id, &legacy);
+    let old_report = w.save_assessment_record(&id, old_report).unwrap();
+    let legacy_bytes = serde_json::to_vec(&legacy.payload).unwrap();
+    let legacy_json = json(&legacy.payload);
+    assert!(legacy_json["comparison"]["input"]
+        .get("debtExtras")
+        .is_none());
+    assert!(legacy_json["comparison"]["input"]
+        .get("goalContributions")
+        .is_none());
+    assert_eq!(legacy.payload.comparison.warnings.len(), 6);
+    let decoded: Payload = serde_json::from_slice(&legacy_bytes).unwrap();
+    saved_scenarios::validate(&decoded, &id).unwrap();
+    assert_eq!(serde_json::to_vec(&decoded).unwrap(), legacy_bytes);
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let mut p = input();
+    p.label = "Extra loan and goal proposal".into();
+    p.debt_extras = vec![crate::debt::DatedAmount {
+        month: "2026-11".into(),
+        amount: "100".into(),
+    }];
+    p.goal_contributions = vec![scenarios::GoalContributionChange {
+        index: 0,
+        amount: Some("100".into()),
+    }];
+    let new = w
+        .save_client_scenario(
+            &id,
+            Input {
+                expected_count: 1,
+                proposal: p,
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        new.payload
+            .comparison
+            .proposed
+            .first_month_buffer
+            .as_deref(),
+        Some("1550.00")
+    );
+    let i = report(&mut w, &id, &new);
+    let a = w.save_assessment_record(&id, i).unwrap();
+    assert_eq!(a.payload.assessment.operating_cashflow, "0.00");
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    for changed in ["extra", "goal", "index"] {
+        let mut forged = json(&new.payload);
+        match changed {
+            "extra" => forged["comparison"]["input"]["debtExtras"][0]["amount"] = "101.00".into(),
+            "goal" => {
+                forged["comparison"]["proposed"]["plans"]["savings"]["data"]["goals"][0]
+                    ["monthlyContribution"] = "999.00".into()
+            }
+            _ => forged["comparison"]["input"]["goalContributions"][0]["index"] = 99.into(),
+        }
+        let forged: Payload = serde_json::from_value(forged).unwrap();
+        assert!(saved_scenarios::validate(&forged, &id).is_err());
+    }
+    let out = tempfile::tempdir().unwrap();
+    let pdf = w
+        .export_assessment_pdf(
+            &id,
+            &a.payload.id,
+            out.path().join("extended.pdf").to_str().unwrap(),
+        )
+        .unwrap();
+    let d = lopdf::Document::load(pdf.path).unwrap();
+    let text = d
+        .extract_text(&d.get_pages().keys().copied().collect::<Vec<_>>())
+        .unwrap()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    for value in [
+        "Additional proposed debt payment: 2026-11 / USD 100.00",
+        "Proposed goal monthly contribution: Synthetic insurance / USD 100.00",
+        "Baseline USD 1700.00 / proposed USD 1550.00",
+        "2026-12-31",
+    ] {
+        assert!(text.contains(value), "Missing {value}");
+    }
+    let mut budget = budget_input(1);
+    budget.lines = w.get_client_budget(&id).unwrap().lines;
+    budget.lines[0].amount = Some("1600".into());
+    w.save_client_budget(&id, budget).unwrap();
+    let backup = w
+        .create_backup(out.path().to_string_lossy().into(), PASSWORD.into())
+        .unwrap();
+    w.lock_workspace();
+    let mut reopened = Workspace::new(root.path().into());
+    reopened.unlock_workspace(PASSWORD.into()).unwrap();
+    assert!(
+        reopened
+            .get_client_scenario(&id, &new.payload.id)
+            .unwrap()
+            .needs_review
+    );
+    reopened.lock_workspace();
+    let review = reopened
+        .prepare_restore(backup.path, PASSWORD.into())
+        .unwrap();
+    reopened
+        .confirm_restore(review.token, "RESTORE".into())
+        .unwrap();
+    reopened.unlock_workspace(PASSWORD.into()).unwrap();
+    for (record, report) in [(&legacy, &old_report), (&new, &a)] {
+        let restored = reopened
+            .get_client_scenario(&id, &record.payload.id)
+            .unwrap();
+        assert_eq!(restored.digest, record.digest);
+        assert_eq!(json(&restored.payload), json(&record.payload));
+        assert!(restored.needs_review);
+        let linked = reopened
+            .get_assessment_record(&id, &report.payload.id)
+            .unwrap();
+        assert_eq!(linked.digest, report.digest);
+        assert_eq!(linked.scenario.unwrap().digest, record.digest);
+        assert!(linked.needs_review);
+    }
+}
+#[test]
 fn saved_scenario_and_report_keep_exact_baseline_proposal_and_live_data_separate() {
     let (_dir, mut w, id) = fixture();
     let before = json(&w.get_assessment_planning(&id).unwrap());

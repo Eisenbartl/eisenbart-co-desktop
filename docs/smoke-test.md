@@ -179,3 +179,13 @@ verifies it after restart and both recovery paths. Later budget revisions flag
 both records Needs review while their 983.34 proposal buffer and separate 1,820.02
 approved report figures remain frozen. All historical report/client-plan checks
 continue in the same full workflow.
+
+The 0.21.0 workflow retains every earlier comparison/report check and adds an
+explicit 300.00 November extra plus a 100.00 goal contribution. It verifies
+833.34 funding buffer, 12.20 interest, December payoff/goal completion, invalid
+extra precision with retained input and unchanged live contributions/payments.
+A second immutable scenario and selected report survive restart and both recovery
+paths with original milestones and Needs review flags. Four additional PDFs
+verify added-payment/goal assumptions separately from approved operating activity
+1,820.02 and unchanged dated closing 3,300.00. Artifacts include
+`native-scenario-controls-*.png` and `scenario-controls-*.pdf`.

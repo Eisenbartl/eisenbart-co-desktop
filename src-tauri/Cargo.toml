@@ -1,6 +1,6 @@
 [package]
 name = "eisenbart-counseling-suite"
-version = "0.20.0"
+version = "0.21.0"
 description = "Offline financial counseling desktop foundation"
 edition = "2021"
 rust-version = "1.90"
