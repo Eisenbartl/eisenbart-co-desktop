@@ -236,6 +236,20 @@ class WebDriver:
         except DriverFailure as error:
             raise SmokeFailure(f"Native field {selector}: {error}") from error
 
+    def fill_pdf_destination(self, selector: str, destination: Path) -> None:
+        # Use real keyboard events so React observes replacement of a retained
+        # controlled text field, rather than relying on the clear endpoint.
+        # Send one select-all/delete gesture, observe the empty value, then type
+        # once and verify the complete destination before exporting. Never retry
+        # typing or an export, and never set a DOM value through JavaScript.
+        element = self.interactive(selector)
+        self.scroll_element(element)
+        element = self.interactive(selector)
+        self.command("POST", f"/element/{element}/value", {"text": "\ue009a\ue000\ue003"})
+        self.wait_value(selector, "", "keyboard-cleared PDF destination")
+        self.command("POST", f"/element/{element}/value", {"text": str(destination)})
+        self.wait_value(selector, str(destination), "complete PDF destination before export")
+
     def select(self, selector: str, value: str, using: str = "css selector") -> None:
         # WebDriver clicks the HTML option rather than calling application code.
         select = self.interactive(selector, using)
@@ -682,7 +696,7 @@ def export_counselor_evidence_pdf(driver: WebDriver, artifacts: Path, label: str
     destination = artifacts / f"counselor-evidence-{label}.pdf"
     if destination.exists():
         raise SmokeFailure("Counselor evidence PDF destination must be new")
-    driver.fill("#assessment-pdf-path", str(destination))
+    driver.fill_pdf_destination("#assessment-pdf-path", destination)
     driver.click_button("Export saved assessment PDF")
     driver.wait_text(".saved-assessments > .success-message", str(destination), "exact counselor evidence export completion")
     text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
@@ -875,7 +889,7 @@ def export_scenario_controls_pdf(driver: WebDriver, artifacts: Path, label: str)
     destination = artifacts / f"temporary-income-{label}.pdf"
     if destination.exists():
         raise SmokeFailure("Extended scenario PDF destination must be new")
-    driver.fill("#assessment-pdf-path", str(destination))
+    driver.fill_pdf_destination("#assessment-pdf-path", destination)
     driver.click_button("Export saved assessment PDF")
     driver.wait_text(".saved-assessments > .success-message", str(destination), "extended scenario PDF completion")
     text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
@@ -926,7 +940,7 @@ def export_saved_combined_pdf(driver: WebDriver, artifacts: Path, label: str) ->
     destination = artifacts / f"saved-combined-{label}.pdf"
     if destination.exists():
         raise SmokeFailure("Saved combined PDF destination must be new")
-    driver.fill("#assessment-pdf-path", str(destination))
+    driver.fill_pdf_destination("#assessment-pdf-path", destination)
     driver.click_button("Export saved assessment PDF")
     driver.wait_text(".saved-assessments > .success-message", str(destination), "selected combined scenario PDF completion")
     text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
@@ -1005,7 +1019,7 @@ def export_original_assessment_pdf(driver: WebDriver, artifacts: Path, label: st
     destination = artifacts / f"saved-assessment-{label}.pdf"
     if destination.exists():
         raise SmokeFailure("PDF smoke destination must be new; never overwrite an earlier export")
-    driver.fill("#assessment-pdf-path", str(destination))
+    driver.fill_pdf_destination("#assessment-pdf-path", destination)
     driver.click_button("Export saved assessment PDF")
     driver.wait_text(".saved-assessments > .success-message", str(destination), "visible native PDF export completion for selected destination")
     original = destination.read_bytes()
@@ -1031,7 +1045,7 @@ def export_client_action_pdf(driver: WebDriver, artifacts: Path, label: str, nee
     destination = artifacts / f"client-action-plan-{label}.pdf"
     if destination.exists():
         raise SmokeFailure("Client PDF smoke destination must be new")
-    driver.fill("#client-plan-pdf-path", str(destination))
+    driver.fill_pdf_destination("#client-plan-pdf-path", destination)
     driver.click_button("Export client action plan PDF")
     driver.wait_text(".client-action-plans > .success-message", str(destination), "client PDF export completion for selected destination")
     text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
@@ -1089,7 +1103,7 @@ def export_captured_planning_pdf(driver: WebDriver, artifacts: Path, label: str)
     destination = artifacts / f"saved-planning-{label}.pdf"
     if destination.exists():
         raise SmokeFailure("Planning PDF smoke destination must be new")
-    driver.fill("#assessment-pdf-path",str(destination))
+    driver.fill_pdf_destination("#assessment-pdf-path", destination)
     driver.click_button("Export saved assessment PDF")
     driver.wait_text(".saved-assessments > .success-message", str(destination), "native planning scenario PDF completion for selected destination")
     text = subprocess.run(["pdftotext","-layout",str(destination),"-"],check=True,capture_output=True,text=True).stdout

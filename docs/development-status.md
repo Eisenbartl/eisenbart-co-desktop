@@ -28,18 +28,50 @@ normal plans and conditional payoff/goal milestones stay unchanged.
 | Production frontend / complete interface suite | Passed build and 117 tests |
 | Complete Linux backend / PDF processes | Passed: 161 library + 2 process tests (163 total) |
 | Formatting / Clippy, warnings denied | Passed |
-| Standalone native build / complete workflow | Standalone debug build passed; complete workflow running |
-| Windows installer workflow | Requested; validation pending |
+| Standalone native build / complete workflow | Passed: complete fresh native run, restart, encrypted restore and missing-metadata error-screen recovery |
+| Windows installer workflow | Passed: 117 UI, 162 library + 2 process tests; NSIS build, install, responsive x64 window, uninstall and download metadata |
 | Clean Windows 11 offline/full GUI release acceptance | Not run |
 
 The first saved-record test compile failed because its error assertion required
 Debug on the successful review type. The fixture now inspects the error Option
 without changing production types or relaxing the assertion; its focused rerun
 passed. The first compile log is retained. No financial rule or timeout changed.
-Logs use `/workspace/shared/income-period-*.log`; native artifacts will be in
-`desktop-smoke-income-periods`. Current Windows/evaluation/download instructions
-are updated together for this preview, including schema 16 and recovery layout.
-The packaging run will supply the exact version, source commit and SHA-256 file.
+
+The first full native run passed the new income controls/report but failed a
+later retained PDF-destination replacement: the app reported an unavailable
+parent folder, and the screenshot still began with the earlier export path.
+The exact submitted value was not captured, so the cause is not established.
+An isolated controlled-text-field probe passed both clear and keyboard replacement.
+The harness now uses one native select-all/delete gesture, observes the empty
+field, types once and checks the entire destination before export; no save,
+financial mutation or export is replayed. The fresh full run passed that
+previously failing export and all restart, encrypted restore and error-screen
+recovery checks (exit 0). Application and installer source remain `bd2d1a88544ea941e69373f6312cf275d3767186`;
+this follow-up changes the test harness and documentation only. The first log,
+screenshot and failed exit status remain preserved; no assertion was removed.
+Logs use `/workspace/shared/income-period-*.log`; first native artifacts remain
+in `desktop-smoke-income-periods`, fresh-run artifacts in
+`desktop-smoke-income-periods-verified`. Current Windows/evaluation/download
+instructions use schema 16 and the actual recovery layout.
+
+[Windows packaging run 38668750314](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38668750314)
+completed successfully for the source above. All packaging, installed-window,
+uninstall, metadata and upload steps passed.
+[Download artifact 11943645145](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38668750314/artifacts/11943645145)
+expires October 29, 2026 at 02:12 UTC. The downloaded ZIP passed its GitHub digest
+and CRC checks; its README identifies version 0.23.0, that source and schema 16.
+The installer is `Eisenbart Counseling Suite_0.23.0_x64-setup.exe` (222,803,905
+bytes), unsigned, with SHA-256:
+`83da0ac3773869ada8e8d8b5099a54ffbf8a4bfca58b3b42f1a63a723dc2aed1`.
+The checksum matches its included `SHA256SUMS.txt`; trusted archive inspection
+passed and found the 214,090,448-byte WebView2 offline redistributable. Its
+presence does not establish installation on a clean offline Windows 11 machine.
+A source archive and complete-history Git bundle are retained under
+`/workspace/shared/checkpoints/eisenbart-income-period-source.*`; both are verified
+against the final committed source after documenting these results.
+Windows logs confirm installer header 0x014C, installed application 0x8664,
+installation/uninstallation exit 0 and a responsive titled window. No counselor
+setup/client workflow was entered on Windows; those limits remain open.
 
 Next priority after this preview: practical household intake and follow-up
 workflow for pilot use, then remaining model/report requirements and Windows

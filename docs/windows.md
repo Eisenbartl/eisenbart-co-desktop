@@ -2,8 +2,11 @@
 
 ## Download and install
 
-The requested 0.23.0 Windows x64 preview is being packaged and checked. Its verified
-download link will be recorded here when the packaging run completes.
+[Download the verified 0.23.0 Windows x64 preview](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38668750314/artifacts/11943645145)
+(about 213 MiB). The ZIP contains `Eisenbart Counseling Suite_0.23.0_x64-setup.exe`,
+`README.txt` and `SHA256SUMS.txt`. This artifact expires October 29, 2026 (UTC).
+[Build and Windows checks](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38668750314)
+passed for source `bd2d1a88544ea941e69373f6312cf275d3767186`.
 
 1. Download the **windows-installer** ZIP from the verified build link. Sign in to
    GitHub with access to the repository if prompted.

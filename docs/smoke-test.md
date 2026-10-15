@@ -19,6 +19,11 @@ process restart. It also checks that the application is running inside Tauri and
 private workspace data leaves the page when locked. The test password is randomly
 generated and never printed. Temporary application data is removed on completion.
 
+PDF destination replacement uses native select-all/delete keyboard events. The
+test observes the empty field, types the new destination once and verifies the
+complete value before clicking export. It never retries typing or export clicks,
+and verifies the resulting file and its independently expected report contents.
+
 ## Linux cloud environment
 
 Build the frontend and native application with the repository's documented

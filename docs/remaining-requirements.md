@@ -25,4 +25,4 @@ workflow passed through direct WebKit transport before this feature stage; see
 The original workbook/legacy parity remains unverified without the authorized
 reference. Stages 3–8 of the original specification are partly open and need
 several smaller checkpoints; a stage count is not a reliable percentage or time
-estimate. A Windows preview installer is requested for 0.23.0; packaging checks and clean Windows 11 acceptance are recorded separately in development status.
+estimate. A tested 0.23.0 Windows preview installer is available in the [Windows guide](windows.md); package checks and clean Windows 11 acceptance remain separate evidence.
