@@ -101,3 +101,13 @@ behavior for historical records. Add statement-account selection to future card
 import adapters without mutating existing format-1 sources. Card PDFs, other debt
 and paystub adapters, OCR, direct printing and installed Windows acceptance remain
 separate work.
+
+The next policy needs dated applicability for newly opened/closed cards, a recorded
+household inventory and source-bound necessary/discretionary spending roles for
+card approvals. Map each card's verified closing debt to the existing balance
+inventory explicitly, preserving unknown/unmapped balances and reconciliation
+differences. Do not add card debt a second time or infer spending roles from a
+category name. Final approval must require all applicable bank/card evidence,
+current review bindings, resolved exceptions and fresh professional confirmation.
+Keep unsupported cross-period/split repayments blocked until their semantics are
+defined and independently checked.

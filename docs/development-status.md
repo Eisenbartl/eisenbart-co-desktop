@@ -13,8 +13,11 @@ issues. See [bank-card-review.md](bank-card-review.md).
 Validation is in progress. Locked setup, the production frontend, 193 UI tests,
 205 Linux library tests plus 2 PDF-worker tests, formatting and all-target Clippy
 with warnings denied have passed. Native and Windows source results and the
-checkpoint will be recorded before this stage is marked complete. No installer
-is being created.
+checkpoint will be recorded before this stage is marked complete. The standalone
+native build and full native workflow have now passed (exit 0), including the new
+card account/repayment controls, independent figures, report/PDF capture, permanent
+stale bindings, restart, encrypted recovery and isolation. Native review/history
+screens were visually inspected. No installer is being created.
 
 Next priority: card-inclusive household inventory, reviewed balance/fact mappings
 and a versioned completeness policy before final card approval. Keep v1 policy

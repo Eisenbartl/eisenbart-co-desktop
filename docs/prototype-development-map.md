@@ -132,3 +132,11 @@ Preserve legacy report bytes and v1 readiness receipts. Cross-period/split payme
 need explicit semantics, not automatic adjustments. Broader document adapters,
 OCR, direct printing, installed Windows acceptance and commercial/multiple-counselor
 work remain separate. See [bank-card-review.md](bank-card-review.md).
+
+Acceptance for the next policy includes dated card applicability, explicit
+necessary/discretionary classifications bound to card approval IDs, verified
+closing-debt mappings to the existing inventory without duplicate debt, unknown
+and discrepancy gates, and fresh professional review. Categories alone cannot
+supply verified spending roles. New fields/calculators/policies require versioned
+capture and unchanged historical report bytes. Unsupported repayment timing and
+split cases remain blocked until separately defined and tested.
