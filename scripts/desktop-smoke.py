@@ -2288,7 +2288,13 @@ def check_final_report_approval(driver: WebDriver, artifacts: Path, data_root: P
     driver.click('#record-ack')
     driver.click_button('Save assessment record')
     driver.wait_text('.saved-assessments','Assessment record saved with its supporting evidence.','complete immutable assessment captured')
-    parent=driver.observe_script("return document.querySelector('#saved-assessment').value")
+    # The save notice can render before the refreshed directory contains the
+    # selected record. Capture its real ID only after its option is selected;
+    # an empty ID would select the checklist's placeholder, not an assessment.
+    parent=driver.wait(lambda: driver.observe_script(
+        "const select=document.querySelector('#saved-assessment');"
+        "return select?.value && select.selectedOptions[0]?.textContent.startsWith('Fictional final-ready completed-period assessment') ? select.value : false;"),
+        'newly saved final-report assessment selected in its refreshed directory')
     driver.click_button('Final report checklist')
 
     def open_approval() -> None:
