@@ -54,7 +54,7 @@ pub struct ReviewInput {
     pub reason: String,
     pub acknowledge: bool,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Source {
     pub format: u32,
@@ -68,7 +68,7 @@ pub struct Source {
     pub input: Input,
     pub rows: Vec<Raw>,
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Row {
     pub row: usize,
@@ -76,7 +76,7 @@ pub struct Row {
     pub fields: Fields,
     pub status: Status,
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Review {
     pub id: String,
@@ -88,7 +88,7 @@ pub struct Review {
     pub counselor_name: String,
     pub revision: i64,
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Summary {
     pub approved: usize,
@@ -109,7 +109,7 @@ pub struct Summary {
     pub approved_difference: Option<String>,
     pub reconciled: bool,
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Statement {
     pub source: Source,
@@ -118,7 +118,7 @@ pub struct Statement {
     pub summary: Summary,
     pub warnings: Vec<String>,
 }
-#[derive(Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub client_id: String,

@@ -119,6 +119,9 @@ pub fn readiness(
             detail: detail.into(),
         })
     };
+    if p.cards.is_some() {
+        add("cardPolicy","Card-inclusive final approval policy",false,"The bank/card supplement is provisional. Policy v1 cannot approve card-inclusive completeness; retain this as an internal assessment.");
+    }
     add("context","Current client and supporting context",!changed,"Client, source decisions, firm, selected review and planning context must match the saved assessment. Record a new assessment after changes.");
     add("period","Completed, recent assessment period",end<today && (today-end).num_days()<=90,"Policy v1 supports completed periods ending within the last 90 days. Older internal assessments remain available for historical export.");
     add("approved","Approved dated financial activity",a.totals.approved>0 && a.totals.pending+a.totals.needs_clarification+a.undated_records==0,"At least one approved in-period transaction is required. Pending, clarification and undated records cannot be waived; rejected and out-of-period rows remain excluded.");

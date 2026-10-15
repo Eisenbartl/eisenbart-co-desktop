@@ -172,3 +172,17 @@ Current bank assessments/directories detect known card evidence and flag origina
 and newly recorded records; v1 final approval remains blocked until card-inclusive
 reporting is implemented. Preserve the v1 captured CSV extraction behavior for old
 sources when introducing future adapters. See [credit-card-review.md](credit-card-review.md).
+
+`card_review.rs` separates durable card identity, explicit repayment bindings and
+`bank-card-review-v1` calculations from bank cashflow. `card_review_store` stores
+schema-24 append-only scoped snapshots with shared source revisions and atomic
+audit; reads/recovery validate historical approval ownership while current views
+flag superseded IDs. Format-8 assessments optionally capture the complete card
+ledger at its exact revision and reviewed links, retain otherwise-pruned original
+bank repayment approvals, recompute the supplement and independently validate its
+scoped sources. Optional omission preserves formats 1–7. `CardFinancialReview`
+provides guarded account/assignment/repayment CRUD, version history and calendar
+review. `AssessmentRecords` requires explicit review before capturing the new
+supplement; only internal PDFs render it. Final policy v1 rejects the new format's
+card supplement without changing old-format readiness receipts. See
+[bank-card-review.md](bank-card-review.md).

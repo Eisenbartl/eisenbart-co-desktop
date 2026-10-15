@@ -111,3 +111,24 @@ review is working in 0.34.0; [its guide](credit-card-review.md) records future c
 PDF parsing, durable card identity/metadata CRUD and planning-account mappings.
 Broader loan/paystub adapters, OCR, printing, commercial licensing, multiple
 counselors and installed Windows acceptance remain separate.
+
+### 0.35.0 — integrated provisional bank/card review
+
+Financial Review → Bank & card activity now implements durable card account
+creation/rename/archive/reopen, explicit statement assignment/unassignment,
+one-to-one repayment matching/removal, preserved version history and exact calendar
+review. `card_review.rs`/`card_review_store.rs` own calculations, scope, provenance,
+revision/audit transactions and recovery. `CardFinancialReview` owns guarded forms;
+`AssessmentRecords` captures reviewed format-8 supplements and `assessment_pdf`
+prints them. Existing bank figures, manual balance facts and planning are not
+silently changed. Gaps/overlaps, mismatches, adjustments and stale approvals block
+combined observed spending. Independent example: 749.96 bank cash, 1287.10 spending,
+50.03 repayment excluded. Final card-inclusive approval remains blocked.
+
+Next priority: card-inclusive household inventory and balance/fact mapping with a
+versioned completeness policy. Account identity and repayment links now exist;
+do not reimplement them or relax bank/card final gates without complete evidence.
+Preserve legacy report bytes and v1 readiness receipts. Cross-period/split payments
+need explicit semantics, not automatic adjustments. Broader document adapters,
+OCR, direct printing, installed Windows acceptance and commercial/multiple-counselor
+work remain separate. See [bank-card-review.md](bank-card-review.md).

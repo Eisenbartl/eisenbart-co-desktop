@@ -354,3 +354,12 @@ use known budget allocations; missing information stays unavailable. Add a 75.00
 monthly necessary expense and compare again. Save a scenario/report, export a PDF,
 restart the app and reopen them. Create an encrypted backup in Settings before
 trying additional changes. Keep your password; backup encryption does not bypass it.
+
+## Bank and credit-card activity
+
+Use Financial Review → Bank & card activity to create card accounts, assign
+reviewed statements and match card payments to approved bank balance movements.
+Choose calendar months to see cash movement separately from spending. Reports can
+retain a reviewed bank/card supplement in a saved internal assessment. Payments do
+not become another expense. Incomplete or stale links remain visible and final
+card-inclusive approval is still unavailable. See [bank-card-review.md](bank-card-review.md).

@@ -49,8 +49,19 @@ fn parse_status(s: &str) -> Result<crate::imports::Status, String> {
     }
 }
 pub(super) fn read(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<Snapshot, String> {
+    read_at(c, w, client, imports_store::revision(c, w, client)?)
+}
+pub(super) fn read_at(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    client: &str,
+    revision: i64,
+) -> Result<Snapshot, String> {
     bounds(c, w, client)?;
-    let revision = imports_store::revision(c, w, client)?;
+    let current_revision = imports_store::revision(c, w, client)?;
+    if revision < 0 || revision > current_revision {
+        return Err(STORAGE_ERROR.into());
+    }
     let saved=c.prepare("SELECT id,payload_json,digest,source_hash,source_blob FROM card_statements WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3 ORDER BY rowid LIMIT 21").map_err(storage_error)?.query_map(params![client,w.organization_id,w.counselor_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,Option<Vec<u8>>>(4)?))).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
     let mut statements = vec![];
     for (id, body, digest, source_hash, blob) in saved {
@@ -59,6 +70,9 @@ pub(super) fn read(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<Sn
             return Err(STORAGE_ERROR.into());
         }
         let source: Source = decode(&body)?;
+        if source.import_revision > revision {
+            continue;
+        }
         if source.format != 1
             || source.id != id
             || source.client_id != client
@@ -158,6 +172,9 @@ pub(super) fn read(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<Sn
         let mut history = vec![];
         let mut previous = source.import_revision;
         for (id, row, fields, state, reason, at, counselor, rev) in saved {
+            if rev > revision {
+                continue;
+            }
             if fields.len() > 8192
                 || row >= rows.len()
                 || rev <= previous
@@ -191,7 +208,7 @@ pub(super) fn read(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<Sn
             });
         }
         let summary = cards::summary(&source, &rows)?;
-        let mut warnings=vec!["Card statements are a separate liability review. Their amounts are not included in bank dashboards, budgets or report figures. Bank-based final approval is blocked for this client until integrated card reporting is implemented.".into(),"Positive normalized amounts increase debt; negative amounts reduce it. Payments reduce debt and are not expenses or income. Purchases, fees and interest less refunds supply card spending only. Adjustments are excluded from spending; verify their meaning and cash counterpart.".into(),"Arithmetic reconciliation does not establish complete real-world evidence or verify a bank. Inspect original rows, possible duplicates and rejected activity individually.".into()];
+        let mut warnings=vec!["Card statements are a separate liability review. Their amounts do not alter bank dashboards or planning figures. Financial Review offers an explicit bank/card supplement for internal reports; card-inclusive final approval remains blocked until complete-basis validation is implemented.".into(),"Positive normalized amounts increase debt; negative amounts reduce it. Payments reduce debt and are not expenses or income. Purchases, fees and interest less refunds supply card spending only. Adjustments are excluded from spending; verify their meaning and cash counterpart.".into(),"Arithmetic reconciliation does not establish complete real-world evidence or verify a bank. Inspect original rows, possible duplicates and rejected activity individually.".into()];
         let mut fingerprints = std::collections::HashSet::new();
         if source
             .rows
@@ -356,13 +373,13 @@ impl Workspace {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::cards::{Fields, Kind};
     use crate::imports::{AmountMode, DateFormat, Mapping, Status};
     use crate::storage::tests::{client_input, configured, PASSWORD};
     const CSV:&str="Date,Description,Amount,Category\n2026-09-01,Fictional groceries,100.01,Food\n2026-09-02,Fictional refund,-20.02,Food\n2026-09-03,Fictional card payment,-50.03,Card payment\n2026-09-04,Fictional fee,5.04,Fees\n2026-09-05,Fictional interest,2.05,Interest\n";
-    fn input() -> cards::Input {
+    pub(crate) fn input() -> cards::Input {
         cards::Input {
             account_label: "Fictional card".into(),
             period_start: "2026-09-01".into(),
@@ -387,7 +404,7 @@ mod tests {
             },
         }
     }
-    fn stage(w: &mut Workspace, client: &str, dir: &Path) -> Snapshot {
+    pub(crate) fn stage(w: &mut Workspace, client: &str, dir: &Path) -> Snapshot {
         let path = dir.join("card.csv");
         fs::write(&path, CSV).unwrap();
         let p = w
@@ -404,7 +421,12 @@ mod tests {
         )
         .unwrap()
     }
-    fn decision(s: &Snapshot, row: usize, kind: Kind, status: Status) -> cards::ReviewInput {
+    pub(crate) fn decision(
+        s: &Snapshot,
+        row: usize,
+        kind: Kind,
+        status: Status,
+    ) -> cards::ReviewInput {
         let statement = &s.statements[0];
         cards::ReviewInput {
             expected_revision: s.revision,
@@ -618,7 +640,7 @@ mod tests {
         let before: i64 = c
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        c.execute_batch("DROP TABLE card_decisions; DROP TABLE card_statements; PRAGMA user_version=22; CREATE TABLE audit_events_v23(collision TEXT);").unwrap();
+        c.execute_batch("DROP TABLE IF EXISTS card_review_history; DROP TABLE card_decisions; DROP TABLE card_statements; PRAGMA user_version=22; CREATE TABLE audit_events_v23(collision TEXT);").unwrap();
         assert!(migrate(c, false).is_err());
         assert_eq!(
             c.pragma_query_value(None, "user_version", |r| r.get::<_, i32>(0))

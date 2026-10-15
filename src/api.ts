@@ -22,6 +22,9 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getCardReview:(clientId:string)=>command<import('./types').CardReviewDirectory>('get_card_review',{clientId}),
+  saveCardReview:(clientId:string,input:{expectedRevision:number;expectedSourceRevision:number;reason:string;acknowledge:boolean;action:import('./types').CardReviewAction})=>command<import('./types').CardReviewDirectory>('save_card_review',{clientId,input}),
+  previewCardReview:(clientId:string,input:{fromMonth:string;throughMonth:string})=>command<import('./types').BankCardReview>('preview_card_review',{clientId,input}),
   getCardStatements:(clientId:string)=>command<import('./types').CardSnapshot>('get_card_statements',{clientId}),
   stageCardStatement:(clientId:string,input:{expectedRevision:number;token:string;input:import('./types').CardInput})=>command<import('./types').CardSnapshot>('stage_card_statement',{clientId,input}),
   reviewCardTransaction:(clientId:string,input:{expectedRevision:number;statementId:string;row:number;fields:import('./types').CardFields;status:import('./types').ReviewStatus;reason:string;acknowledge:boolean})=>command<import('./types').CardSnapshot>('review_card_transaction',{clientId,input}),

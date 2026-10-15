@@ -1,4 +1,4 @@
-# Remaining original requirements after 0.28.0 source
+# Remaining original requirements after 0.35.0 source
 
 The application has an encrypted offline desktop foundation, isolated clients and
 notes, exact entered budgets/debt/savings/cash-flow plans, encrypted recovery,
@@ -12,21 +12,28 @@ workflow passed through direct WebKit transport before this feature stage; see
 [development-status.md](development-status.md) for new-stage verification.
 
 
-All twelve main navigation sections and named future/admin areas are present in
-0.27.0 source. See [prototype-development-map.md](prototype-development-map.md)
-for working CRUD coverage, missing behavior and acceptance criteria. The next
-implementation priority is standalone statement-account metadata/lifecycle CRUD.
-The document collection checklist is working in 0.28.0 source. Planned pages do
-not implement their future features.
+All twelve main sections and named future/admin areas are present. Statement-account
+CRUD, document collection, firm/logo/contact branding, saved bank completeness
+reviews and bounded bank-only final approvals have since been implemented.
+Signed card CSV review and provisional bank/card supplements now work, including
+durable card account/source links, explicit repayment matching and historical
+report/PDF capture. Do not repeat those completed foundations. See
+[development-status.md](development-status.md) for current verification and
+[prototype-development-map.md](prototype-development-map.md) for entry points.
+Planned pages still do not implement their future features.
+
+Next implementation priority: card-inclusive household inventory and verified
+balance/fact mappings, with a separately versioned completeness/final policy.
+The current provisional supplement cannot authorize final card-inclusive reports.
 
 | Work area | Main remaining work |
 |---|---|
-| Reports and client plans | Further comparative report measures and remaining financial models; client-plan logo/contact branding and complete-basis final validation; direct application printing; savings-goal progress and final report validation |
+| Reports and client plans | Card-inclusive completeness/final approval and reviewed balance mappings; remaining comparative measures/models; direct application printing; savings-goal progress. Firm presentation and bank-only final validation already exist. |
 | Financial models — next | Savings drawdown/funding-source simulation and period-specific client-plan allocations; new-goal and account-targeted extra payment controls; advanced daily/variable/promotional debt terms, delayed transfer settlement, finer account reserve allocation, and meaningful gross-income underwriting metrics where verified data exists |
-| Documents/review | Scanned PDF/OCR, institution/card/loan/paystub adapters, broader supported input formats, category suggestions and document/account workflow refinements with provenance/review safeguards |
+| Documents/review | Scanned PDF/OCR, card PDF, institution/loan/paystub adapters, broader supported input formats, category suggestions and document/account workflow refinements with provenance/review safeguards |
 | Client management/workflow | Configurable time zones and remaining account/document/action-history views; broader review/usability acceptance. Explicitly selected intake sections in immutable internal reports are implemented in 0.26.0 source. The practice-wide filtered appointment/follow-up overview is implemented in 0.25.0 source. Optional household/employment context and per-client dated reminders/completion/cancellation are implemented in 0.24.0 source. |
 | Security/privacy | Configurable lock/password safeguards, multiple counselor accounts/roles and organization permissions, export/deletion, broader audit/recovery options, independent security/dependency/license review and privacy acceptance |
-| Commercial customization/support | Organization branding/logo/contact details, licensing architecture, commercial documentation/disclosures/legal review and update/support procedures |
+| Commercial customization/support | Further branding/usability refinements, licensing architecture, commercial documentation/disclosures/legal review and update/support procedures |
 | Windows release/final verification | Signed installer, clean Windows 11 offline install and complete workflows, upgrades/uninstall, recovery drills, realistic data-volume tests, usability/accessibility and final release acceptance |
 
 The original workbook/legacy parity remains unverified without the authorized

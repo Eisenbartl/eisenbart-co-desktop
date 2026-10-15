@@ -4,6 +4,7 @@ mod assessments;
 mod branding;
 mod budget;
 mod budget_methods;
+mod card_review;
 mod cards;
 mod cashflow;
 mod client_care;
@@ -271,6 +272,42 @@ async fn list_assessment_records(
     })
     .await
     .map_err(|_| "Assessment records could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn get_card_review(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<card_review::Directory, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || access(&state, |w| w.get_card_review(&client_id)))
+        .await
+        .map_err(|_| "Card review could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn save_card_review(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: card_review::Input,
+) -> Result<card_review::Directory, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_card_review(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Card review could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn preview_card_review(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: dashboard::Input,
+) -> Result<card_review::Review, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.preview_card_review(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Card review could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn get_card_statements(
@@ -1054,6 +1091,9 @@ pub fn run() {
             export_client_action_plan,
             choose_action_plan_pdf,
             get_assessment_record,
+            get_card_review,
+            save_card_review,
+            preview_card_review,
             get_card_statements,
             stage_card_statement,
             review_card_transaction,

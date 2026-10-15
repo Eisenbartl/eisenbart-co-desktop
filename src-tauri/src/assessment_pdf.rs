@@ -1024,6 +1024,67 @@ fn render_report(
             l.text(reason, 10.0)?;
         }
     }
+    if let Some(c) = &p.cards {
+        l.section("Captured bank/card review supplement / provisional")?;
+        let v = &c.review;
+        l.value("Calculation", &v.calculator)?;
+        l.value("Card link version", &c.links.revision.to_string())?;
+        for (label, value) in [
+            ("Bank cash movement", &v.bank_cash_movement),
+            ("Bank net spending", &v.bank_net_spending),
+            ("Card net spending", &v.card_net_spending),
+            ("Card payments / excluded from spending", &v.card_payments),
+            ("Matched in-period repayments", &v.matched_payments),
+            (
+                "Card liability change / not total debt",
+                &v.card_liability_movement,
+            ),
+        ] {
+            l.value(label, &format!("USD {value}"))?;
+        }
+        l.value(
+            "Provisional combined observed spending",
+            &v.observed_spending
+                .as_ref()
+                .map(|s| format!("USD {s}"))
+                .unwrap_or("Unavailable / resolve review issues".into()),
+        )?;
+        for issue in v.issues.iter().chain(v.disclosures.iter()) {
+            l.text(issue, 10.0)?;
+        }
+        for a in &c.links.accounts {
+            l.value(
+                "Durable card account",
+                &format!("{} / {} / archived {}", a.label, a.id, a.archived),
+            )?;
+        }
+        for s in &c.ledger.statements {
+            l.value(
+                "Captured card source",
+                &format!(
+                    "{} / {} / SHA-256 {} / {} to {}",
+                    s.source.input.account_label,
+                    s.source.file_name,
+                    s.source.sha256,
+                    s.source.input.period_start,
+                    s.source.input.period_end
+                ),
+            )?;
+        }
+        for link in &c.links.repayments {
+            l.value(
+                "Repayment evidence",
+                &format!(
+                    "Card source {} row {} decision {} / bank row {} decision {}",
+                    link.statement_id,
+                    link.row + 2,
+                    link.card_decision_id,
+                    link.bank_record_id,
+                    link.bank_decision_id
+                ),
+            )?;
+        }
+    }
     if let Some(review) = &p.completeness {
         l.section("Captured counselor completeness review / internal context")?;
         l.value("Saved review version", &review.revision.to_string())?;

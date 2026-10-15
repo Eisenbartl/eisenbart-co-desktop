@@ -320,3 +320,9 @@ checks original versus one-cent corrected arithmetic, rejection/history with USD
 review flags. Restart, encrypted backup/restore, source identity, historical
 amounts and second-client isolation are verified. Screenshots record reconciled,
 correction-history and restored views. All prior assertions remain.
+
+The 0.35.0 extension exercises visible durable card account creation, explicit
+statement and repayment links, independently checked cash/spending/payment totals,
+format-8 assessment/PDF capture, newer-approval invalidation, rename/archive,
+process restart, full encrypted recovery and historical report/client isolation.
+No direct IPC mutations are used. Earlier native workflows still run in full.

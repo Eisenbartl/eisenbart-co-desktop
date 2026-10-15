@@ -78,6 +78,9 @@ fn decode(
     if let Some(branding) = &p.branding {
         branding_store::validate_source(c, w, branding)?;
     }
+    if let Some(cards) = &p.cards {
+        card_review_store::validate_capture(c, w, client, cards)?;
+    }
     texts(&p)?;
     assessments::validate(&p).map_err(|_| STORAGE_ERROR.to_owned())?;
     if let Some(e) = &p.supporting {
@@ -175,8 +178,12 @@ pub(super) fn record(
             review_reasons.push("Saved budget, debt, savings or dated cash-flow plans changed after this scenario was captured. Its original assumptions and projections remain historical.".into());
         }
     }
-    if cards_store::has_cards(c, w, client)? {
-        review_reasons.push("Credit-card evidence is stored separately and is not included in this bank-based assessment. Review the card statements; final bank-report approval is blocked until integrated liability reporting is implemented.".into());
+    if payload.cards.is_some() || cards_store::has_cards(c, w, client)? {
+        if payload.cards.is_some() {
+            review_reasons.push("A bank/card review supplement is captured below. It remains provisional; card-inclusive completeness and final approval are not implemented. Bank dashboard and planning figures retain their original basis.".into());
+        } else {
+            review_reasons.push("Credit-card evidence is stored separately and is not included in this bank-based assessment. Review the card statements; final bank-report approval is blocked until integrated liability reporting is implemented.".into());
+        }
     }
     let scenario = scenarios_store::validate_link(c, w, client, &payload)?;
     if let Some(r) = &scenario {
@@ -289,6 +296,7 @@ impl Workspace {
             };
             let branding_changed =
                 branding_store::revision(&s.connection, &s.info)? != brand_revision.unwrap_or(0);
+            let card_capture:bool=s.connection.query_row("SELECT COALESCE(json_type(payload_json,'$.cards')='object',0) FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
             records.push(Summary {
                 id,
                 title,
@@ -297,6 +305,7 @@ impl Workspace {
                 period_end,
                 source_revision,
                 needs_review: card_evidence
+                    || card_capture
                     || coverage_changed
                     || branding_changed
                     || source_revision != source.revision
@@ -397,11 +406,49 @@ impl Workspace {
                 )
             })
             .transpose()?;
-        let basis = if supporting.is_some() {
+        let cards = input
+            .cards
+            .map(|selection| {
+                card_review_store::capture(
+                    &tx,
+                    &s.info,
+                    client,
+                    selection,
+                    &source,
+                    crate::dashboard::Input {
+                        from_month: input.from_month.clone(),
+                        through_month: input.through_month.clone(),
+                    },
+                )
+            })
+            .transpose()?;
+        let required_bank_decisions = cards
+            .as_ref()
+            .map(|c| {
+                c.links
+                    .repayments
+                    .iter()
+                    .map(|p| p.bank_decision_id.as_str())
+                    .collect::<std::collections::HashSet<_>>()
+            })
+            .unwrap_or_default();
+        let card_bank_history = source
+            .history
+            .iter()
+            .filter(|h| required_bank_decisions.contains(h.id.as_str()))
+            .map(|h| serde_json::to_string(h).map_err(|_| STORAGE_ERROR))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut basis = if supporting.is_some() {
             assessments::capture_report(source, true)
         } else {
             assessments::capture(source)
         };
+        for h in card_bank_history {
+            let h: crate::imports::History = serde_json::from_str(&h).map_err(|_| STORAGE_ERROR)?;
+            if !basis.history.iter().any(|b| b.id == h.id) {
+                basis.history.insert(0, h);
+            }
+        }
         let branding = branding_store::capture(&tx, &s.info, input.expected_branding_revision)?;
         let mut recorded_workspace = s.info.clone();
         recorded_workspace.organization_name = tx
@@ -411,12 +458,16 @@ impl Workspace {
                 |r| r.get(0),
             )
             .map_err(storage_error)?;
+        let has_card_capture = cards.is_some();
         let payload = Payload {
+            cards,
             completeness: completeness.clone(),
             branding: branding.clone(),
             selected_scenario,
             planning,
-            format: if completeness.is_some() {
+            format: if has_card_capture {
+                8
+            } else if completeness.is_some() {
                 7
             } else if branding.is_some() {
                 6

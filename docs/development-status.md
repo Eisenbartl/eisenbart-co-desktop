@@ -1,6 +1,27 @@
 # Development status
 
-## Current stage — supervised credit-card CSV review (0.34.0, schema 23)
+## Current stage — provisional bank/card review (0.35.0, schema 24)
+
+Financial Review → Bank & card activity adds durable card account CRUD/archive,
+explicit statement assignments, one-to-one evidence-bound repayment matching,
+permanent stale-link flags and exact calendar review. Format-8 internal assessments
+optionally capture the reviewed card ledger and account/repayment history; internal
+PDFs render the supplement. Formats 1–7 retain their old bytes/digests. Bank cash
+and card spending remain distinct, with unavailable combined figures for review
+issues. See [bank-card-review.md](bank-card-review.md).
+
+Validation is in progress. Locked setup, the production frontend, 193 UI tests,
+205 Linux library tests plus 2 PDF-worker tests, formatting and all-target Clippy
+with warnings denied have passed. Native and Windows source results and the
+checkpoint will be recorded before this stage is marked complete. No installer
+is being created.
+
+Next priority: card-inclusive household inventory, reviewed balance/fact mappings
+and a versioned completeness policy before final card approval. Keep v1 policy
+and the new format-8 calculator stable for historical reports.
+
+
+## Supervised credit-card CSV review (0.34.0, schema 23)
 
 Documents → Credit-card statements now stores signed card liability sources,
 explicit individual decisions, correction/rejection history and exact source versus

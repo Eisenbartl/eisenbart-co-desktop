@@ -110,3 +110,12 @@ privacy and navigation/lock guards. Native verification exercises the full exist
 application plus card import/review, reconciliation, correction/history, unchanged
 bank amounts, report flags, restart, encrypted restore and client isolation.
 Executed results are recorded in development-status.md.
+
+
+## Integration available in 0.35.0
+
+Durable reviewed card-account/source links, explicit bank repayment matching and a
+provisional internal report supplement are now implemented. Use Financial Review
+→ Bank & card activity and see [bank-card-review.md](bank-card-review.md). Original
+bank dashboard/planning figures remain unchanged. Card-inclusive final approval
+still requires the next completeness/balance mapping policy.

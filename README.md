@@ -1,6 +1,6 @@
 # Eisenbart & Co. Financial Counseling Suite
 
-Version **0.34.0 source** adds [credit-card CSV review](docs/credit-card-review.md): signed liability movements, individual decisions, exact statement reconciliation and retained correction history. Card figures remain separate from bank reports, whose final approval is blocked for clients with known card evidence until integration is implemented. No installer was created.
+Version **0.35.0 source** adds [bank/card financial review](docs/bank-card-review.md): durable card accounts, explicit source and repayment links, separate cash/spending figures, and immutable report/PDF supplements. Final card-inclusive approval remains blocked pending complete-basis validation. No installer was created.
 
 Version **0.33.0 source** adds [final counselor report approval](docs/final-report-approval.md): required evidence gates, explicit professional decisions, immutable audited approvals and offline final PDFs. Later context changes preserve the original approval and flag it for review. No installer was created.
 
