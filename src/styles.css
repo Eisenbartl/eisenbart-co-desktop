@@ -545,3 +545,10 @@ textarea { resize: vertical; min-height: 100px; }
 .collection-table td span { display: block; margin-top: 5px; font-size: 11px; color: #647680; }
 .collection-editor { margin-top: 20px; padding: 20px; border: 1px solid var(--line); border-radius: 4px; }
 .collection-editor > label { margin-top: 16px; }
+.firm-brand-preview { padding: 18px; margin: 14px 0; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: #263d48; white-space: pre-line; overflow-wrap: anywhere; }
+.firm-brand-preview > strong { display: block; font-size: 20px; }
+.firm-brand-preview > img { display: block; max-width: 180px; max-height: 72px; margin-bottom: 14px; }
+.firm-brand-preview p { margin: 6px 0; }
+.firm-branding form > fieldset > label { margin-top: 16px; }
+.statement-accounts .checkbox-label { display: flex; flex-direction: row; align-items: center; gap: 10px; margin-top: 16px; }
+.statement-accounts .checkbox-label input { width: auto; margin: 0; }

@@ -262,3 +262,10 @@ The account-management native workflow adds a standalone account, renames it,
 archives/reactivates it, checks original/current metadata and all four history
 versions, switches to an empty second client, and rechecks persistence after
 restart and both encrypted recovery paths. No new installer is needed.
+
+The firm-branding native extension runs after the existing financial/recovery
+suite. It saves a synthetic local PNG/name/contact/disclosure, records a branded
+assessment and linked client plan, changes current contact details, restarts,
+backs up/restores and exports the historical report. It checks retained logo/
+original contact, latest current settings, history and review flags through
+visible controls. Product branding and mandatory financial warnings remain.

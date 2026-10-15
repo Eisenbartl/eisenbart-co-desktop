@@ -1,0 +1,2 @@
+import type {FirmBrandingData} from './types';
+export default function FirmBrandingView({data}:{data:FirmBrandingData}){return <div className="firm-brand-preview">{data.logoPng&&<img src={`data:image/png;base64,${data.logoPng}`} alt={`${data.name} logo`}/>}<strong>{data.name}</strong>{[data.address,data.email,data.phone,data.website].filter(Boolean).map((v,i)=><p key={i}>{v}</p>)}{data.disclosure&&<p><b>Firm disclosure: </b>{data.disclosure}</p>}</div>;}

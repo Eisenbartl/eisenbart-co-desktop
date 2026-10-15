@@ -1,5 +1,27 @@
 # Development status
 
+## Current stage — firm/report branding (0.30.0, schema 20)
+
+Settings → Branding now edits the firm display name, optional contact details,
+normalized local PNG logo and disclosure with preview and version history. Rust
+owns bounded image/text validation, organization scope, optimistic versions,
+atomic audit/name updates and recovery validation. Report forms preview the saved
+firm version; format-6 assessments capture it exactly and linked client plans
+inherit it. Older report formats retain their payload bytes/digests; later edits
+flag historical context without substituting current branding. Product branding
+remains separate. See [firm-report-branding.md](firm-report-branding.md).
+
+Targeted branding/history/report/PDF/recovery tests and 158 interface tests have
+passed. Complete backend, native and Windows validation is in progress. The
+PNG/base64 dependencies now directly name versions already present in the lockfile;
+no package versions were upgraded. No installer is being created for this stage.
+The previously requested installer remains 0.23.0; source 0.30.0 is a development
+build, with installed Windows/commercial acceptance still separate.
+
+Next priority: financial completeness and final report validation, as defined in
+[prototype-development-map.md](prototype-development-map.md).
+
+
 ## Current stage — statement account management (0.29.0, schema 19)
 
 Implemented standalone checking/savings account creation, current-name editing,

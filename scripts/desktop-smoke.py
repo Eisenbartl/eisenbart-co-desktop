@@ -1089,7 +1089,7 @@ def assert_client_action_restored(driver: WebDriver, artifacts: Path, label: str
     export_client_action_pdf(driver, artifacts, label)
 
 
-def save_client_action_plan(driver: WebDriver, artifacts: Path) -> None:
+def save_client_action_plan(driver: WebDriver, artifacts: Path, export_label: str = "current") -> None:
     driver.click(".client-action-plans > summary")
     driver.interactive("#saved-action-plan")
     driver.click_button("Review client plan basis")
@@ -1105,7 +1105,7 @@ def save_client_action_plan(driver: WebDriver, artifacts: Path) -> None:
     driver.click_button("Record client action plan")
     driver.wait_text(".saved-client-action-plan h3", "Alex agreed client plan", "recorded client plan")
     driver.wait_text(".action-plan-status", "Recorded basis matches", "current recorded client agreement")
-    export_client_action_pdf(driver, artifacts, "current", False)
+    export_client_action_pdf(driver, artifacts, export_label, False)
     driver.interactive("#client-plan-pdf-path")
     driver.scroll_to(".saved-client-action-plan", "start")
     driver.screenshot(artifacts / "native-client-action-plan.png")
@@ -1782,6 +1782,119 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")
+    check_firm_branding(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_firm_branding(driver: WebDriver, artifacts: Path, data_root: Path, password: str,
+                        binary: Path, restart_driver: Callable[[], None]) -> None:
+    import struct
+    import zlib
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
+    logo=data_root / 'fictional-logo.png'
+    logo.write_bytes(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',2,1,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(b'\x00\xb0\x8a\x42\x26\x3d\x48'))+chunk(b'IEND',b''))
+    firm='Fictional Oak Counseling'
+    def settings() -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
+        driver.click_button('Branding')
+        driver.interactive('#firm-name')
+    settings()
+    driver.fill('#firm-name',firm)
+    driver.fill('#firm-address','123 Fictional Lane\nExample Town')
+    driver.fill('#firm-email','office@example.invalid')
+    driver.fill('#firm-phone','555-0100')
+    driver.fill('#firm-website','https://example.invalid')
+    driver.fill('#firm-disclosure','Fictional firm disclosure: verify the stated financial assumptions.')
+    driver.fill('#firm-logo-path',str(logo))
+    driver.click_button('Inspect logo')
+    driver.wait_text('.firm-branding','Logo inspected locally','local bounded logo inspection')
+    driver.element('.firm-brand-preview img')
+    driver.click_button('Save firm branding')
+    driver.wait_text('.firm-branding','Saved branding version 1','firm branding saved')
+    driver.wait_text('.workspace-label',firm,'workspace uses saved firm name')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+    driver.select('#workspace-client','Alex Fictional')
+    driver.click('.saved-assessments > summary')
+    driver.wait_text('.report-branding-preview','Saved firm branding version 1','current branding reviewed for capture')
+    driver.fill('#record-from','2026-09')
+    driver.fill('#record-through','2026-10')
+    driver.fill('#record-title','Fictional branded progress assessment')
+    driver.click('#record-include-planning')
+    driver.click_button('Review current saved plans')
+    driver.wait_text('.scenario-selection .scenario-budget-totals','Income$3,250.00','saved assumptions reviewed for branded report')
+    driver.fill('#record-scenario-label','Fictional branded saved plan')
+    driver.fill('#record-scenario-assumptions','Entered plans remain separate from approved statement activity.')
+    driver.select('#record-debt-strategy','Avalanche')
+    driver.click('#record-ack')
+    driver.click_button('Save assessment record')
+    driver.wait_text('.saved-assessments','Assessment record saved with its supporting evidence.','branded assessment captured')
+    driver.wait_text("section[aria-label='Captured firm branding']",'555-0100','captured original contact')
+    record_id=driver.observe_script("return document.querySelector('#saved-assessment').value")
+    if not record_id:
+        raise SmokeFailure('The branded assessment ID was not shown in the saved-record selector')
+    # The linked client plan inherits the same captured branding; its established
+    # independently checked allocations and mandatory warnings remain enabled.
+    save_client_action_plan(driver,artifacts,"branded-current")
+    settings()
+    driver.fill('#firm-phone','555-0199')
+    driver.click_button('Save firm branding')
+    driver.wait_text('.firm-branding','Saved branding version 2','later contact change saved')
+    driver.scroll_to('.firm-branding','start')
+    driver.command('POST','/execute/async',{'script':'const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));','args':[]})
+    driver.screenshot(artifacts / 'native-firm-branding.png')
+    restart_driver()
+    driver.open(binary)
+    driver.fill('#password',password)
+    driver.click_button('Unlock workspace')
+    driver.wait_text('.workspace-label',firm,'firm display name survives restart')
+    settings()
+    driver.wait_value('#firm-phone','555-0199','latest firm contact survives restart')
+    backup_folder=data_root / 'branding-backups'
+    backup_folder.mkdir()
+    driver.click_button('Backup & recovery')
+    driver.fill('#backup-folder',str(backup_folder))
+    driver.fill('#backup-password',password)
+    driver.click_button('Create encrypted backup')
+    driver.wait_text('.backup-success','Encrypted backup saved.','branding backup saved')
+    backup_path=Path(driver.text('.backup-file-path'))
+    driver.click_button('Lock workspace')
+    if firm in driver.text('body'):
+        raise SmokeFailure('Private firm branding remained visible while locked')
+    driver.click('.restore-panel > summary')
+    driver.fill('#restore-file',str(backup_path))
+    driver.fill('#restore-password',password)
+    driver.click_button('Verify backup for recovery')
+    driver.wait_text('.restore-review',firm,'branding verified for recovery')
+    driver.fill('#restore-confirmation','RESTORE')
+    driver.click_button('Restore verified workspace')
+    driver.wait_text('.auth-card','Workspace restored. Unlock it','branding backup activated')
+    driver.fill('#password',password)
+    driver.click_button('Unlock workspace')
+    settings()
+    driver.wait_value('#firm-phone','555-0199','current branding restored')
+    driver.wait_text("section[aria-label='Firm branding history']",'Version 1: Fictional Oak Counseling','original branding version restored')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+    driver.select('#workspace-client','Alex Fictional')
+    driver.click('.saved-assessments > summary')
+    choice=driver.observe_script("return Array.from(document.querySelector('#saved-assessment').options).find(o=>o.value==="+json.dumps(record_id)+")?.textContent")
+    if not choice or 'Needs review' not in choice:
+        raise SmokeFailure('The historical branded report did not flag its later branding change')
+    driver.select('#saved-assessment',choice)
+    driver.wait_text("section[aria-label='Captured firm branding']",'555-0100','report retains captured contact after recovery')
+    if '555-0199' in driver.text("section[aria-label='Captured firm branding']"):
+        raise SmokeFailure('Current contact details replaced the historical report branding')
+    driver.element("section[aria-label='Captured firm branding'] img")
+    destination=artifacts / 'firm-branding-restored.pdf'
+    driver.fill_pdf_destination('#assessment-pdf-path',destination)
+    driver.click_button('Export saved assessment PDF')
+    driver.wait_text('.saved-assessments > .success-message',str(destination),'branded historical PDF exported')
+    text=subprocess.run(['pdftotext','-layout',str(destination),'-'],check=True,capture_output=True,text=True).stdout
+    for expected in [firm,'office@example.invalid','555-0100','Fictional firm disclosure','NEEDS REVIEW']:
+        if expected not in text:
+            raise SmokeFailure(f'Branded historical PDF omitted {expected!r}')
+    if '555-0199' in text:
+        raise SmokeFailure('The historical PDF used the current contact details')
+    status('firm name/contact/logo/disclosure, reviewed report/client-plan capture, restart, encrypted recovery and historical PDF branding')
 
 
 def check_document_collection(driver: WebDriver, artifacts: Path, label: str, initial: bool = False) -> None:
@@ -1929,7 +2042,8 @@ def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:
     driver.screenshot(artifacts / "native-workspace-pages.png")
     driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
     driver.click("nav[aria-label='Settings sections'] button:nth-child(4)")
-    driver.wait_text(".planned-page", "Editing is planned", "branding page is a labeled future feature")
+    driver.interactive("#firm-name")
+    driver.wait_text(".firm-branding", "No branding changes yet", "branding page is a working saved form")
     driver.open_client("Alex Fictional")
     driver.interactive("#first-name")
     status("all twelve main pages, saved planner data, isolated client context, future areas and report/admin separation")

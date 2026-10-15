@@ -13,6 +13,8 @@ pub const CALCULATOR: &str = "approved-assessment-v1";
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Input {
     #[serde(default)]
+    pub expected_branding_revision: Option<i64>,
+    #[serde(default)]
     pub intake: Option<crate::report_intake::Selection>,
     #[serde(default)]
     pub supporting: Option<crate::report_evidence::Selection>,
@@ -33,6 +35,8 @@ pub struct Input {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Payload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branding: Option<crate::branding::Snapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intake: Option<crate::report_intake::Snapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -129,13 +133,14 @@ pub fn capture_report(mut source: imports::Snapshot, supporting: bool) -> import
 }
 pub fn validate(payload: &Payload) -> Result<(), String> {
     let bad = || "The saved assessment evidence is invalid or unsupported.".to_owned();
-    if !matches!(payload.format, 1 | 2 | FORMAT | 4 | INTAKE_FORMAT)
+    if !matches!(payload.format, 1 | 2 | FORMAT | 4 | INTAKE_FORMAT | 6)
         || (payload.format == 1 && payload.planning.is_some())
         || (payload.supporting.is_some() && payload.format < FORMAT)
         || (payload.format == FORMAT && payload.supporting.is_none())
-        || (payload.intake.is_some() != (payload.format == INTAKE_FORMAT))
+        || ((payload.intake.is_some() && !matches!(payload.format, INTAKE_FORMAT | 6))
+            || (payload.format == INTAKE_FORMAT && payload.intake.is_none()))
         || (payload.format == 4 && payload.selected_scenario.is_none())
-        || (payload.selected_scenario.is_some() && !matches!(payload.format, 4 | INTAKE_FORMAT))
+        || (payload.selected_scenario.is_some() && !matches!(payload.format, 4 | INTAKE_FORMAT | 6))
         || (payload.selected_scenario.is_some() && payload.planning.is_none())
         || payload.calculator != CALCULATOR
         || payload.app_version.is_empty()
@@ -146,6 +151,17 @@ pub fn validate(payload: &Payload) -> Result<(), String> {
         || payload.basis.revision != payload.assessment.revision
     {
         return Err(bad());
+    }
+    if payload.branding.is_some() != (payload.format == 6) {
+        return Err(bad());
+    }
+    if let Some(branding) = &payload.branding {
+        crate::branding::validate(branding)?;
+        if branding.organization_id != payload.workspace.organization_id
+            || branding.data.name != payload.workspace.organization_name
+        {
+            return Err(bad());
+        }
     }
     if let Some(intake) = &payload.intake {
         crate::report_intake::validate(intake, &payload.client.id)?;

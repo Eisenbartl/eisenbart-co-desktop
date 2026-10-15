@@ -118,6 +118,7 @@ mod tests {
     }
     fn report(c: &Client, intake: Option<Selection>) -> crate::assessments::Input {
         crate::assessments::Input {
+            expected_branding_revision: None,
             intake,
             supporting: None,
             selected_scenario: None,

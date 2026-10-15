@@ -287,10 +287,10 @@ export type IntakeSection = 'address'|'household'|'employment';
 export interface ReportIntakeSelection {expectedRevision:number;sections:IntakeSection[]}
 export interface ReportIntakePreview {clientId:string;revision:number;updatedAt:string|null;values:ClientIntake}
 export interface ReportIntakeSnapshot {clientId:string;revision:number;updatedAt:string;sections:IntakeSection[];values:ClientIntake}
-export interface AssessmentRecordInput {intake?:ReportIntakeSelection;selectedScenario?:SavedScenarioSelection;supporting?:{expectedNotesCount:number;noteIds:string[]}|null;planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
+export interface AssessmentRecordInput {expectedBrandingRevision?:number;intake?:ReportIntakeSelection;selectedScenario?:SavedScenarioSelection;supporting?:{expectedNotesCount:number;noteIds:string[]}|null;planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
 export interface AssessmentRecordSummary {id:string;title:string;createdAt:string;periodStart:string;periodEnd:string;sourceRevision:number;needsReview:boolean}
 export interface AssessmentDirectory {clientId:string;records:AssessmentRecordSummary[]}
-export interface SavedAssessment {scenario?:SavedScenario;clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{intake?:ReportIntakeSnapshot;selectedScenario?:SavedScenarioSelection;supporting?:CapturedReportEvidence|null;planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
+export interface SavedAssessment {scenario?:SavedScenario;clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{branding?:FirmBrandingSnapshot;intake?:ReportIntakeSnapshot;selectedScenario?:SavedScenarioSelection;supporting?:CapturedReportEvidence|null;planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
 
 export interface PlanningRevisions {budget:number;debt:number;savings:number;cashflow:number}
 export type PlanningDebtStrategy = 'none'|'snowball'|'avalanche';
@@ -356,3 +356,6 @@ export interface StatementAccountVersion {revision:number;label:string;archived:
 export interface ManagedStatementAccount {id:string;label:string;originalLabel:string;kind:'checking'|'savings';archived:boolean;revision:number;sourceCount:number;history:StatementAccountVersion[]}
 export interface StatementAccountsDirectory {clientId:string;importRevision:number;accounts:ManagedStatementAccount[]}
 export interface StatementAccountInput {id:string|null;expectedRevision:number;expectedImportRevision:number;label:string;kind:'checking'|'savings';archived:boolean}
+export interface FirmBrandingData {name:string;address:string;email:string;phone:string;website:string;disclosure:string;logoPng:string|null}
+export interface FirmBrandingSnapshot {organizationId:string;revision:number;updatedAt:string;data:FirmBrandingData}
+export interface FirmBrandingRecord {organizationId:string;revision:number;updatedAt:string|null;data:FirmBrandingData;history:{revision:number;name:string;updatedAt:string}[]}

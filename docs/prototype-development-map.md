@@ -30,7 +30,7 @@ Rust-backed data. Do not add another persistence layer or copy the calculators.
 | Cash-Flow Calendar | Saved account balances, dated schedules/transfers, calendar/ledger and non-writing previews (`CashflowEditor.tsx`) |
 | Financial Scenarios | Temporary comparisons, explicitly saved scenarios and historical review (`ScenarioComparisons.tsx`) |
 | Reports | Immutable internal assessments, selected intake/evidence/scenarios, client action plans and PDF exports (`AssessmentRecords.tsx`, `ClientActionPlans.tsx`) |
-| Settings and Administration | Workspace identity, security/lock, encrypted backup, lock-to-restore route, help; named future branding/roles/data/licensing pages (`AdministrationPages.tsx`) |
+| Settings and Administration | Workspace identity, security/lock, encrypted backup, lock-to-restore route, help; working firm/report branding and named future roles/data/licensing pages (`AdministrationPages.tsx`) |
 
 Client pages require a selected client and display that context. Switching a
 page/client ignores late responses and checks unsaved persistent-record drafts
@@ -53,7 +53,7 @@ No workspace or confidential data is stored in browser local storage or a URL.
 | Documents / collection | Inspect/import sources and read provenance; create/edit requests, mark receipt and view versions | Cancel unsaved previews/requests; archive/reactivate saved requests. Saved source replacement/deletion is not implemented |
 | Transactions | Import, inspect, correct fields and change review decisions | Reject/reverse with retained decision history; no silent destruction of source evidence |
 | Scenarios/reports/client plans | Explicitly record, reopen and export immutable snapshots | Retained history; amend by recording a new reviewed version, not editing old financial claims |
-| Organization/admin | Read setup identity; password access, lock, backup/verified recovery | Identity editing, counselor/role CRUD, password changes, portable export/deletion and licensing remain planned |
+| Organization/admin | Versioned firm name/contact/PNG/disclosure editing and report capture; password access, lock, backup/verified recovery | Counselor/role CRUD, password changes, categories/templates, portable export/deletion and licensing remain planned |
 
 A CRUD-oriented interface does not justify deleting audit evidence or rewriting
 an assessment already given to a client. Destructive lifecycle work needs explicit
@@ -85,7 +85,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Reports → Print & presentation | `assessment_pdf.rs`, branding snapshots and native printing | Embedded/offline assets, exact totals, private internal evidence excluded from client plans, page margins and Windows print acceptance |
 | Clients → History & records | Add bounded cross-module timeline and reviewed note amendments beside note storage | Authorship, original notes retained, reason/audit, scope/pagination, stale edits, restart and encrypted recovery |
 | Documents → Statement accounts (working) | `StatementAccounts.tsx`, `statement_accounts_store`, schema 19 | Scoped standalone create/rename/archive/reactivate, revision/audit/recovery checks; original source/report associations preserved; no destructive deletion |
-| Settings → Branding | Versioned organization contact/logo store and immutable report captures | Validated bounded local logo/contact fields, atomic scoped save, source identity captured on record, old report bytes and restore preserved |
+| Settings → Branding — working in 0.30.0 | `FirmBranding.tsx`, `branding.rs`, `branding_store.rs`, schema 20, format-6 assessments | Implemented bounded normalized local PNG/contact/disclosure, guarded revision/audit saves, exact immutable capture, old payload/digest preservation and recovery; see [limits and future work](firm-report-branding.md) |
 | Settings → Counselors & roles | Auth/session/storage ownership and role model before UI CRUD | Explicit account lifecycle and permissions for reads/writes/approvals/reports/admin, fail-closed access, isolation and recovery drills |
 | Settings → Security | Existing password/key/session model | Password rekey/rollback/recovery, inactivity settings, no password disclosure and independent security acceptance |
 | Settings → Backup & recovery | `backup.rs`; current verified recovery flow already works | Scheduled backups/retained-copy selection need bounded local scheduling, failures, durable restore and clean Windows offline drills |
@@ -100,9 +100,9 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **firm/report branding** next: authenticated organization display-name
-editing and explicit saved report branding, preserving original report formats,
-bytes and provenance. Keep commercial licensing and multi-counselor permissions
-planned until their own implementation and verification. Account institution
-metadata, additional account/document types and planning mappings are recorded in
-[statement-account-management.md](statement-account-management.md).
+Implement **Financial Review → Completeness & final validation** next. Define
+account/period/source coverage and explicit unresolved items, retain unknown data
+and approved-only totals, and connect the result to the final report checklist.
+Do not imply that parsed statements or a recorded internal assessment establish
+complete financial coverage. Keep commercial licensing, categories/templates,
+native printing and multi-counselor permissions in their mapped future areas.

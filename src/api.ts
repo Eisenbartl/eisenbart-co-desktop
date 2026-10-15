@@ -22,6 +22,10 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getFirmBranding:()=>command<import('./types').FirmBrandingRecord>('get_firm_branding'),
+  saveFirmBranding:(input:{expectedRevision:number;data:import('./types').FirmBrandingData})=>command<import('./types').FirmBrandingRecord>('save_firm_branding',{input}),
+  chooseBrandingLogo:()=>command<string|null>('choose_branding_logo'),
+  inspectBrandingLogo:(path:string)=>command<string>('inspect_branding_logo',{path}),
   getStatementAccounts:(clientId:string)=>command<import('./types').StatementAccountsDirectory>('get_statement_accounts',{clientId}),
   saveStatementAccount:(clientId:string,input:import('./types').StatementAccountInput)=>command<import('./types').StatementAccountsDirectory>('save_statement_account',{clientId,input}),
   getDocumentCollection:(clientId:string,revision:number|null=null)=>command<import('./types').DocumentCollection>('get_document_collection',{clientId,revision}),

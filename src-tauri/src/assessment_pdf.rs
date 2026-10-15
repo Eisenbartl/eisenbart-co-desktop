@@ -18,7 +18,24 @@ pub struct Export {
     pub pages: usize,
     pub record_id: String,
 }
+pub(crate) fn validate_branding_text(data: &crate::branding::Data) -> Result<(), String> {
+    let layout = Layout::new()?;
+    for text in [
+        &data.name,
+        &data.address,
+        &data.email,
+        &data.phone,
+        &data.website,
+        &data.disclosure,
+    ] {
+        for c in text.chars().filter(|c| *c != '\n') {
+            layout.advance(c, 10.0)?;
+        }
+    }
+    Ok(())
+}
 struct Layout {
+    logo: Option<crate::branding::Pixels>,
     pages: Vec<Vec<Operation>>,
     y: f32,
     face: ttf_parser::Face<'static>,
@@ -27,11 +44,48 @@ struct Layout {
 impl Layout {
     fn new() -> Result<Self, String> {
         Ok(Self {
+            logo: None,
             pages: vec![vec![]],
             y: 730.0,
             face: ttf_parser::Face::parse(FONT, 0).map_err(|_| ERROR)?,
             chars: BTreeMap::new(),
         })
+    }
+    fn branding(&mut self, data: &crate::branding::Data) -> Result<(), String> {
+        if let Some(png) = &data.logo_png {
+            let pixels = crate::branding::logo_pixels(png)?;
+            let scale = (120.0 / pixels.width as f32).min(48.0 / pixels.height as f32);
+            let width = pixels.width as f32 * scale;
+            let height = pixels.height as f32 * scale;
+            self.pages.last_mut().ok_or(ERROR)?.extend([
+                Operation::new("q", vec![]),
+                Operation::new(
+                    "cm",
+                    vec![
+                        width.into(),
+                        0.into(),
+                        0.into(),
+                        height.into(),
+                        48.into(),
+                        (self.y - height).into(),
+                    ],
+                ),
+                Operation::new("Do", vec!["BrandLogo".into()]),
+                Operation::new("Q", vec![]),
+            ]);
+            self.y -= height + 12.0;
+            self.logo = Some(pixels);
+        }
+        self.text(&data.name, 18.0)?;
+        for line in [&data.address, &data.email, &data.phone, &data.website] {
+            if !line.is_empty() {
+                self.text(line, 9.0)?;
+            }
+        }
+        if !data.disclosure.is_empty() {
+            self.value("Firm disclosure", &data.disclosure)?;
+        }
+        Ok(())
     }
     fn room(&mut self, height: f32) -> Result<(), String> {
         if self.y - height < 62.0 {
@@ -227,11 +281,16 @@ impl Layout {
         cmap.push_str("endcmap CMapName currentdict /CMap defineresource pop end end");
         let unicode = d.add_object(Stream::new(dictionary! {}, cmap.into_bytes()));
         let font=d.add_object(dictionary!{"Type"=>"Font","Subtype"=>"Type0","BaseFont"=>"OpenSans","Encoding"=>"Identity-H","DescendantFonts"=>vec![Object::Reference(cid)],"ToUnicode"=>unicode});
+        let mut resources = dictionary! {"Font"=>dictionary!{"F1"=>font}};
+        if let Some(logo) = self.logo {
+            let image=d.add_object(Stream::new(dictionary!{"Type"=>"XObject","Subtype"=>"Image","Width"=>logo.width as i64,"Height"=>logo.height as i64,"ColorSpace"=>"DeviceRGB","BitsPerComponent"=>8},logo.rgb));
+            resources.set("XObject", dictionary! {"BrandLogo"=>image});
+        }
         let mut kids = vec![];
         for operations in self.pages {
             let content = Content { operations }.encode().map_err(|_| ERROR)?;
             let stream = d.add_object(Stream::new(dictionary! {}, content));
-            let page=d.add_object(dictionary!{"Type"=>"Page","Parent"=>pages,"Contents"=>stream,"MediaBox"=>vec![0.into(),0.into(),612.into(),792.into()],"Resources"=>dictionary!{"Font"=>dictionary!{"F1"=>font}}});
+            let page=d.add_object(dictionary!{"Type"=>"Page","Parent"=>pages,"Contents"=>stream,"MediaBox"=>vec![0.into(),0.into(),612.into(),792.into()],"Resources"=>resources.clone()});
             kids.push(Object::Reference(page));
         }
         d.objects.insert(
@@ -828,7 +887,11 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
     crate::assessments::validate(p)?;
     let a = &p.assessment;
     let mut l = Layout::new()?;
-    l.text(&p.workspace.organization_name, 18.0)?;
+    if let Some(brand) = &p.branding {
+        l.branding(&brand.data)?;
+    } else {
+        l.text(&p.workspace.organization_name, 18.0)?;
+    }
     l.text(&p.title, 16.0)?;
     l.text(
         "IMMUTABLE INTERNAL ASSESSMENT / INCOMPLETE INFORMATION",
@@ -1351,7 +1414,11 @@ pub fn render_action_plan(r: &crate::action_plans::Record) -> Result<(Vec<u8>, u
         .as_ref()
         .ok_or("A captured scenario is required.")?;
     let mut l = Layout::new()?;
-    l.text(&basis.workspace.organization_name, 18.0)?;
+    if let Some(brand) = &basis.branding {
+        l.branding(&brand.data)?;
+    } else {
+        l.text(&basis.workspace.organization_name, 18.0)?;
+    }
     l.text("Your financial action plan", 18.0)?;
     l.text(&p.title, 13.0)?;
     l.value(

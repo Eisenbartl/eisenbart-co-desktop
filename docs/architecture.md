@@ -112,3 +112,15 @@ staging checks archive status transactionally. Recovery validates all metadata
 versions. `StatementAccounts` exposes guarded CRUD/archive and read-only history;
 new-import choices show active current labels. See
 [statement-account-management.md](statement-account-management.md).
+
+`branding.rs` validates bounded plain-text firm presentation and normalizes local
+static PNGs to metadata-free RGB. `storage::branding_store` stores scoped schema-20
+append-only versions with atomic organization-name/audit updates and optimistic
+revision checks; sessions refresh the firm name from authenticated storage.
+Format-6 assessments capture a reviewed exact branding version, validated against
+its original history on read/export/recovery. Optional omission preserves formats
+1–5 bytes. Client plans inherit their parent report's branding. The local PDF
+renderer embeds bounded RGB image resources without remote assets or changing
+financial outputs. `FirmBranding` exposes guarded settings, draft preview and
+history; `AssessmentRecords` previews the version to capture and separately shows
+historical presentation. See [firm-report-branding.md](firm-report-branding.md).

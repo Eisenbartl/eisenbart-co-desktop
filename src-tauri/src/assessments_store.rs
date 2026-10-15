@@ -72,6 +72,9 @@ fn decode(
     if let Some(i) = &p.intake {
         report_intake_store::validate_source(c, w, client, i)?;
     }
+    if let Some(branding) = &p.branding {
+        branding_store::validate_source(c, w, branding)?;
+    }
     texts(&p)?;
     assessments::validate(&p).map_err(|_| STORAGE_ERROR.to_owned())?;
     if let Some(e) = &p.supporting {
@@ -141,6 +144,9 @@ pub(super) fn record(
     }
     if current_client != payload.client {
         review_reasons.push("The saved client profile changed after this assessment. The record retains its original identity and goals.".into());
+    }
+    if branding_store::revision(c, w)? != payload.branding.as_ref().map_or(0, |b| b.revision) {
+        review_reasons.push("Firm branding changed after this assessment was saved. Its captured firm presentation is preserved, including after names or contact details are reverted.".into());
     }
     if w != &payload.workspace {
         review_reasons
@@ -262,6 +268,9 @@ impl Workspace {
                 .transpose()?
                 .unwrap_or(false);
             let recorded_notes:Option<u32>=s.connection.query_row("SELECT json_extract(payload_json,'$.supporting.notesCount') FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
+            let brand_revision:Option<i64>=s.connection.query_row("SELECT json_extract(payload_json,'$.branding.revision') FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
+            let branding_changed =
+                branding_store::revision(&s.connection, &s.info)? != brand_revision.unwrap_or(0);
             records.push(Summary {
                 id,
                 title,
@@ -269,7 +278,8 @@ impl Workspace {
                 period_start,
                 period_end,
                 source_revision,
-                needs_review: source_revision != source.revision
+                needs_review: branding_changed
+                    || source_revision != source.revision
                     || profile_at_save != current.updated_at
                     || plans_changed
                     || recorded_notes.is_some_and(|n| n != current_notes),
@@ -358,10 +368,22 @@ impl Workspace {
         } else {
             assessments::capture(source)
         };
+        let branding = branding_store::capture(&tx, &s.info, input.expected_branding_revision)?;
+        let mut recorded_workspace = s.info.clone();
+        recorded_workspace.organization_name = tx
+            .query_row(
+                "SELECT name FROM organizations WHERE id=?1",
+                [&s.info.organization_id],
+                |r| r.get(0),
+            )
+            .map_err(storage_error)?;
         let payload = Payload {
+            branding: branding.clone(),
             selected_scenario,
             planning,
-            format: if intake.is_some() {
+            format: if branding.is_some() {
+                6
+            } else if intake.is_some() {
                 assessments::INTAKE_FORMAT
             } else if chosen.is_some() {
                 4
@@ -376,7 +398,7 @@ impl Workspace {
             app_version: env!("CARGO_PKG_VERSION").into(),
             id: Uuid::new_v4().to_string(),
             created_at,
-            workspace: s.info.clone(),
+            workspace: recorded_workspace,
             client: profile,
             title: required_text(&input.title, "Assessment title", 120)?,
             findings: optional_text(&input.findings, "Counselor findings", 4000, true)?,

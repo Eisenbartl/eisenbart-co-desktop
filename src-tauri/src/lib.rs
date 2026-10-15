@@ -1,6 +1,7 @@
 mod action_plans;
 mod assessment_pdf;
 mod assessments;
+mod branding;
 mod budget;
 mod budget_methods;
 mod cashflow;
@@ -587,6 +588,42 @@ fn get_assessment_intake(
 }
 
 #[tauri::command]
+fn get_firm_branding(state: State<'_, DesktopState>) -> Result<branding::Record, String> {
+    access(&state, Workspace::get_firm_branding)
+}
+#[tauri::command]
+fn save_firm_branding(
+    state: State<'_, DesktopState>,
+    input: branding::Input,
+) -> Result<branding::Record, String> {
+    access(&state, |w| w.save_firm_branding(input))
+}
+#[tauri::command]
+fn inspect_branding_logo(state: State<'_, DesktopState>, path: String) -> Result<String, String> {
+    access(&state, |w| w.inspect_branding_logo(path))
+}
+#[tauri::command]
+async fn choose_branding_logo(state: State<'_, DesktopState>) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, Workspace::workspace_info)?;
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("PNG logo", &["png"])
+            .blocking_pick_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local PNG logo.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "Logo selection could not finish.".to_owned())?
+}
+#[tauri::command]
 fn get_statement_accounts(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -889,6 +926,10 @@ pub fn run() {
             get_client,
             save_client,
             get_client_care,
+            get_firm_branding,
+            save_firm_branding,
+            inspect_branding_logo,
+            choose_branding_logo,
             get_statement_accounts,
             save_statement_account,
             get_document_collection,

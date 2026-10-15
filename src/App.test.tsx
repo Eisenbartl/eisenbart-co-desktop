@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   lockWorkspace: vi.fn(), workspaceInfo: vi.fn(), listClients: vi.fn(),
   getClient: vi.fn(), saveClient: vi.fn(), addClientNote: vi.fn(), listClientNotes: vi.fn(),
   chooseBackupFolder:vi.fn(), chooseRestoreFile:vi.fn(), createWorkspaceBackup:vi.fn(), prepareWorkspaceRestore:vi.fn(), confirmWorkspaceRestore:vi.fn(), cancelWorkspaceRestore:vi.fn(),
-  chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),getStatementAccounts:vi.fn(),getClientImports:vi.fn(),reviewRecurringPayment:vi.fn(),reviewStatementBalances:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn(),
+  chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),getStatementAccounts:vi.fn(),saveFirmBranding:vi.fn(),getFirmBranding:vi.fn(),getClientImports:vi.fn(),reviewRecurringPayment:vi.fn(),reviewStatementBalances:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn(),
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
   listClientScenarios:vi.fn(),getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
@@ -41,7 +41,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-beforeEach(() => {
+beforeEach(() => {mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
   mocks.getStatementAccounts.mockImplementation(async(clientId:string)=>({clientId,importRevision:0,accounts:[]}));
   vi.clearAllMocks();
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
@@ -156,6 +156,10 @@ describe('desktop workspace', () => {
     vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByRole('button',{name:'Collection checklist'}));
     expect(screen.getByLabelText('Current account name')).toHaveValue('Private Alice account');
     await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private Alice account');
+  });
+
+  it('guards branding drafts across settings/main pages and updates the sidebar after save',async()=>{
+    mocks.saveFirmBranding.mockImplementation(async({data})=>({organizationId:workspace.organizationId,revision:1,updatedAt:'2026-10-14T22:00:00Z',data,history:[{revision:1,name:data.name,updatedAt:'2026-10-14T22:00:00Z'}]}));render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Branding'}));await screen.findByLabelText('Firm display name');fireEvent.change(screen.getByLabelText('Firm display name'),{target:{value:'Fictional branded practice'}});vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByRole('button',{name:'Security'}));expect(screen.getByLabelText('Firm display name')).toHaveValue('Fictional branded practice');vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByRole('button',{name:'Dashboard'}));expect(screen.getByLabelText('Firm display name')).toHaveValue('Fictional branded practice');fireEvent.click(screen.getByRole('button',{name:'Save firm branding'}));await screen.findByText(/Firm branding saved locally/);expect(document.querySelector('.workspace-label')).toHaveTextContent('Fictional branded practice');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Fictional branded practice');
   });
 
   it('guards unsaved CSV selection and clears private source paths on lock',async()=>{
@@ -411,7 +415,7 @@ it('exposes labeled future areas and every administration page without fake save
  render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.click(screen.getByRole('button',{name:/Scanned documents \/ OCR/}));expect(screen.getByRole('region',{name:'Scanned documents / OCR planned feature'})).toHaveTextContent('mandatory verification');expect(screen.queryByRole('button',{name:/Save OCR/})).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'Settings'}));
  for(const tab of ['Branding','Counselors & roles','Data management','Licensing','Help & about','Security','Backup & recovery']){
-  fireEvent.click(screen.getByRole('button',{name:tab}));expect(screen.getByRole('button',{name:tab})).toHaveAttribute('aria-current','page');
+  fireEvent.click(screen.getByRole('button',{name:tab}));expect(screen.getByRole('button',{name:tab})).toHaveAttribute('aria-current','page');if(tab==='Branding')await screen.findByLabelText('Firm display name');
  }
  expect(screen.getByRole('heading',{name:'Encrypted workspace backup'})).toBeInTheDocument();expect(screen.getByRole('button',{name:'Lock workspace to restore a backup'})).toBeInTheDocument();
 });
