@@ -160,3 +160,15 @@ legacy internal and client-plan formats remain unchanged. Preserve v1 policy
 recomputation for historical approvals; future policies need explicit version
 dispatch rather than changing the meaning of already approved gates. See
 [final-report-approval.md](final-report-approval.md).
+
+
+`cards.rs` defines signed liability movements and exact card-only spending/payment
+summaries. `cards_store` uses schema-23 immutable sources, append-only per-row
+canonical decisions, shared source revisions, compound ownership, atomic audit
+and bounded authenticated recovery. CSV extraction reuses the existing explicit
+parser and client-bound preview tokens; card sources do not enter bank snapshots.
+`CardStatements` adds a guarded Documents page with private late-response cleanup.
+Current bank assessments/directories detect known card evidence and flag original
+and newly recorded records; v1 final approval remains blocked until card-inclusive
+reporting is implemented. Preserve the v1 captured CSV extraction behavior for old
+sources when introducing future adapters. See [credit-card-review.md](credit-card-review.md).

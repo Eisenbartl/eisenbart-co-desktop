@@ -175,6 +175,9 @@ pub(super) fn record(
             review_reasons.push("Saved budget, debt, savings or dated cash-flow plans changed after this scenario was captured. Its original assumptions and projections remain historical.".into());
         }
     }
+    if cards_store::has_cards(c, w, client)? {
+        review_reasons.push("Credit-card evidence is stored separately and is not included in this bank-based assessment. Review the card statements; final bank-report approval is blocked until integrated liability reporting is implemented.".into());
+    }
     let scenario = scenarios_store::validate_link(c, w, client, &payload)?;
     if let Some(r) = &scenario {
         review_reasons.extend(r.review_reasons.clone());
@@ -258,6 +261,7 @@ impl Workspace {
         let rows=s.connection.prepare("SELECT id,title,created_at,period_start,period_end,source_revision FROM client_assessment_records WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3 ORDER BY rowid DESC").map_err(storage_error)?.query_map(params![client,s.info.organization_id,s.info.counselor_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,i64>(5)?))).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
         let current_plans = plan_revisions(&s.connection, &s.info, client)?;
         let current_notes = notes_count(&s.connection, &s.info, client)?;
+        let card_evidence = cards_store::has_cards(&s.connection, &s.info, client)?;
         let mut records = Vec::new();
         for (id, title, created_at, period_start, period_end, source_revision) in rows {
             required_text(&title, "Assessment title", 120)?;
@@ -292,7 +296,8 @@ impl Workspace {
                 period_start,
                 period_end,
                 source_revision,
-                needs_review: coverage_changed
+                needs_review: card_evidence
+                    || coverage_changed
                     || branding_changed
                     || source_revision != source.revision
                     || profile_at_save != current.updated_at

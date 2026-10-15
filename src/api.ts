@@ -22,6 +22,9 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getCardStatements:(clientId:string)=>command<import('./types').CardSnapshot>('get_card_statements',{clientId}),
+  stageCardStatement:(clientId:string,input:{expectedRevision:number;token:string;input:import('./types').CardInput})=>command<import('./types').CardSnapshot>('stage_card_statement',{clientId,input}),
+  reviewCardTransaction:(clientId:string,input:{expectedRevision:number;statementId:string;row:number;fields:import('./types').CardFields;status:import('./types').ReviewStatus;reason:string;acknowledge:boolean})=>command<import('./types').CardSnapshot>('review_card_transaction',{clientId,input}),
   reviewFinalReport:(clientId:string,assessmentId:string)=>command<import('./types').FinalReportPreview>('review_final_report',{clientId,assessmentId}),
   getFinalReport:(clientId:string,id:string)=>command<import('./types').FinalReportRecord>('get_final_report',{clientId,id}),
   approveFinalReport:(clientId:string,input:{assessmentId:string;expectedDigest:string;expectedReadiness:string;decision:import('./types').FinalDecision})=>command<import('./types').FinalReportRecord>('approve_final_report',{clientId,input}),

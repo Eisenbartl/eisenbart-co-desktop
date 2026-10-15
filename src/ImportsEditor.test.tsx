@@ -85,7 +85,7 @@ describe('merchant grouping and recurring decisions',()=>{
  });
  it('retains failed edits, signals unsaved work, and blocks conflicting source decisions',async()=>{
   mocks.getClientImports.mockResolvedValue(grouped);mocks.reviewRecurringPayment.mockRejectedValue('Evidence changed; reopen the client.');const dirty=vi.fn();render(<ImportsEditor client={client} onDirty={dirty} onBusy={vi.fn()} otherSaving={false}/>);await screen.findByRole('table',{name:'Merchant payment groups'});
-  fireEvent.click(screen.getByRole('button',{name:'Review payments for Fictional service'}));fireEvent.change(screen.getByLabelText('Payment pattern review reason'),{target:{value:'Keep this draft'}});expect(dirty).toHaveBeenLastCalledWith(true);expect(screen.getByRole('button',{name:'Inspect CSV'})).toBeDisabled();expect(screen.getByRole('button',{name:'Review synthetic.csv record 2'})).toBeDisabled();
+  const reviewButton=screen.getByRole('button',{name:'Review payments for Fictional service'});await waitFor(()=>expect(reviewButton).toBeEnabled());fireEvent.click(reviewButton);fireEvent.change(screen.getByLabelText('Payment pattern review reason'),{target:{value:'Keep this draft'}});expect(dirty).toHaveBeenLastCalledWith(true);expect(screen.getByRole('button',{name:'Inspect CSV'})).toBeDisabled();expect(screen.getByRole('button',{name:'Review synthetic.csv record 2'})).toBeDisabled();
   fireEvent.click(screen.getByRole('button',{name:'Save payment pattern decision'}));await screen.findByRole('alert');expect(screen.getByLabelText('Payment pattern review reason')).toHaveValue('Keep this draft');expect(dirty).toHaveBeenLastCalledWith(true);
  });
  it('flags changed evidence, blocks confirmation without enough distinct payments, and permits withdrawal',async()=>{

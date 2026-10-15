@@ -377,3 +377,13 @@ export interface FinalReadiness {policy:string;clientId:string;assessmentId:stri
 export interface FinalDecision {accounts:{accountId:string;reason:string}[];planning:string;planningNotes:string;professionalNotes:string;confirmClient:boolean;confirmSources:boolean;confirmInventory:boolean;confirmAssumptions:boolean}
 export interface FinalReportPreview {readiness:FinalReadiness;receipt:string;approvalId:string|null}
 export interface FinalReportRecord {clientId:string;digest:string;assessment:SavedAssessment;needsReview:boolean;reviewReasons:string[];payload:{format:number;policy:string;appVersion:string;id:string;clientId:string;assessmentId:string;assessmentDigest:string;approvedAt:string;reportDate:string;approvedBy:WorkspaceInfo;readiness:FinalReadiness;decision:FinalDecision}}
+
+export type CardKind='unclassified'|'purchase'|'refund'|'payment'|'fee'|'interest'|'adjustment';
+export interface CardFields {date:string|null;amount:string|null;description:string;category:string;kind:CardKind}
+export interface CardInput {accountLabel:string;periodStart:string;periodEnd:string;openingOwed:string;closingOwed:string;retainSource:boolean;mapping:CsvMapping}
+export interface CardSource {format:number;id:string;clientId:string;importedAt:string;importRevision:number;fileName:string;sha256:string;byteCount:number;input:CardInput;rows:RawCsvRecord[]}
+export interface CardRow {row:number;raw:RawCsvRecord;fields:CardFields;status:ReviewStatus}
+export interface CardReview {id:string;row:number;fields:CardFields;status:ReviewStatus;reason:string;reviewedAt:string;counselorName:string;revision:number}
+export interface CardSummary {approved:number;rejected:number;pending:number;clarification:number;purchases:string;refunds:string;payments:string;fees:string;interest:string;adjustments:string;netSpending:string;liabilityMovement:string;sourceClosing:string|null;sourceDifference:string|null;approvedClosing:string|null;approvedDifference:string|null;reconciled:boolean}
+export interface CardStatement {source:CardSource;rows:CardRow[];history:CardReview[];summary:CardSummary;warnings:string[]}
+export interface CardSnapshot {clientId:string;revision:number;statements:CardStatement[]}

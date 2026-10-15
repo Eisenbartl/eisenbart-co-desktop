@@ -2,11 +2,12 @@
 
 The complete product specification is [product-specification.md](product-specification.md). [Development status](development-status.md) records the verified checkpoint. Each stage needs working behavior, meaningful tests, updated documentation, and a Git commit before the next feature group.
 
-Source 0.33.0 includes exact financial planners and comparisons, reviewed CSV/text
+Source 0.34.0 includes exact financial planners and comparisons, reviewed CSV/text
 PDF sources, client intake/follow-ups, collection/account management, branded
 immutable internal and client-plan reports, saved completeness reviews and bounded
-final counselor approval. The next implementation priority is supervised
-credit-card statement review. See the [prototype map](prototype-development-map.md)
+final counselor approval, plus separate supervised signed-CSV card liability
+review. The next priority is integrated card financial review and versioned report
+capture with explicit repayment counterparts. See the [prototype map](prototype-development-map.md)
 for current working areas, planned functions and acceptance; the original product
 stages below describe scope rather than a remaining-stage count.
 

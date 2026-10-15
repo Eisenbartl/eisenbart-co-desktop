@@ -7,13 +7,13 @@ use std::collections::{BTreeMap, HashSet};
 const MAX_RECORDS: usize = 5000;
 const MAX_HISTORY: usize = 10000;
 pub(super) struct PendingCsv {
-    client_id: String,
-    token: String,
-    bytes: Zeroizing<Vec<u8>>,
-    file_name: String,
-    sha256: String,
+    pub(super) client_id: String,
+    pub(super) token: String,
+    pub(super) bytes: Zeroizing<Vec<u8>>,
+    pub(super) file_name: String,
+    pub(super) sha256: String,
     created: Instant,
-    pdf_pages: Option<Vec<crate::pdf::Page>>,
+    pub(super) pdf_pages: Option<Vec<crate::pdf::Page>>,
 }
 impl PendingCsv {
     pub(super) fn expired(&self) -> bool {
@@ -43,7 +43,7 @@ fn json<T: Serialize>(v: &T) -> Result<String, String> {
 fn decode<T: serde::de::DeserializeOwned>(v: &str) -> Result<T, String> {
     serde_json::from_str(v).map_err(|_| STORAGE_ERROR.to_owned())
 }
-fn revision(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<i64, String> {
+pub(super) fn revision(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<i64, String> {
     c.query_row("SELECT revision FROM client_import_state WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3",params![client,w.organization_id,w.counselor_id],|r|r.get(0)).optional().map_err(storage_error).map(|v|v.unwrap_or(0))
 }
 pub(super) fn bump(
@@ -2791,7 +2791,7 @@ mod tests {
             .review_financial_facts(&c.id, facts_input(&s, data))
             .unwrap();
         let conn = &mut w.session.as_mut().unwrap().connection;
-        conn.execute_batch("DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE client_action_plans; DROP TABLE client_assessment_records; PRAGMA user_version=13; CREATE TABLE audit_events_v14(collision TEXT);").unwrap();
+        conn.execute_batch("DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE client_action_plans; DROP TABLE client_assessment_records; PRAGMA user_version=13; CREATE TABLE audit_events_v14(collision TEXT);").unwrap();
         assert!(migrate(conn, false).is_err());
         assert_eq!(
             conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
@@ -3054,7 +3054,7 @@ mod tests {
         let s = facts_fixture(&mut w, &client.id, dir.path());
         let before = s.records[0].raw.clone();
         let c = &mut w.session.as_mut().unwrap().connection;
-        c.execute_batch("DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE financial_fact_reviews; PRAGMA user_version=12; CREATE TABLE audit_events_v13(collision TEXT);").unwrap();
+        c.execute_batch("DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE financial_fact_reviews; PRAGMA user_version=12; CREATE TABLE audit_events_v13(collision TEXT);").unwrap();
         assert!(migrate(c, false).is_err());
         assert_eq!(
             c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
@@ -3427,7 +3427,7 @@ mod tests {
             doc("Legacy checking"),
         );
         let connection = &mut w.session.as_mut().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE statement_balance_reviews; PRAGMA user_version=11; CREATE TABLE audit_events_v12(collision TEXT);").unwrap();
+        connection.execute_batch("DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE statement_balance_reviews; PRAGMA user_version=11; CREATE TABLE audit_events_v12(collision TEXT);").unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
             connection
@@ -3770,7 +3770,7 @@ mod tests {
             .review_recurring_payment(&c.id, recurring_input(&s))
             .unwrap();
         let connection = &mut w.session.as_mut().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
+        connection.execute_batch("DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; PRAGMA user_version=10; CREATE TABLE recurring_review_invalidations(collision TEXT);").unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
             connection
@@ -3779,7 +3779,7 @@ mod tests {
             10
         );
         connection
-            .execute_batch("DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations;")
+            .execute_batch("DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations;")
             .unwrap();
         migrate(connection, false).unwrap();
         let after = w.get_client_imports(&c.id).unwrap();
@@ -3811,7 +3811,7 @@ mod tests {
         let connection = &mut w.session.as_mut().unwrap().connection;
         connection
             .execute_batch(
-                "DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
+                "DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history;",
             )
             .unwrap();
         connection
@@ -4577,7 +4577,7 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
         connection
-            .execute_batch("DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
+            .execute_batch("DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; PRAGMA user_version=8; CREATE TABLE audit_events_v9(collision TEXT);")
             .unwrap();
         assert!(migrate(connection, false).is_err());
         assert_eq!(
@@ -4874,7 +4874,7 @@ mod tests {
         let input = scenario_input(&mut w, &s, &c);
         let a = w.save_assessment_record(&c.id, input).unwrap();
         let conn = &mut w.session.as_mut().unwrap().connection;
-        conn.execute_batch("DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE client_action_plans; DROP INDEX assessment_records_identity; PRAGMA user_version=14; CREATE TABLE audit_events_v15(collision TEXT);").unwrap();
+        conn.execute_batch("DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE client_action_plans; DROP INDEX assessment_records_identity; PRAGMA user_version=14; CREATE TABLE audit_events_v15(collision TEXT);").unwrap();
         assert!(migrate(conn, false).is_err());
         assert_eq!(
             conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
@@ -5197,5 +5197,87 @@ mod tests {
                 .digest,
             legacy.digest
         );
+    }
+    #[test]
+    fn card_evidence_blocks_bank_final_approval_and_preserves_original_reports() {
+        let (root, mut w, _) = configured();
+        let c = w.save_client(client_input()).unwrap();
+        let a = final_candidate(&mut w, &c, root.path());
+        let p = w.review_final_report(&c.id, &a.payload.id).unwrap();
+        assert!(p.readiness.ready);
+        let approval = w.approve_final_report(&c.id, final_input(&p)).unwrap();
+        let original = serde_json::to_string(&approval.payload).unwrap();
+        let path = root.path().join("card-guard.csv");
+        fs::write(
+            &path,
+            "Date,Description,Amount,Category\n2026-09-01,Fictional card purchase,100.01,Food\n",
+        )
+        .unwrap();
+        let preview = w
+            .inspect_client_csv(c.id.clone(), path.to_str().unwrap().into())
+            .unwrap();
+        let mut mapping = crate::imports::tests::mapping();
+        mapping.kind = None;
+        let revision = w.get_client_imports(&c.id).unwrap().revision;
+        w.stage_card_statement(
+            &c.id,
+            crate::cards::Stage {
+                expected_revision: revision,
+                token: preview.token,
+                input: crate::cards::Input {
+                    account_label: "Known fictional card".into(),
+                    period_start: "2026-09-01".into(),
+                    period_end: "2026-09-30".into(),
+                    opening_owed: "1000".into(),
+                    closing_owed: "1100.01".into(),
+                    retain_source: true,
+                    mapping,
+                },
+            },
+        )
+        .unwrap();
+        let historical = w.get_final_report(&c.id, &approval.payload.id).unwrap();
+        assert!(historical.needs_review);
+        assert_eq!(
+            serde_json::to_string(&historical.payload).unwrap(),
+            original
+        );
+        assert!(historical
+            .review_reasons
+            .iter()
+            .any(|s| s.contains("Credit-card evidence")));
+        let source = w.get_client_imports(&c.id).unwrap();
+        let review = w.get_coverage_review(&c.id, None).unwrap();
+        w.save_coverage_review(
+            &c.id,
+            crate::coverage_review::Input {
+                expected_revision: review.latest_revision,
+                expected_source_revision: source.revision,
+                expected_profile_updated_at: c.updated_at.clone(),
+                data: review.snapshot.unwrap().data,
+            },
+        )
+        .unwrap();
+        let mut input = assessment_input(&source, &c);
+        input.from_month = a.payload.assessment.period_start[..7].into();
+        input.through_month = a.payload.assessment.period_end[..7].into();
+        input.completeness = Some(crate::coverage_review::Selection { revision: 2 });
+        let new = w.save_assessment_record(&c.id, input).unwrap();
+        assert!(new.needs_review);
+        assert!(new
+            .review_reasons
+            .iter()
+            .any(|s| s.contains("Credit-card evidence")));
+        let preview = w.review_final_report(&c.id, &new.payload.id).unwrap();
+        assert!(!preview.readiness.ready);
+        assert!(w
+            .approve_final_report(&c.id, final_input(&preview))
+            .is_err());
+        assert!(w
+            .list_assessment_records(&c.id)
+            .unwrap()
+            .records
+            .iter()
+            .all(|r| r.needs_review));
     }
 }

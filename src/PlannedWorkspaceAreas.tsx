@@ -1,10 +1,10 @@
 import type {ModuleView} from './workspaceNavigation';
-export const workingAreas:Partial<Record<ModuleView,string[]>>={'Financial Review':['Completeness & final validation'],Reports:['Final report checklist'],Documents:['Collection checklist','Statement accounts']};
+export const workingAreas:Partial<Record<ModuleView,string[]>>={'Financial Review':['Completeness & final validation'],Reports:['Final report checklist'],Documents:['Collection checklist','Statement accounts','Credit-card statements']};
 // Keep implementation entry points and acceptance criteria in docs/prototype-development-map.md.
 export const plannedAreas:Record<ModuleView,{title:string;detail:string}[]>={
  'Financial Review':[{title:'Savings progress',detail:'Dated savings progress charts based on recorded balances, with unknown-data and source labels.'}],
  Transactions:[{title:'Classification assistance',detail:'Local category suggestions and reusable classification rules, with explicit counselor review and preserved source provenance.'},{title:'Activity history',detail:'A client-wide searchable decision timeline, retaining original corrections, reversals and transfer links.'}],
- Documents:[{title:'Scanned documents / OCR',detail:'Bounded local OCR, page evidence and mandatory verification before extracted facts can be approved.'},{title:'Additional document types',detail:'Credit-card, loan, paystub and broader institution parsers, each with validated mappings and source reconciliation.'}],
+ Documents:[{title:'Scanned documents / OCR',detail:'Bounded local OCR, page evidence and mandatory verification before extracted facts can be approved.'},{title:'Additional document types',detail:'Card PDF, loan, paystub and broader institution parsers, each with validated mappings and source reconciliation. Signed CSV credit-card review is available in Credit-card statements.'}],
  'Budget Planner':[{title:'Paycheck allocation',detail:'Period-specific allocation of saved budget priorities to confirmed or explicitly estimated paychecks without double-counting dated cash flow.'}],
  'Debt Planner':[{title:'Advanced debt terms',detail:'Daily interest, variable/promotional rates, fees and payment frequencies with explicit unknown-term safeguards and independently checked schedules.'}],
  'Savings Planner':[{title:'Funding & drawdown',detail:'Model funding sources, reserved balances and drawdowns without spending the same savings twice or treating transfers as expenses.'}],

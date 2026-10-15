@@ -4,6 +4,7 @@ mod assessments;
 mod branding;
 mod budget;
 mod budget_methods;
+mod cards;
 mod cashflow;
 mod client_care;
 mod completeness;
@@ -270,6 +271,44 @@ async fn list_assessment_records(
     })
     .await
     .map_err(|_| "Assessment records could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn get_card_statements(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<cards::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_card_statements(&client_id))
+    })
+    .await
+    .map_err(|_| "Card operation could not finish. Refresh before another attempt.".to_owned())?
+}
+#[tauri::command]
+async fn stage_card_statement(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: cards::Stage,
+) -> Result<cards::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.stage_card_statement(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Card operation could not finish. Refresh before another attempt.".to_owned())?
+}
+#[tauri::command]
+async fn review_card_transaction(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: cards::ReviewInput,
+) -> Result<cards::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.review_card_transaction(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Card operation could not finish. Refresh before another attempt.".to_owned())?
 }
 #[tauri::command]
 async fn get_assessment_record(
@@ -1015,6 +1054,9 @@ pub fn run() {
             export_client_action_plan,
             choose_action_plan_pdf,
             get_assessment_record,
+            get_card_statements,
+            stage_card_statement,
+            review_card_transaction,
             save_assessment_record,
             choose_assessment_pdf,
             review_final_report,

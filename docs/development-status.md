@@ -1,6 +1,43 @@
 # Development status
 
-## Current stage — final counselor report approval (0.33.0, schema 22)
+## Current stage — supervised credit-card CSV review (0.34.0, schema 23)
+
+Documents → Credit-card statements now stores signed card liability sources,
+explicit individual decisions, correction/rejection history and exact source versus
+approved statement arithmetic. Payments reduce debt without becoming another
+expense or income. Existing bank amounts remain unchanged. Known card evidence
+flags bank-based reports and blocks v1 final approval until integrated card
+reporting is implemented, preserving old payloads/digests. See
+[credit-card-review.md](credit-card-review.md) for workflow, bounds and rules.
+
+Validation in progress, 2026-10-15 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 186 tests |
+| Complete Linux backend | Passed 200 library + 2 PDF process tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles |
+| Complete native workflow | Pending |
+| Windows source checks | Pending; installer steps must stay skipped |
+| Installer | Not created, per user instruction |
+
+The initial full UI run exposed an existing asynchronous test clicking the payment
+review control while it was disabled during loading. It now waits until enabled,
+retaining every assertion; the full rerun passed. Initial card recovery fixtures
+used an in-workspace backup destination and were corrected to use a separate
+folder, preserving the application's backup safeguard.
+
+This stage supports bounded signed UTF-8 CSV input, not card PDFs or combined
+bank/card reports. The source remains a development build; the downloadable
+preview remains 0.23.0. No dependency or installer was added.
+
+Next priority: integrated card financial review and versioned report capture,
+including explicit bank repayment links, cash versus spending views and complete
+basis gates before card-inclusive final approval.
+
+## Final counselor report approval (0.33.0, schema 22)
 
 Implemented required readiness checks and explicit counselor approval in Reports
 → Final report checklist. A separate scoped immutable approval binds the exact

@@ -308,3 +308,15 @@ After a new completeness version, restart and encrypted backup/restore, the same
 approval ID/digest and original notes remain, with explicit current review flags
 in the screen and historical final PDF. Screenshots include blocked, confirmation,
 approved and restored approval views. All earlier assertions remain in the run.
+
+
+## Credit-card CSV review (0.34.0 source)
+
+The full native workflow adds five fictional card rows through explicit mapping
+and individual decisions. Independent expected results are USD 87.08 card spending,
+USD 50.03 repayments, USD 37.05 debt movement and USD 1,037.05 closing owed. It
+checks original versus one-cent corrected arithmetic, rejection/history with USD
+-12.93 remaining net spending, unchanged bank figures and card-related bank-report
+review flags. Restart, encrypted backup/restore, source identity, historical
+amounts and second-client isolation are verified. Screenshots record reconciled,
+correction-history and restored views. All prior assertions remain.

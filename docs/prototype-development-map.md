@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.33.0 source
+# Prototype structure and development map — 0.34.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -70,6 +70,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | UI home | Next implementation files / dependencies | Acceptance before marking working |
 |---|---|---|
 | Documents → Collection checklist — working in 0.28.0 | `DocumentCollection.tsx`, `document_collection.rs`, `document_collection_store.rs`, schema 18; see [usage and limits](document-collection.md) | Implemented create/reopen/edit/archive/reactivate, explicit receipt and scoped source links, history, stale-save/audit rollback, restart/recovery checks; expand limits and usability only with evidence |
+| Documents → Credit-card statements — signed CSV review working | `cards.rs`, `cards_store.rs`, `CardStatements.tsx`, schema 23 | Scoped encrypted sources, explicit signed mapping, individual decisions/history, exact liability/spending/payment checks, bank-report guard and restart/recovery. [Limits and integration work](credit-card-review.md) |
 | Documents → Additional document types | `pdf.rs`, `imports.rs`, supervised parser adapters and import UI | Synthetic card/loan/paystub/institution fixtures, bounded parse, original locators, individual review, duplicate/sign/balance controls |
 | Documents → Scanned documents / OCR | Extend supervised `pdf_process.rs`; vetted offline OCR assets/dependencies | Scanned/mixed/rotated/low-quality fixtures, time/memory/page limits, no guessed facts, explicit review, offline/license checks |
 | Transactions → Classification assistance | Pure local suggestions plus scoped decision/rule persistence; `RecurringReview.tsx` conventions | Suggestions never auto-approve; immutable provenance, false-positive correction, undo/reversal and client isolation |
@@ -100,12 +101,13 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **additional document types, starting with supervised credit-card
-statement review** next. Define liability-account movement/sign semantics and
-independent synthetic examples before extending existing import/reconciliation
-controls; preserve original provenance, mandatory decisions and exact amounts.
-Do not treat a card purchase as a cash-account movement or silently double-count
-repayment transfers. Broader loan/paystub adapters and OCR remain separate stages.
-Final counselor approval is working under the bounded v1 policy in 0.33.0; see
-[its limits](final-report-approval.md). Keep signing, commercial licensing, native
-printing, multi-counselor permissions and installed Windows acceptance separate.
+Implement **integrated card financial review and report capture** next. Keep card
+spending distinct from bank cash movements; explicitly link repayment counterparts
+without double-counting expenses or treating borrowing as income. Capture reviewed
+card evidence in a new report version with unchanged legacy bytes, independently
+checked combined examples and complete-basis gates before expanding final approval.
+The conservative bank-report block must remain until this passes. Signed CSV card
+review is working in 0.34.0; [its guide](credit-card-review.md) records future card
+PDF parsing, durable card identity/metadata CRUD and planning-account mappings.
+Broader loan/paystub adapters, OCR, printing, commercial licensing, multiple
+counselors and installed Windows acceptance remain separate.
