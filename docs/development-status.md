@@ -18,18 +18,33 @@ change is required. See [follow-up-overview.md](follow-up-overview.md).
 | Focused interface | 24 passed across overview and desktop integration |
 | Production frontend / complete interface suite | Passed build and 129 tests |
 | Complete backend / formatting / Clippy | Passed: 169 library + 2 PDF process tests; formatting and warnings-denied Clippy |
-| Standalone native build / integrated workflow | Standalone debug build passed; integrated workflow running |
-| Windows source checks | Pending |
+| Standalone native build / integrated workflow | Passed: complete workflow, lock/restart, encrypted restore and missing-metadata recovery |
+| Windows source checks | Passed: 129 UI tests, 170 library + 2 PDF process tests; all installer steps skipped |
 | Installer | Not created, per user instruction |
 
 Older generated application compiler caches were pruned before building; recent
 incremental caches, dependencies, source and recoverable checkpoints were retained.
 No environment configuration change was needed. Logs use
-`/workspace/shared/followup-overview-*.log`; the native workflow will use
-`desktop-smoke-followup-overview`. It extends the existing intake example by
+`/workspace/shared/followup-overview-*.log`; native artifacts remain in
+`desktop-smoke-followup-overview`. The initial native overview checks passed:
+opening the exact overdue task before completion, latest counts, closed-history
+filtering, client/kind/date filters and appointment focus. Visual inspection at
+1200px confirmed readable controls, counts, rows and pagination within the card.
+The full workflow passed (exit 0), including all four overview checks through
+restart, encrypted restore and storage-error recovery. It extends the intake example by
 opening the overdue task from the dashboard before completion, then verifies
 current counts/closed history, name/kind/date filters and exact appointment focus
 after restart and both recovery paths, retaining prior financial/PDF assertions.
+
+[Windows source run 38673896038](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38673896038)
+passed for feature source `9f574460981c9baf6191ba8eb5cd8ab2570e1e04`.
+Build/tests ran; installer build, installation smoke, metadata and artifact-upload
+steps were all skipped. This does not establish a new installed Windows build
+or clean Windows 11 offline acceptance. The final follow-up commit changes only
+these validation notes; application source is the tested feature checkpoint.
+A source archive and complete-history bundle are retained under
+`/workspace/shared/checkpoints/eisenbart-followup-overview-source.*` and verified
+against the final clean, committed source and remote main.
 
 Next priority: selected intake context in immutable counselor reports, followed
 by remaining report/model/document and release requirements. Background Windows
