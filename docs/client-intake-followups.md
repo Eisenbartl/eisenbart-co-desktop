@@ -1,4 +1,6 @@
-# Client intake and follow-ups — 0.24.0 source
+# Client intake and follow-ups
+
+Introduced in 0.24.0 source. Version 0.25.0 adds the [practice dashboard overview](follow-up-overview.md), which opens a selected item directly in this panel.
 
 Open a saved client and expand **Intake and follow-ups**. Mailing address,
 household composition, employment status, employer, occupation and income
@@ -21,9 +23,10 @@ Client switching respects the existing unsaved-change guard; locking clears
 private intake and tasks. Reads and writes reject stale responses for another
 client, and other saves temporarily disable conflicting editing controls.
 
-This stage supplies reminders within the opened client record. It does not run
-Windows/background notifications, create recurring appointments, contact clients,
-sync calendars, provide a practice-wide due-date inbox or configure time zones.
+Reminders are available within the opened client record and, from 0.25.0, on the
+dashboard across clients. The application does not run Windows/background
+notifications, create recurring appointments, contact clients, sync calendars
+or configure time zones.
 Those are separate workflow work. Earlier intake versions are retained for
 integrity/recovery; this stage does not add a history browser or export them in
 financial PDFs. No financial or client action-plan history is rewritten.

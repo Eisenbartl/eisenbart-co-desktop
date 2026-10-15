@@ -5,10 +5,11 @@ import type {ClientCareData,ClientCareRecord,ClientFollowUp,ClientIntake} from '
 const employment = [['','Not specified'],['employed','Employed'],['selfEmployed','Self-employed'],['unemployed','Unemployed'],['retired','Retired'],['student','Student'],['other','Other']];
 const message=(e:unknown)=>e instanceof Error?e.message:String(e);
 
-export default function ClientCare({clientId,onDirty,onBusy,otherSaving}:{clientId:string;onDirty:(v:boolean)=>void;onBusy:(v:boolean)=>void;otherSaving:boolean}) {
-  const [open,setOpen]=useState(false),[saved,setSaved]=useState<ClientCareRecord|null>(null),[draft,setDraft]=useState<ClientCareData|null>(null);
+export default function ClientCare({clientId,onDirty,onBusy,otherSaving,focusFollowUp}:{clientId:string;onDirty:(v:boolean)=>void;onBusy:(v:boolean)=>void;otherSaving:boolean;focusFollowUp?:string}) {
+  const [open,setOpen]=useState(Boolean(focusFollowUp)),[saved,setSaved]=useState<ClientCareRecord|null>(null),[draft,setDraft]=useState<ClientCareData|null>(null);
   const [loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[attempt,setAttempt]=useState(0);
   const generation=useRef(0);
+  const focused=useRef('');
   const dirty=Boolean(saved&&draft&&JSON.stringify(saved.data)!==JSON.stringify(draft));
   const busy=loading||saving;
   useEffect(()=>{onDirty(dirty);return()=>onDirty(false);},[dirty,onDirty]);
@@ -25,6 +26,14 @@ export default function ClientCare({clientId,onDirty,onBusy,otherSaving}:{client
     }).catch(e=>{if(g===generation.current)setError(message(e));}).finally(()=>{if(g===generation.current)setLoading(false);});
     return()=>{generation.current++;};
   },[clientId,open,attempt]);
+  useEffect(()=>{if(focusFollowUp)setOpen(true);},[focusFollowUp]);
+  useEffect(()=>{
+    if(!focusFollowUp||!draft||busy||focused.current===`${clientId}:${focusFollowUp}`)return;
+    const target=document.getElementById(`care-follow-up-${focusFollowUp}`);
+    if(target){target.scrollIntoView({block:'start',behavior:'instant'});target.querySelector('input')?.focus({preventScroll:true});}
+    else setNotice('The selected follow-up is unavailable in this current client record. Review the saved items below.');
+    focused.current=`${clientId}:${focusFollowUp}`;
+  },[focusFollowUp,clientId,draft,busy]);
   function intake<K extends keyof ClientIntake>(key:K,value:ClientIntake[K]) {setDraft(d=>d?{...d,intake:{...d.intake,[key]:value}}:d);setNotice('');}
   function follow<K extends keyof ClientFollowUp>(index:number,key:K,value:ClientFollowUp[K]) {
     setDraft(d=>d?{...d,followUps:d.followUps.map((f,i)=>i===index?{...f,[key]:value,...(key==='kind'&&value==='task'?{time:''}:{})}:f)}:d);setNotice('');
@@ -66,7 +75,7 @@ export default function ClientCare({clientId,onDirty,onBusy,otherSaving}:{client
           <label htmlFor="intake-income-notes">Employment and income details<textarea id="intake-income-notes" rows={3} maxLength={4000} value={draft.intake.incomeNotes} onChange={e=>intake('incomeNotes',e.target.value)} placeholder="Income sources, stability and information still needed; record amounts in the appropriate financial models"/></label>
           <h3>Appointments and follow-up tasks</h3>
           {!draft.followUps.length&&<p className="muted">No appointments or follow-up tasks recorded.</p>}
-          {draft.followUps.map((f,i)=><div className="care-follow-up" key={f.id||`new-${i}`}>
+          {draft.followUps.map((f,i)=><div className="care-follow-up" key={f.id||`new-${i}`} id={f.id?`care-follow-up-${f.id}`:undefined}>
             <h4>Follow-up {i+1}{f.id?' · Saved':''}</h4>
             <div className="form-grid">
               <label htmlFor={`follow-kind-${i}`}>Kind<select id={`follow-kind-${i}`} value={f.kind} onChange={e=>follow(i,'kind',e.target.value as ClientFollowUp['kind'])}><option value="task">Task</option><option value="appointment">Appointment</option></select></label>

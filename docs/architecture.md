@@ -34,6 +34,8 @@ There is no required cloud service, spreadsheet integration, or shared network d
 
 `client_care.rs` validates optional intake and explicit task/appointment dates and calculates due counts in America/Chicago. `storage::client_care_store` appends scoped, canonical schema-17 snapshots with optimistic revisions and atomic audit. Recovery validates all versions and retained task identities. `ClientCare` guards drafts and delayed responses without supplying financial facts or rewriting report history. See [client-intake-followups.md](client-intake-followups.md).
 
+`follow_up_overview.rs` derives scoped date-only practice counts, filters, stable ordering and 25-item pages. `client_care_store` reads matching client identities and latest versions in one SQLite snapshot. `FollowUpOverview` renders the read-only dashboard and opens the current client/item through guarded navigation; `ClientCare` focuses that item. Schema 17 is unchanged. See [follow-up-overview.md](follow-up-overview.md).
+
 ## Data model and ownership
 
 Organization, counselor, client, note, and audit records use internal identifiers. The first installation creates one organization and counselor; this is not a completed multi-user permission system. Queries must derive the organization from the authenticated session and constrain records by that organization in Rust. Interface filtering alone is insufficient.

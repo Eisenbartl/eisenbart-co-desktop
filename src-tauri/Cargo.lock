@@ -847,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "eisenbart-counseling-suite"
-version = "0.24.0"
+version = "0.25.0"
 dependencies = [
  "argon2",
  "chrono",

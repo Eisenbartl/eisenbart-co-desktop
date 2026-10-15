@@ -65,6 +65,21 @@ export interface ClientCareRecord {
   overdue: number; dueToday: number; data: ClientCareData;
 }
 
+export interface FollowUpQuery {
+  view: 'open'|'overdue'|'today'|'upcoming'|'closed'; kind: 'all'|'task'|'appointment';
+  includeArchived: boolean; search: string; page: number;
+}
+export interface FollowUpItem {
+  clientId: string; clientName: string; clientStatus: string; followUpId: string;
+  kind: 'task'|'appointment'; title: string; dueDate: string; time: string;
+  status: 'open'|'completed'|'cancelled'; careRevision: number;
+}
+export interface FollowUpOverviewData {
+  organizationId: string; counselorId: string; reviewDate: string; timeZone: string;
+  input: FollowUpQuery; overdue: number; dueToday: number; upcoming: number; closed: number;
+  total: number; pageSize: number; items: FollowUpItem[];
+}
+
 export interface SetupInput {
   organizationName: string;
   counselorName: string;

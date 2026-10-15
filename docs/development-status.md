@@ -1,5 +1,41 @@
 # Development status
 
+## Stage 3L: practice appointment/follow-up overview — 0.25.0 source
+
+The dashboard now shows latest saved tasks/appointments across scoped clients,
+exact overdue/today/upcoming/closed counts, explicit date/kind/name-title filters,
+optional archived clients and stable 25-item pagination. Opening a row navigates
+to its client and focuses the exact saved item. Existing care revision checks,
+draft guards, private-state clearing and encrypted history remain in effect.
+One authenticated read snapshot supplies client identity and current care data;
+unreadable data/bounds fail explicitly. No schema/dependency or financial-model
+change is required. See [follow-up-overview.md](follow-up-overview.md).
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; unchanged setup and dependencies |
+| Focused Rust | Three passed: day/filter/page behavior and latest scoped data, archive exclusion, corrupt data and no writes |
+| Focused interface | 24 passed across overview and desktop integration |
+| Production frontend / complete interface suite | Passed build and 129 tests |
+| Complete backend / formatting / Clippy | Passed: 169 library + 2 PDF process tests; formatting and warnings-denied Clippy |
+| Standalone native build / integrated workflow | Standalone debug build passed; integrated workflow running |
+| Windows source checks | Pending |
+| Installer | Not created, per user instruction |
+
+Older generated application compiler caches were pruned before building; recent
+incremental caches, dependencies, source and recoverable checkpoints were retained.
+No environment configuration change was needed. Logs use
+`/workspace/shared/followup-overview-*.log`; the native workflow will use
+`desktop-smoke-followup-overview`. It extends the existing intake example by
+opening the overdue task from the dashboard before completion, then verifies
+current counts/closed history, name/kind/date filters and exact appointment focus
+after restart and both recovery paths, retaining prior financial/PDF assertions.
+
+Next priority: selected intake context in immutable counselor reports, followed
+by remaining report/model/document and release requirements. Background Windows
+notifications, calendar sync and configurable practice time zones are not part
+of this stage. No new installer will be made until the user asks for one.
+
 ## Stage 3K: optional client intake and dated follow-ups — 0.24.0 source
 
 Optional address, household composition, employment/employer/occupation and

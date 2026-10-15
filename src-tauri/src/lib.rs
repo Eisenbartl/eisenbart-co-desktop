@@ -8,6 +8,7 @@ mod client_care;
 mod dashboard;
 mod debt;
 mod financial_facts;
+mod follow_up_overview;
 mod imports;
 mod income_periods;
 mod models;
@@ -583,6 +584,18 @@ fn get_client_care(
     access(&state, |w| w.get_client_care(&client_id))
 }
 #[tauri::command]
+async fn get_follow_up_overview(
+    state: State<'_, DesktopState>,
+    input: follow_up_overview::Input,
+) -> Result<follow_up_overview::Overview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_follow_up_overview(input))
+    })
+    .await
+    .map_err(|_| "The follow-up overview could not be loaded.".to_owned())?
+}
+#[tauri::command]
 fn save_client_care(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -834,6 +847,7 @@ pub fn run() {
             get_client,
             save_client,
             get_client_care,
+            get_follow_up_overview,
             save_client_care,
             add_client_note,
             list_client_notes,

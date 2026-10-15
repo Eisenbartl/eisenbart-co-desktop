@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getFollowUpOverview:(input:import('./types').FollowUpQuery)=>command<import('./types').FollowUpOverviewData>('get_follow_up_overview',{input}),
   getClientCare:(clientId:string)=>command<import('./types').ClientCareRecord>('get_client_care',{clientId}),
   saveClientCare:(clientId:string,input:{expectedRevision:number;data:import('./types').ClientCareData})=>command<import('./types').ClientCareRecord>('save_client_care',{clientId,input}),
   listClientScenarios:(clientId:string)=>command<ScenarioDirectory>('list_client_scenarios',{clientId}),

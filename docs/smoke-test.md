@@ -32,6 +32,11 @@ appointment with time, an overdue task and completion/cancellation outcomes. It
 checks second-client isolation, lock privacy, restart, encrypted restore and
 missing-metadata recovery while retaining all previous financial/PDF checks.
 
+The 0.25.0 workflow opens the saved overdue item from the practice dashboard
+before completing it. It checks latest counts, closed history, name/kind/date
+filters and exact client/item keyboard focus after restart and both recovery
+paths, without adding a duplicate financial scenario/report workflow.
+
 ## Linux cloud environment
 
 Build the frontend and native application with the repository's documented

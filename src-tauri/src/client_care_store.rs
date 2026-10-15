@@ -89,6 +89,68 @@ pub(super) fn validate_records(
 }
 
 impl Workspace {
+    pub fn get_follow_up_overview(
+        &mut self,
+        input: crate::follow_up_overview::Input,
+    ) -> Result<crate::follow_up_overview::Overview, String> {
+        use crate::follow_up_overview::{self, Item};
+        let s = self.session()?;
+        let input = follow_up_overview::clean(input)?;
+        // One SELECT holds a consistent SQLite read snapshot for client identity
+        // and latest care data, including concurrent writes from other windows.
+        let mut q = s.connection.prepare(
+            "SELECT c.id,c.first_name,c.last_name,c.status,h.revision,h.data_json,h.updated_at
+             FROM clients c JOIN client_care_snapshots h ON h.client_id=c.id
+                AND h.organization_id=c.organization_id AND h.counselor_id=c.counselor_id
+             WHERE c.organization_id=?1 AND c.counselor_id=?2 AND (?3 OR c.status!='Archived')
+                AND h.revision=(SELECT MAX(v.revision) FROM client_care_snapshots v
+                    WHERE v.client_id=c.id AND v.organization_id=c.organization_id AND v.counselor_id=c.counselor_id)
+             ORDER BY c.id LIMIT 1001"
+        ).map_err(storage_error)?;
+        let mut rows = q
+            .query(params![
+                s.info.organization_id,
+                s.info.counselor_id,
+                input.include_archived
+            ])
+            .map_err(storage_error)?;
+        let mut items = Vec::new();
+        let mut clients = 0;
+        while let Some(r) = rows.next().map_err(storage_error)? {
+            clients += 1;
+            if clients > 1000 {
+                return Err("The follow-up overview supports up to 1,000 included clients with saved intake records. Review follow-ups in individual client records.".into());
+            }
+            let id: String = r.get(0).map_err(storage_error)?;
+            let first: String = r.get(1).map_err(storage_error)?;
+            let last: String = r.get(2).map_err(storage_error)?;
+            let status: String = r.get(3).map_err(storage_error)?;
+            let revision: i64 = r.get(4).map_err(storage_error)?;
+            let json: String = r.get(5).map_err(storage_error)?;
+            let updated: String = r.get(6).map_err(storage_error)?;
+            if !(1..=500).contains(&revision)
+                || chrono::DateTime::parse_from_rfc3339(&updated).is_err()
+            {
+                return Err(STORAGE_ERROR.into());
+            }
+            for f in decode(&json)?.follow_ups {
+                items.push(Item {
+                    client_id: id.clone(),
+                    client_name: format!("{first} {last}"),
+                    client_status: status.clone(),
+                    follow_up_id: f.id,
+                    kind: f.kind,
+                    title: f.title,
+                    due_date: f.due_date,
+                    time: f.time,
+                    status: f.status,
+                    care_revision: revision,
+                });
+            }
+        }
+        Ok(follow_up_overview::build(input, items, &today(), &s.info))
+    }
+
     pub fn get_client_care(&mut self, client: &str) -> Result<Record, String> {
         let s = self.session()?;
         scoped_client(&s.connection, &s.info, client)?;
@@ -169,6 +231,125 @@ mod tests {
             expected_revision: revision,
             data,
         }
+    }
+
+    #[test]
+    fn overview_uses_latest_scoped_records_excludes_archived_and_never_writes() {
+        use crate::follow_up_overview::Input as Query;
+        let query = || Query {
+            view: "open".into(),
+            kind: "all".into(),
+            include_archived: false,
+            search: "".into(),
+            page: 0,
+        };
+        let (_dir, mut w, info) = configured();
+        let a = w.save_client(client_input()).unwrap();
+        let mut archived = client_input();
+        archived.status = "Archived".into();
+        let b = w.save_client(archived).unwrap();
+        let first = w.save_client_care(&a.id, input(0, draft())).unwrap();
+        let mut next = first.data.clone();
+        next.follow_ups[0].status = "completed".into();
+        next.follow_ups.push(crate::client_care::FollowUp {
+            id: "".into(),
+            kind: "task".into(),
+            title: "Overdue fictional review".into(),
+            due_date: "1900-01-01".into(),
+            time: "".into(),
+            status: "open".into(),
+            notes: "Private notes never enter overview rows".into(),
+        });
+        w.save_client_care(&a.id, input(1, next)).unwrap();
+        w.save_client_care(&b.id, input(0, draft())).unwrap();
+        {
+            let c = &w.session().unwrap().connection;
+            c.execute(
+                "INSERT INTO organizations(id,name) VALUES('foreign-org','Foreign organization')",
+                [],
+            )
+            .unwrap();
+            c.execute("INSERT INTO counselors(id,organization_id,name) VALUES('foreign-counselor','foreign-org','Other counselor'),('same-org-counselor',?1,'Same organization other counselor')",[&info.organization_id]).unwrap();
+            let json = serde_json::to_string(&first.data).unwrap();
+            for (id, org, counselor) in [
+                ("foreign-client", "foreign-org", "foreign-counselor"),
+                (
+                    "other-counselor-client",
+                    info.organization_id.as_str(),
+                    "same-org-counselor",
+                ),
+            ] {
+                c.execute("INSERT INTO clients(id,organization_id,counselor_id,first_name,last_name,household_size,status,created_at,updated_at) VALUES(?1,?2,?3,'Foreign','Private Client',1,'Planning',?4,?4)",params![id,org,counselor,timestamp()]).unwrap();
+                c.execute("INSERT INTO client_care_snapshots(client_id,organization_id,counselor_id,revision,data_json,updated_at) VALUES(?1,?2,?3,1,?4,?5)",params![id,org,counselor,json,timestamp()]).unwrap();
+            }
+        }
+        let before: i64 = w
+            .session()
+            .unwrap()
+            .connection
+            .query_row("SELECT count(*) FROM audit_events", [], |r| r.get(0))
+            .unwrap();
+        let r = w.get_follow_up_overview(query()).unwrap();
+        assert_eq!((r.overdue, r.upcoming, r.closed, r.total), (1, 0, 1, 1));
+        assert_eq!(r.items[0].client_id, a.id);
+        assert_eq!(r.items[0].care_revision, 2);
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(!json.contains("Private notes never"));
+        let r = w
+            .get_follow_up_overview(Query {
+                include_archived: true,
+                ..query()
+            })
+            .unwrap();
+        assert_eq!((r.total, r.upcoming), (2, 1));
+        assert!(r
+            .items
+            .iter()
+            .any(|f| f.client_id == b.id && f.client_status == "Archived"));
+        assert_eq!(
+            w.get_follow_up_overview(Query {
+                search: "Foreign".into(),
+                include_archived: true,
+                ..query()
+            })
+            .unwrap()
+            .total,
+            0
+        );
+        let r = w
+            .get_follow_up_overview(Query {
+                view: "closed".into(),
+                ..query()
+            })
+            .unwrap();
+        assert_eq!(r.items[0].status, "completed");
+        let after: i64 = w
+            .session()
+            .unwrap()
+            .connection
+            .query_row("SELECT count(*) FROM audit_events", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(before, after);
+        w.session()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TRIGGER client_care_no_update;")
+            .unwrap();
+        w.session()
+            .unwrap()
+            .connection
+            .execute(
+                "UPDATE client_care_snapshots SET data_json='{}' WHERE client_id=?1 AND revision=2",
+                [&a.id],
+            )
+            .unwrap();
+        assert!(w.get_follow_up_overview(query()).is_err());
+        w.lock_workspace();
+        assert!(w
+            .get_follow_up_overview(query())
+            .err()
+            .unwrap()
+            .contains("locked"));
     }
 
     #[test]

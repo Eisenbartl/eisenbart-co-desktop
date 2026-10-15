@@ -1,7 +1,8 @@
 # Windows evaluation guide
 
-The installer below is 0.23.0. Current 0.24.0 source additionally supports optional
-client intake and dated follow-up tasks/appointments; see [the intake guide](client-intake-followups.md).
+The installer below is 0.23.0. Current 0.25.0 source additionally supports optional
+client intake, dated follow-up tasks/appointments and a filtered dashboard overview;
+see [the intake guide](client-intake-followups.md) and [overview guide](follow-up-overview.md).
 Those additions require a newer build and are not in the linked 0.23.0 installer.
 
 Version 0.23.0 is a Windows x64 evaluation build with encrypted local records,

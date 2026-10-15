@@ -1,6 +1,7 @@
 # Windows development installer — 0.23.0
 
-Current development source is **0.24.0**, with schema 17 intake and follow-ups.
+Current development source is **0.25.0**, with schema 17 intake, follow-ups and
+a practice-wide dashboard overview. No new installer is created until requested.
 The downloadable **0.23.0** preview below predates those changes. Do not open a
 schema-17 workspace with the older application.
 

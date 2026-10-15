@@ -68,16 +68,16 @@ text PDF transaction review; recurring-payment and running-balance review; appro
 data dashboards; saved scenarios; counselor and client-plan PDF reports.
 
 NEW IN THIS VERSION
-Optional mailing address, household and employment intake; explicit dated tasks
-and appointments; overdue/due-today reminders in the client record; retained
-completion/cancellation outcomes; encrypted version history and safe stale-edit
-rejection. Reminder dates and appointment times use America/Chicago. There are
-no background Windows notifications. Intake notes do not supply verified facts
-or enter financial report PDFs.
+The dashboard lists saved tasks and appointments across your scoped clients.
+Overdue, due-today, upcoming and completed/cancelled views; kind/name/title filters;
+optional archived clients; and 25-item pages are available. Open a row to review
+the exact current client follow-up. Dates and times use America/Chicago; reminders
+appear inside the app. Intake notes remain separate from financial facts/reports.
 
 TRY THIS
 1. Create a fictional client; open Intake and follow-ups to try the new controls.
-   Save optional intake and a dated task/appointment; complete or cancel an item.
+   Save optional intake and a dated task/appointment. Return to Dashboard, apply
+   follow-up filters and open the item; complete or cancel it in the client record.
    Save normal income and necessary expenses in the separate budget.
 2. Save debt, savings and cash-flow models if you want those forecasts.
 3. Open Compare combined financial scenarios and reload the saved baseline.

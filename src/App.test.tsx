@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
   listClientScenarios:vi.fn(),getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
-  getClientCare:vi.fn(),saveClientCare:vi.fn(),
+  getClientCare:vi.fn(),saveClientCare:vi.fn(),getFollowUpOverview:vi.fn(),
 }));
 
 vi.mock('./api', () => ({
@@ -43,6 +43,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
   mocks.getClientCare.mockImplementation(async(clientId:string)=>({clientId,revision:0,updatedAt:null,reviewDate:'2026-10-15',overdue:0,dueToday:0,data:{intake:{address:'',household:'',employment:'',employer:'',occupation:'',incomeNotes:''},followUps:[]}}));
   mocks.listClientScenarios.mockImplementation(async(clientId:string)=>({clientId,records:[]}));
   mocks.getClientImports.mockImplementation(async (clientId:string)=>({clientId,revision:0,accounts:[],documents:[],records:[],history:[],merchantGroups:[],recurringHistory:[],summary:{pending:0,needsClarification:0,approved:0,rejected:0,income:'0.00',spending:'0.00',refunds:'0.00',netSpending:'0.00',netCash:'0.00',accountNet:[],warnings:[]}}));
@@ -84,6 +85,31 @@ async function selectClient(name: string) {
 }
 
 describe('desktop workspace', () => {
+  it('opens the selected dashboard follow-up, guards its draft and clears it on lock',async()=>{
+    const id='e9f2be11-e17b-4ee4-8bb3-39a7062ac9c2';
+    const descriptor=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'scrollIntoView');
+    Object.defineProperty(HTMLElement.prototype,'scrollIntoView',{configurable:true,value:vi.fn()});
+    try {
+      mocks.getFollowUpOverview.mockImplementationOnce(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:1,dueToday:0,upcoming:0,closed:0,total:1,pageSize:25,items:[{clientId:alice.id,clientName:'Alice Able',clientStatus:alice.status,followUpId:id,kind:'task',title:'Private Alice follow-up',dueDate:'1900-01-01',time:'',status:'open',careRevision:1}]}));
+      mocks.getClientCare.mockResolvedValueOnce({clientId:alice.id,revision:1,updatedAt:'2026-10-15T12:00:00Z',reviewDate:'2026-10-15',overdue:1,dueToday:0,data:{intake:{address:'',household:'',employment:'',employer:'',occupation:'',incomeNotes:''},followUps:[{id,kind:'task',title:'Private Alice follow-up',dueDate:'1900-01-01',time:'',status:'open',notes:''}]}});
+      render(<App/>);await unlock();
+      fireEvent.click(await screen.findByRole('button',{name:'Open Private Alice follow-up for Alice Able'}));
+      await waitFor(()=>expect(screen.getByLabelText('Title')).toHaveFocus());
+      expect(screen.getByRole('heading',{name:'Alice Able'})).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText('Follow-up notes / outcome'),{target:{value:'Private unsaved outcome'}});
+      vi.mocked(window.confirm).mockReturnValueOnce(false);
+      fireEvent.click(screen.getByRole('button',{name:'Dashboard'}));
+      expect(window.confirm).toHaveBeenCalled();
+      expect(screen.getByLabelText('Follow-up notes / outcome')).toHaveValue('Private unsaved outcome');
+      await act(async()=>mocks.lockHandler?.());
+      expect(document.documentElement.outerHTML).not.toContain('Private Alice follow-up');
+      expect(document.documentElement.outerHTML).not.toContain('Private unsaved outcome');
+      expect(mocks.saveClientCare).not.toHaveBeenCalled();
+    } finally {
+      if(descriptor)Object.defineProperty(HTMLElement.prototype,'scrollIntoView',descriptor);
+      else Reflect.deleteProperty(HTMLElement.prototype,'scrollIntoView');
+    }
+  });
   it('guards an intake draft when changing clients and clears private employment details on lock',async()=>{
     render(<App/>);await unlock();await selectClient('Alice Able');
     await screen.findByText('No saved budget yet');

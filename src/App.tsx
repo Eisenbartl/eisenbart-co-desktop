@@ -1,3 +1,4 @@
+import FollowUpOverview from './FollowUpOverview';
 import ClientCare from './ClientCare';
 import ImportsEditor from './ImportsEditor';
 import {BackupPanel,RestorePanel} from './RecoveryPanel';
@@ -133,8 +134,8 @@ function clientInput(client: Client): ClientInput {
   return { id: client.id, firstName: client.firstName, lastName: client.lastName, email: client.email, phone: client.phone, householdSize: client.householdSize, status: client.status, goals: client.goals };
 }
 
-function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy }: {
-  client: Client | null; workspace: WorkspaceInfo;
+function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy, followUpId }: {
+  client: Client | null; workspace: WorkspaceInfo; followUpId?:string;
   onSaved: (client: Client) => void; onCancel: () => void;
   onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void;
 }) {
@@ -216,7 +217,7 @@ function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy }:
         </fieldset>
       </form>
     </div>
-    {client && <ClientCare key={client.id} clientId={client.id} onDirty={setCareDirty} onBusy={setCareBusy} otherSaving={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy} />}
+    {client && <ClientCare key={client.id} clientId={client.id} focusFollowUp={followUpId} onDirty={setCareDirty} onBusy={setCareBusy} otherSaving={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy} />}
     {client ? <ClientNotes key={client.id} client={client} workspace={workspace} onBusy={setNoteSaving} onDirty={setNoteDirty} clientSaving={saving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy || careBusy} /> : <div className="panel notes-placeholder"><Icon name="file" size={25} /><div><h3>Session notes</h3><p className="muted small">Save this client first to start a dated counseling history.</p></div></div>}
     {client && <BudgetEditor key={client.id} client={client} onDirty={setBudgetDirty} onBusy={setBudgetSaving} otherSaving={saving || noteSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy || careBusy} />}
     {client && <DebtEditor key={client.id} client={client} onDirty={setDebtDirty} onBusy={setDebtSaving} otherSaving={saving || noteSaving || budgetSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy || careBusy} />}
@@ -307,6 +308,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All statuses');
   const [selected, setSelected] = useState<Client | null>(null);
+  const [targetFollowUp,setTargetFollowUp]=useState<string|undefined>(undefined);
   const [editing, setEditing] = useState(false);
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [selectionError, setSelectionError] = useState('');
@@ -373,6 +375,7 @@ export default function App() {
     setClientsError('');
     setClientsLoading(false);
     setSelected(null);
+    setTargetFollowUp(undefined);
     setEditing(false);
     setSelectionLoading(false);
     setSelectionError('');
@@ -427,6 +430,7 @@ export default function App() {
   function clearSelection() {
     selectionRequest.current += 1;
     setSelected(null);
+    setTargetFollowUp(undefined);
     setEditing(false);
     setSelectionLoading(false);
     setSelectionError('');
@@ -446,7 +450,7 @@ export default function App() {
     setEditing(true);
   }
 
-  async function openClient(id: string) {
+  async function openClient(id: string, followUpId?:string) {
     if (!canLeave()) return;
     clearSelection();
     const request = selectionRequest.current;
@@ -456,6 +460,8 @@ export default function App() {
     try {
       const result = await api.getClient(id);
       if (request === selectionRequest.current && currentSession === session.current) {
+        if(result.id!==id)throw new Error('The client response did not match the selected record.');
+        setTargetFollowUp(followUpId);
         setSelected(result);
         setEditing(true);
       }
@@ -507,6 +513,7 @@ export default function App() {
         {clientsError && <div className="load-error"><ErrorMessage>{clientsError}</ErrorMessage><button className="button secondary" onClick={loadClients} disabled={clientsLoading}>{clientsLoading ? 'Loading…' : 'Retry loading clients'}</button></div>}
         {view === 'Dashboard' && <>
           <div className="stats-grid">{[{ label: 'Active clients', value: activeClients.length, caption: 'Clients currently in your care', icon: 'clients' }, { label: 'New intakes', value: newIntakes.length, caption: 'At the start of their journey', icon: 'file' }, { label: 'Follow-up stage', value: followUps.length, caption: 'Clients marked for follow-up', icon: 'check' }].map(stat => <div className="stat-card" key={stat.label}><div className="stat-header"><span>{stat.label}</span><div className="stat-icon"><Icon name={stat.icon} size={18} /></div></div><strong className="stat-value">{clientsLoading || clientsError ? '—' : stat.value}</strong><p>{stat.caption}</p></div>)}</div>
+          <FollowUpOverview organizationId={workspace.organizationId} counselorId={workspace.counselorId} onOpen={(id,follow)=>void openClient(id,follow)}/>
           <div className="dashboard-grid"><section className="panel recent-panel"><div className="panel-heading"><div><h2>Recent client activity</h2><p className="muted small">The most recently updated client records.</p></div><button className="text-button" onClick={() => navigate('Clients')}>View all<Icon name="arrow" size={15} /></button></div>{clientsLoading ? <div className="empty-state" role="status">Loading client records…</div> : clientsError ? <div className="empty-state">Client records could not be loaded.</div> : recentClients.length ? <div className="recent-list">{recentClients.map(client => <button className="recent-row" key={client.id} onClick={() => openClient(client.id)}><Initials client={client} /><div className="recent-name"><strong>{client.firstName} {client.lastName}</strong><span>Updated {dateLabel(client.updatedAt)}</span></div><Status status={client.status} /><Icon name="arrow" size={16} /></button>)}</div> : <div className="empty-state"><div className="empty-icon"><Icon name="clients" size={30} /></div><h3>Every journey starts with a conversation.</h3><p>Add your first fictional client to begin organizing intake and counseling notes.</p><button className="button secondary" onClick={createClient}><Icon name="plus" size={16} />Add your first client</button></div>}</section>
           <aside className="practice-card"><div className="practice-icon"><Icon name="shield" size={24} /></div><p className="eyebrow">BUILT FOR FOCUSED WORK</p><h2>Your workspace.<br />On your computer.</h2><p>Client records and notes are saved locally, so you can continue your work without an internet connection.</p><div className="practice-divider" /><h3>A working foundation</h3><p>Client intake, counseling status, notes, monthly budgets, debt payoff comparisons, savings goals, cash-flow calendars, CSV and selectable-text PDF transaction review, merchant/recurring-payment review, and statement running-balance checks are available.</p><button className="text-button" onClick={() => navigate('Settings')}>View workspace details<Icon name="arrow" size={15} /></button></aside></div>
           <section className="panel progress-panel"><div><h2>Counseling progress</h2><p className="muted small">Client counts by their current counseling stage.</p></div><div className="stage-grid">{CLIENT_STATUSES.filter(status => status !== 'Archived').map(status => <div className="stage-item" key={status}><span>{status}</span><strong>{clientsLoading || clientsError ? '—' : clients.filter(client => client.status === status).length}</strong></div>)}</div></section>
@@ -516,7 +523,7 @@ export default function App() {
             {clientsLoading ? <div className="empty-state" role="status">Loading clients…</div> : clientsError ? <div className="empty-state">Use Retry loading clients to recover the directory.</div> : visibleClients.length ? <div className="client-list">{visibleClients.map(client => <button className={`client-row ${selected?.id === client.id ? 'selected' : ''}`} key={client.id} onClick={() => openClient(client.id)} aria-pressed={selected?.id === client.id}><Initials client={client} /><div className="client-row-text"><strong>{client.firstName} {client.lastName}</strong><span>{client.email || client.phone || 'No contact details added'}</span><Status status={client.status} /></div><Icon name="arrow" size={15} /></button>)}</div> : <div className="empty-state"><Icon name={clients.length ? 'search' : 'clients'} size={28} /><h3>{clients.length ? 'No matching clients' : 'Your client directory starts here.'}</h3><p>{clients.length ? 'Try a different search or status filter.' : 'Add a fictional client to create your first record.'}</p>{!clients.length && <button className="button secondary" onClick={createClient}>Add client</button>}</div>}
             <div className="directory-footer">{visibleClients.length} {visibleClients.length === 1 ? 'client' : 'clients'}{query || statusFilter !== 'All statuses' ? ` of ${clients.length}` : ''}</div>
           </section>
-          {selectionLoading ? <div className="panel selection-loading" role="status">Opening client record…</div> : editing ? <ClientEditor key={selected?.id ?? 'new'} client={selected} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onCancel={() => { if (canLeave()) clearSelection(); }} /> : clients.length > 0 && <div className="panel client-selection-hint"><Icon name="file" size={34} /><h2>A complete client picture</h2><p className="muted">Select a client to review intake details, update their counseling stage, and add a session note.</p></div>}
+          {selectionLoading ? <div className="panel selection-loading" role="status">Opening client record…</div> : editing ? <ClientEditor key={selected?.id ?? 'new'} client={selected} workspace={workspace} followUpId={targetFollowUp} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onCancel={() => { if (canLeave()) clearSelection(); }} /> : clients.length > 0 && <div className="panel client-selection-hint"><Icon name="file" size={34} /><h2>A complete client picture</h2><p className="muted">Select a client to review intake details, update their counseling stage, and add a session note.</p></div>}
           {selectionError && <ErrorMessage>{selectionError}</ErrorMessage>}
         </div>}
         {view === 'Settings' && <div className="settings-grid"><BackupPanel/><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">WORKSPACE IDENTITY</p><h2>Organization & counselor</h2></div><Icon name="settings" size={22} /></div><dl className="details-list"><div><dt>Organization</dt><dd>{workspace.organizationName}</dd></div><div><dt>Counselor</dt><dd>{workspace.counselorName}</dd></div><div><dt>Workspace type</dt><dd>Single counselor · Local desktop</dd></div></dl><p className="field-help">These names were set when the workspace was created. Identity editing and additional counselor accounts are planned for a later milestone.</p></section><section className="panel settings-panel"><div className="panel-heading"><div><p className="eyebrow">LOCAL DATA & ACCESS</p><h2>Storage & security</h2></div><Icon name="shield" size={22} /></div><dl className="details-list"><div><dt>Storage</dt><dd>Persistent local SQLite database</dd></div><div><dt>Internet connection</dt><dd>Not required for this milestone</dd></div><div><dt>Workspace access</dt><dd>Password protected</dd></div></dl><p className="field-help">Lock the workspace when stepping away. Password protection controls application access; confidential production use requires further security review and safeguards.</p><button className="button secondary" onClick={lock}><Icon name="lock" size={16} />Lock workspace</button></section><section className="panel settings-development"><Icon name="file" size={24} /><div><h2>A working counseling workspace</h2><p className="muted">Workspace setup, password access, persistent client records, counseling stages, session notes, monthly budgets, debt comparisons, savings goals, cash-flow calendars, CSV and selectable-text PDF transaction review, merchant/recurring-payment review, and statement running-balance checks are available. Encrypted backup and verified recovery are available. Scanned-document OCR, reports, and production security remain development priorities.</p></div></section></div>}
