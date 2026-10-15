@@ -2051,7 +2051,7 @@ def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:
             raise SmokeFailure(f"Document import controls leaked into {page}")
     driver.click(".imports-sources > summary")
     driver.wait_text(".imports-sources", "checking.csv", "saved source inventory in Documents")
-    driver.click("nav[aria-label='Documents sections'] button:nth-child(2)")
+    driver.click("//nav[@aria-label='Documents sections']//button[starts-with(normalize-space(.), 'Scanned documents / OCR')]", "xpath")
     driver.wait_text(".planned-module-page", "mandatory verification", "future OCR area is explicitly planned")
     driver.click("nav[aria-label='Documents sections'] button:first-child")
     driver.wait_text("#imports-title", "Documents and statement accounts", "return from planned area")

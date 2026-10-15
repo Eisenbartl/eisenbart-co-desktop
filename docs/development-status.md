@@ -14,13 +14,33 @@ This is a diagnostic stage: finalization remains blocked until expected inventor
 applicable periods, exceptions and professional review can be recorded. It does
 not assert that every real-world account or obligation is present.
 
-Validation in progress 2026-10-15 (America/Chicago): locked setup, production
-frontend, all 164 UI tests, focused Rust coverage/report/recovery tests, formatting
-and warnings-denied Clippy passed. Full backend, final native build, desktop
-workflows and Windows source checks are pending. Existing UI tests now await
-post-save dirty callbacks and enabled settings controls before checking them;
-assertions remain intact. No installer requested or created. Final results will
-replace this paragraph after validation.
+Validated 2026-10-15 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 164 tests |
+| Complete Linux backend | Passed 188 library + 2 PDF process tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles |
+| Full native workflows / new review pages | Passed, exit 0: financial workflows, restart, both encrypted recovery paths, branding, live coverage, captured report checklist and historical PDF disclosures |
+| Windows source checks | Passed: 164 UI + 189 library + 2 PDF process tests; installer steps skipped |
+| Installer | Not created, per user instruction |
+
+Feature commit: `411fa22a32b4a8599117212eff08fa6ce65abc1a`.
+Windows source validation passed in
+[run 38748867369](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38748867369).
+Existing UI tests now await post-save dirty callbacks and enabled settings
+controls before checking them; all assertions remain. The initial native run
+selected the OCR tab by its old position after working subpages moved earlier.
+The harness now selects that tab by name and retains the original planned-OCR
+assertion. Application code is unchanged by this harness correction. The full
+rerun passed with exit 0; both new pages were also visually inspected.
+Native artifacts use `/workspace/shared/desktop-smoke-completeness-final`; logs
+use `/workspace/shared/completeness-`. The prior failed run is preserved under
+`desktop-smoke-completeness`. The downloadable preview remains 0.23.0; source
+0.31.0 remains a development build. Installed Windows/offline and commercial
+acceptance require separate release work.
 
 Next priority: versioned completeness review, as detailed in the development map.
 
