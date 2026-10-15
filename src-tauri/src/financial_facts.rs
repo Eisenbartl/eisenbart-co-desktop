@@ -57,7 +57,7 @@ pub struct Input {
     pub reason: String,
     pub acknowledge: bool,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Review {
     pub id: String,

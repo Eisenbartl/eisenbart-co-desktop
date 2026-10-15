@@ -363,3 +363,12 @@ Choose calendar months to see cash movement separately from spending. Reports ca
 retain a reviewed bank/card supplement in a saved internal assessment. Payments do
 not become another expense. Incomplete or stale links remain visible and final
 card-inclusive approval is still unavailable. See [bank-card-review.md](bank-card-review.md).
+
+## Card completeness and balances
+
+Use Financial Review → Card completeness to review expected cards and dates,
+classify approved spending by necessity, and compare card closing balances to
+existing verified household debt. Unknowns and differences remain visible; debt
+is not added twice. Save reviewed versions and optionally include them with the
+bank/card supplement in internal reports. Final card-inclusive approval remains
+unavailable. See [card-completeness-evidence.md](card-completeness-evidence.md).

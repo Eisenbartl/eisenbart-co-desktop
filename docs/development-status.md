@@ -1,6 +1,26 @@
 # Development status
 
-## Current stage — provisional bank/card review (0.35.0, schema 24)
+## Current stage — reviewed card completeness evidence (0.36.0, schema 25)
+
+Financial Review → Card completeness records known/unprovided cards, dated
+applicability, selected source coverage, spending roles bound to exact approvals
+and comparisons to distinct existing verified debts. Immutable format-9 internal
+report/PDF captures preserve those choices and findings. Old formats 1–8 retain
+their original bytes. Mappings never add debt or change planning/bank figures.
+See [card-completeness-evidence.md](card-completeness-evidence.md).
+
+Validation is in progress. The focused backend checks, production frontend and
+201 UI tests have passed, as have 209 library and 2 PDF-worker tests. Focused
+checks also passed after a known-versus-unknown comparison refinement and the
+distinct-debt mapping assertion. The final full backend run, native and Windows
+results will be recorded before completion. No installer is being created.
+
+Next priority: a separately versioned card-inclusive final approval policy,
+combining current bank completeness, this evidence and reviewed repayment
+semantics without changing existing historical calculators or approval receipts.
+
+
+## Provisional bank/card review (0.35.0, schema 24)
 
 Financial Review → Bank & card activity adds durable card account CRUD/archive,
 explicit statement assignments, one-to-one evidence-bound repayment matching,

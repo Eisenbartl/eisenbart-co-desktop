@@ -140,3 +140,25 @@ and discrepancy gates, and fresh professional review. Categories alone cannot
 supply verified spending roles. New fields/calculators/policies require versioned
 capture and unchanged historical report bytes. Unsupported repayment timing and
 split cases remain blocked until separately defined and tested.
+
+### 0.36.0 — reviewed card completeness, spending roles and debt mappings
+
+Financial Review → Card completeness now records known/unprovided cards,
+applicability/dates, explicitly selected sources, role classifications tied to
+approvals, distinct existing-debt mappings and preserved read-only history.
+`card_facts.rs`/`card_facts_store.rs` own validation, exact calculations, scope,
+immutable source reconstruction, audit and recovery. `CardCompleteness` owns
+private draft/busy guards. Format-9 `AssessmentRecords` and internal PDFs capture
+the exact reviewed evidence with the original bank/card supplement. Zero net
+unclassified spending still has an unresolved-row gate. Mappings compare debt;
+they never add household debt a second time. See
+[card-completeness-evidence.md](card-completeness-evidence.md).
+
+Next priority: a separately versioned card-inclusive final policy using existing
+bank completeness, recorded card evidence and current repayment approvals. Add
+fresh professional confirmation and parent/digest-bound approval/export without
+changing old policy receipts. Keep unsupported credits, early closure balance
+semantics, split/cross-period repayments and unprovided obligations blocked.
+Preserve format-9 evidence/calculator behavior and legacy report bytes. Existing
+card identity/assignment/role/debt-mapping CRUD now works; build on it. Other
+original document/OCR/printing/commercial and installed Windows work remains open.

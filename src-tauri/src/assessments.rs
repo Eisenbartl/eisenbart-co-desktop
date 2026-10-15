@@ -13,6 +13,8 @@ pub const CALCULATOR: &str = "approved-assessment-v1";
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Input {
     #[serde(default)]
+    pub card_facts: Option<crate::card_facts::Selection>,
+    #[serde(default)]
     pub cards: Option<crate::card_review::Selection>,
     #[serde(default)]
     pub completeness: Option<crate::coverage_review::Selection>,
@@ -39,6 +41,8 @@ pub struct Input {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Payload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card_facts: Option<crate::card_facts::Snapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cards: Option<crate::card_review::Capture>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -144,15 +148,15 @@ pub fn validate(payload: &Payload) -> Result<(), String> {
     let bad = || "The saved assessment evidence is invalid or unsupported.".to_owned();
     if !matches!(
         payload.format,
-        1 | 2 | FORMAT | 4 | INTAKE_FORMAT | 6 | 7 | 8
+        1 | 2 | FORMAT | 4 | INTAKE_FORMAT | 6 | 7 | 8 | 9
     ) || (payload.format == 1 && payload.planning.is_some())
         || (payload.supporting.is_some() && payload.format < FORMAT)
         || (payload.format == FORMAT && payload.supporting.is_none())
-        || ((payload.intake.is_some() && !matches!(payload.format, INTAKE_FORMAT | 6 | 7 | 8))
+        || ((payload.intake.is_some() && !matches!(payload.format, INTAKE_FORMAT | 6 | 7 | 8 | 9))
             || (payload.format == INTAKE_FORMAT && payload.intake.is_none()))
         || (payload.format == 4 && payload.selected_scenario.is_none())
         || (payload.selected_scenario.is_some()
-            && !matches!(payload.format, 4 | INTAKE_FORMAT | 6 | 7 | 8))
+            && !matches!(payload.format, 4 | INTAKE_FORMAT | 6 | 7 | 8 | 9))
         || (payload.selected_scenario.is_some() && payload.planning.is_none())
         || payload.calculator != CALCULATOR
         || payload.app_version.is_empty()
@@ -164,13 +168,32 @@ pub fn validate(payload: &Payload) -> Result<(), String> {
     {
         return Err(bad());
     }
-    if (payload.branding.is_some() && !matches!(payload.format, 6..=8))
+    if (payload.branding.is_some() && !matches!(payload.format, 6..=9))
         || (payload.format == 6 && payload.branding.is_none())
-        || (payload.completeness.is_some() && !matches!(payload.format, 7 | 8))
+        || (payload.completeness.is_some() && !matches!(payload.format, 7..=9))
         || (payload.format == 7 && payload.completeness.is_none())
-        || (payload.cards.is_some() != (payload.format == 8))
+        || (payload.cards.is_some() != matches!(payload.format, 8 | 9))
+        || (payload.card_facts.is_some() != (payload.format == 9))
     {
         return Err(bad());
+    }
+    if let Some(s) = &payload.card_facts {
+        crate::card_facts::validate(s)?;
+        let cards = payload.cards.as_ref().ok_or_else(bad)?;
+        let choices = crate::card_facts::choices(
+            Some(&cards.links),
+            &cards.ledger,
+            payload.basis.financial_facts.history.last().cloned(),
+        );
+        if s.client_id != payload.client.id
+            || s.source_revision != payload.basis.revision
+            || s.profile_updated_at != payload.client.updated_at
+            || s.choices != choices
+            || s.data.from_month != payload.assessment.period_start.get(..7).ok_or_else(bad)?
+            || s.data.through_month != payload.assessment.period_end.get(..7).ok_or_else(bad)?
+        {
+            return Err(bad());
+        }
     }
     if let Some(c) = &payload.cards {
         let expected = crate::card_review::calculate(

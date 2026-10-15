@@ -1024,6 +1024,74 @@ fn render_report(
             l.text(reason, 10.0)?;
         }
     }
+    if let Some(s) = &p.card_facts {
+        l.section("Captured card completeness evidence / internal review")?;
+        l.value("Review version", &s.revision.to_string())?;
+        l.value("Reviewed by", &s.counselor_name)?;
+        l.value("Inventory review", &s.data.inventory_notes)?;
+        l.value("Missing card information", &s.data.missing_information)?;
+        l.value("Conclusion", &s.data.conclusion)?;
+        l.value(
+            "Necessary card spending",
+            &format!("USD {}", s.evaluation.necessary_spending),
+        )?;
+        l.value(
+            "Discretionary card spending",
+            &format!("USD {}", s.evaluation.discretionary_spending),
+        )?;
+        l.value(
+            "Unclassified card spending",
+            &format!(
+                "USD {} / {} unresolved rows",
+                s.evaluation.unclassified_spending, s.evaluation.stale_classifications
+            ),
+        )?;
+        for a in &s.data.accounts {
+            l.value(
+                "Expected card",
+                &format!(
+                    "{} / {:?} / {} through {} / {}",
+                    a.label,
+                    a.applicability,
+                    a.start.as_deref().unwrap_or("Unknown"),
+                    a.end.as_deref().unwrap_or("Unknown"),
+                    a.notes
+                ),
+            )?;
+        }
+        for f in &s.evaluation.findings {
+            l.value(
+                "Card debt comparison / not added",
+                &format!(
+                    "{} / closing {} / existing verified debt {} / difference {}",
+                    f.label,
+                    f.closing_owed.as_deref().unwrap_or("Unknown"),
+                    f.mapped_balance.as_deref().unwrap_or("Unknown"),
+                    f.difference.as_deref().unwrap_or("Unknown")
+                ),
+            )?;
+        }
+        for i in s
+            .evaluation
+            .issues
+            .iter()
+            .chain(s.evaluation.disclosures.iter())
+        {
+            l.text(i, 10.0)?;
+        }
+        for c in &s.data.classifications {
+            l.value(
+                "Card spending role evidence",
+                &format!(
+                    "{} row {} / approval {} / {:?}",
+                    c.statement_id,
+                    c.row + 2,
+                    c.approval_id,
+                    c.role
+                ),
+            )?;
+        }
+    }
     if let Some(c) = &p.cards {
         l.section("Captured bank/card review supplement / provisional")?;
         let v = &c.review;

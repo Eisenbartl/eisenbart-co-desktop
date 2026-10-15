@@ -186,3 +186,17 @@ review. `AssessmentRecords` requires explicit review before capturing the new
 supplement; only internal PDFs render it. Final policy v1 rejects the new format's
 card supplement without changing old-format readiness receipts. See
 [bank-card-review.md](bank-card-review.md).
+
+`card_facts.rs` adds `card-completeness-evidence-v1`: explicit expected card
+applicability/coverage, approval-bound spending roles and comparisons to distinct
+existing verified debt entries. `card_facts_store` stores schema-25 immutable
+scoped snapshots with source/profile/review version checks and atomic audit.
+Reads/recovery reconstruct original compact choices from card history at the
+captured source revision, original assignments and exact verified-facts history.
+No financial-source revision or household balance is changed by context saves.
+`CardCompleteness` provides guarded editing, explicit stale-binding removal and
+read-only versions. Format-9 assessments require matching reviewed bank/card and
+card-completeness captures; original formats 1–8 remain byte-compatible. Internal
+PDFs render roles and debt comparisons; client plans omit the new context.
+Final policy v1 remains blocked for card evidence. See
+[card-completeness-evidence.md](card-completeness-evidence.md).

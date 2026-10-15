@@ -81,6 +81,9 @@ fn decode(
     if let Some(cards) = &p.cards {
         card_review_store::validate_capture(c, w, client, cards)?;
     }
+    if let Some(s) = &p.card_facts {
+        card_facts_store::validate_capture(c, w, client, s)?;
+    }
     texts(&p)?;
     assessments::validate(&p).map_err(|_| STORAGE_ERROR.to_owned())?;
     if let Some(e) = &p.supporting {
@@ -183,6 +186,11 @@ pub(super) fn record(
             review_reasons.push("A bank/card review supplement is captured below. It remains provisional; card-inclusive completeness and final approval are not implemented. Bank dashboard and planning figures retain their original basis.".into());
         } else {
             review_reasons.push("Credit-card evidence is stored separately and is not included in this bank-based assessment. Review the card statements; final bank-report approval is blocked until integrated liability reporting is implemented.".into());
+        }
+    }
+    if let Some(s) = &payload.card_facts {
+        if card_facts_store::revision(c, w, client)? != s.revision {
+            review_reasons.push("A later card completeness review exists. The captured inventory, spending roles and balance comparisons remain historical.".into());
         }
     }
     let scenario = scenarios_store::validate_link(c, w, client, &payload)?;
@@ -406,6 +414,26 @@ impl Workspace {
                 )
             })
             .transpose()?;
+        if input.card_facts.is_some() && input.cards.is_none() {
+            return Err(
+                "Include the reviewed bank/card supplement when capturing card completeness."
+                    .into(),
+            );
+        }
+        let card_facts = input
+            .card_facts
+            .map(|selection| {
+                card_facts_store::capture(
+                    &tx,
+                    &s.info,
+                    client,
+                    selection,
+                    &source,
+                    &profile,
+                    (&input.from_month, &input.through_month),
+                )
+            })
+            .transpose()?;
         let cards = input
             .cards
             .map(|selection| {
@@ -459,13 +487,17 @@ impl Workspace {
             )
             .map_err(storage_error)?;
         let has_card_capture = cards.is_some();
+        let has_card_facts = card_facts.is_some();
         let payload = Payload {
+            card_facts,
             cards,
             completeness: completeness.clone(),
             branding: branding.clone(),
             selected_scenario,
             planning,
-            format: if has_card_capture {
+            format: if has_card_facts {
+                9
+            } else if has_card_capture {
                 8
             } else if completeness.is_some() {
                 7

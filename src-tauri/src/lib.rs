@@ -4,6 +4,7 @@ mod assessments;
 mod branding;
 mod budget;
 mod budget_methods;
+mod card_facts;
 mod card_review;
 mod cards;
 mod cashflow;
@@ -272,6 +273,29 @@ async fn list_assessment_records(
     })
     .await
     .map_err(|_| "Assessment records could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn get_card_facts(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<card_facts::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || access(&state, |w| w.get_card_facts(&client_id)))
+        .await
+        .map_err(|_| "Card completeness could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn save_card_facts(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: card_facts::Input,
+) -> Result<card_facts::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_card_facts(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Card completeness could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn get_card_review(
@@ -1091,6 +1115,8 @@ pub fn run() {
             export_client_action_plan,
             choose_action_plan_pdf,
             get_assessment_record,
+            get_card_facts,
+            save_card_facts,
             get_card_review,
             save_card_review,
             preview_card_review,

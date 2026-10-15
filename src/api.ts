@@ -22,6 +22,8 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getCardFacts:(clientId:string)=>command<import('./types').CardCompletenessRecord>('get_card_facts',{clientId}),
+  saveCardFacts:(clientId:string,input:{expectedRevision:number;expectedSourceRevision:number;expectedProfileUpdatedAt:string;data:import('./types').CardCompletenessData;acknowledge:boolean})=>command<import('./types').CardCompletenessRecord>('save_card_facts',{clientId,input}),
   getCardReview:(clientId:string)=>command<import('./types').CardReviewDirectory>('get_card_review',{clientId}),
   saveCardReview:(clientId:string,input:{expectedRevision:number;expectedSourceRevision:number;reason:string;acknowledge:boolean;action:import('./types').CardReviewAction})=>command<import('./types').CardReviewDirectory>('save_card_review',{clientId,input}),
   previewCardReview:(clientId:string,input:{fromMonth:string;throughMonth:string})=>command<import('./types').BankCardReview>('preview_card_review',{clientId,input}),

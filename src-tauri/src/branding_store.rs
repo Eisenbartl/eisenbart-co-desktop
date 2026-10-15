@@ -240,7 +240,7 @@ mod tests {
     fn branding_migration_and_corrupt_history_fail_before_recovery_activation() {
         let (_dir, mut w, _) = configured();
         let s = w.session().unwrap();
-        s.connection.execute_batch("DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE firm_branding_history; PRAGMA user_version=19; CREATE TABLE audit_events_v20(collision TEXT);").unwrap();
+        s.connection.execute_batch("DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE firm_branding_history; PRAGMA user_version=19; CREATE TABLE audit_events_v20(collision TEXT);").unwrap();
         assert!(migrate(&mut s.connection, false).is_err());
         assert_eq!(
             s.connection

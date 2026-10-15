@@ -326,3 +326,9 @@ statement and repayment links, independently checked cash/spending/payment total
 format-8 assessment/PDF capture, newer-approval invalidation, rename/archive,
 process restart, full encrypted recovery and historical report/client isolation.
 No direct IPC mutations are used. Earlier native workflows still run in full.
+
+The 0.36.0 native extension adds recorded card inventory/applicability, exact role
+classification, an existing-debt comparison without doubling household debt,
+a one-cent verified balance discrepancy, read-only history, format-9 report/PDF,
+blocked final approval, restart, encrypted recovery and client isolation. All
+mutations use visible native controls; no direct IPC shortcuts are used.

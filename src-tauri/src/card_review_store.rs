@@ -840,7 +840,7 @@ mod tests {
         let s = card::stage(&mut w, &c.id, root.path());
         let original = json(&s).unwrap();
         let conn = &mut w.session().unwrap().connection;
-        conn.execute_batch("DROP TABLE card_review_history; PRAGMA user_version=23; CREATE TABLE audit_events_v24(collision TEXT);").unwrap();
+        conn.execute_batch("DROP TABLE IF EXISTS card_facts_history; DROP TABLE card_review_history; PRAGMA user_version=23; CREATE TABLE audit_events_v24(collision TEXT);").unwrap();
         assert!(migrate(conn, false).is_err());
         assert_eq!(
             conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
