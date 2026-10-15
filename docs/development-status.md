@@ -29,8 +29,8 @@ schedules remain explicit. Annual expenses are budget-only.
 | Production frontend / complete interface suite | Passed build and 113 tests |
 | Complete Linux backend / PDF workers | Passed: 157 library + 2 PDF-process tests (159 total) |
 | Formatting / Clippy, warnings denied | Passed |
-| Standalone native build / complete workflow | Standalone debug build passed; complete workflow running |
-| Windows source CI | Validation in progress; installer not requested |
+| Standalone native build / complete workflow | Passed build and complete direct native run, exit 0: four expense comparisons and integrated report PDFs, restart and both recovery paths; earlier workflows retained |
+| Windows source CI | [Run 38666523905](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38666523905) passed: production frontend build, 113 interface tests, 158 library + 2 PDF-process tests (160 total); installer/package/upload steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
 
 The existing integrated native proposal/report workflow is extended rather than
@@ -39,10 +39,31 @@ the expense is added; older proposals and client reports remain separate. Full
 regression checks still follow repository requirements. Feature details are
 consolidated in the existing combined-scenario document.
 
-Validation logs use `/workspace/shared/recurring-expense-*.log`; native artifacts
-will be in `desktop-smoke-recurring-expenses`. The original extra/goal warning
+Validation logs use `/workspace/shared/recurring-expense-*.log`; native completion
+is recorded in `recurring-expense-native.log`/`.exit` and artifacts in
+`desktop-smoke-recurring-expenses`. The original extra/goal warning
 was separately checked byte for byte against the prior source for proposals
-without new dated expenses. Final results and checkpoint details follow validation.
+without new dated expenses. Four integrated `recurring-expense-*.pdf` exports
+preserve 758.34/3,225.00, explicit bill bindings, earlier extra/goal assumptions and
+separate approved totals. The rendered initial PDF and native screenshot were
+visually checked for readable payment assumptions, comparison figures and target
+milestones. No test failure or test deadline/assertion relaxation was required.
+
+Application source checkpoint: `c2afa2cb06e0c216e19e62a8dfbbc6d73aff382a`.
+All application checks use this unchanged source. Windows source validation
+completed successfully on this exact commit in
+[run 38666523905](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38666523905),
+including its Windows-specific library check. Evidence includes
+`recurring-expense-windows-validation.log`, `recurring-expense-windows-job.log`
+and `recurring-expense-windows-result.json` under `/workspace/shared`.
+No installer was built or uploaded.
+Internal source/full-history checkpoints are
+`checkpoints/eisenbart-recurring-expense-source.tar.gz` and
+`checkpoints/eisenbart-recurring-expense.bundle` under `/workspace/shared`.
+Final verification documentation does not change application code. The source
+archive is verified against all 157 tracked files byte for byte; the bundle
+retains complete history. Clean Windows installation/offline release acceptance
+remains a separate pending requirement.
 
 Next priority: **temporary income-reduction scenarios** with explicit period scope,
 then remaining financial-model/report requirements. Seven major roadmap areas
