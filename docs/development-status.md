@@ -9,11 +9,52 @@ report/PDF captures preserve those choices and findings. Old formats 1–8 retai
 their original bytes. Mappings never add debt or change planning/bank figures.
 See [card-completeness-evidence.md](card-completeness-evidence.md).
 
-Validation is in progress. The focused backend checks, production frontend and
-201 UI tests have passed, as have 209 library and 2 PDF-worker tests. Focused
-checks also passed after a known-versus-unknown comparison refinement and the
-distinct-debt mapping assertion. The final full backend run, native and Windows
-results will be recorded before completion. No installer is being created.
+Validation on 2026-10-15 (UTC):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 201 tests |
+| Complete Linux backend | Passed 209 library + 2 PDF-worker tests on final feature source |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles |
+| Complete native workflow | Passed, exit 0: all earlier workflows plus card inventory/applicability, approval-bound roles, no duplicate debt, one-cent discrepancy, read-only history, format-9 report/PDF, blocked final approval, restart, encrypted recovery and isolation |
+| Windows source validation | Passed: 201 UI + 210 library + 2 PDF-worker tests; all five installer/checksum/upload steps skipped |
+| Installer | Not created, per user instruction |
+
+Feature commit: `a425c9e92f722c7b7954a7d34f72a9de4e8ad473`.
+Windows source validation passed for that exact source in
+[run 38797595959](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38797595959).
+The complete backend suite was repeated after the final comparison display and
+distinct-debt mapping checks. The first native run passed the earlier workflows
+and saved an incomplete card review, then exposed WebKit rejecting the smoke
+driver's empty send-keys parameter. Test-only commit `3b34efe` uses a normal
+select-all/delete keyboard gesture and verifies the empty value. No assertion or
+application behavior was changed. A second run exposed an older final-approval
+fixture reading the report selector before its refreshed directory contained the
+saved record. Test-only commit `a9d3e56` waits for the real selected title/ID,
+preventing the empty placeholder from being treated as the report. The complete
+native rerun passed with both fixes and all earlier assertions retained.
+No dependency was added. Native artifacts are under
+`/workspace/shared/desktop-smoke-card-completeness`; validation logs use the
+`/workspace/shared/card-completeness-` prefix.
+
+The native review and restored historical-report screens were visually inspected.
+The exported PDF was checked through real text extraction for the independently
+known role totals and original debt comparison. The explicit native exit file
+records `0`. Failed-attempt diagnostics are retained separately.
+
+Clean source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-card-completeness-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-card-completeness-source.bundle`, verified
+against the final clean commit and remote main. Follow-up commits change only
+native test fixtures and these validation records; application source remains
+the exact feature commit validated on Windows.
+
+This remains a development build. Recorded card evidence does not authorize final
+approval; bank completeness, repayments and other household obligations retain
+their separate requirements. Installed Windows and commercial acceptance remain
+open. The last downloadable preview is still 0.23.0.
 
 Next priority: a separately versioned card-inclusive final approval policy,
 combining current bank completeness, this evidence and reviewed repayment
