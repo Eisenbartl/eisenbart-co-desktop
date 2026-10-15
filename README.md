@@ -1,6 +1,6 @@
 # Eisenbart & Co. Financial Counseling Suite
 
-Version **0.36.0 source** adds [card completeness evidence](docs/card-completeness-evidence.md): reviewed inventory/applicability, approval-bound spending roles, comparisons to existing debt and immutable report/PDF capture. Debt is not added twice; final card-inclusive approval remains a separate policy step. No installer was created.
+Version **0.37.0 source** adds [card-inclusive final approval](docs/card-inclusive-final-approval.md): complete supported bank/card evidence, explicit counselor review, exact combined spending versus bank cash movement, and immutable approvals/PDFs. Existing debt is counted once and older approvals retain their original policy. No installer was created.
 
 Version **0.33.0 source** adds [final counselor report approval](docs/final-report-approval.md): required evidence gates, explicit professional decisions, immutable audited approvals and offline final PDFs. Later context changes preserve the original approval and flag it for review. No installer was created.
 

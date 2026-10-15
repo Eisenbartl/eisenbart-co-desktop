@@ -935,6 +935,31 @@ fn render_report(
         for d in &approval.readiness.disclosures {
             l.text(d, 10.0)?;
         }
+        if let Some(s) = &approval.readiness.card_summary {
+            l.section("Card-inclusive approved figures")?;
+            for (label, value) in [
+                ("Bank cash movement", &s.bank_cash_movement),
+                ("Bank net spending", &s.bank_net_spending),
+                ("Card net spending", &s.card_net_spending),
+                ("Combined necessary spending", &s.necessary_spending),
+                ("Combined discretionary spending", &s.discretionary_spending),
+                ("Combined recorded spending", &s.combined_spending),
+                ("Income less combined spending", &s.income_less_spending),
+                (
+                    "Matched repayments / excluded from spending",
+                    &s.matched_repayments,
+                ),
+                (
+                    "Existing household debt / counted once",
+                    &s.existing_household_debt,
+                ),
+            ] {
+                l.value(label, &format!("USD {value}"))?;
+            }
+        }
+        if let Some(d) = &approval.decision.card_review {
+            l.value("Card evidence and repayment review", &d.notes)?;
+        }
         l.value(
             "Professional approval notes",
             &approval.decision.professional_notes,
@@ -1255,7 +1280,16 @@ fn render_report(
             }
         }
     }
-    l.section("Approved income, spending and cash flow")?;
+    let card_approved =
+        approved.is_some_and(|r| r.payload.policy == crate::card_final_policy::POLICY);
+    l.section(if card_approved {
+        "Original bank-only income, spending and cash flow"
+    } else {
+        "Approved income, spending and cash flow"
+    })?;
+    if card_approved {
+        l.text("The original bank-only figures, categories and spending-based estimates below exclude card spending. They are preserved supporting evidence, not combined household spending or updated emergency-savings coverage. Use the separate card-inclusive approved summary above for combined spending; recorded balance facts remain the existing household inventory.",10.0)?;
+    }
     for (label, v) in [
         ("Income receipts", &a.totals.income),
         ("Gross spending", &a.totals.spending),
@@ -1304,6 +1338,9 @@ fn render_report(
     }
     let f = &a.facts_metrics;
     l.section("Verified classifications and dated balance facts")?;
+    if card_approved {
+        l.text("Spending roles and spending-derived ratios in this original section use bank activity only. Dated balance facts already include mapped card debt once; no additional debt is added by the combined summary.",10.0)?;
+    }
     for (label, v) in [
         ("Necessary spending", &f.necessary_spending),
         ("Discretionary spending", &f.discretionary_spending),

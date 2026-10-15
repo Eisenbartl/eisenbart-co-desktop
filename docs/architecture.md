@@ -200,3 +200,13 @@ card-completeness captures; original formats 1–8 remain byte-compatible. Inter
 PDFs render roles and debt comparisons; client plans omit the new context.
 Final policy v1 remains blocked for card evidence. See
 [card-completeness-evidence.md](card-completeness-evidence.md).
+
+
+`card_final_policy.rs` adds frozen `counselor-final-report-v2` and its exact
+`card-inclusive-final-v1` summary over unchanged format-9 evidence. Existing
+schema-25 approval storage dispatches format-1/v1 and format-2/v2 validation;
+optional fields omit absent values to preserve old receipts. `CardFinalSummary`
+only displays Rust figures. Required separate card notes/confirmation use the
+existing private draft guards, atomic receipt/date/audit and PDF preflight.
+Recovery recomputes original policy figures against the scoped immutable parent.
+See [defined gates and scope](card-inclusive-final-approval.md).

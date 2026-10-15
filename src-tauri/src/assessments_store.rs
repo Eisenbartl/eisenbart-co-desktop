@@ -181,7 +181,16 @@ pub(super) fn record(
             review_reasons.push("Saved budget, debt, savings or dated cash-flow plans changed after this scenario was captured. Its original assumptions and projections remain historical.".into());
         }
     }
-    if payload.cards.is_some() || cards_store::has_cards(c, w, client)? {
+    if payload.format == 9 {
+        let current_links = card_review_store::history(c, w, client)?.pop();
+        if payload.cards.as_ref().is_none_or(|capture| {
+            current_links
+                .as_ref()
+                .is_none_or(|links| links.revision != capture.links.revision)
+        }) {
+            review_reasons.push("Card accounts, assignments or repayment links changed after this assessment. Its original evidence remains historical.".into());
+        }
+    } else if payload.cards.is_some() || cards_store::has_cards(c, w, client)? {
         if payload.cards.is_some() {
             review_reasons.push("A bank/card review supplement is captured below. It remains provisional; card-inclusive completeness and final approval are not implemented. Bank dashboard and planning figures retain their original basis.".into());
         } else {
@@ -305,6 +314,15 @@ impl Workspace {
             let branding_changed =
                 branding_store::revision(&s.connection, &s.info)? != brand_revision.unwrap_or(0);
             let card_capture:bool=s.connection.query_row("SELECT COALESCE(json_type(payload_json,'$.cards')='object',0) FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
+            let integrated:Option<(i64,i64)>=s.connection.query_row("SELECT json_extract(payload_json,'$.cards.links.revision'),json_extract(payload_json,'$.cardFacts.revision') FROM client_assessment_records WHERE id=?1 AND json_extract(payload_json,'$.format')=9",[&id],|r|Ok((r.get(0)?,r.get(1)?))).optional().map_err(storage_error)?;
+            let cards_changed = if let Some((links, facts)) = integrated {
+                card_review_store::history(&s.connection, &s.info, client)?
+                    .last()
+                    .is_none_or(|v| v.revision != links)
+                    || card_facts_store::revision(&s.connection, &s.info, client)? != facts
+            } else {
+                card_evidence || card_capture
+            };
             records.push(Summary {
                 id,
                 title,
@@ -312,8 +330,7 @@ impl Workspace {
                 period_start,
                 period_end,
                 source_revision,
-                needs_review: card_evidence
-                    || card_capture
+                needs_review: cards_changed
                     || coverage_changed
                     || branding_changed
                     || source_revision != source.revision

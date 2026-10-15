@@ -332,3 +332,14 @@ classification, an existing-debt comparison without doubling household debt,
 a one-cent verified balance discrepancy, read-only history, format-9 report/PDF,
 blocked final approval, restart, encrypted recovery and client isolation. All
 mutations use visible native controls; no direct IPC shortcuts are used.
+
+
+The 0.37.0 extension explicitly renews the stale repayment review, records a known
+required payment, updates both bank/card completeness versions and captures all
+three contexts in a format-9 parent. The synthetic repayment original is explicitly
+authorized for retention at import so the final source gate can pass. It checks
+independent USD 1287.10 spending, 712.91 income less spending, 749.96 bank cash and
+1037.05 existing debt; missing card confirmation cannot approve. It exports a v2
+final PDF, then verifies original figures/identity after a later review, restart,
+encrypted recovery and client changes. Earlier v1 approval and full workflows
+remain in the same run. No direct IPC mutations or installer are used.

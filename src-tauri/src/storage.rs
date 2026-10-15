@@ -3242,3 +3242,7 @@ mod tests {
 #[cfg(test)]
 #[path = "scenarios_tests.rs"]
 mod scenario_tests;
+
+#[cfg(test)]
+#[path = "card_final_policy_tests.rs"]
+mod card_final_policy_tests;

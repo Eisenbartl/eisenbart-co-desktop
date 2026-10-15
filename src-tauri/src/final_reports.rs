@@ -30,6 +30,8 @@ pub struct AccountScope {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Readiness {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card_summary: Option<crate::card_final_policy::Summary>,
     pub policy: String,
     pub client_id: String,
     pub assessment_id: String,
@@ -50,6 +52,8 @@ pub struct AccountDecision {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Decision {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card_review: Option<CardDecision>,
     pub accounts: Vec<AccountDecision>,
     pub planning: String,
     pub planning_notes: String,
@@ -58,6 +62,12 @@ pub struct Decision {
     pub confirm_sources: bool,
     pub confirm_inventory: bool,
     pub confirm_assumptions: bool,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CardDecision {
+    pub notes: String,
+    pub confirmed: bool,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -279,6 +289,7 @@ pub fn readiness(
         return Err("Invalid assessment period.".into());
     }
     Ok(Readiness {
+        card_summary: None,
         policy: POLICY.into(),
         client_id: p.client.id.clone(),
         assessment_id: p.id.clone(),
@@ -309,6 +320,23 @@ pub fn canonical(mut d: Decision, r: &Readiness) -> Result<Decision, String> {
     }
     if !(d.confirm_client && d.confirm_sources && d.confirm_inventory && d.confirm_assumptions) {
         return Err("Confirm the client, original sources, inventory/scope and assumptions explicitly before approval.".into());
+    }
+    if r.policy == crate::card_final_policy::POLICY {
+        let cards = d
+            .card_review
+            .as_mut()
+            .ok_or("Record the card and repayment review explicitly before approval.")?;
+        if !cards.confirmed || r.card_summary.is_none() {
+            return Err("Confirm the reviewed card sources, spending, repayments and existing debt mappings.".into());
+        }
+        cards.notes = text(
+            &cards.notes,
+            "Card evidence and repayment review",
+            2000,
+            true,
+        )?;
+    } else if d.card_review.is_some() {
+        return Err("Card review decisions require the card-inclusive approval policy.".into());
     }
     if d.planning != r.planning || d.accounts.len() != r.accounts.len() {
         return Err(
@@ -351,9 +379,14 @@ pub fn validate(p: &Payload, a: &assessments::Record) -> Result<(), String> {
     let at = chrono::DateTime::parse_from_rfc3339(&p.approved_at)
         .map_err(|_| "Invalid approval date.")?;
     let today = at.with_timezone(&chrono_tz::America::Chicago).date_naive();
-    let original = readiness(&a.payload, &a.digest, false, today)?;
-    if p.format != 1
-        || p.policy != POLICY
+    let original = match (p.format, p.policy.as_str()) {
+        (1, POLICY) => readiness(&a.payload, &a.digest, false, today)?,
+        (2, crate::card_final_policy::POLICY) => {
+            crate::card_final_policy::readiness(&a.payload, &a.digest, false, today)?
+        }
+        _ => return Err("Unsupported final approval policy or format.".into()),
+    };
+    if p.policy != original.policy
         || p.app_version.is_empty()
         || uuid::Uuid::parse_str(&p.id).is_err()
         || p.client_id != a.client_id

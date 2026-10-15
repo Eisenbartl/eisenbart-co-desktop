@@ -1,5 +1,9 @@
 # Final counselor reports — 0.33.0, schema 22
 
+Card-inclusive format-9 approval is now separately implemented by
+[policy v2](card-inclusive-final-approval.md). The following describes the preserved
+bank-only v1 policy and its original receipts.
+
 Reports → Final report checklist now reviews readiness and records an explicit
 counselor approval linked to an original immutable internal assessment. A separate
 final-report PDF includes the original financial evidence, recorded scope,

@@ -1,6 +1,28 @@
 # Development status
 
-## Current stage — reviewed card completeness evidence (0.36.0, schema 25)
+## Current stage — card-inclusive final approval (0.37.0, schema 25 unchanged)
+
+Reports → Final report checklist now selects policy v2 for matching format-9
+assessments. Current bank/card completeness, exact approval-bound roles, repayment
+counterparts, known required payments and original existing-debt mappings gate
+explicit counselor approval. The separate immutable combined summary/PDF keeps
+cash movement, spending and debt distinct. Old v1 approvals and original internal
+report/calculator bytes retain their interpretation. See
+[card-inclusive-final-approval.md](card-inclusive-final-approval.md).
+
+Validation is in progress. Locked setup, production interface build and all
+205 UI tests passed, along with 212 library + 2 PDF-worker tests. Expanded focused
+backend cases and the final PDF basis labels were checked again afterward;
+formatting/Clippy passed with warnings denied. Standalone native and Windows source
+results will be recorded before completion. No installer is being created.
+
+Next priority: searchable client-wide bank/card transaction history, using the
+existing retained sources and immutable decisions with bounded filters/pagination,
+provenance and client isolation. Unsupported loan obligations and other card-policy
+cases remain blocked pending their own explicitly modeled evidence workflows.
+
+
+## Reviewed card completeness evidence (0.36.0, schema 25)
 
 Financial Review → Card completeness records known/unprovided cards, dated
 applicability, selected source coverage, spending roles bound to exact approvals

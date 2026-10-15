@@ -1,4 +1,4 @@
-# Remaining original requirements after 0.36.0 source
+# Remaining original requirements after 0.37.0 source
 
 The [original product specification](product-specification.md) governs the full
 application. This is a tested development checkpoint, not a commercial release.
@@ -22,6 +22,8 @@ still identify functionality that is unavailable.
   internal report/PDF supplements. Payments do not become another expense.
 - Recorded card completeness/applicability, source-bound necessary/discretionary
   roles and distinct existing-debt mappings, captured in internal reports/PDFs.
+- Versioned card-inclusive final counselor approval, exact combined spending/cash
+  figures and preserved original approvals/PDFs within its supported scope.
 - Encrypted backup/recovery and bounded integrity validation of historical records.
 
 Do not repeat these foundations. See [development-status.md](development-status.md)
@@ -31,20 +33,22 @@ entry points and acceptance criteria.
 
 ## Next development priority
 
-Implement a separately versioned card-inclusive final policy combining current
-bank completeness, recorded card evidence and reviewed repayment treatment.
-Inventory/applicability, source-bound roles and existing debt mappings now work;
-do not repeat them. Require the full applicable bank/card/household basis, fresh
-professional confirmation and exact parent/digest binding. Unsupported credits,
-early closure balance semantics and split/cross-period repayments stay blocked
-until explicitly modeled and independently checked. Preserve all historical
-report bytes and existing final-policy receipts.
+Implement searchable client-wide bank/card transaction history over existing
+source and decision records, with stable filters/pagination, exact provenance,
+corrections, transfer context and client isolation. No new parser or approval
+mutation is needed for this read workflow.
+
+Card-inclusive final approval now works for the [bounded v2 policy](card-inclusive-final-approval.md).
+Unsupported other loan obligations, bank-refund role treatments, credits, early
+opening/closure and split/cross-period repayments remain blocked until explicitly
+modeled and independently checked. Preserve all historical report bytes and policy
+receipts when extending these rules.
 
 ## Further original requirements
 
 | Work area | Main remaining work |
 |---|---|
-| Financial review and reports | The final card policy above; further comparative measures; dated savings-progress charts; direct desktop printing; final full-product report acceptance. Existing branding and bank-only final validation already work. |
+| Financial review and reports | Broader obligation/card-policy support; further comparative measures; dated savings-progress charts; direct desktop printing; final full-product report acceptance. Existing branding and bank-only final validation already work. |
 | Financial models | Savings funding/drawdown, paycheck allocation, proposed new goals and account-targeted extra payments, advanced daily/variable/promotional debt terms and fees, delayed transfer settlement and finer account reserves. Verified gross-income metrics only where their basis exists. |
 | Documents and transactions | Card PDF, loan/paystub and broader institution adapters, scanned PDF/OCR, local category suggestions/reusable rules and client-wide searchable activity history, all with provenance and explicit review. No universal parser compatibility is claimed. |
 | Client workflow and administration | Configurable time zones, remaining workflow refinements and realistic counselor usability/accessibility acceptance. Client intake, reminders, follow-up overview and account CRUD already exist. |

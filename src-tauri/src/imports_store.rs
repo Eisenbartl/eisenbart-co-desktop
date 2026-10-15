@@ -1895,7 +1895,11 @@ pub(crate) mod tests {
             .to_string_lossy()
             .starts_with(".tmp")));
     }
-    fn final_candidate(w: &mut Workspace, c: &Client, dir: &Path) -> crate::assessments::Record {
+    pub(crate) fn final_candidate(
+        w: &mut Workspace,
+        c: &Client,
+        dir: &Path,
+    ) -> crate::assessments::Record {
         use chrono::Datelike;
         // Keep live approval fixtures inside the freshness policy after this release.
         let today = Utc::now()
@@ -1949,8 +1953,8 @@ pub(crate) mod tests {
         input.completeness = Some(crate::coverage_review::Selection { revision: 1 });
         w.save_assessment_record(&c.id, input).unwrap()
     }
-    fn final_input(p: &crate::final_reports::Preview) -> crate::final_reports::Input {
-        crate::final_reports::Input{assessment_id:p.readiness.assessment_id.clone(),expected_digest:p.readiness.assessment_digest.clone(),expected_readiness:p.receipt.clone(),decision:crate::final_reports::Decision{accounts:p.readiness.accounts.iter().map(|a|crate::final_reports::AccountDecision{account_id:a.account_id.clone(),reason:"Original complete-period account evidence reviewed.".into()}).collect(),planning:p.readiness.planning.clone(),planning_notes:"Historical assessment only; no hypothetical scenario or planning recommendation is applicable.".into(),professional_notes:"Fictional counselor checked the complete evidence, scope, source warnings and limitations before approval.".into(),confirm_client:true,confirm_sources:true,confirm_inventory:true,confirm_assumptions:true}}
+    pub(crate) fn final_input(p: &crate::final_reports::Preview) -> crate::final_reports::Input {
+        crate::final_reports::Input{assessment_id:p.readiness.assessment_id.clone(),expected_digest:p.readiness.assessment_digest.clone(),expected_readiness:p.receipt.clone(),decision:crate::final_reports::Decision{card_review:None,accounts:p.readiness.accounts.iter().map(|a|crate::final_reports::AccountDecision{account_id:a.account_id.clone(),reason:"Original complete-period account evidence reviewed.".into()}).collect(),planning:p.readiness.planning.clone(),planning_notes:"Historical assessment only; no hypothetical scenario or planning recommendation is applicable.".into(),professional_notes:"Fictional counselor checked the complete evidence, scope, source warnings and limitations before approval.".into(),confirm_client:true,confirm_sources:true,confirm_inventory:true,confirm_assumptions:true}}
     }
     #[test]
     fn final_report_approval_scope_stale_receipts_atomic_audit_and_immutable_recovery_pdf() {

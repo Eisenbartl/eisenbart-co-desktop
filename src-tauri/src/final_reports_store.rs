@@ -17,7 +17,11 @@ fn preview(c: &Connection, w: &WorkspaceInfo, client: &str, id: &str) -> Result<
     let today = Utc::now()
         .with_timezone(&chrono_tz::America::Chicago)
         .date_naive();
-    let readiness = final_report::readiness(&a.payload, &a.digest, a.needs_review, today)?;
+    let readiness = if a.payload.format == 9 {
+        crate::card_final_policy::readiness(&a.payload, &a.digest, a.needs_review, today)?
+    } else {
+        final_report::readiness(&a.payload, &a.digest, a.needs_review, today)?
+    };
     let receipt = hash(&serde_json::to_string(&readiness).map_err(|_| STORAGE_ERROR.to_owned())?);
     let approval_id=c.query_row("SELECT id FROM final_report_approvals WHERE assessment_id=?1 AND client_id=?2 AND organization_id=?3 AND counselor_id=?4",params![id,client,w.organization_id,w.counselor_id],|r|r.get(0)).optional().map_err(storage_error)?;
     Ok(Preview {
@@ -116,8 +120,12 @@ impl Workspace {
             return Err("The local report date changed during approval. Refresh readiness and confirm again; nothing was saved.".into());
         }
         let payload = Payload {
-            format: 1,
-            policy: final_report::POLICY.into(),
+            format: if current.readiness.policy == crate::card_final_policy::POLICY {
+                2
+            } else {
+                1
+            },
+            policy: current.readiness.policy.clone(),
             app_version: env!("CARGO_PKG_VERSION").into(),
             id: Uuid::new_v4().to_string(),
             client_id: client.into(),

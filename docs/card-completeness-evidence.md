@@ -103,7 +103,13 @@ manual facts, role choices and findings remain unchanged after later corrections
 Final policy v1 still blocks card reports; old approval receipts retain their
 original interpretation.
 
-## Next implementation priority
+## Subsequent implementation (0.37.0)
+
+The separately versioned [v2 final policy](card-inclusive-final-approval.md) now
+builds on this evidence without changing its calculator or stored bytes. The
+following describes the original handoff; remaining unsupported cases stay blocked.
+
+## Original next implementation priority
 
 Build and test a separately versioned card-inclusive final policy that combines
 bank completeness, this recorded card evidence, reviewed repayment treatment and

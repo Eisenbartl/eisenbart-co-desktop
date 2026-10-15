@@ -162,3 +162,23 @@ semantics, split/cross-period repayments and unprovided obligations blocked.
 Preserve format-9 evidence/calculator behavior and legacy report bytes. Existing
 card identity/assignment/role/debt-mapping CRUD now works; build on it. Other
 original document/OCR/printing/commercial and installed Windows work remains open.
+
+### 0.37.0 — versioned card-inclusive final approval
+
+`card_final_policy.rs` combines existing bank gates with saved format-9 card
+inventory/roles/debt evidence and exact current repayment links. All required gates
+precede a format-2 `counselor-final-report-v2` approval. The optional original
+summary distinguishes bank cash, combined spending and existing debt, while
+`FinalReportApproval` collects separate card notes/confirmation. Scoped storage,
+audit, receipt/date rechecks, PDF preflight and recovery reuse the existing final
+report service. Original v1 receipts and calculators stay frozen. See
+[policy and limitations](card-inclusive-final-approval.md).
+
+Next priority: implement Transactions → Activity history using bounded read-only
+queries across existing bank/card decisions. Include text/date/source/status
+filters, stable pagination, exact source/approval locators, corrections, transfer
+counterparts, safe empty/error states and client isolation; preserve private data
+on navigation/lock. Do not redo review CRUD or silently change financial figures.
+Unsupported loan obligations, early closure, credits and split/cross-period
+repayments remain blocked until their own modeled evidence workflows. Broader
+adapters/OCR/printing/advanced models and installed/commercial acceptance remain.

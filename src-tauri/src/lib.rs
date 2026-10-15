@@ -5,6 +5,7 @@ mod branding;
 mod budget;
 mod budget_methods;
 mod card_facts;
+mod card_final_policy;
 mod card_review;
 mod cards;
 mod cashflow;

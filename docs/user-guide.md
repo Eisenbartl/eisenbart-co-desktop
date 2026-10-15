@@ -372,3 +372,20 @@ existing verified household debt. Unknowns and differences remain visible; debt
 is not added twice. Save reviewed versions and optionally include them with the
 bank/card supplement in internal reports. Final card-inclusive approval remains
 unavailable. See [card-completeness-evidence.md](card-completeness-evidence.md).
+
+
+## Approving a bank/card assessment (0.37.0 source)
+
+Complete and save bank completeness, card repayment review and card completeness
+for the same months. Record known required debt payments and retain authorized
+original sources. In Reports → Working tools, include all three reviewed contexts
+in a saved assessment; then open Final report checklist. Read each required check,
+record bank/card scope and professional decisions, and confirm the separate card
+review before approving. Combined spending and income less spending are shown
+separately from bank cash movement. Debt is compared with the existing inventory
+and counted once. Export the immutable final PDF to a private new filename.
+
+Resolve blocked checks with original evidence. Never omit a known loan or missing
+card to obtain approval. Unsupported cases remain blocked. Later changes preserve
+the original approval with review flags. See the
+[complete supported workflow](card-inclusive-final-approval.md).
