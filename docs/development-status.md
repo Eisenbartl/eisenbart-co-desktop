@@ -11,9 +11,32 @@ source identity, collection links, financial totals and saved report bytes remai
 unchanged by metadata edits. Encrypted recovery validates every metadata version.
 See [statement-account-management.md](statement-account-management.md).
 
-Validation is in progress; final counts/native/Windows results will be recorded
-when complete. No installer was requested or created for this stage. The latest
-previous installer remains 0.23.0; source 0.29.0 is a development build.
+Validated 2026-10-14 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 151 tests |
+| Complete Linux backend | Passed 180 library + 2 PDF process tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles |
+| Full native financial/account/recovery workflows | Passed, exit 0; account create/rename/archive/reactivate/history and client isolation checked initially, after restart and after both restore routes |
+| Windows source checks | Passed: 151 UI + 181 library + 2 PDF process tests; all installer build/install/upload steps skipped |
+| Installer | Not created, per user instruction |
+
+The initial smoke launcher lacked the activated desktop environment; it stopped
+before application launch. Sourcing `scripts/cloud-env.sh` corrected the launcher,
+and the complete workflow then passed. Native artifacts are in
+`/workspace/shared/desktop-smoke-accounts`; validation logs use the
+`/workspace/shared/accounts-` prefix. The account screen was visually inspected.
+The feature commit is `d5c5c1626cd9a41ab587058943fc3b07076d7a1b`.
+Windows source validation passed in
+[run 38682529849](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38682529849).
+This verifies Windows source compilation/tests; Windows installer/offline runtime
+acceptance remains a separate release check when an installer is requested.
+
+The latest previous installer remains 0.23.0; source 0.29.0 is a development build.
+No dependency or immutable report-format changes were introduced.
 
 Next priority: firm/report branding with preserved historical report payloads.
 Remaining specification work is tracked in
