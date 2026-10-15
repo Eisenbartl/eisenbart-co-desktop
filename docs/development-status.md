@@ -11,18 +11,46 @@ snapshots; encrypted restore validates original versions and links before
 activation. No financial models, report payload formats or dependencies changed.
 See [document-collection.md](document-collection.md).
 
-Validation in progress: locked setup, four focused Rust checks, production UI
-build and all 144 interface tests passed (31 focused checklist/desktop checks).
-Formatting and warnings-denied Clippy passed. Full backend/native/Windows checks
-will be recorded after completion. Initial compiler errors in new record debug derivation
+| Check | Result |
+|---|---|
+| Locked setup | Passed; existing configuration/dependencies reused |
+| Focused backend / interface | Four Rust and 31 checklist/desktop interface checks passed |
+| Production frontend / complete UI suite | Passed build and 144 tests |
+| Complete backend | Passed 176 library + 2 PDF process tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed, debug/no bundles |
+| Native collection/financial/recovery workflows | Passed, exit 0: initial save, restart, encrypted restore and error-screen recovery |
+| Windows source checks | Passed: 144 UI + 177 library + 2 PDF process tests; installer steps skipped |
+| Installer | Not created, per user instruction |
+
+Initial compiler errors in new record debug derivation
 and a test session borrow were corrected without weakening assertions. Existing
 legacy migration fixtures now also remove the newly added table when simulating
 older schemas. The development map's earlier description of saved follow-up
 removal was corrected: only unsaved follow-ups can be removed; saved items can
-be cancelled and remain retained. No follow-up behavior changed.
+be cancelled and remain retained. No follow-up behavior changed. Logs use `/workspace/shared/collection-*.log`;
+synthetic desktop artifacts are in `/workspace/shared/desktop-smoke-collection`.
+The existing Vite single-chunk size advisory remains; no checks were weakened.
+No environment draft changes were needed.
+The new native request creation/receipt/archive/history/source/client-isolation
+checks passed initially. A 1200px native screenshot was visually inspected: the
+collection navigation, saved counts, filters, history and request table fit the
+card and remain readable. Existing financial/PDF assertions continue in the full
+restart and recovery workflow. The complete run passed (exit 0), including
+all four collection source/history/client-isolation checks.
+
+[Windows source run 38680069267](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38680069267)
+passed for feature source `cb2938285c999117fb3f52528beb0c044b7a4c81`.
+Installer build, installation smoke, metadata and both upload steps were skipped.
+This establishes Windows source checks, not a new installed Windows build or
+clean Windows 11 offline acceptance. The final follow-up commit records validation
+only; application source is the tested feature checkpoint. A tracked-source
+archive and complete-history bundle are retained under
+`/workspace/shared/checkpoints/eisenbart-collection-source.*`, verified against
+final clean/pushed HEAD. These are source checkpoints, not client-data backups.
 
 Next priority: standalone statement-account metadata/lifecycle CRUD, then firm
-branding and the remaining mapped functionality. No installer is being created.
+branding and the remaining mapped functionality. No installer was created.
 
 ## Prototype structure: all main sections and future areas — 0.27.0 source
 
