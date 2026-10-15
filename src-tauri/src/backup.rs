@@ -550,6 +550,7 @@ impl Workspace {
         }
         for id in &ids {
             scoped_client(&connection, &workspace_info, id)?;
+            client_care_store::validate_records(&connection, &workspace_info, id)?;
             read_budget(&connection, &workspace_info, id)?;
             read_debt_plan(&connection, &workspace_info, id)?;
             read_savings_plan(&connection, &workspace_info, id)?;
@@ -1038,7 +1039,7 @@ mod tests {
         let client = all_records(&mut w);
         let target = tempdir().unwrap();
         let connection = &w.session.as_ref().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; CREATE TABLE audit_events_v6 (
+        connection.execute_batch("DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; CREATE TABLE audit_events_v6 (
             id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
             event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved','cashflow_plan_saved')),
             entity_id TEXT,created_at TEXT NOT NULL,

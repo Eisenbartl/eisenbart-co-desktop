@@ -22,6 +22,8 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getClientCare:(clientId:string)=>command<import('./types').ClientCareRecord>('get_client_care',{clientId}),
+  saveClientCare:(clientId:string,input:{expectedRevision:number;data:import('./types').ClientCareData})=>command<import('./types').ClientCareRecord>('save_client_care',{clientId,input}),
   listClientScenarios:(clientId:string)=>command<ScenarioDirectory>('list_client_scenarios',{clientId}),
   getClientScenario:(clientId:string,id:string)=>command<SavedScenario>('get_client_scenario',{clientId,id}),
   saveClientScenario:(clientId:string,input:{expectedCount:number;proposal:ScenarioInput})=>command<SavedScenario>('save_client_scenario',{clientId,input}),

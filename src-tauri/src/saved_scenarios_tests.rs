@@ -729,14 +729,14 @@ fn schema_fifteen_upgrade_and_failed_upgrade_preserve_original_models_and_audits
         .unwrap();
     let conn = &mut w.session.as_mut().unwrap().connection;
     conn.execute_batch(
-        "DROP TABLE assessment_scenario_links;DROP TABLE client_scenarios;PRAGMA user_version=15;",
+        "DROP TABLE IF EXISTS client_care_snapshots;DROP TABLE assessment_scenario_links;DROP TABLE client_scenarios;PRAGMA user_version=15;",
     )
     .unwrap();
     migrate(conn, false).unwrap();
     assert_eq!(
         conn.pragma_query_value::<i64, _>(None, "user_version", |r| r.get(0))
             .unwrap(),
-        16
+        SCHEMA_VERSION as i64
     );
     assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
     assert_eq!(
@@ -746,7 +746,7 @@ fn schema_fifteen_upgrade_and_failed_upgrade_preserve_original_models_and_audits
         legacy.digest
     );
     let conn = &mut w.session.as_mut().unwrap().connection;
-    conn.execute_batch("DROP TABLE assessment_scenario_links;DROP TABLE client_scenarios;CREATE TABLE client_scenarios(broken TEXT);PRAGMA user_version=15;").unwrap();
+    conn.execute_batch("DROP TABLE IF EXISTS client_care_snapshots;DROP TABLE assessment_scenario_links;DROP TABLE client_scenarios;CREATE TABLE client_scenarios(broken TEXT);PRAGMA user_version=15;").unwrap();
     assert!(migrate(conn, false).is_err());
     assert_eq!(
         conn.pragma_query_value::<i64, _>(None, "user_version", |r| r.get(0))

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
   listClientScenarios:vi.fn(),getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
+  getClientCare:vi.fn(),saveClientCare:vi.fn(),
 }));
 
 vi.mock('./api', () => ({
@@ -42,6 +43,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getClientCare.mockImplementation(async(clientId:string)=>({clientId,revision:0,updatedAt:null,reviewDate:'2026-10-15',overdue:0,dueToday:0,data:{intake:{address:'',household:'',employment:'',employer:'',occupation:'',incomeNotes:''},followUps:[]}}));
   mocks.listClientScenarios.mockImplementation(async(clientId:string)=>({clientId,records:[]}));
   mocks.getClientImports.mockImplementation(async (clientId:string)=>({clientId,revision:0,accounts:[],documents:[],records:[],history:[],merchantGroups:[],recurringHistory:[],summary:{pending:0,needsClarification:0,approved:0,rejected:0,income:'0.00',spending:'0.00',refunds:'0.00',netSpending:'0.00',netCash:'0.00',accountNet:[],warnings:[]}}));
   mocks.cancelClientCsv.mockResolvedValue(undefined);
@@ -82,6 +84,22 @@ async function selectClient(name: string) {
 }
 
 describe('desktop workspace', () => {
+  it('guards an intake draft when changing clients and clears private employment details on lock',async()=>{
+    render(<App/>);await unlock();await selectClient('Alice Able');
+    await screen.findByText('No saved budget yet');
+    fireEvent.click(screen.getByText('Intake and follow-ups'));
+    await screen.findByLabelText('Employer');
+    await waitFor(()=>expect(screen.getByLabelText('Employer')).toBeEnabled());
+    fireEvent.change(screen.getByLabelText('Employer'),{target:{value:'Alice private fictional employer'}});
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    expect(window.confirm).toHaveBeenCalled();
+    expect(screen.getByLabelText('Employer')).toHaveValue('Alice private fictional employer');
+    await act(async()=>mocks.lockHandler?.());
+    expect(document.documentElement.outerHTML).not.toContain('Alice private fictional employer');
+    expect(screen.queryByText('Intake and follow-ups')).not.toBeInTheDocument();
+    expect(mocks.saveClientCare).not.toHaveBeenCalled();
+  });
   it('blocks writes during scenario baseline loading and clears temporary proposals and late replies on lock',async()=>{
     const pending=deferred<unknown>();mocks.getAssessmentPlanning.mockReturnValueOnce(pending.promise);
     render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No saved budget yet');await screen.findByText('No imported transactions yet');

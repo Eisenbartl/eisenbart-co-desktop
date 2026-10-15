@@ -1,5 +1,9 @@
 # Windows development installer — 0.23.0
 
+Current development source is **0.24.0**, with schema 17 intake and follow-ups.
+The downloadable **0.23.0** preview below predates those changes. Do not open a
+schema-17 workspace with the older application.
+
 ## Download and install
 
 [Download the verified 0.23.0 Windows x64 preview](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38668750314/artifacts/11943645145)

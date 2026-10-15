@@ -1472,6 +1472,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
         raise SmokeFailure("The first client's cash-flow account appeared for another client")
     driver.wait_text(".imports-panel", "No imported transactions yet", "isolated second client CSV queue")
     status("two clients with isolated notes, budgets, debts, savings, and cash flow")
+    check_client_care(driver, artifacts, "initial", initial=True)
 
     driver.open_client("Alex Fictional")
     driver.wait_text(".notes-history", note, "first client's note after selection")
@@ -1486,7 +1487,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click_button("Lock workspace")
     driver.element("#password")
     private_values = [f"{first_name} {first_last}", f"{second_name} {second_last}",
-                      first_goal, edited_goal, note, organization, counselor, "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve", "Alex synthetic checking", "Alex synthetic cash-flow priority", "Alex synthetic dated pay", "Synthetic reserve transfer", "Synthetic incoming transfer", "Synthetic checking", "checking.csv", "Fictional payroll", "Synthetic PDF checking"]
+                      first_goal, edited_goal, note, organization, counselor, "Alex fictional employer", "Reviewed the synthetic documents", "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve", "Alex synthetic checking", "Alex synthetic cash-flow priority", "Alex synthetic dated pay", "Synthetic reserve transfer", "Synthetic incoming transfer", "Synthetic checking", "checking.csv", "Fictional payroll", "Synthetic PDF checking"]
 
     def assert_locked() -> None:
         markup = str(driver.observe_script("return document.documentElement.outerHTML"))
@@ -1579,6 +1580,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.fill("#password",password)
     driver.click_button("Unlock workspace")
     assert_recurring_restored(driver)
+    check_client_care(driver, artifacts, "restart")
     assert_statement_balances_restored(driver, artifacts, "restart")
     assert_captured_planning_restored(driver, artifacts, "restart")
     check_budget_methods(driver, artifacts, "restart")
@@ -1673,6 +1675,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click(".review-history > summary")
     driver.wait_text(".review-history", "Needs Clarification → Approved", "restored immutable PDF approval history")
     assert_recurring_restored(driver)
+    check_client_care(driver, artifacts, "encrypted-restore")
     assert_statement_balances_restored(driver, artifacts, "encrypted-restore")
     assert_captured_planning_restored(driver, artifacts, "encrypted-restore")
     check_budget_methods(driver, artifacts, "encrypted-restore")
@@ -1710,6 +1713,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_value("#cashflow-date-0", "2026-11-03", "restored original cash-flow dates after recovery")
     driver.wait_text(".imports-progress", "Approved 6 · Rejected 1", "storage-error recovery includes imported records")
     assert_recurring_restored(driver)
+    check_client_care(driver, artifacts, "error-screen-restore")
     assert_statement_balances_restored(driver, artifacts, "error-screen-restore")
     assert_captured_planning_restored(driver, artifacts, "error-screen-restore")
     check_budget_methods(driver, artifacts, "error-screen-restore")
@@ -1719,6 +1723,59 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")
+
+
+def check_client_care(driver: WebDriver, artifacts: Path, label: str, initial: bool = False) -> None:
+    driver.open_client("Alex Fictional")
+    if driver.command("GET", f"/element/{driver.element('.client-care')}/property/open") is not True:
+        driver.click(".client-care > summary")
+    driver.interactive("#intake-address")
+    if initial:
+        driver.fill("#intake-address", "123 Fictional Lane\nExample City")
+        driver.fill("#intake-household", "Two fictional adults and one dependent")
+        driver.select("#intake-employment", "Employed")
+        driver.fill("#intake-employer", "Alex fictional employer")
+        driver.fill("#intake-occupation", "Fictional office role")
+        driver.fill("#intake-income-notes", "Entered intake context only; verify financial documents separately.")
+        driver.click_button("Add follow-up")
+        driver.select("#follow-kind-0", "Appointment")
+        driver.fill("#follow-title-0", "Review fictional statements")
+        driver.fill("#follow-date-0", "2100-02-03")
+        driver.fill("#follow-time-0", "09:30")
+        driver.wait_value("#follow-time-0", "09:30", "explicit appointment time")
+        driver.click_button("Add follow-up")
+        driver.fill("#follow-title-1", "Collect missing fictional documents")
+        driver.fill("#follow-date-1", "1900-01-01")
+        driver.click_button("Save intake and follow-ups")
+        driver.wait_text(".client-care .success-message", "saved locally", "initial encrypted client intake save")
+        driver.wait_text(".care-reminders", "1 overdue", "only open past task generates reminder")
+        driver.select("#follow-status-1", "Completed")
+        driver.fill("#follow-notes-1", "Reviewed the synthetic documents")
+        driver.click_button("Add follow-up")
+        driver.fill("#follow-title-2", "Cancelled fictional call")
+        driver.fill("#follow-date-2", "1900-01-01")
+        driver.select("#follow-status-2", "Cancelled")
+        driver.click_button("Save intake and follow-ups")
+        driver.wait_text(".care-reminders", "0 overdue", "completed and cancelled tasks stop reminders")
+    driver.wait_value("#intake-employer", "Alex fictional employer", f"saved employment intake ({label})")
+    driver.wait_value("#follow-time-0", "09:30", f"saved explicit appointment time ({label})")
+    driver.wait_value("#follow-date-0", "2100-02-03", f"saved appointment date ({label})")
+    driver.wait_value("#follow-status-1", "completed", f"retained task completion ({label})")
+    driver.wait_value("#follow-notes-1", "Reviewed the synthetic documents", f"retained task outcome ({label})")
+    driver.wait_value("#follow-status-2", "cancelled", f"retained cancellation ({label})")
+    driver.wait_text(".care-reminders", "0 overdue", f"closed tasks remain out of reminders ({label})")
+    driver.scroll_to(".care-reminders", "start")
+    driver.screenshot(artifacts / f"native-client-intake-{label}.png")
+    driver.scroll_to("#follow-title-0", "start")
+    driver.screenshot(artifacts / f"native-client-follow-ups-{label}.png")
+    driver.click(".client-care > summary")
+    driver.open_client("Robin Synthetic")
+    driver.click(".client-care > summary")
+    driver.wait_value("#intake-employer", "", "other client has no employment intake")
+    driver.wait_text(".client-care", "No appointments or follow-up tasks recorded.", "follow-ups remain isolated by client")
+    driver.click(".client-care > summary")
+    driver.open_client("Alex Fictional")
+    status(f"optional client intake, explicit appointments, overdue/completed/cancelled tasks and client isolation ({label})")
 
 
 def main() -> int:

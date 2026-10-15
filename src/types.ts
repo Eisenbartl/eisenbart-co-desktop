@@ -51,6 +51,20 @@ export interface ClientNote {
   createdAt: string;
 }
 
+export interface ClientIntake {
+  address: string; household: string; employment: string; employer: string;
+  occupation: string; incomeNotes: string;
+}
+export interface ClientFollowUp {
+  id: string; kind: 'task' | 'appointment'; title: string; dueDate: string;
+  time: string; status: 'open' | 'completed' | 'cancelled'; notes: string;
+}
+export interface ClientCareData { intake: ClientIntake; followUps: ClientFollowUp[] }
+export interface ClientCareRecord {
+  clientId: string; revision: number; updatedAt: string | null; reviewDate: string;
+  overdue: number; dueToday: number; data: ClientCareData;
+}
+
 export interface SetupInput {
   organizationName: string;
   counselorName: string;

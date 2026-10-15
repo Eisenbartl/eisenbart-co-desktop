@@ -1,5 +1,44 @@
 # Development status
 
+## Stage 3K: optional client intake and dated follow-ups — 0.24.0 source
+
+Optional address, household composition, employment/employer/occupation and
+income context now sit beside each saved client. Tasks and appointments retain
+explicit dates, optional appointment times, open/completed/cancelled status and
+outcome notes. Rust calculates overdue/due-today counts using America/Chicago.
+Saved items stay in append-only version history with scoped authorization,
+optimistic revisions and atomic audit. Schema 17 migrates transactionally;
+encrypted recovery validates every stored version before activation. Financial
+models, approved facts and immutable reports retain their existing inputs.
+See [client-intake-followups.md](client-intake-followups.md) for limits and usage.
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing dependencies/configuration reused |
+| Focused backend | Five tests passed: validation/counts, scoped storage, migration/audit rollback, reopen/recovery and corrupted history |
+| Focused interface | Five component checks passed |
+| Production frontend / full interface suite | Final build and 123 tests passed, including intake navigation/lock privacy |
+| Complete backend / formatting / Clippy | Passed: 166 library + 2 PDF process tests; formatting and warnings-denied Clippy |
+| Standalone native build / workflow | Standalone debug build passed; full native workflow running |
+| Windows source checks | Pending |
+| New Windows installer / clean Windows 11 offline acceptance | Not run; existing 0.23.0 package remains separate |
+
+Old-schema test fixtures now remove the schema-17 table when constructing an
+earlier database, and migration success checks use the current schema constant.
+No assertion about rollback, original financial records or report integrity is
+removed. The first complete backend run passed 165 tests and failed only an
+older migration assertion expecting schema 16 instead of the actual schema 17.
+That expectation now uses the current schema constant; the full rerun passed all
+166 library and both PDF process checks.
+The original failed log remains `intake-backend.log`. Logs use
+`/workspace/shared/intake-*.log`; native artifacts will use
+`desktop-smoke-client-intake`. No new dependency or cloud runtime is introduced.
+
+Next priority: a practice-wide appointment/follow-up overview, then report/intake
+integration and remaining original model/document/release requirements. These
+client reminders currently appear inside the opened record; background Windows
+notifications and a configurable practice time zone are not part of this stage.
+
 ## Stage 3J: temporary income funding/recovery and Windows preview — 0.23.0
 
 Bounded temporary income reductions now retain explicit month ranges, reduced

@@ -32,6 +32,8 @@ flowchart LR
 
 There is no required cloud service, spreadsheet integration, or shared network database. Each installation owns its local data directory. Development dependency downloads and Windows installer build downloads are separate from the installed application's essential offline workflow.
 
+`client_care.rs` validates optional intake and explicit task/appointment dates and calculates due counts in America/Chicago. `storage::client_care_store` appends scoped, canonical schema-17 snapshots with optimistic revisions and atomic audit. Recovery validates all versions and retained task identities. `ClientCare` guards drafts and delayed responses without supplying financial facts or rewriting report history. See [client-intake-followups.md](client-intake-followups.md).
+
 ## Data model and ownership
 
 Organization, counselor, client, note, and audit records use internal identifiers. The first installation creates one organization and counselor; this is not a completed multi-user permission system. Queries must derive the organization from the authenticated session and constrain records by that organization in Rust. Interface filtering alone is insufficient.

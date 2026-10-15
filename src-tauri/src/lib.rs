@@ -4,6 +4,7 @@ mod assessments;
 mod budget;
 mod budget_methods;
 mod cashflow;
+mod client_care;
 mod dashboard;
 mod debt;
 mod financial_facts;
@@ -575,6 +576,22 @@ fn get_client(state: State<'_, DesktopState>, id: String) -> Result<Client, Stri
 }
 
 #[tauri::command]
+fn get_client_care(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<client_care::Record, String> {
+    access(&state, |w| w.get_client_care(&client_id))
+}
+#[tauri::command]
+fn save_client_care(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: client_care::Input,
+) -> Result<client_care::Record, String> {
+    access(&state, |w| w.save_client_care(&client_id, input))
+}
+
+#[tauri::command]
 fn save_client(state: State<'_, DesktopState>, input: ClientInput) -> Result<Client, String> {
     access(&state, |workspace| workspace.save_client(input))
 }
@@ -816,6 +833,8 @@ pub fn run() {
             list_clients,
             get_client,
             save_client,
+            get_client_care,
+            save_client_care,
             add_client_note,
             list_client_notes,
             compare_budget_methods,

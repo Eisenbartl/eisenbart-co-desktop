@@ -1,5 +1,9 @@
 # Windows evaluation guide
 
+The installer below is 0.23.0. Current 0.24.0 source additionally supports optional
+client intake and dated follow-up tasks/appointments; see [the intake guide](client-intake-followups.md).
+Those additions require a newer build and are not in the linked 0.23.0 installer.
+
 Version 0.23.0 is a Windows x64 evaluation build with encrypted local records,
 client notes, budgets, debt/savings/cash-flow plans, reviewed statement imports,
 approved-data charts, immutable scenarios, counselor reports and client-plan PDF

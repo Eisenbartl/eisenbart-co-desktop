@@ -68,14 +68,17 @@ text PDF transaction review; recurring-payment and running-balance review; appro
 data dashboards; saved scenarios; counselor and client-plan PDF reports.
 
 NEW IN THIS VERSION
-Temporary income reductions have explicit start/end months, funding deficits and
-normal recovery. Selecting a matching paycheck schedule changes only affected
-dated receipts. Normal debt/savings forecasts remain conditional on their entered
-commitments. New recurring expenses, extra debt payments and goal contributions
-can be compared and captured together without applying them to live plans.
+Optional mailing address, household and employment intake; explicit dated tasks
+and appointments; overdue/due-today reminders in the client record; retained
+completion/cancellation outcomes; encrypted version history and safe stale-edit
+rejection. Reminder dates and appointment times use America/Chicago. There are
+no background Windows notifications. Intake notes do not supply verified facts
+or enter financial report PDFs.
 
 TRY THIS
-1. Create a fictional client and save normal income and necessary expenses.
+1. Create a fictional client; open Intake and follow-ups to try the new controls.
+   Save optional intake and a dated task/appointment; complete or cancel an item.
+   Save normal income and necessary expenses in the separate budget.
 2. Save debt, savings and cash-flow models if you want those forecasts.
 3. Open Compare combined financial scenarios and reload the saved baseline.
 4. Model a temporary income reduction and review its monthly funding/recovery.
