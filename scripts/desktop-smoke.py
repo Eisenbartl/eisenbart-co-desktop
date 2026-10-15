@@ -1783,6 +1783,41 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     assert_alex_dashboard(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")
     check_firm_branding(driver, artifacts, data_root, password, binary, restart_driver)
+    check_completeness(driver, artifacts)
+
+
+def check_completeness(driver: WebDriver, artifacts: Path) -> None:
+    # Run after restart/recovery and historical branding checks, through visible UI.
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Financial Review']")
+    driver.click_button('Completeness & final validation')
+    driver.interactive('#coverage-from')
+    driver.fill('#coverage-from','2026-09')
+    driver.fill('#coverage-through','2026-09')
+    driver.click_button('Review financial completeness')
+    driver.wait_text('.coverage-results','2026-09-01 through 2026-09-30','explicit completeness period')
+    driver.wait_text('.coverage-results','Synthetic checking','original account identity in coverage')
+    driver.wait_text('.coverage-results','Not eligible for finalization','unknown inventory blocks finalization')
+    driver.wait_text('.coverage-results','of 30 calendar days','calendar-day coverage uses exact selected month')
+    driver.scroll_to("section[aria-label='Financial completeness review']",'start')
+    driver.screenshot(artifacts / 'native-financial-completeness.png')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+    driver.click_button('Final report checklist')
+    driver.interactive('#checklist-report')
+    choice=driver.observe_script("return Array.from(document.querySelector('#checklist-report').options).find(o=>o.textContent.startsWith('Fictional branded progress assessment'))?.textContent")
+    if not choice or 'Needs review' not in choice:
+        raise SmokeFailure('Saved-report validation did not expose the historical changed-context report')
+    driver.select('#checklist-report',choice)
+    driver.wait_text('.report-validation','coverage-review-v1','versioned derived report checklist')
+    driver.wait_text('.report-validation','Current supporting context · Needs review','current supporting changes remain explicit')
+    driver.wait_text('.report-validation','Financial completeness · Blocked','incomplete historical report cannot finalize')
+    driver.wait_text('.report-validation .coverage-results','2026-09-01 through 2026-10-31','report checklist uses captured period rather than live coverage period')
+    driver.scroll_to("section[aria-label='Saved report checklist']",'start')
+    driver.screenshot(artifacts / 'native-report-validation.png')
+    pdf_text=subprocess.run(['pdftotext','-layout',str(artifacts / 'firm-branding-restored.pdf'),'-'],check=True,capture_output=True,text=True).stdout
+    for expected in ['Final report validation / not eligible for finalization','coverage-review-v1','Financial completeness / Blocked','Declared account coverage']:
+        if expected not in pdf_text:
+            raise SmokeFailure(f'Historical internal PDF omitted validation evidence {expected!r}')
+    status('live account/source/date coverage and captured final-report checklist after restart and encrypted recovery, including PDF disclosures')
 
 
 def check_firm_branding(driver: WebDriver, artifacts: Path, data_root: Path, password: str,

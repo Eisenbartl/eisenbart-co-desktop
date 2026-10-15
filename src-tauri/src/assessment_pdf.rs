@@ -925,6 +925,33 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
             &p.client.goals
         },
     )?;
+    l.section("Final report validation / not eligible for finalization")?;
+    let validation = crate::completeness::report(p, r.needs_review)?;
+    l.text("Derived from original captured evidence using coverage-review-v1; historical payload bytes are unchanged. Current context is checked at export. Declared coverage is not verified completeness.",10.0)?;
+    for check in &validation.checks {
+        l.value(&format!("{} / {}", check.label, check.state), &check.detail)?;
+    }
+    for account in &validation.coverage.accounts {
+        l.value(
+            "Declared account coverage",
+            &format!(
+                "{} / {} of {} days",
+                account.label, account.covered_days, account.total_days
+            ),
+        )?;
+        for gap in &account.gaps {
+            l.value("Uncovered dates", &format!("{} to {}", gap.start, gap.end))?;
+        }
+        for overlap in &account.overlaps {
+            l.value(
+                "Overlapping dates",
+                &format!("{} to {}", overlap.start, overlap.end),
+            )?;
+        }
+    }
+    for reason in &validation.coverage.blocking_reasons {
+        l.text(reason, 10.0)?;
+    }
     l.section("Basis, exclusions and missing information")?;
     l.text(if p.planning.is_some(){"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply historical financial amounts. A separately labeled hypothetical saved planning scenario is captured below; its entered debt terms, allocations and forecasts do not change approved facts or establish a final budget agreement/client action plan. Session and recurring evidence is included only when explicitly selected, in a separately labeled section below. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."}else{"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply financial amounts. Internal assessment only; no finalized client action plan, selected planning scenarios, debt APR/repayment terms or budget agreement are included. Session and recurring evidence is included only when explicitly selected below. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."},10.0)?;
     if p.supporting.is_some() {

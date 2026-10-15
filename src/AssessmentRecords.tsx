@@ -1,3 +1,4 @@
+import {ValidationView} from './CompletenessReview';
 import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import FirmBrandingView from './FirmBrandingView';
@@ -121,6 +122,7 @@ export default function AssessmentRecords({client,source,disabled,onDirty,onBusy
      <div className="budget-add"><button className="button secondary" type="button" onClick={()=>void exportPdf(true)}>Choose PDF destination</button><button className="button primary" type="button" disabled={!exportPath.trim()} onClick={()=>void exportPdf(false)}>Export saved assessment PDF</button></div>
      {dirty&&<p className="field-help">Save or discard your assessment draft before exporting a saved record.</p>}
     </fieldset>
+    {selected.validation&&<ValidationView value={selected.validation}/>}
     <FinancialAssessmentView value={p.assessment} historical/>
     {selected?.scenario&&<div className="selected-combined-scenario"><h4>Selected saved combined scenario</h4><CombinedScenarioView value={selected.scenario.payload.comparison}/></div>}
     {p.planning&&<PlanningScenarioView key={p.id} value={p.planning}/>}

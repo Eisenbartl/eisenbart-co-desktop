@@ -290,7 +290,7 @@ export interface ReportIntakeSnapshot {clientId:string;revision:number;updatedAt
 export interface AssessmentRecordInput {expectedBrandingRevision?:number;intake?:ReportIntakeSelection;selectedScenario?:SavedScenarioSelection;supporting?:{expectedNotesCount:number;noteIds:string[]}|null;planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
 export interface AssessmentRecordSummary {id:string;title:string;createdAt:string;periodStart:string;periodEnd:string;sourceRevision:number;needsReview:boolean}
 export interface AssessmentDirectory {clientId:string;records:AssessmentRecordSummary[]}
-export interface SavedAssessment {scenario?:SavedScenario;clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{branding?:FirmBrandingSnapshot;intake?:ReportIntakeSnapshot;selectedScenario?:SavedScenarioSelection;supporting?:CapturedReportEvidence|null;planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
+export interface SavedAssessment {validation?:ReportValidation;scenario?:SavedScenario;clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{branding?:FirmBrandingSnapshot;intake?:ReportIntakeSnapshot;selectedScenario?:SavedScenarioSelection;supporting?:CapturedReportEvidence|null;planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
 
 export interface PlanningRevisions {budget:number;debt:number;savings:number;cashflow:number}
 export type PlanningDebtStrategy = 'none'|'snowball'|'avalanche';
@@ -359,3 +359,10 @@ export interface StatementAccountInput {id:string|null;expectedRevision:number;e
 export interface FirmBrandingData {name:string;address:string;email:string;phone:string;website:string;disclosure:string;logoPng:string|null}
 export interface FirmBrandingSnapshot {organizationId:string;revision:number;updatedAt:string;data:FirmBrandingData}
 export interface FirmBrandingRecord {organizationId:string;revision:number;updatedAt:string|null;data:FirmBrandingData;history:{revision:number;name:string;updatedAt:string}[]}
+
+export interface CompletenessData {
+ clientId:string;revision:number;periodStart:string;periodEnd:string;approved:number;rejected:number;pending:number;clarification:number;undated:number;outOfPeriod:number;assignmentIssues:number;finalEligible:boolean;blockingReasons:string[];
+ accounts:{id:string;label:string;kind:string;documentIds:string[];coveredDays:number;totalDays:number;gaps:{start:string;end:string}[];overlaps:{start:string;end:string}[]}[];
+ sources:{id:string;fileName:string;accountId:string;periodStart:string|null;periodEnd:string|null;pending:number;clarification:number;rejected:number;undated:number;outsideDeclaredPeriod:number;issues:string[]}[];
+}
+export interface ReportValidation {version:string;finalEligible:boolean;coverage:CompletenessData;checks:{label:string;state:string;detail:string}[]}

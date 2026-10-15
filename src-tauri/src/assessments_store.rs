@@ -172,6 +172,7 @@ pub(super) fn record(
         review_reasons.extend(r.review_reasons.clone());
     }
     Ok(Record {
+        validation: crate::completeness::report(&payload, !review_reasons.is_empty())?,
         scenario,
         client_id: client.into(),
         needs_review: !review_reasons.is_empty(),

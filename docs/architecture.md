@@ -124,3 +124,12 @@ renderer embeds bounded RGB image resources without remote assets or changing
 financial outputs. `FirmBranding` exposes guarded settings, draft preview and
 history; `AssessmentRecords` previews the version to capture and separately shows
 historical presentation. See [firm-report-branding.md](firm-report-branding.md).
+
+`completeness.rs` derives inclusive per-account declared statement coverage,
+gaps/overlaps and source checks using the existing approved-data calculator.
+The authenticated live command reads saved imports; report reads derive versioned
+validation outside immutable payloads, and internal PDFs render the same captured
+coverage with current context flags. `CompletenessReview` exposes working live
+and saved-report pages with scoped asynchronous reads. Schema 20 and formats 1–6
+are unchanged; finalization remains blocked until expected inventory and explicit
+professional review can be recorded. See [financial-completeness.md](financial-completeness.md).

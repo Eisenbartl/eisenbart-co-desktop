@@ -249,10 +249,10 @@ pub fn assess(source: &Snapshot, input: Input, today: NaiveDate) -> Result<Asses
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use imports::{Account, Record};
-    fn fixture() -> Snapshot {
+    pub(crate) fn fixture() -> Snapshot {
         let csv = "Date,Description,Amount,Category,Type\n2026-09-01,Wages,1000.01,Pay,income\n2026-09-02,Rent,-300.02,Housing,expense\n2026-09-03,Refund,20.03,Housing,refund\n2026-09-04,Fee,-0.01,Fees,fee\n2026-09-05,Interest,-3.33,Fees,interest\n2026-09-06,Interest,2.22,Interest,interest\n2026-09-07,Principal,-200,Loan,balance movement\n2026-09-08,Transfer,-50,Internal,transfer\n2026-09-08,Transfer,50,Internal,transfer\n2026-09-09,Pending,9999,Pay,income\n2026-09-10,Rejected,8888,Pay,income\n2026-09-11,Clarify,-7777,Housing,expense\n2026-10-01,Wages,200.01,Pay,income\n2026-10-02,Food,-0.02,Food,expense\n2026-08-01,Outside period,777,Pay,income\n2026-11-01,Outside period,-888,Housing,expense\n";
         let raw = imports::extract(
             &imports::read_csv(csv.as_bytes()).unwrap(),

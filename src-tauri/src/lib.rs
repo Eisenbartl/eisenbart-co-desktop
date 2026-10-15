@@ -6,6 +6,7 @@ mod budget;
 mod budget_methods;
 mod cashflow;
 mod client_care;
+mod completeness;
 mod dashboard;
 mod debt;
 mod document_collection;
@@ -341,6 +342,14 @@ fn review_financial_facts(
     input: financial_facts::Input,
 ) -> Result<imports::Snapshot, String> {
     access(&state, |w| w.review_financial_facts(&client_id, input))
+}
+#[tauri::command]
+fn get_financial_completeness(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: dashboard::Input,
+) -> Result<completeness::Review, String> {
+    access(&state, |w| w.get_financial_completeness(&client_id, input))
 }
 #[tauri::command]
 fn get_client_dashboard(
@@ -890,6 +899,7 @@ pub fn run() {
             cancel_client_csv,
             get_client_imports,
             get_client_dashboard,
+            get_financial_completeness,
             review_financial_facts,
             list_assessment_records,
             get_assessment_planning,

@@ -79,6 +79,7 @@ pub struct Directory {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Record {
+    pub validation: crate::completeness::ReportValidation,
     pub client_id: String,
     pub payload: Payload,
     pub digest: String,

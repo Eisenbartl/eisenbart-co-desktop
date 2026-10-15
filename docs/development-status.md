@@ -1,6 +1,31 @@
 # Development status
 
-## Current stage — firm/report branding (0.30.0, schema 20)
+## Current stage — financial completeness diagnostics (0.31.0, schema 20)
+
+Financial Review now has a working completeness page for declared account/source
+coverage, uncovered and overlapping dates, unknown periods, undecided rows and
+arithmetic/reconciliation issues. Reports has a working final-report checklist
+using each assessment's original captured evidence and current context flags.
+Internal PDF exports include this review. Original report payloads/digests and
+approved-only financial figures remain unchanged; no schema/dependency changes.
+See [financial-completeness.md](financial-completeness.md).
+
+This is a diagnostic stage: finalization remains blocked until expected inventory,
+applicable periods, exceptions and professional review can be recorded. It does
+not assert that every real-world account or obligation is present.
+
+Validation in progress 2026-10-15 (America/Chicago): locked setup, production
+frontend, all 164 UI tests, focused Rust coverage/report/recovery tests, formatting
+and warnings-denied Clippy passed. Full backend, final native build, desktop
+workflows and Windows source checks are pending. Existing UI tests now await
+post-save dirty callbacks and enabled settings controls before checking them;
+assertions remain intact. No installer requested or created. Final results will
+replace this paragraph after validation.
+
+Next priority: versioned completeness review, as detailed in the development map.
+
+
+## Firm/report branding (0.30.0, schema 20)
 
 Settings → Branding now edits the firm display name, optional contact details,
 normalized local PNG logo and disclosure with preview and version history. Rust
@@ -39,8 +64,8 @@ present in the lockfile; no package versions were upgraded.
 The previously requested installer remains 0.23.0; source 0.30.0 is a development
 build, with installed Windows/commercial acceptance still separate.
 
-Next priority: financial completeness and final report validation, as defined in
-[prototype-development-map.md](prototype-development-map.md).
+This next priority is implemented as conservative diagnostics in 0.31.0 above;
+recorded inventory review and finalization remain separate work.
 
 
 ## Statement account management — 0.29.0 source (schema 19)

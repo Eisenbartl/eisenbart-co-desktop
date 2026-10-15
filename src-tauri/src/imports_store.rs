@@ -1893,6 +1893,95 @@ mod tests {
             .starts_with(".tmp")));
     }
     #[test]
+    fn report_validation_uses_captured_evidence_and_survives_current_changes_and_recovery() {
+        let (root, mut w, _) = configured();
+        let dir = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let source = facts_fixture(&mut w, &c.id, dir.path());
+        let r = w
+            .save_assessment_record(&c.id, assessment_input(&source, &c))
+            .unwrap();
+        let json = serde_json::to_vec(&r.payload).unwrap();
+        let digest = r.digest.clone();
+        let coverage = serde_json::to_vec(&r.validation.coverage).unwrap();
+        assert!(!r.validation.final_eligible);
+        assert!(!r.needs_review);
+        assert_eq!(r.validation.coverage.client_id, c.id);
+        assert_eq!(r.validation.coverage.revision, source.revision);
+        assert!(r
+            .validation
+            .checks
+            .iter()
+            .any(|c| c.label == "Financial completeness" && c.state == "Blocked"));
+        assert!(w.get_assessment_record(&other.id, &r.payload.id).is_err());
+        let id = source
+            .records
+            .iter()
+            .find(|r| r.status == Status::Approved)
+            .unwrap()
+            .id
+            .clone();
+        review(
+            &mut w,
+            &c.id,
+            &id,
+            Status::Rejected,
+            "Fictional withdrawn approval",
+            true,
+        )
+        .unwrap();
+        let current = w
+            .get_financial_completeness(
+                &c.id,
+                crate::dashboard::Input {
+                    from_month: "2026-09".into(),
+                    through_month: "2026-09".into(),
+                },
+            )
+            .unwrap();
+        assert_eq!(current.approved + 1, r.validation.coverage.approved);
+        let check = |r: &crate::assessments::Record| {
+            assert_eq!(serde_json::to_vec(&r.payload).unwrap(), json);
+            assert_eq!(r.digest, digest);
+            assert_eq!(
+                serde_json::to_vec(&r.validation.coverage).unwrap(),
+                coverage
+            );
+            assert!(r.needs_review);
+            assert!(r
+                .validation
+                .checks
+                .iter()
+                .any(|c| c.label == "Current supporting context" && c.state == "Needs review"));
+            assert!(!r.validation.final_eligible);
+        };
+        check(&w.get_assessment_record(&c.id, &r.payload.id).unwrap());
+        w.lock_workspace();
+        assert!(w.get_assessment_record(&c.id, &r.payload.id).is_err());
+        drop(w);
+        let mut w = Workspace::new(root.path().into());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        check(&w.get_assessment_record(&c.id, &r.payload.id).unwrap());
+        let out = tempdir().unwrap();
+        let backup = w
+            .create_backup(out.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        let prepared = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(prepared.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        check(&w.get_assessment_record(&c.id, &r.payload.id).unwrap());
+        let (pdf, pages) = crate::assessment_pdf::render(
+            &w.get_assessment_record(&c.id, &r.payload.id).unwrap(),
+            "2026-10-15T00:00:00Z",
+        )
+        .unwrap();
+        assert!(pdf.starts_with(b"%PDF-"));
+        assert!(pages > 1);
+    }
+
+    #[test]
     fn firm_branding_capture_preserves_legacy_reports_pdfs_and_client_plans_across_recovery() {
         use crate::branding;
         let (_root, mut w, _) = configured();

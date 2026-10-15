@@ -430,6 +430,15 @@ impl Workspace {
             .map_err(storage_error)
     }
 
+    pub fn get_financial_completeness(
+        &mut self,
+        client_id: &str,
+        input: crate::dashboard::Input,
+    ) -> Result<crate::completeness::Review, String> {
+        let snapshot = self.get_client_imports(client_id)?;
+        crate::completeness::review(&snapshot, input, chrono::Utc::now().date_naive())
+    }
+
     pub fn get_client_dashboard(
         &mut self,
         client_id: &str,
@@ -1445,6 +1454,44 @@ mod tests {
             status: "New Intake".to_owned(),
             goals: "SYNTHETIC_PRIVATE_GOAL_812767".to_owned(),
         }
+    }
+
+    #[test]
+    fn completeness_requires_scope_and_survives_lock_reopen_without_writing() {
+        let (directory, mut w, _) = configured();
+        let c = w.save_client(client_input()).unwrap();
+        let period = || crate::dashboard::Input {
+            from_month: "2026-09".into(),
+            through_month: "2026-09".into(),
+        };
+        assert!(w
+            .get_financial_completeness("other-client", period())
+            .is_err());
+        let before = serde_json::to_string(&w.get_client_imports(&c.id).unwrap()).unwrap();
+        let r = w.get_financial_completeness(&c.id, period()).unwrap();
+        assert_eq!(r.client_id, c.id);
+        assert!(!r.final_eligible);
+        assert!(r.accounts.is_empty());
+        assert_eq!(
+            serde_json::to_string(&w.get_client_imports(&c.id).unwrap()).unwrap(),
+            before
+        );
+        w.lock_workspace();
+        assert!(w
+            .get_financial_completeness(&c.id, period())
+            .err()
+            .unwrap()
+            .contains("locked"));
+        drop(w);
+        let mut reopened = Workspace::new(directory.path().to_path_buf());
+        reopened.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            reopened
+                .get_financial_completeness(&c.id, period())
+                .unwrap()
+                .revision,
+            r.revision
+        );
     }
 
     #[test]

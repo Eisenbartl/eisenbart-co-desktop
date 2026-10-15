@@ -12,9 +12,9 @@ const mocks = vi.hoisted(() => ({
   chooseBackupFolder:vi.fn(), chooseRestoreFile:vi.fn(), createWorkspaceBackup:vi.fn(), prepareWorkspaceRestore:vi.fn(), confirmWorkspaceRestore:vi.fn(), cancelWorkspaceRestore:vi.fn(),
   chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),getStatementAccounts:vi.fn(),saveFirmBranding:vi.fn(),getFirmBranding:vi.fn(),getClientImports:vi.fn(),reviewRecurringPayment:vi.fn(),reviewStatementBalances:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn(),
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
-  listClientScenarios:vi.fn(),getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
+  listAssessmentRecords:vi.fn(),getAssessmentRecord:vi.fn(),listClientScenarios:vi.fn(),getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
-  getDocumentCollection:vi.fn(),saveDocumentCollection:vi.fn(),getClientCare:vi.fn(),saveClientCare:vi.fn(),getFollowUpOverview:vi.fn(),
+  getFinancialCompleteness:vi.fn(),getDocumentCollection:vi.fn(),saveDocumentCollection:vi.fn(),getClientCare:vi.fn(),saveClientCare:vi.fn(),getFollowUpOverview:vi.fn(),
 }));
 
 vi.mock('./api', () => ({
@@ -47,6 +47,7 @@ beforeEach(() => {mocks.getFirmBranding.mockResolvedValue({organizationId:worksp
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
   mocks.getDocumentCollection.mockImplementation(async(clientId:string)=>({clientId,revision:0,latestRevision:0,updatedAt:null,reviewDate:'2026-10-14',items:[],history:[],accounts:[],sources:[],missing:0,received:0,archived:0}));
   mocks.getClientCare.mockImplementation(async(clientId:string)=>({clientId,revision:0,updatedAt:null,reviewDate:'2026-10-15',overdue:0,dueToday:0,data:{intake:{address:'',household:'',employment:'',employer:'',occupation:'',incomeNotes:''},followUps:[]}}));
+  mocks.listAssessmentRecords.mockImplementation(async(clientId:string)=>({clientId,records:[]}));
   mocks.listClientScenarios.mockImplementation(async(clientId:string)=>({clientId,records:[]}));
   mocks.getClientImports.mockImplementation(async (clientId:string)=>({clientId,revision:0,accounts:[],documents:[],records:[],history:[],merchantGroups:[],recurringHistory:[],summary:{pending:0,needsClarification:0,approved:0,rejected:0,income:'0.00',spending:'0.00',refunds:'0.00',netSpending:'0.00',netCash:'0.00',accountNet:[],warnings:[]}}));
   mocks.cancelClientCsv.mockResolvedValue(undefined);
@@ -415,7 +416,7 @@ it('exposes labeled future areas and every administration page without fake save
  render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.click(screen.getByRole('button',{name:/Scanned documents \/ OCR/}));expect(screen.getByRole('region',{name:'Scanned documents / OCR planned feature'})).toHaveTextContent('mandatory verification');expect(screen.queryByRole('button',{name:/Save OCR/})).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'Settings'}));
  for(const tab of ['Branding','Counselors & roles','Data management','Licensing','Help & about','Security','Backup & recovery']){
-  fireEvent.click(screen.getByRole('button',{name:tab}));expect(screen.getByRole('button',{name:tab})).toHaveAttribute('aria-current','page');if(tab==='Branding')await screen.findByLabelText('Firm display name');
+  await waitFor(()=>expect(screen.getByRole('button',{name:tab})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:tab}));expect(screen.getByRole('button',{name:tab})).toHaveAttribute('aria-current','page');if(tab==='Branding')await screen.findByLabelText('Firm display name');
  }
  expect(screen.getByRole('heading',{name:'Encrypted workspace backup'})).toBeInTheDocument();expect(screen.getByRole('button',{name:'Lock workspace to restore a backup'})).toBeInTheDocument();
 });
@@ -432,4 +433,15 @@ it('keeps backup operations on their page until completion and clears the passwo
 
 it('keeps the collection area when selecting a client and guards checklist drafts on navigation and lock',async()=>{
  render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.click(screen.getByRole('button',{name:'Collection checklist'}));fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});await screen.findByText('No document requests yet. Add a request to begin.');fireEvent.click(screen.getByRole('button',{name:'Add document request'}));fireEvent.change(screen.getByLabelText('Request title'),{target:{value:'Private fictional collection draft'}});vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Reports'}));expect(screen.getByLabelText('Request title')).toHaveValue('Private fictional collection draft');fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:bob.id}});expect(screen.getByLabelText('Client for Documents')).toHaveValue(alice.id);await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional collection draft');expect(mocks.saveDocumentCollection).not.toHaveBeenCalled();
+});
+
+it('opens working completeness and report checklist areas for the selected client without planned badges',async()=>{
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Financial Review'}));
+ const coverage=screen.getByRole('button',{name:'Completeness & final validation'});expect(coverage).not.toHaveTextContent('Planned');fireEvent.click(coverage);
+ expect(screen.getByRole('heading',{name:'Select a client to open Financial Review'})).toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Client for Financial Review'),{target:{value:alice.id}});await screen.findByRole('region',{name:'Financial completeness review'});
+ expect(mocks.getFinancialCompleteness).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Reports'}));fireEvent.click(screen.getByRole('button',{name:'Final report checklist'}));
+ await screen.findByLabelText('Saved assessment for validation');expect(mocks.listAssessmentRecords).toHaveBeenCalledWith(alice.id);
+ await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('region',{name:'Saved report checklist'})).not.toBeInTheDocument();
 });

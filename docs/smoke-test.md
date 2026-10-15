@@ -269,3 +269,14 @@ assessment and linked client plan, changes current contact details, restarts,
 backs up/restores and exports the historical report. It checks retained logo/
 original contact, latest current settings, history and review flags through
 visible controls. Product branding and mandatory financial warnings remain.
+
+## Financial completeness diagnostics (0.31.0 source)
+
+After the full financial, restart, encrypted restore and branding workflows,
+native automation opens the working completeness page with an explicit month,
+checks original account names, calendar-day coverage and the finalization block,
+then opens a historical report through the working final-report checklist. It
+checks the captured two-month period, changed-context flag, versioned checklist
+and inventory block. The previously exported historical internal PDF must contain
+the same validation disclosures. All prior financial assertions stay enabled.
+Artifacts use `/workspace/shared/desktop-smoke-completeness` for this stage.

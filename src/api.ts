@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getFinancialCompleteness:(clientId:string,input:{fromMonth:string;throughMonth:string})=>command<import('./types').CompletenessData>('get_financial_completeness',{clientId,input}),
   getFirmBranding:()=>command<import('./types').FirmBrandingRecord>('get_firm_branding'),
   saveFirmBranding:(input:{expectedRevision:number;data:import('./types').FirmBrandingData})=>command<import('./types').FirmBrandingRecord>('save_firm_branding',{input}),
   chooseBrandingLogo:()=>command<string|null>('choose_branding_logo'),
