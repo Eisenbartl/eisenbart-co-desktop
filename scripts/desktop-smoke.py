@@ -233,8 +233,15 @@ class WebDriver:
         self.scroll_element(element)
         element = self.interactive(selector)
         try:
-            self.command("POST", f"/element/{element}/clear", {})
-            self.command("POST", f"/element/{element}/value", {"text": value})
+            if value == "":
+                # WebKit rejects an empty send-keys text parameter. Use a real
+                # select-all/delete gesture so controlled fields also receive
+                # an input event; never replace their value through JavaScript.
+                self.command("POST", f"/element/{element}/value", {"text": "\ue009a\ue000\ue003"})
+                self.wait_value(selector, "", "keyboard-cleared native field")
+            else:
+                self.command("POST", f"/element/{element}/clear", {})
+                self.command("POST", f"/element/{element}/value", {"text": value})
         except DriverFailure as error:
             raise SmokeFailure(f"Native field {selector}: {error}") from error
 
