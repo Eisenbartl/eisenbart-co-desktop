@@ -133,3 +133,14 @@ coverage with current context flags. `CompletenessReview` exposes working live
 and saved-report pages with scoped asynchronous reads. Schema 20 and formats 1–6
 are unchanged; finalization remains blocked until expected inventory and explicit
 professional review can be recorded. See [financial-completeness.md](financial-completeness.md).
+
+`coverage_review.rs` validates bounded expected inventories, applicable dates and
+source selections as counselor context. `coverage_review_store` stores scoped
+schema-21 append-only snapshots with original choices, source/profile versions,
+atomic audit and recovery validation. Format-7 assessments capture the exact
+latest matching review; original-history checks and later-version flags preserve
+legacy formats 1–6 and old digests. Internal PDFs render captured review context;
+client PDFs omit it. `SavedCoverageReviews` adds guarded editing and read-only
+numbered history beneath live completeness diagnostics. Calendar bounds reuse
+`dashboard::period`; approved financial calculations remain unchanged. See
+[saved-completeness-reviews.md](saved-completeness-reviews.md).

@@ -57,7 +57,7 @@ at export. Client plans keep their existing incomplete-basis disclosures and
 inherit the original parent presentation; private internal validation details
 are not added to the client-plan PDF.
 
-## Explicit remaining work / next priority
+## Subsequent saved-review stage and remaining work
 
 **Finalization remains unavailable.** `finalEligible` is always false in this
 stage. A complete household inventory and final professional review have not yet
@@ -65,11 +65,11 @@ been recorded. A fully decided queue, zero arithmetic differences, full declared
 calendar coverage, a collection item marked received, or a saved scenario cannot
 clear that block.
 
-Next implement a versioned completeness review: explicit expected accounts and
+Version 0.32.0 implements [saved completeness reviews](saved-completeness-reviews.md): explicit expected accounts and
 applicable date ranges, missing accounts/obligations/information, documented
 exceptions and source selection, scoped optimistic saves with atomic audit,
-retained history and encrypted recovery. Bind that reviewed version to report
-capture and invalidate it when its source/client/period context changes. Do not
+retained history and encrypted recovery. The reviewed version is bound to report
+capture and flagged when its source/client/period context changes. Do not
 add a finalization button until a specific final-report contract and all required
 professional-review gates are implemented and tested. Broader statement parsers,
 OCR, advanced debt terms, printing and commercial release acceptance remain in

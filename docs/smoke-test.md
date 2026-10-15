@@ -282,3 +282,14 @@ the same validation disclosures. All prior financial assertions stay enabled.
 Artifacts use `/workspace/shared/desktop-smoke-completeness-final` for this stage.
 The OCR-area check selects its named tab rather than assuming its position among
 working and planned subpages.
+
+## Saved completeness reviews (0.32.0 source)
+
+After all prior financial/recovery/branding/coverage checks, native automation
+saves expected account periods and a missing loan, selects coverage evidence,
+opens numbered history read-only, captures version 1 in an internal assessment,
+amends to version 2, restarts and restores an encrypted backup. It verifies
+current and original versions, retained report figures, the later-review flag
+and a PDF using original missing-information text. Artifacts:
+`/workspace/shared/desktop-smoke-coverage-review`. No direct IPC or financial
+assertions are bypassed.

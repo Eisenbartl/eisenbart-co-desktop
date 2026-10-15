@@ -13,6 +13,8 @@ pub const CALCULATOR: &str = "approved-assessment-v1";
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Input {
     #[serde(default)]
+    pub completeness: Option<crate::coverage_review::Selection>,
+    #[serde(default)]
     pub expected_branding_revision: Option<i64>,
     #[serde(default)]
     pub intake: Option<crate::report_intake::Selection>,
@@ -35,6 +37,8 @@ pub struct Input {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Payload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completeness: Option<crate::coverage_review::Snapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub branding: Option<crate::branding::Snapshot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -134,14 +138,15 @@ pub fn capture_report(mut source: imports::Snapshot, supporting: bool) -> import
 }
 pub fn validate(payload: &Payload) -> Result<(), String> {
     let bad = || "The saved assessment evidence is invalid or unsupported.".to_owned();
-    if !matches!(payload.format, 1 | 2 | FORMAT | 4 | INTAKE_FORMAT | 6)
+    if !matches!(payload.format, 1 | 2 | FORMAT | 4 | INTAKE_FORMAT | 6 | 7)
         || (payload.format == 1 && payload.planning.is_some())
         || (payload.supporting.is_some() && payload.format < FORMAT)
         || (payload.format == FORMAT && payload.supporting.is_none())
-        || ((payload.intake.is_some() && !matches!(payload.format, INTAKE_FORMAT | 6))
+        || ((payload.intake.is_some() && !matches!(payload.format, INTAKE_FORMAT | 6 | 7))
             || (payload.format == INTAKE_FORMAT && payload.intake.is_none()))
         || (payload.format == 4 && payload.selected_scenario.is_none())
-        || (payload.selected_scenario.is_some() && !matches!(payload.format, 4 | INTAKE_FORMAT | 6))
+        || (payload.selected_scenario.is_some()
+            && !matches!(payload.format, 4 | INTAKE_FORMAT | 6 | 7))
         || (payload.selected_scenario.is_some() && payload.planning.is_none())
         || payload.calculator != CALCULATOR
         || payload.app_version.is_empty()
@@ -153,8 +158,23 @@ pub fn validate(payload: &Payload) -> Result<(), String> {
     {
         return Err(bad());
     }
-    if payload.branding.is_some() != (payload.format == 6) {
+    if (payload.branding.is_some() && !matches!(payload.format, 6 | 7))
+        || (payload.format == 6 && payload.branding.is_none())
+        || (payload.completeness.is_some() != (payload.format == 7))
+    {
         return Err(bad());
+    }
+    if let Some(review) = &payload.completeness {
+        crate::coverage_review::validate(review)?;
+        if review.client_id != payload.client.id
+            || review.profile_updated_at != payload.client.updated_at
+            || review.source_revision != payload.basis.revision
+            || review.choices != crate::coverage_review::choices(&payload.basis)
+            || payload.assessment.period_start.get(..7) != Some(review.data.from_month.as_str())
+            || payload.assessment.period_end.get(..7) != Some(review.data.through_month.as_str())
+        {
+            return Err(bad());
+        }
     }
     if let Some(branding) = &payload.branding {
         crate::branding::validate(branding)?;

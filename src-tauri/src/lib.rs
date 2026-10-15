@@ -7,6 +7,7 @@ mod budget_methods;
 mod cashflow;
 mod client_care;
 mod completeness;
+mod coverage_review;
 mod dashboard;
 mod debt;
 mod document_collection;
@@ -342,6 +343,22 @@ fn review_financial_facts(
     input: financial_facts::Input,
 ) -> Result<imports::Snapshot, String> {
     access(&state, |w| w.review_financial_facts(&client_id, input))
+}
+#[tauri::command]
+fn get_coverage_review(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    revision: Option<i64>,
+) -> Result<coverage_review::Record, String> {
+    access(&state, |w| w.get_coverage_review(&client_id, revision))
+}
+#[tauri::command]
+fn save_coverage_review(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: coverage_review::Input,
+) -> Result<coverage_review::Record, String> {
+    access(&state, |w| w.save_coverage_review(&client_id, input))
 }
 #[tauri::command]
 fn get_financial_completeness(
@@ -900,6 +917,8 @@ pub fn run() {
             get_client_imports,
             get_client_dashboard,
             get_financial_completeness,
+            get_coverage_review,
+            save_coverage_review,
             review_financial_facts,
             list_assessment_records,
             get_assessment_planning,

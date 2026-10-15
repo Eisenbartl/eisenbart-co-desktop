@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
   listAssessmentRecords:vi.fn(),getAssessmentRecord:vi.fn(),listClientScenarios:vi.fn(),getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
-  getFinancialCompleteness:vi.fn(),getDocumentCollection:vi.fn(),saveDocumentCollection:vi.fn(),getClientCare:vi.fn(),saveClientCare:vi.fn(),getFollowUpOverview:vi.fn(),
+  getCoverageReview:vi.fn(),getFinancialCompleteness:vi.fn(),getDocumentCollection:vi.fn(),saveDocumentCollection:vi.fn(),getClientCare:vi.fn(),saveClientCare:vi.fn(),getFollowUpOverview:vi.fn(),
 }));
 
 vi.mock('./api', () => ({
@@ -444,4 +444,9 @@ it('opens working completeness and report checklist areas for the selected clien
  fireEvent.click(screen.getByRole('button',{name:'Reports'}));fireEvent.click(screen.getByRole('button',{name:'Final report checklist'}));
  await screen.findByLabelText('Saved assessment for validation');expect(mocks.listAssessmentRecords).toHaveBeenCalledWith(alice.id);
  await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('region',{name:'Saved report checklist'})).not.toBeInTheDocument();
+});
+
+it('guards persistent completeness drafts across navigation and clears them on workspace lock',async()=>{
+ mocks.getCoverageReview.mockResolvedValue({clientId:alice.id,latestRevision:0,snapshot:null,history:[],choices:{accounts:[],sources:[]},currentSourceRevision:0,currentProfileUpdatedAt:alice.updatedAt,needsReview:false,reviewReasons:[],unresolved:[]});
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Financial Review'}));fireEvent.click(screen.getByRole('button',{name:'Completeness & final validation'}));fireEvent.change(screen.getByLabelText('Client for Financial Review'),{target:{value:alice.id}});await screen.findByText('Saved completeness reviews');fireEvent.click(screen.getByText('Saved completeness reviews'));await screen.findByLabelText('Missing information');fireEvent.change(screen.getByLabelText('Missing information'),{target:{value:'Private fictional completeness draft'}});vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByLabelText('Missing information')).toHaveValue('Private fictional completeness draft');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional completeness draft');
 });

@@ -287,10 +287,10 @@ export type IntakeSection = 'address'|'household'|'employment';
 export interface ReportIntakeSelection {expectedRevision:number;sections:IntakeSection[]}
 export interface ReportIntakePreview {clientId:string;revision:number;updatedAt:string|null;values:ClientIntake}
 export interface ReportIntakeSnapshot {clientId:string;revision:number;updatedAt:string;sections:IntakeSection[];values:ClientIntake}
-export interface AssessmentRecordInput {expectedBrandingRevision?:number;intake?:ReportIntakeSelection;selectedScenario?:SavedScenarioSelection;supporting?:{expectedNotesCount:number;noteIds:string[]}|null;planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
+export interface AssessmentRecordInput {completeness?:{revision:number};expectedBrandingRevision?:number;intake?:ReportIntakeSelection;selectedScenario?:SavedScenarioSelection;supporting?:{expectedNotesCount:number;noteIds:string[]}|null;planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
 export interface AssessmentRecordSummary {id:string;title:string;createdAt:string;periodStart:string;periodEnd:string;sourceRevision:number;needsReview:boolean}
 export interface AssessmentDirectory {clientId:string;records:AssessmentRecordSummary[]}
-export interface SavedAssessment {validation?:ReportValidation;scenario?:SavedScenario;clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{branding?:FirmBrandingSnapshot;intake?:ReportIntakeSnapshot;selectedScenario?:SavedScenarioSelection;supporting?:CapturedReportEvidence|null;planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
+export interface SavedAssessment {validation?:ReportValidation;scenario?:SavedScenario;clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{completeness?:CoverageReviewSnapshot;branding?:FirmBrandingSnapshot;intake?:ReportIntakeSnapshot;selectedScenario?:SavedScenarioSelection;supporting?:CapturedReportEvidence|null;planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
 
 export interface PlanningRevisions {budget:number;debt:number;savings:number;cashflow:number}
 export type PlanningDebtStrategy = 'none'|'snowball'|'avalanche';
@@ -366,3 +366,9 @@ export interface CompletenessData {
  sources:{id:string;fileName:string;accountId:string;periodStart:string|null;periodEnd:string|null;pending:number;clarification:number;rejected:number;undated:number;outsideDeclaredPeriod:number;issues:string[]}[];
 }
 export interface ReportValidation {version:string;finalEligible:boolean;coverage:CompletenessData;checks:{label:string;state:string;detail:string}[]}
+
+export interface CoverageChoices {accounts:{id:string;label:string;kind:string}[];sources:{id:string;accountId:string;fileName:string;sha256:string;periodStart:string|null;periodEnd:string|null}[]}
+export interface CoverageExpectation {accountId:string|null;label:string;kind:string;expectedStart:string|null;expectedEnd:string|null;exception:string;sourceIds:string[]}
+export interface CoverageReviewData {fromMonth:string;throughMonth:string;inventoryReviewed:boolean;inventoryNotes:string;accounts:CoverageExpectation[];missingInformation:string;conclusion:string}
+export interface CoverageReviewSnapshot {clientId:string;revision:number;updatedAt:string;sourceRevision:number;profileUpdatedAt:string;choices:CoverageChoices;data:CoverageReviewData}
+export interface CoverageReviewRecord {clientId:string;latestRevision:number;snapshot:CoverageReviewSnapshot|null;history:{revision:number;updatedAt:string;fromMonth:string;throughMonth:string}[];choices:CoverageChoices;currentSourceRevision:number;currentProfileUpdatedAt:string;needsReview:boolean;reviewReasons:string[];unresolved:string[]}

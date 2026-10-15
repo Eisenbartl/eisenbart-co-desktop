@@ -952,6 +952,50 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
     for reason in &validation.coverage.blocking_reasons {
         l.text(reason, 10.0)?;
     }
+    if let Some(review) = &p.completeness {
+        l.section("Captured counselor completeness review / internal context")?;
+        l.value("Saved review version", &review.revision.to_string())?;
+        l.value(
+            "Reviewed source revision",
+            &review.source_revision.to_string(),
+        )?;
+        l.text("Coverage source selection is review context only. It never removes approved rows from the captured financial amounts, verifies a bank or grants final report approval.",10.0)?;
+        l.value(
+            "Inventory marked reviewed",
+            if review.data.inventory_reviewed {
+                "Yes / counselor recorded"
+            } else {
+                "No / unknown"
+            },
+        )?;
+        l.value("Inventory notes", &review.data.inventory_notes)?;
+        l.value(
+            "Missing information",
+            if review.data.missing_information.is_empty() {
+                "None entered; not proof of completeness"
+            } else {
+                &review.data.missing_information
+            },
+        )?;
+        l.value("Review conclusion", &review.data.conclusion)?;
+        for e in &review.data.accounts {
+            l.value(
+                "Expected account or obligation",
+                &format!(
+                    "{} / {} / {} to {}",
+                    e.label,
+                    e.kind,
+                    e.expected_start.as_deref().unwrap_or("Unknown"),
+                    e.expected_end.as_deref().unwrap_or("Unknown")
+                ),
+            )?;
+            l.value("Coverage source IDs", &e.source_ids.join(", "))?;
+            l.value("Exception / applicability notes", &e.exception)?;
+        }
+        for issue in crate::coverage_review::unresolved(review) {
+            l.text(&issue, 10.0)?;
+        }
+    }
     l.section("Basis, exclusions and missing information")?;
     l.text(if p.planning.is_some(){"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply historical financial amounts. A separately labeled hypothetical saved planning scenario is captured below; its entered debt terms, allocations and forecasts do not change approved facts or establish a final budget agreement/client action plan. Session and recurring evidence is included only when explicitly selected, in a separately labeled section below. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."}else{"Approved imported activity only. Statement coverage remains unverified. Pending, NeedsClarification, Rejected, undated and out-of-period records do not supply financial amounts. Internal assessment only; no finalized client action plan, selected planning scenarios, debt APR/repayment terms or budget agreement are included. Session and recurring evidence is included only when explicitly selected below. Counselor text is advice, not approved transaction data. Balance facts are separately dated evidence; transaction running balances do not verify assets."},10.0)?;
     if p.supporting.is_some() {

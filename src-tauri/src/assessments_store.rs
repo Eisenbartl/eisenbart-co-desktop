@@ -72,6 +72,9 @@ fn decode(
     if let Some(i) = &p.intake {
         report_intake_store::validate_source(c, w, client, i)?;
     }
+    if let Some(review) = &p.completeness {
+        coverage_review_store::validate_source(c, w, client, review)?;
+    }
     if let Some(branding) = &p.branding {
         branding_store::validate_source(c, w, branding)?;
     }
@@ -141,6 +144,11 @@ pub(super) fn record(
     let mut review_reasons = Vec::new();
     if revision != payload.assessment.revision {
         review_reasons.push("Imported source decisions or verified financial facts changed after this assessment was saved. Its original figures remain historical; record a new assessment for current conclusions.".into());
+    }
+    if let Some(review) = &payload.completeness {
+        if coverage_review_store::revision(c, w, client)? != review.revision {
+            review_reasons.push("A newer completeness review was recorded. This assessment retains its original reviewed inventory, source selections, missing information and exceptions.".into());
+        }
     }
     if current_client != payload.client {
         review_reasons.push("The saved client profile changed after this assessment. The record retains its original identity and goals.".into());
@@ -270,6 +278,11 @@ impl Workspace {
                 .unwrap_or(false);
             let recorded_notes:Option<u32>=s.connection.query_row("SELECT json_extract(payload_json,'$.supporting.notesCount') FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
             let brand_revision:Option<i64>=s.connection.query_row("SELECT json_extract(payload_json,'$.branding.revision') FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
+            let coverage_revision:Option<i64>=s.connection.query_row("SELECT json_extract(payload_json,'$.completeness.revision') FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
+            let coverage_changed = match coverage_revision {
+                Some(r) => coverage_review_store::revision(&s.connection, &s.info, client)? != r,
+                None => false,
+            };
             let branding_changed =
                 branding_store::revision(&s.connection, &s.info)? != brand_revision.unwrap_or(0);
             records.push(Summary {
@@ -279,7 +292,8 @@ impl Workspace {
                 period_start,
                 period_end,
                 source_revision,
-                needs_review: branding_changed
+                needs_review: coverage_changed
+                    || branding_changed
                     || source_revision != source.revision
                     || profile_at_save != current.updated_at
                     || plans_changed
@@ -321,8 +335,8 @@ impl Workspace {
         let assessment = crate::dashboard::assess(
             &source,
             crate::dashboard::Input {
-                from_month: input.from_month,
-                through_month: input.through_month,
+                from_month: input.from_month.clone(),
+                through_month: input.through_month.clone(),
             },
             calculation_date,
         )?;
@@ -364,6 +378,20 @@ impl Workspace {
                 )
             })
             .transpose()?;
+        let completeness = input
+            .completeness
+            .map(|selection| {
+                coverage_review_store::capture(
+                    &tx,
+                    &s.info,
+                    client,
+                    selection,
+                    &source,
+                    &profile,
+                    (&input.from_month, &input.through_month),
+                )
+            })
+            .transpose()?;
         let basis = if supporting.is_some() {
             assessments::capture_report(source, true)
         } else {
@@ -379,10 +407,13 @@ impl Workspace {
             )
             .map_err(storage_error)?;
         let payload = Payload {
+            completeness: completeness.clone(),
             branding: branding.clone(),
             selected_scenario,
             planning,
-            format: if branding.is_some() {
+            format: if completeness.is_some() {
+                7
+            } else if branding.is_some() {
                 6
             } else if intake.is_some() {
                 assessments::INTAKE_FORMAT

@@ -71,7 +71,7 @@ fn scale(amount: i64, maximum: i64) -> u16 {
         ((i128::from(amount.abs()) * 1000) / i128::from(maximum)) as u16
     }
 }
-pub fn assess(source: &Snapshot, input: Input, today: NaiveDate) -> Result<Assessment, String> {
+pub fn period(input: &Input) -> Result<(NaiveDate, NaiveDate, i32), String> {
     let start = month(&input.from_month)?;
     let end_month = month(&input.through_month)?;
     let count = (end_month.year() - start.year()) * 12 + end_month.month() as i32
@@ -84,6 +84,10 @@ pub fn assess(source: &Snapshot, input: Input, today: NaiveDate) -> Result<Asses
         .checked_add_months(Months::new(1))
         .and_then(|d| d.pred_opt())
         .ok_or("Assessment period is invalid.")?;
+    Ok((start, end, count))
+}
+pub fn assess(source: &Snapshot, input: Input, today: NaiveDate) -> Result<Assessment, String> {
+    let (start, end, count) = period(&input)?;
     let mut dated = Vec::new();
     let mut undated_records = 0;
     for record in &source.records {

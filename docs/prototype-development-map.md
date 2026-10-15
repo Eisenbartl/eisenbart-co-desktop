@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.31.0 source
+# Prototype structure and development map — 0.32.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -21,7 +21,7 @@ Rust-backed data. Do not add another persistence layer or copy the calculators.
 |---|---|
 | Dashboard | Scoped practice counts, recent clients, appointments and follow-ups (`FollowUpOverview.tsx`) |
 | Clients | Directory/search/filter, create/edit/status/archive; Profile, Intake & follow-ups, Session notes, History & records, Complete record (`App.tsx`, `ClientCare.tsx`) |
-| Financial Review | Approved-data dashboard, explicit financial facts, running-balance checks, recurring-payment review and live completeness diagnostics (`ImportsEditor.tsx`, `CompletenessReview.tsx`) |
+| Financial Review | Approved-data dashboard, explicit financial facts, running-balance checks, recurring-payment review and live completeness diagnostics and versioned reviews (`ImportsEditor.tsx`, `CompletenessReview.tsx`, `SavedCoverageReviews.tsx`) |
 | Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers (`ImportsEditor.tsx` transactions page) |
 | Documents | CSV/selectable-text PDF import, statement account management, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`, `StatementAccounts.tsx`) |
 | Budget Planner | Saved income/expenses/allocations, remove/edit rows, optional budget method comparisons (`BudgetEditor.tsx`) |
@@ -74,14 +74,14 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Documents → Scanned documents / OCR | Extend supervised `pdf_process.rs`; vetted offline OCR assets/dependencies | Scanned/mixed/rotated/low-quality fixtures, time/memory/page limits, no guessed facts, explicit review, offline/license checks |
 | Transactions → Classification assistance | Pure local suggestions plus scoped decision/rule persistence; `RecurringReview.tsx` conventions | Suggestions never auto-approve; immutable provenance, false-positive correction, undo/reversal and client isolation |
 | Transactions → Activity history | Bounded scoped history query across existing review records | Stable pagination/filtering, corrections and both transfer legs, authorized scope, unreadable history failure and no writes |
-| Financial Review → Completeness & final validation — diagnostics working | `completeness.rs`, `CompletenessReview.tsx` | Implemented declared account/date/source coverage, unknowns/exclusions and explicit blocks. Next: versioned expected inventory, applicable periods and reviewed exceptions; [limits](financial-completeness.md) |
+| Financial Review → Completeness & final validation — working review/history | `completeness.rs`, `coverage_review.rs`, `coverage_review_store.rs`, `SavedCoverageReviews.tsx` | Declared coverage plus scoped schema-21 expected inventory, dates, source choices, missing information and exceptions; stale/audit/recovery controls and immutable format-7 capture. [Limits and final-approval work](saved-completeness-reviews.md) |
 | Financial Review → Savings progress | Dated verified balance facts and `FactMetricsView.tsx` | Real approved/verified sources, explicit period, unknown data, independent expected points and no estimates masquerading as facts |
 | Budget Planner → Paycheck allocation | Reuse `budget.rs` and `cashflow.rs`; define period allocations first | Exact frequency/rounding examples, unknown dates, insufficient funding and no automatic double-counted schedules |
 | Debt Planner → Advanced debt terms | Extend Rust debt models/versioned capture, not React math | Independent daily/variable/promotional/fee schedules, payment-order assumptions, unknown terms, comparable strategies and legacy payload compatibility |
 | Savings Planner → Funding & drawdown | Extend `savings.rs` and shared `planning.rs` contexts | No duplicate reserves or invented funds, bounded drawdown dates, independently checked deficits/recovery and transfers excluded from expenses |
 | Cash-Flow Calendar → Transfer settlement | Extend per-account `cashflow.rs` events and persisted assumptions | Outgoing/incoming dates, both account shortfalls, reserves, same-day order, no premature combined liquidity or invented settlement dates |
 | Financial Scenarios → New goals & funding sources | `scenarios.rs` / `scenarios_store` and control components | Explicit new goal/funding/account IDs, baseline remains unchanged, exact affordability/milestones, immutable linked report/recovery validation |
-| Reports → Final report checklist — review working | `completeness.rs`, `assessments_store.rs`, report UI/PDF | Implemented captured-source checks and current-context flags without changing historical payloads. Finalization remains blocked pending recorded completeness and professional-review gates |
+| Reports → Final report checklist — review working | `completeness.rs`, `assessments_store.rs`, report UI/PDF | Implemented captured-source checks and current-context flags without changing historical payloads. Exact saved completeness review attachment is implemented in format 7; finalization remains blocked pending professional-review gates |
 | Reports → Print & presentation | `assessment_pdf.rs`, branding snapshots and native printing | Embedded/offline assets, exact totals, private internal evidence excluded from client plans, page margins and Windows print acceptance |
 | Clients → History & records | Add bounded cross-module timeline and reviewed note amendments beside note storage | Authorship, original notes retained, reason/audit, scope/pagination, stale edits, restart and encrypted recovery |
 | Documents → Statement accounts (working) | `StatementAccounts.tsx`, `statement_accounts_store`, schema 19 | Scoped standalone create/rename/archive/reactivate, revision/audit/recovery checks; original source/report associations preserved; no destructive deletion |
@@ -100,12 +100,12 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **versioned completeness review** next: expected account inventory,
-applicable date ranges, missing obligations/information and documented exceptions
-bound to the exact client/period/source context. Save with scope, optimistic
-versions, atomic audit and recovery validation; retain historical reviews and
-bind a selected review to report capture. The new diagnostics are working,
-but complete household coverage and finalization are not yet recorded. See
-[financial-completeness.md](financial-completeness.md). Keep commercial licensing,
-categories/templates, native printing and multi-counselor permissions in their
-mapped future areas.
+Implement **final-report readiness and professional approval** next. Define the
+required complete-basis checks, applicable accounts/periods, documented exception
+decisions, current source/client/scenario context and agreement on assumptions.
+Record an explicit auditable approval and preserve immutable final exports only
+when its defined gates pass. Saved completeness reviews are working in 0.32.0;
+they record unknowns and exceptions without certifying completeness. See
+[saved-completeness-reviews.md](saved-completeness-reviews.md). Keep commercial
+licensing, categories/templates, native printing and multi-counselor permissions
+in their mapped future areas.

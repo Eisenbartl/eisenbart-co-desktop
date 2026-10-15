@@ -290,13 +290,13 @@ pub fn report(
     p: &crate::assessments::Payload,
     needs_review: bool,
 ) -> Result<ReportValidation, String> {
-    let coverage = from_assessment(&p.basis, &p.assessment)?;
+    let mut coverage = from_assessment(&p.basis, &p.assessment)?;
     let item = |label: &str, state: &str, detail: &str| Check {
         label: label.into(),
         state: state.into(),
         detail: detail.into(),
     };
-    let checks=vec![
+    let mut checks=vec![
         item("Client and source identity","Checked","Stored client, organization, counselor and source bindings passed authenticated validation. Confirm the intended person before sharing."),
         item("Calculation version","Checked",&p.calculator),
         item("Current supporting context",if needs_review{"Needs review"}else{"Checked"},if needs_review{"Source, profile, firm or selected planning context changed; original figures are preserved."}else{"Recorded context matches the last authenticated check. This does not establish completeness."}),
@@ -308,6 +308,16 @@ pub fn report(
         item("Planning assumptions and scenario",if p.planning.is_some(){"Needs review"}else{"Unknown"},if p.selected_scenario.is_some(){"A named saved combined scenario and its assumptions were captured. Confirm suitability and agreement; projections remain estimates."}else if p.planning.is_some(){"Saved entered plans and explicit assumptions were captured; no named combined scenario was selected. Confirm suitability and agreement."}else{"No planning scenario was selected. Its applicability and assumptions remain unconfirmed."}),
         item("Financial completeness","Blocked","Complete household inventory, source completeness and final professional review are not yet recorded. This assessment cannot be finalized."),
     ];
+    if let Some(review) = &p.completeness {
+        coverage.blocking_reasons[0]="A counselor inventory review is captured. Full source completeness and final professional approval remain unconfirmed.".into();
+        checks.push(item("Recorded completeness review","Needs review",&format!("Captured review version {}. Counselor-entered inventory, selected coverage sources and exceptions remain separate from approved amounts. {} unresolved items. Final professional approval is still required.",review.revision,crate::coverage_review::unresolved(review).len())));
+        if let Some(last) = checks
+            .iter_mut()
+            .find(|c| c.label == "Financial completeness")
+        {
+            last.detail="A counselor completeness review is captured. Source completeness, assumptions and final professional approval still require validation; this remains an internal assessment.".into();
+        }
+    }
     Ok(ReportValidation {
         version: "coverage-review-v1".into(),
         final_eligible: false,

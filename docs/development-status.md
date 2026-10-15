@@ -1,6 +1,27 @@
 # Development status
 
-## Current stage — financial completeness diagnostics (0.31.0, schema 20)
+## Current stage — saved completeness reviews (0.32.0, schema 21)
+
+Implemented encrypted append-only completeness reviews with expected known and
+unprovided accounts/obligations, applicable dates, selected coverage sources,
+inventory notes, missing information and exceptions. Historical versions are
+read-only; scoped optimistic saves, atomic audit, canonical validation and
+recovery preserve them. Optional format-7 reports capture the exact latest review
+for the same client/source/profile/period. Later review changes flag original
+reports without replacing their bytes. Internal views/PDFs show captured context;
+client-plan PDFs omit private review notes. See
+[saved-completeness-reviews.md](saved-completeness-reviews.md).
+
+Focused backend tests, all 172 UI tests, frontend build and warnings-denied Clippy
+have passed. Full backend, standalone desktop/native recovery and Windows source
+checks are pending. No installer was requested or created. Finalization remains
+unavailable; recording a review does not establish complete financial coverage.
+
+Next priority: final-report readiness and professional approval, with explicit
+applicability/exception gates and immutable audited final exports.
+
+
+## Financial completeness diagnostics (0.31.0, schema 20)
 
 Financial Review now has a working completeness page for declared account/source
 coverage, uncovered and overlapping dates, unknown periods, undecided rows and
@@ -42,7 +63,7 @@ use `/workspace/shared/completeness-`. The prior failed run is preserved under
 0.31.0 remains a development build. Installed Windows/offline and commercial
 acceptance require separate release work.
 
-Next priority: versioned completeness review, as detailed in the development map.
+That priority is implemented in 0.32.0 above; final-report approval remains separate.
 
 
 ## Firm/report branding (0.30.0, schema 20)

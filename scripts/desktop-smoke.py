@@ -1784,6 +1784,128 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")
     check_firm_branding(driver, artifacts, data_root, password, binary, restart_driver)
     check_completeness(driver, artifacts)
+    check_saved_coverage_reviews(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_saved_coverage_reviews(driver: WebDriver, artifacts: Path, data_root: Path,
+                                 password: str, binary: Path,
+                                 restart_driver: Callable[[], None]) -> None:
+    original='Fictional loan statement and repayment terms remain unprovided.'
+    changed='Fictional lender terms requested again at the next appointment.'
+    def review_page(select_client: bool = False) -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Financial Review']")
+        if select_client:
+            driver.select('#workspace-client','Alex Fictional')
+        driver.click_button('Completeness & final validation')
+        driver.click('.saved-coverage-reviews > summary')
+        driver.interactive('#coverage-review-from')
+    review_page()
+    driver.fill('#coverage-review-from','2026-09')
+    driver.fill('#coverage-review-through','2026-10')
+    driver.fill('#coverage-inventory-notes','Fictional household checking, savings and missing loan inventory reviewed.')
+    driver.fill('#coverage-missing-information',original)
+    driver.fill('#coverage-conclusion','Collect the remaining evidence before final approval.')
+    count=driver.observe_script("return document.querySelectorAll('input[id^=coverage-label-]').length")
+    if not isinstance(count,int) or count < 2:
+        raise SmokeFailure('The saved review omitted known checking/savings accounts')
+    for i in range(count):
+        driver.fill(f'#coverage-start-{i}','2026-09-01')
+        driver.fill(f'#coverage-end-{i}','2026-10-31')
+    driver.click(".saved-coverage-reviews input[aria-label^='Use ']")
+    driver.click_button('Add missing account or obligation')
+    driver.fill(f'#coverage-label-{count}','Fictional unprovided loan')
+    driver.select(f'#coverage-kind-{count}','loan')
+    driver.fill(f'#coverage-exception-{count}','Source statement not yet received; balance remains unknown.')
+    driver.click('#coverage-inventory-reviewed')
+    driver.click_button('Save completeness review')
+    driver.wait_text('.saved-coverage-reviews','Completeness review saved as version 1.','scoped completeness context saved')
+    driver.select('#coverage-review-version','Version 1 — 2026-09 through 2026-10')
+    driver.wait_text('.saved-coverage-reviews','Historical completeness review version 1.','numbered review history is read-only')
+    if not driver.observe_script("return document.querySelector('#coverage-inventory-notes').matches(':disabled')"):
+        raise SmokeFailure('Numbered saved completeness history was editable')
+    driver.select('#coverage-review-version','Current editable review (1)')
+    driver.wait_value('#coverage-missing-information',original,'original completeness draft reopened')
+    driver.scroll_to('.saved-coverage-reviews','start')
+    driver.screenshot(artifacts / 'native-saved-completeness-review.png')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+    driver.click('.saved-assessments > summary')
+    driver.interactive('#record-title')
+    driver.fill('#record-from','2026-09')
+    driver.fill('#record-through','2026-10')
+    driver.fill('#record-title','Fictional completeness-linked assessment')
+    driver.click('#record-include-completeness')
+    driver.click_button('Review saved completeness context')
+    driver.wait_text('.coverage-review-selection',original,'reviewed saved completeness evidence before report capture')
+    driver.interactive('#record-ack')
+    driver.click('#record-ack')
+    driver.click_button('Save assessment record')
+    driver.wait_text('.saved-assessments','Assessment record saved with its supporting evidence.','completeness version attached to immutable report')
+    driver.wait_text('.saved-assessment-view .captured-coverage-review','Saved completeness review version 1','original review retained in recorded report')
+    record_id=driver.observe_script("return document.querySelector('#saved-assessment').value")
+    totals=driver.text('.saved-assessment-view .assessment-totals')
+    review_page()
+    driver.fill('#coverage-missing-information',changed)
+    driver.click_button('Save completeness review')
+    driver.wait_text('.saved-coverage-reviews','Completeness review saved as version 2.','amendment retained as a new review version')
+    restart_driver()
+    driver.open(binary)
+    driver.fill('#password',password)
+    driver.click_button('Unlock workspace')
+    review_page(True)
+    driver.wait_value('#coverage-missing-information',changed,'current review survives restart')
+    driver.select('#coverage-review-version','Version 1 — 2026-09 through 2026-10')
+    driver.wait_value('#coverage-missing-information',original,'original review history survives restart')
+    driver.select('#coverage-review-version','Current editable review (2)')
+    driver.wait_value('#coverage-missing-information',changed,'return to current completeness context')
+    backup_folder=data_root / 'coverage-review-backups'
+    backup_folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
+    driver.click_button('Backup & recovery')
+    driver.fill('#backup-folder',str(backup_folder))
+    driver.fill('#backup-password',password)
+    driver.click_button('Create encrypted backup')
+    driver.wait_text('.backup-success','Encrypted backup saved.','completeness review backup created')
+    backup_path=Path(driver.text('.backup-file-path'))
+    driver.click_button('Lock workspace')
+    driver.click('.restore-panel > summary')
+    driver.fill('#restore-file',str(backup_path))
+    driver.fill('#restore-password',password)
+    driver.click_button('Verify backup for recovery')
+    driver.wait_text('.restore-review','Fictional Oak Counseling','completeness review backup verified')
+    driver.fill('#restore-confirmation','RESTORE')
+    driver.click_button('Restore verified workspace')
+    driver.wait_text('.auth-card','Workspace restored. Unlock it','completeness review backup activated')
+    driver.fill('#password',password)
+    driver.click_button('Unlock workspace')
+    review_page(True)
+    driver.wait_value('#coverage-missing-information',changed,'current completeness review restored')
+    driver.select('#coverage-review-version','Version 1 — 2026-09 through 2026-10')
+    driver.wait_value('#coverage-missing-information',original,'original review restored read-only')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+    driver.click('.saved-assessments > summary')
+    driver.interactive('#saved-assessment')
+    choice=driver.observe_script("return Array.from(document.querySelector('#saved-assessment').options).find(o=>o.value==="+json.dumps(record_id)+")?.textContent")
+    if not choice or 'Needs review' not in choice:
+        raise SmokeFailure('A newer completeness review did not flag its original report')
+    driver.select('#saved-assessment',choice)
+    driver.wait_text('.saved-assessment-view .captured-coverage-review',original,'report retains original completeness version after encrypted recovery')
+    if changed in driver.text('.saved-assessment-view .captured-coverage-review'):
+        raise SmokeFailure('Current completeness notes replaced original report context')
+    if driver.text('.saved-assessment-view .assessment-totals') != totals:
+        raise SmokeFailure('Coverage review edits changed the saved approved financial amounts')
+    destination=artifacts / 'captured-completeness-restored.pdf'
+    driver.fill_pdf_destination('#assessment-pdf-path',destination)
+    driver.click_button('Export saved assessment PDF')
+    driver.wait_text('.saved-assessments > .success-message',str(destination),'captured completeness PDF exported after recovery')
+    text=subprocess.run(['pdftotext','-layout',str(destination),'-'],check=True,capture_output=True,text=True).stdout
+    for expected in ['Captured counselor completeness review',original,'Fictional unprovided loan','NEEDS REVIEW']:
+        if expected not in text:
+            raise SmokeFailure(f'Captured completeness PDF omitted {expected!r}')
+    if changed in text:
+        raise SmokeFailure('Historical completeness PDF substituted current review notes')
+    driver.scroll_to('.saved-assessment-view .captured-coverage-review','start')
+    driver.screenshot(artifacts / 'native-captured-completeness-review.png')
+    status('saved completeness create/amend/read-only history, expected accounts and source selection, report binding, restart, encrypted recovery and historical PDF')
 
 
 def check_completeness(driver: WebDriver, artifacts: Path) -> None:
