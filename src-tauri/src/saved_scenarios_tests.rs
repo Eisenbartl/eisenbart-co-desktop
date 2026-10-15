@@ -37,6 +37,7 @@ fn save(w: &mut Workspace, id: &str) -> Record {
 fn report(w: &mut Workspace, id: &str, r: &Record) -> crate::assessments::Input {
     let client = w.get_client(id).unwrap();
     crate::assessments::Input {
+        intake: None,
         selected_scenario: Some(Selection {
             id: r.payload.id.clone(),
             digest: r.digest.clone(),
@@ -712,6 +713,7 @@ fn schema_fifteen_upgrade_and_failed_upgrade_preserve_original_models_and_audits
         .save_assessment_record(
             &id,
             crate::assessments::Input {
+                intake: None,
                 selected_scenario: None,
                 supporting: None,
                 planning: None,

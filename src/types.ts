@@ -283,10 +283,14 @@ export interface FactMetrics {
 
 export interface AssessmentEvidencePreview {clientId:string;sourceRevision:number;notesCount:number;notes:ClientNote[];groupCount:number;reviewCount:number}
 export interface CapturedReportEvidence {calculator:string;notesCount:number;notes:ClientNote[]}
-export interface AssessmentRecordInput {selectedScenario?:SavedScenarioSelection;supporting?:{expectedNotesCount:number;noteIds:string[]}|null;planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
+export type IntakeSection = 'address'|'household'|'employment';
+export interface ReportIntakeSelection {expectedRevision:number;sections:IntakeSection[]}
+export interface ReportIntakePreview {clientId:string;revision:number;updatedAt:string|null;values:ClientIntake}
+export interface ReportIntakeSnapshot {clientId:string;revision:number;updatedAt:string;sections:IntakeSection[];values:ClientIntake}
+export interface AssessmentRecordInput {intake?:ReportIntakeSelection;selectedScenario?:SavedScenarioSelection;supporting?:{expectedNotesCount:number;noteIds:string[]}|null;planning?:PlanningSelection|null;expectedRevision:number;expectedProfileUpdatedAt:string;fromMonth:string;throughMonth:string;title:string;findings:string;recommendations:string;followUp:string;acknowledge:boolean}
 export interface AssessmentRecordSummary {id:string;title:string;createdAt:string;periodStart:string;periodEnd:string;sourceRevision:number;needsReview:boolean}
 export interface AssessmentDirectory {clientId:string;records:AssessmentRecordSummary[]}
-export interface SavedAssessment {scenario?:SavedScenario;clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{selectedScenario?:SavedScenarioSelection;supporting?:CapturedReportEvidence|null;planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
+export interface SavedAssessment {scenario?:SavedScenario;clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{intake?:ReportIntakeSnapshot;selectedScenario?:SavedScenarioSelection;supporting?:CapturedReportEvidence|null;planning?:CapturedPlanning|null;format:number;calculator:string;appVersion:string;id:string;createdAt:string;workspace:WorkspaceInfo;client:Client;title:string;findings:string;recommendations:string;followUp:string;assessment:FinancialAssessment;basis:ClientImports}}
 
 export interface PlanningRevisions {budget:number;debt:number;savings:number;cashflow:number}
 export type PlanningDebtStrategy = 'none'|'snowball'|'avalanche';

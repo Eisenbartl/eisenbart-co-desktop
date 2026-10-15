@@ -10,6 +10,8 @@ pub mod backup;
 pub mod client_care_store;
 #[path = "imports_store.rs"]
 pub mod imports_store;
+#[path = "report_intake_store.rs"]
+pub mod report_intake_store;
 #[path = "scenarios_store.rs"]
 pub mod scenarios_store;
 

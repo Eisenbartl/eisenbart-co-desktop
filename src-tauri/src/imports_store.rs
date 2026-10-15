@@ -1327,6 +1327,7 @@ mod tests {
     }
     fn assessment_input(s: &Snapshot, c: &Client) -> crate::assessments::Input {
         crate::assessments::Input {
+            intake: None,
             selected_scenario: None,
             supporting: None,
             planning: None,

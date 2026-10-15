@@ -1,8 +1,9 @@
 # Windows evaluation guide
 
-The installer below is 0.23.0. Current 0.25.0 source additionally supports optional
-client intake, dated follow-up tasks/appointments and a filtered dashboard overview;
-see [the intake guide](client-intake-followups.md) and [overview guide](follow-up-overview.md).
+The installer below is 0.23.0. Current 0.26.0 source additionally supports optional
+client intake, dated follow-ups, a filtered dashboard overview and selected intake
+in immutable internal reports;
+see [the intake guide](client-intake-followups.md) [overview guide](follow-up-overview.md) and [report intake](report-intake-context.md).
 Those additions require a newer build and are not in the linked 0.23.0 installer.
 
 Version 0.23.0 is a Windows x64 evaluation build with encrypted local records,
@@ -298,6 +299,14 @@ Confirm the review acknowledgment and save the assessment. Use **Choose PDF
 destination** or enter a full private path and export the saved assessment PDF.
 Existing files are never overwritten. Reports retain their captured figures after
 later changes; **Needs review** flags changed context without rewriting history.
+
+To include intake, first save it in **Intake and follow-ups**. Enable **Include
+selected saved intake context in this internal report**, choose **Review saved
+intake** and select address, household and/or employment context. Reconfirm the
+acknowledgment and save. Selected original values appear in the internal report
+and PDF; client action-plan PDFs omit them. Selected details changing later leave
+a permanent **Needs review** flag, even if reverted. Unselected intake and task
+edits do not change this report context. See [report intake](report-intake-context.md).
 
 Temporary-income reports include the funding/recovery table and conditional
 forecast warnings. A separate planning report with reviewed monthly allocations

@@ -1,5 +1,26 @@
 # Development status
 
+## Stage 3M: selected intake in immutable counselor reports — 0.26.0 source
+
+Internal assessments now optionally capture explicitly reviewed address,
+household and/or employment/income sections from a saved intake version. Source
+validation binds captured values to original scoped care history; selected-field
+changes permanently flag the original report even after reversion. Unselected
+address/task changes do not flag intake, and client action-plan PDFs exclude it.
+Financial calculations are unchanged. Schema 17/dependencies are unchanged;
+format 5 adds intake while preserving absent-field legacy serialization.
+See [report-intake-context.md](report-intake-context.md).
+
+Validation in progress: locked setup, three focused backend checks, production
+frontend build and all 132 interface tests passed (including 19 report tests).
+Formatting and warnings-denied Clippy passed. Initial fixture compilation, PDF
+whitespace assertions and a test initializer lint were corrected without removing
+behavior checks. Full backend, native workflow and Windows source checks will be
+recorded after completion. No installer is being created, per user instruction.
+
+Next priority: organization contact details and branding in saved reports/client
+plans, followed by remaining report/model/document and release requirements.
+
 ## Stage 3L: practice appointment/follow-up overview — 0.25.0 source
 
 The dashboard now shows latest saved tasks/appointments across scoped clients,

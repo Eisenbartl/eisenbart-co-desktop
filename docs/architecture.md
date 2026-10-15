@@ -73,3 +73,12 @@ Combined scenario previews (`combined-preview-v1`) read all four scoped saved mo
 `saved_scenarios.rs` and `storage::scenarios_store` add schema 16 immutable combined proposals. Inputs/counts/versions are checked in a scoped atomic save, all captured calculations are recomputed on read/recovery, and compound append-only links bind selected format 4 assessments to their original proposed model sets. Formats 1–3 remain supported. Internal PDF export validates the linked record and prints selected comparison context separately from approved totals. See [saved-combined-scenarios.md](saved-combined-scenarios.md).
 
 Optional combined proposal extensions add dated debt extras and indexed existing-goal contributions, retaining empty-field/warning compatibility for earlier immutable captures. They reuse the original Rust calculators and report/recovery provenance; schema 16 is unchanged. See [scenario-payment-goal-controls.md](scenario-payment-goal-controls.md).
+
+`report_intake.rs` canonicalizes explicit address/household/employment selections;
+`storage::report_intake_store` captures the expected saved care version inside
+the assessment transaction, validates original selected values/timestamps on
+read/recovery and checks later bounded care versions for permanent selected-field
+changes. Format-5 payloads retain only selected intake fields. Optional omission
+preserves formats 1–4 bytes/digests; schema 17 is unchanged. Internal PDF export
+prints counselor context separately from financial facts. The client-plan PDF
+renderer excludes it. See [report-intake-context.md](report-intake-context.md).

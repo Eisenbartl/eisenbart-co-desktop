@@ -1,4 +1,4 @@
-# Remaining original requirements after 0.25.0 source
+# Remaining original requirements after 0.26.0 source
 
 The application has an encrypted offline desktop foundation, isolated clients and
 notes, exact entered budgets/debt/savings/cash-flow plans, encrypted recovery,
@@ -17,7 +17,7 @@ workflow passed through direct WebKit transport before this feature stage; see
 | Reports and client plans | Further comparative report measures and remaining financial models; client-plan logo/contact branding and complete-basis final validation; direct application printing; savings-goal progress and final report validation |
 | Financial models — next | Savings drawdown/funding-source simulation and period-specific client-plan allocations; new-goal and account-targeted extra payment controls; advanced daily/variable/promotional debt terms, delayed transfer settlement, finer account reserve allocation, and meaningful gross-income underwriting metrics where verified data exists |
 | Documents/review | Scanned PDF/OCR, institution/card/loan/paystub adapters, broader supported input formats, category suggestions and document/account workflow refinements with provenance/review safeguards |
-| Client management/workflow | Further intake/report integration, configurable time zones and remaining account/document/action-history views; broader review/usability acceptance. The practice-wide filtered appointment/follow-up overview is implemented in 0.25.0 source. Optional household/employment context and per-client dated reminders/completion/cancellation are implemented in 0.24.0 source. |
+| Client management/workflow | Configurable time zones and remaining account/document/action-history views; broader review/usability acceptance. Explicitly selected intake sections in immutable internal reports are implemented in 0.26.0 source. The practice-wide filtered appointment/follow-up overview is implemented in 0.25.0 source. Optional household/employment context and per-client dated reminders/completion/cancellation are implemented in 0.24.0 source. |
 | Security/privacy | Configurable lock/password safeguards, multiple counselor accounts/roles and organization permissions, export/deletion, broader audit/recovery options, independent security/dependency/license review and privacy acceptance |
 | Commercial customization/support | Organization branding/logo/contact details, licensing architecture, commercial documentation/disclosures/legal review and update/support procedures |
 | Windows release/final verification | Signed installer, clean Windows 11 offline install and complete workflows, upgrades/uninstall, recovery drills, realistic data-volume tests, usability/accessibility and final release acceptance |

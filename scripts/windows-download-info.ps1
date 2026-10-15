@@ -68,11 +68,12 @@ text PDF transaction review; recurring-payment and running-balance review; appro
 data dashboards; saved scenarios; counselor and client-plan PDF reports.
 
 NEW IN THIS VERSION
-The dashboard lists saved tasks and appointments across your scoped clients.
-Overdue, due-today, upcoming and completed/cancelled views; kind/name/title filters;
-optional archived clients; and 25-item pages are available. Open a row to review
-the exact current client follow-up. Dates and times use America/Chicago; reminders
-appear inside the app. Intake notes remain separate from financial facts/reports.
+Internal counselor reports can include explicitly selected saved address, household
+and employment/income context. Review saved intake, select sections and acknowledge
+before recording. Later selected-detail changes permanently flag the original
+report, including after reversion. Unselected fields and follow-up outcomes are
+excluded; client action-plan PDFs omit internal intake. Financial models use their
+separate inputs. Existing dashboard follow-ups remain available.
 
 TRY THIS
 1. Create a fictional client; open Intake and follow-ups to try the new controls.

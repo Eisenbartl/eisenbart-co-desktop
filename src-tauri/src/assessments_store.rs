@@ -69,6 +69,9 @@ fn decode(
         return Err(STORAGE_ERROR.into());
     }
     scenarios_store::validate_link(c, w, client, &p)?;
+    if let Some(i) = &p.intake {
+        report_intake_store::validate_source(c, w, client, i)?;
+    }
     texts(&p)?;
     assessments::validate(&p).map_err(|_| STORAGE_ERROR.to_owned())?;
     if let Some(e) = &p.supporting {
@@ -142,6 +145,11 @@ pub(super) fn record(
     if w != &payload.workspace {
         review_reasons
             .push("Workspace identity details changed after this assessment was saved.".into());
+    }
+    if let Some(i) = &payload.intake {
+        if report_intake_store::changed_since(c, w, client, i)? {
+            review_reasons.push("Selected intake information changed after this report was saved. The original selected context remains historical, including after values are reverted.".into());
+        }
     }
     if let Some(e) = &payload.supporting {
         if notes_count(c, w, client)? != e.notes_count {
@@ -336,6 +344,15 @@ impl Workspace {
             let notes=selection.note_ids.iter().map(|id|note(&tx,&s.info,client,id)).collect::<Result<Vec<_>,_>>()?;
             Ok(crate::report_evidence::Snapshot{calculator:"counselor-evidence-v1".into(),notes_count:count,notes})
         }).transpose()?;
+        let intake = input
+            .intake
+            .map(|selection| {
+                crate::report_intake::capture(
+                    report_intake_store::current(&tx, &s.info, client)?,
+                    selection,
+                )
+            })
+            .transpose()?;
         let basis = if supporting.is_some() {
             assessments::capture_report(source, true)
         } else {
@@ -344,7 +361,9 @@ impl Workspace {
         let payload = Payload {
             selected_scenario,
             planning,
-            format: if chosen.is_some() {
+            format: if intake.is_some() {
+                assessments::INTAKE_FORMAT
+            } else if chosen.is_some() {
                 4
             } else if supporting.is_some() {
                 assessments::FORMAT
@@ -352,6 +371,7 @@ impl Workspace {
                 2
             },
             supporting,
+            intake,
             calculator: assessments::CALCULATOR.into(),
             app_version: env!("CARGO_PKG_VERSION").into(),
             id: Uuid::new_v4().to_string(),

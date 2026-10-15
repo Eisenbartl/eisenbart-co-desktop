@@ -21,6 +21,7 @@ mod planning;
 mod reconciliation;
 mod recurring;
 mod report_evidence;
+mod report_intake;
 mod saved_scenarios;
 mod savings;
 mod scenarios;
@@ -577,6 +578,14 @@ fn get_client(state: State<'_, DesktopState>, id: String) -> Result<Client, Stri
 }
 
 #[tauri::command]
+fn get_assessment_intake(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<report_intake::Preview, String> {
+    access(&state, |w| w.get_assessment_intake(&client_id))
+}
+
+#[tauri::command]
 fn get_client_care(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -816,6 +825,7 @@ pub fn run() {
             list_assessment_records,
             get_assessment_planning,
             get_assessment_evidence,
+            get_assessment_intake,
             review_client_action_plan,
             list_client_action_plans,
             get_client_action_plan,

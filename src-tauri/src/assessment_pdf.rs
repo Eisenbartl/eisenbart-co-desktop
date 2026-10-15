@@ -888,6 +888,38 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
         };
         l.text(warning, 10.0)?;
     }
+    if let Some(i) = &p.intake {
+        l.section("Selected intake context / counselor-entered information")?;
+        l.text("Only explicitly selected intake sections are captured here. These are counselor-entered context, not verified financial facts, approved income or model assumptions. Missing information is not zero; follow-up tasks and their outcome notes are excluded.",10.0)?;
+        l.value("Saved intake version", &i.revision.to_string())?;
+        l.value("Intake saved at (UTC)", &i.updated_at)?;
+        fn value(v: &str) -> &str {
+            if v.is_empty() {
+                "Not recorded"
+            } else {
+                v
+            }
+        }
+        if i.sections.iter().any(|s| s == "address") {
+            l.value("Mailing address", value(&i.values.address))?;
+        }
+        if i.sections.iter().any(|s| s == "household") {
+            l.value("Household composition", value(&i.values.household))?;
+        }
+        if i.sections.iter().any(|s| s == "employment") {
+            l.value(
+                "Employment status",
+                crate::report_intake::employment_label(&i.values.employment),
+            )?;
+            for (label, v) in [
+                ("Employer", &i.values.employer),
+                ("Occupation", &i.values.occupation),
+                ("Employment and income context", &i.values.income_notes),
+            ] {
+                l.value(label, value(v))?;
+            }
+        }
+    }
     l.section("Approved income, spending and cash flow")?;
     for (label, v) in [
         ("Income receipts", &a.totals.income),

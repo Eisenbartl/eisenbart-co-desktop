@@ -1064,6 +1064,9 @@ def export_client_action_pdf(driver: WebDriver, artifacts: Path, label: str, nee
             raise SmokeFailure(f"Client action plan PDF missing expected text: {expected}")
     if "Selected counseling session notes" in text or "Casey fictional discussion" in text:
         raise SmokeFailure("Internal counselor note evidence entered a client PDF")
+    for private in ["Selected intake context", "Alex fictional employer", "Two fictional adults and one dependent", "Entered intake context only"]:
+        if private in text:
+            raise SmokeFailure(f"Internal intake context entered a client PDF: {private}")
     if needs_review and "NEEDS REVIEW" not in text:
         raise SmokeFailure("Historical client plan omitted its review flag")
     if text.index("Verify missing statements") > text.index("Confirm lender payment dates"):
@@ -1122,6 +1125,12 @@ def export_captured_planning_pdf(driver: WebDriver, artifacts: Path, label: str)
             raise SmokeFailure(f"Captured planning PDF missing expected text: {expected}")
     if "Selected counseling session notes" not in text or "Selected / available notes at capture: 1 / 1" not in text or "Casey fictional discussion" in text:
         raise SmokeFailure("Captured planning report lost its selected note or mixed clients")
+    for expected in ["Selected intake context", "Alex fictional employer", "Two fictional adults and one dependent", "not verified financial facts"]:
+        if expected not in text:
+            raise SmokeFailure(f"Selected intake missing from internal PDF: {expected}")
+    for excluded in ["Later omitted fictional address", "Unrelated fictional appointment outcome", "Alex changed employer"]:
+        if excluded in text:
+            raise SmokeFailure(f"Unselected or later intake leaked into report: {excluded}")
     if "Monthly income: USD 3466.67" in text:
         raise SmokeFailure("Later plan income replaced captured PDF assumptions")
     status(f"native planning PDF preserves original assumptions and independently expected milestones ({label})")
@@ -1141,6 +1150,8 @@ def assert_captured_planning_restored(driver: WebDriver, artifacts: Path, label:
     driver.wait_text(".saved-assessment-view .scenario-savings-outcome","2028-06-30","captured savings milestone")
     driver.wait_text(".saved-assessment-view .scenario-cashflow-outcome","$3,300.00","separate captured per-account forecast")
     driver.wait_text(".saved-assessment-view .assessment-totals","Operating cash flow$1,820.02","approved history remains separate from entered planning")
+    driver.wait_text(".saved-assessment-view .report-intake-context", "Alex fictional employer", "captured original employment remains historical")
+    driver.wait_text(".saved-assessment-view .report-intake-context", "Two fictional adults and one dependent", "selected household survives recovery")
     export_captured_planning_pdf(driver,artifacts,label)
     assert_client_action_restored(driver, artifacts, label)
     driver.click(".saved-assessments > summary")
@@ -1167,11 +1178,44 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.click_button("Review report evidence")
     driver.wait_text(".report-evidence-context", "1 saved notes", "Alex current counselor context stays scoped")
     driver.click(".report-evidence-selection .check-label input")
+    driver.click("#record-include-intake")
+    driver.click_button("Review saved intake")
+    driver.interactive("#record-intake-household")
+    driver.click("#record-intake-household")
+    driver.click("#record-intake-employment")
+    driver.wait_text(".report-intake-selection", "Alex fictional employer", "explicitly reviewed saved employment context")
     driver.click("#record-ack")
     driver.click_button("Save assessment record")
     driver.wait_text(".saved-assessment-view h3","Alex saved planning scenario","saved scenario-backed assessment")
     driver.wait_text(".saved-assessment-status","Recorded context matches","new captured scenario context")
+    if driver.command("GET", f"/element/{driver.element('.client-care')}/property/open") is not True:
+        driver.click(".client-care > summary")
+    driver.fill("#intake-address", "Later omitted fictional address")
+    driver.fill("#follow-notes-0", "Unrelated fictional appointment outcome")
+    driver.wait_value("#intake-address", "Later omitted fictional address", "omitted address replacement")
+    driver.wait_value("#follow-notes-0", "Unrelated fictional appointment outcome", "unrelated outcome replacement")
+    driver.click_button("Save intake and follow-ups")
+    driver.wait_text(".client-care .success-message", "saved locally", "unselected care changes saved")
+    driver.interactive("#record-title")
+    driver.wait_text(".saved-assessment-status", "Recorded context matches", "unselected care changes do not invalidate report")
+    driver.click(".client-care > summary")
     save_client_action_plan(driver, artifacts)
+    driver.click(".client-care > summary")
+    driver.fill("#intake-employer", "Alex changed employer")
+    driver.wait_value("#intake-employer", "Alex changed employer", "selected employer replacement")
+    driver.click_button("Save intake and follow-ups")
+    driver.wait_text(".saved-assessment-status", "Needs review", "selected intake change flags report")
+    driver.interactive("#intake-employer")
+    driver.fill("#intake-employer", "Alex fictional employer")
+    driver.wait_value("#intake-employer", "Alex fictional employer", "selected employer restored")
+    driver.click_button("Save intake and follow-ups")
+    driver.interactive("#record-title")
+    driver.wait_text(".saved-assessment-status", "Needs review", "selected intake reversion never reactivates historical report")
+    driver.scroll_to(".saved-assessment-view .report-intake-context", "start")
+    driver.command("POST", "/execute/async", {"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));", "args":[]})
+    driver.screenshot(artifacts / "native-selected-report-intake.png")
+    driver.click(".client-care > summary")
+    status("selected report intake: unselected address/outcome ignored; selected employer change and reversion permanently flagged")
     driver.fill("#budget-amount-0","1600")
     driver.click_button("Save budget and calculate")
     driver.wait_text(".budget-panel .budget-totals","$3,466.67","independent later income change")

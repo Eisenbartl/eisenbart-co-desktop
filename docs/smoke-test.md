@@ -227,3 +227,14 @@ restart/both recovery paths retain monthly assumptions, deficits, recovery and
 separate 1,820.02 approved operating activity. Older comparisons/client plans
 remain in the same complete run. Artifacts: `native-temporary-income-*.png` and
 `temporary-income-*.pdf`.
+
+## Selected report intake (0.26.0 source)
+
+The native synthetic saved-planning-report flow explicitly previews intake and
+selects household/employment only. It changes an omitted address and appointment
+outcome without invalidating the report, then changes/reverts selected employment
+and verifies permanent Needs review. Restart, encrypted restore and storage-error
+recovery retain original selected context. Internal PDF text includes selected
+household/employer/disclosure and excludes later/omitted values; client action-plan
+PDFs exclude internal intake. Existing financial/PDF expected amounts remain.
+Artifacts: `/workspace/shared/desktop-smoke-intake-report` for this checkpoint.
