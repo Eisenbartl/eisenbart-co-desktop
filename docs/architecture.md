@@ -144,3 +144,17 @@ client PDFs omit it. `SavedCoverageReviews` adds guarded editing and read-only
 numbered history beneath live completeness diagnostics. Calendar bounds reuse
 `dashboard::period`; approved financial calculations remain unchanged. See
 [saved-completeness-reviews.md](saved-completeness-reviews.md).
+
+
+`final_reports.rs` defines bounded counselor-final-report-v1 readiness and canonical
+professional decisions. `final_reports_store` uses schema-22 scoped append-only
+approvals with compound parent ownership, original digest binding, rechecked
+readiness receipts, Chicago report dates and atomic audit. In-memory PDF rendering
+precedes approval persistence. Historical validation recomputes original gates
+at approval time; later context/freshness flags do not rewrite approval bytes.
+Encrypted restore validates each bounded approval and its original parent.
+`FinalReportApproval` collects decisions without financial overrides, participates
+in global draft/busy guards and ignores late private responses. Final PDF export
+adds approval/scope/limitations and current flags, preserving original evidence;
+legacy internal and client-plan formats remain unchanged. See
+[final-report-approval.md](final-report-approval.md).

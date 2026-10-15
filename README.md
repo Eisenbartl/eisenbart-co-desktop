@@ -1,6 +1,8 @@
 # Eisenbart & Co. Financial Counseling Suite
 
-Version **0.32.0 source** adds [saved completeness reviews](docs/saved-completeness-reviews.md) with expected accounts, applicable dates, missing information, exceptions and encrypted version history. Reports can capture the exact reviewed version; later changes preserve the original report and flag it for review. Final professional approval remains future work. No installer was created.
+Version **0.33.0 source** adds [final counselor report approval](docs/final-report-approval.md): required evidence gates, explicit professional decisions, immutable audited approvals and offline final PDFs. Later context changes preserve the original approval and flag it for review. No installer was created.
+
+Version **0.32.0 source** adds [saved completeness reviews](docs/saved-completeness-reviews.md) with expected accounts, applicable dates, missing information, exceptions and encrypted version history. Reports can capture the exact reviewed version; later changes preserve the original report and flag it for review. Professional approval follows in 0.33.0 above. No installer was created.
 
 Version **0.31.0 source** adds [financial completeness diagnostics and saved-report validation](docs/financial-completeness.md): declared account/date coverage, gaps/overlaps, unresolved source checks and historical PDF checklists. Finalization remains blocked pending recorded complete inventory and professional review. Versions 0.29–0.30 added [statement account management](docs/statement-account-management.md) and [firm/report branding](docs/firm-report-branding.md). No new installer was created; the downloadable preview remains **0.23.0**.
 
@@ -54,6 +56,7 @@ On Ubuntu/Debian development hosts, Tauri also requires the platform packages li
 ## Documentation
 
 - [Selectable-text PDF import and review](docs/pdf-import-review.md)
+- [Final counselor report approval](docs/final-report-approval.md)
 - [Offline assessment PDF export](docs/assessment-pdf-export.md)
 - [Captured planning scenarios](docs/captured-planning-scenarios.md)
 - [Client action plans](docs/client-action-plans.md)

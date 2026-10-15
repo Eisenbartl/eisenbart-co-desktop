@@ -22,6 +22,11 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  reviewFinalReport:(clientId:string,assessmentId:string)=>command<import('./types').FinalReportPreview>('review_final_report',{clientId,assessmentId}),
+  getFinalReport:(clientId:string,id:string)=>command<import('./types').FinalReportRecord>('get_final_report',{clientId,id}),
+  approveFinalReport:(clientId:string,input:{assessmentId:string;expectedDigest:string;expectedReadiness:string;decision:import('./types').FinalDecision})=>command<import('./types').FinalReportRecord>('approve_final_report',{clientId,input}),
+  chooseFinalReportPdf:(clientId:string,id:string)=>command<string|null>('choose_final_report_pdf',{clientId,id}),
+  exportFinalReportPdf:(clientId:string,id:string,path:string)=>command<{path:string;pages:number;recordId:string}>('export_final_report_pdf',{clientId,id,path}),
   getCoverageReview:(clientId:string,revision:number|null=null)=>command<import('./types').CoverageReviewRecord>('get_coverage_review',{clientId,revision}),
   saveCoverageReview:(clientId:string,input:{expectedRevision:number;expectedSourceRevision:number;expectedProfileUpdatedAt:string;data:import('./types').CoverageReviewData})=>command<import('./types').CoverageReviewRecord>('save_coverage_review',{clientId,input}),
   getFinancialCompleteness:(clientId:string,input:{fromMonth:string;throughMonth:string})=>command<import('./types').CompletenessData>('get_financial_completeness',{clientId,input}),

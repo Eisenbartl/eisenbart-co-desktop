@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.32.0 source
+# Prototype structure and development map — 0.33.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -81,7 +81,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Savings Planner → Funding & drawdown | Extend `savings.rs` and shared `planning.rs` contexts | No duplicate reserves or invented funds, bounded drawdown dates, independently checked deficits/recovery and transfers excluded from expenses |
 | Cash-Flow Calendar → Transfer settlement | Extend per-account `cashflow.rs` events and persisted assumptions | Outgoing/incoming dates, both account shortfalls, reserves, same-day order, no premature combined liquidity or invented settlement dates |
 | Financial Scenarios → New goals & funding sources | `scenarios.rs` / `scenarios_store` and control components | Explicit new goal/funding/account IDs, baseline remains unchanged, exact affordability/milestones, immutable linked report/recovery validation |
-| Reports → Final report checklist — review working | `completeness.rs`, `assessments_store.rs`, report UI/PDF | Implemented captured-source checks and current-context flags without changing historical payloads. Exact saved completeness review attachment is implemented in format 7; finalization remains blocked pending professional-review gates |
+| Reports → Final report checklist — approval working | `final_reports.rs`, `final_reports_store.rs`, `FinalReportApproval.tsx`, report PDF | Schema-22 scoped immutable counselor approval, current evidence gates, account/scenario decisions, exact parent binding, atomic audit, final PDF and restart/recovery. [Policy limits and future work](final-report-approval.md) |
 | Reports → Print & presentation | `assessment_pdf.rs`, branding snapshots and native printing | Embedded/offline assets, exact totals, private internal evidence excluded from client plans, page margins and Windows print acceptance |
 | Clients → History & records | Add bounded cross-module timeline and reviewed note amendments beside note storage | Authorship, original notes retained, reason/audit, scope/pagination, stale edits, restart and encrypted recovery |
 | Documents → Statement accounts (working) | `StatementAccounts.tsx`, `statement_accounts_store`, schema 19 | Scoped standalone create/rename/archive/reactivate, revision/audit/recovery checks; original source/report associations preserved; no destructive deletion |
@@ -100,12 +100,12 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **final-report readiness and professional approval** next. Define the
-required complete-basis checks, applicable accounts/periods, documented exception
-decisions, current source/client/scenario context and agreement on assumptions.
-Record an explicit auditable approval and preserve immutable final exports only
-when its defined gates pass. Saved completeness reviews are working in 0.32.0;
-they record unknowns and exceptions without certifying completeness. See
-[saved-completeness-reviews.md](saved-completeness-reviews.md). Keep commercial
-licensing, categories/templates, native printing and multi-counselor permissions
-in their mapped future areas.
+Implement **additional document types, starting with supervised credit-card
+statement review** next. Define liability-account movement/sign semantics and
+independent synthetic examples before extending existing import/reconciliation
+controls; preserve original provenance, mandatory decisions and exact amounts.
+Do not treat a card purchase as a cash-account movement or silently double-count
+repayment transfers. Broader loan/paystub adapters and OCR remain separate stages.
+Final counselor approval is working under the bounded v1 policy in 0.33.0; see
+[its limits](final-report-approval.md). Keep signing, commercial licensing, native
+printing, multi-counselor permissions and installed Windows acceptance separate.

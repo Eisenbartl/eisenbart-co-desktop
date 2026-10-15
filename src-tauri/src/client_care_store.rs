@@ -453,7 +453,7 @@ mod tests {
         let a = w.save_client(client_input()).unwrap();
         w.add_client_note(&a.id, "Original fictional note").unwrap();
         let s = w.session().unwrap();
-        s.connection.execute_batch("DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE statement_account_history; DROP TRIGGER statement_accounts_no_update; DROP TRIGGER statement_accounts_no_delete; DROP TABLE document_collection_snapshots; DROP TABLE client_care_snapshots; PRAGMA user_version=16; CREATE TABLE audit_events_v17(collision TEXT);").unwrap();
+        s.connection.execute_batch("DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE statement_account_history; DROP TRIGGER statement_accounts_no_update; DROP TRIGGER statement_accounts_no_delete; DROP TABLE document_collection_snapshots; DROP TABLE client_care_snapshots; PRAGMA user_version=16; CREATE TABLE audit_events_v17(collision TEXT);").unwrap();
         assert!(migrate(&mut s.connection, false).is_err());
         let version: i64 = s
             .connection

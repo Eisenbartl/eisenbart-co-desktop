@@ -883,6 +883,20 @@ fn report_evidence_pdf(l: &mut Layout, p: &crate::assessments::Payload) -> Resul
     Ok(())
 }
 pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String> {
+    render_report(r, exported_at, None)
+}
+pub fn render_final_report(
+    r: &crate::final_reports::Record,
+    exported_at: &str,
+) -> Result<(Vec<u8>, usize), String> {
+    crate::final_reports::validate(&r.payload, &r.assessment)?;
+    render_report(&r.assessment, exported_at, Some(r))
+}
+fn render_report(
+    r: &Record,
+    exported_at: &str,
+    approved: Option<&crate::final_reports::Record>,
+) -> Result<(Vec<u8>, usize), String> {
     let p = &r.payload;
     crate::assessments::validate(p)?;
     let a = &p.assessment;
@@ -894,9 +908,65 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
     }
     l.text(&p.title, 16.0)?;
     l.text(
-        "IMMUTABLE INTERNAL ASSESSMENT / INCOMPLETE INFORMATION",
+        if approved.is_some() {
+            "FINAL COUNSELOR REPORT / COUNSELOR APPROVED"
+        } else {
+            "IMMUTABLE INTERNAL ASSESSMENT / INCOMPLETE INFORMATION"
+        },
         10.0,
     )?;
+    if let Some(final_report) = approved {
+        let approval = &final_report.payload;
+        l.value("Final approval ID", &approval.id)?;
+        l.value("Approval date (America/Chicago)", &approval.report_date)?;
+        l.value("Approved by", &approval.approved_by.counselor_name)?;
+        l.value("Approval policy", &approval.policy)?;
+        l.value("Approval SHA-256", &final_report.digest)?;
+        l.value("Original assessment SHA-256", &approval.assessment_digest)?;
+        if final_report.needs_review {
+            l.text("HISTORICAL APPROVAL / CURRENT CONTEXT NEEDS REVIEW. Original evidence and approval are preserved.",10.0)?;
+        }
+        for reason in &final_report.review_reasons {
+            l.text(reason, 10.0)?;
+        }
+        for gate in &approval.readiness.gates {
+            l.value(&format!("Approved check / {}", gate.label), &gate.detail)?;
+        }
+        for d in &approval.readiness.disclosures {
+            l.text(d, 10.0)?;
+        }
+        l.value(
+            "Professional approval notes",
+            &approval.decision.professional_notes,
+        )?;
+        l.value("Scenario applicability", &approval.decision.planning)?;
+        l.value(
+            "Assumptions and applicability decision",
+            &approval.decision.planning_notes,
+        )?;
+        for decision in &approval.decision.accounts {
+            let scope = approval
+                .readiness
+                .accounts
+                .iter()
+                .find(|s| s.account_id == decision.account_id)
+                .ok_or(ERROR)?;
+            l.value(
+                "Approved account scope",
+                &format!(
+                    "{} / {} / {} to {}",
+                    scope.label,
+                    scope.applicability,
+                    scope.expected_start.as_deref().unwrap_or("Not applicable"),
+                    scope.expected_end.as_deref().unwrap_or("Not applicable")
+                ),
+            )?;
+            l.value("Recorded scope exception", &scope.exception)?;
+            l.value("Counselor scope decision", &decision.reason)?;
+        }
+        l.section("Original captured assessment / preserved evidence and limitations")?;
+        l.text("The original assessment's evidence and limitations below remain unchanged. Counselor approval does not verify the institution or turn projections and unknown figures into facts.",10.0)?;
+    }
     l.value(
         "Client",
         &format!("{} {}", p.client.first_name, p.client.last_name),
@@ -925,32 +995,34 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
             &p.client.goals
         },
     )?;
-    l.section("Final report validation / not eligible for finalization")?;
-    let validation = crate::completeness::report(p, r.needs_review)?;
-    l.text("Derived from original captured evidence using coverage-review-v1; historical payload bytes are unchanged. Current context is checked at export. Declared coverage is not verified completeness.",10.0)?;
-    for check in &validation.checks {
-        l.value(&format!("{} / {}", check.label, check.state), &check.detail)?;
-    }
-    for account in &validation.coverage.accounts {
-        l.value(
-            "Declared account coverage",
-            &format!(
-                "{} / {} of {} days",
-                account.label, account.covered_days, account.total_days
-            ),
-        )?;
-        for gap in &account.gaps {
-            l.value("Uncovered dates", &format!("{} to {}", gap.start, gap.end))?;
+    if approved.is_none() {
+        l.section("Final report validation / not eligible for finalization")?;
+        let validation = crate::completeness::report(p, r.needs_review)?;
+        l.text("Derived from original captured evidence using coverage-review-v1; historical payload bytes are unchanged. Current context is checked at export. Declared coverage is not verified completeness.",10.0)?;
+        for check in &validation.checks {
+            l.value(&format!("{} / {}", check.label, check.state), &check.detail)?;
         }
-        for overlap in &account.overlaps {
+        for account in &validation.coverage.accounts {
             l.value(
-                "Overlapping dates",
-                &format!("{} to {}", overlap.start, overlap.end),
+                "Declared account coverage",
+                &format!(
+                    "{} / {} of {} days",
+                    account.label, account.covered_days, account.total_days
+                ),
             )?;
+            for gap in &account.gaps {
+                l.value("Uncovered dates", &format!("{} to {}", gap.start, gap.end))?;
+            }
+            for overlap in &account.overlaps {
+                l.value(
+                    "Overlapping dates",
+                    &format!("{} to {}", overlap.start, overlap.end),
+                )?;
+            }
         }
-    }
-    for reason in &validation.coverage.blocking_reasons {
-        l.text(reason, 10.0)?;
+        for reason in &validation.coverage.blocking_reasons {
+            l.text(reason, 10.0)?;
+        }
     }
     if let Some(review) = &p.completeness {
         l.section("Captured counselor completeness review / internal context")?;
@@ -1473,7 +1545,14 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
     l.value("Captured source revision", &a.revision.to_string())?;
     l.value("Stored record SHA-256", &r.digest)?;
     l.text("This checksum checks the stored record bytes, not this exported file, and is not a digital signature or certification. This local PDF contains readable client information outside workspace encryption. It contains captured evidence references, not attached original statement files. Keep it in an appropriate private location. Review the original sources and assumptions before acting on incomplete information.",10.0)?;
-    l.finish()
+    if approved.is_some() {
+        l.finish_labeled(
+            "COUNSELOR APPROVED / PRESERVED EVIDENCE",
+            "Final counselor report - counselor approved",
+        )
+    } else {
+        l.finish()
+    }
 }
 pub fn render_action_plan(r: &crate::action_plans::Record) -> Result<(Vec<u8>, usize), String> {
     crate::action_plans::validate(&r.payload, &r.assessment)?;

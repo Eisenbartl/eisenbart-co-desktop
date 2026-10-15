@@ -1,6 +1,36 @@
 # Development status
 
-## Current stage — saved completeness reviews (0.32.0, schema 21)
+## Current stage — final counselor report approval (0.33.0, schema 22)
+
+Implemented required readiness checks and explicit counselor approval in Reports
+→ Final report checklist. A separate scoped immutable approval binds the exact
+original assessment, inventory, account exceptions, professional decisions and
+scenario/assumption agreement. Atomic audit, refreshed readiness receipts and
+current-context flags preserve history. Offline final PDFs retain original
+financial evidence, limitations and any later review flags. Complete financial
+gates cannot be waived. See [workflow and bounded v1 policy](final-report-approval.md).
+
+Validation in progress, 2026-10-15 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 179 tests |
+| Complete Linux backend | Passed 195 library + 2 PDF process tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build / full desktop workflow | Pending |
+| Windows source checks | Pending; installer steps must remain skipped |
+| Installer | Not created, per user instruction |
+
+This source remains a development build; the downloadable preview remains 0.23.0.
+Final counselor approval under this policy does not certify the application for
+commercial use or finalize an existing client action plan. Clean installed Windows
+acceptance, broader evidence types and remaining security/release work are separate.
+
+Next priority: additional document types, starting with supervised credit-card
+statement review and independently checked liability/sign/repayment semantics.
+
+## Saved completeness reviews (0.32.0, schema 21)
 
 Implemented encrypted append-only completeness reviews with expected known and
 unprovided accounts/obligations, applicable dates, selected coverage sources,

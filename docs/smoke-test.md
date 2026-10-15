@@ -293,3 +293,18 @@ current and original versions, retained report figures, the later-review flag
 and a PDF using original missing-information text. Artifacts:
 `/workspace/shared/desktop-smoke-coverage-review`. No direct IPC or financial
 assertions are bypassed.
+
+
+## Final counselor reports (0.33.0 source)
+
+The full workflow first checks that an existing incomplete household is blocked.
+A separate fictional Jamie Complete client imports an authorized retained source,
+approves two rows, verifies classifications and period-end complete balance facts,
+saves a matching completeness review and records an immutable assessment. Native
+controls review readiness, record counselor notes/confirmations and approve the
+final report. The test checks selector draft protection and exports a final PDF
+with independently known USD 799.99 operating cash and USD 1,799.99 net worth.
+After a new completeness version, restart and encrypted backup/restore, the same
+approval ID/digest and original notes remain, with explicit current review flags
+in the screen and historical final PDF. Screenshots include blocked, confirmation,
+approved and restored approval views. All earlier assertions remain in the run.

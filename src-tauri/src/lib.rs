@@ -11,6 +11,7 @@ mod coverage_review;
 mod dashboard;
 mod debt;
 mod document_collection;
+mod final_reports;
 mod financial_facts;
 mod follow_up_overview;
 mod imports;
@@ -282,6 +283,89 @@ async fn get_assessment_record(
     })
     .await
     .map_err(|_| "Assessment record could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn review_final_report(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    assessment_id: String,
+) -> Result<final_reports::Preview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.review_final_report(&client_id, &assessment_id)
+        })
+    })
+    .await
+    .map_err(|_| "Final report readiness could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn get_final_report(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+) -> Result<final_reports::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_final_report(&client_id, &id))
+    })
+    .await
+    .map_err(|_| "Final report could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn approve_final_report(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: final_reports::Input,
+) -> Result<final_reports::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.approve_final_report(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Final approval could not finish. Reopen readiness to check the stored result before another attempt.".to_owned())?
+}
+#[tauri::command]
+async fn export_final_report_pdf(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+    path: String,
+) -> Result<assessment_pdf::Export, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.export_final_report_pdf(&client_id, &id, &path)
+        })
+    })
+    .await
+    .map_err(|_| "Final PDF export could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn choose_final_report_pdf(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    id: String,
+) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_final_report(&client_id, &id))?;
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("Final counselor report PDF", &["pdf"])
+            .set_file_name("final-counselor-report.pdf")
+            .blocking_save_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local PDF path.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "PDF destination selection could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn choose_assessment_pdf(
@@ -933,6 +1017,11 @@ pub fn run() {
             get_assessment_record,
             save_assessment_record,
             choose_assessment_pdf,
+            review_final_report,
+            get_final_report,
+            approve_final_report,
+            choose_final_report_pdf,
+            export_final_report_pdf,
             export_assessment_pdf,
             stage_client_csv,
             review_transaction,

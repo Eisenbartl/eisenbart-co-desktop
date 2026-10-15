@@ -344,7 +344,7 @@ mod tests {
             .connection
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        s.connection.execute_batch("DROP TABLE coverage_review_history; PRAGMA user_version=20; CREATE TABLE audit_events_v21(collision TEXT);").unwrap();
+        s.connection.execute_batch("DROP TABLE IF EXISTS final_report_approvals; DROP TABLE coverage_review_history; PRAGMA user_version=20; CREATE TABLE audit_events_v21(collision TEXT);").unwrap();
         assert!(migrate(&mut s.connection, false).is_err());
         let version: i32 = s
             .connection

@@ -68,14 +68,13 @@ review context. All presentation remains offline.
 
 ## Remaining work / next priority
 
-Final-report approval remains unavailable. This stage records review context,
-including unresolved information; it does not certify complete finances. Next
-define and implement a final-report readiness/approval contract: explicit required
-checks, applicability and exception decisions, current professional review,
-scenario/assumption agreement, auditable finalization and immutable final exports.
-A counselor checkbox or full declared calendar coverage must never bypass those
-requirements. Additional source parsers, OCR, advanced financial terms, printing
-and commercial release acceptance remain in the prototype development map.
+This stage records review context, including unresolved information; it does not
+certify complete finances. A bounded [final-report readiness and professional
+approval workflow](final-report-approval.md) is implemented in 0.33.0. Required
+financial checks, current context, explicit scope/assumption decisions and audit
+must pass before its separate immutable final export. Additional source parsers,
+OCR, advanced financial terms, printing and commercial release acceptance remain
+in the prototype development map.
 
 ## Verification
 

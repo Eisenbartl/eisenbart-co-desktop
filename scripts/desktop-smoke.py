@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import datetime as dt
 import http.client
 import json
 import os
@@ -22,6 +23,7 @@ import sys
 import tempfile
 import time
 from typing import Callable, TypeVar
+from zoneinfo import ZoneInfo
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -1785,6 +1787,189 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_firm_branding(driver, artifacts, data_root, password, binary, restart_driver)
     check_completeness(driver, artifacts)
     check_saved_coverage_reviews(driver, artifacts, data_root, password, binary, restart_driver)
+    check_final_report_approval(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_final_report_approval(driver: WebDriver, artifacts: Path, data_root: Path,
+                                password: str, binary: Path,
+                                restart_driver: Callable[[], None]) -> None:
+    period_end=dt.datetime.now(ZoneInfo('America/Chicago')).date().replace(day=1)-dt.timedelta(days=1)
+    period_start=period_end.replace(day=1)
+    month=period_start.strftime('%Y-%m')
+    # First prove that the existing incomplete household cannot be approved.
+    driver.click_button('Final report checklist')
+    driver.interactive('#checklist-report')
+    choice=driver.observe_script("return Array.from(document.querySelector('#checklist-report').options).find(o=>o.textContent.startsWith('Fictional completeness-linked assessment'))?.textContent")
+    if not choice:
+        raise SmokeFailure('Missing original incomplete report for blocked approval check')
+    driver.select('#checklist-report',choice)
+    driver.click_button('Review final-report readiness')
+    driver.wait_text('.final-readiness-status','Final approval blocked','missing evidence cannot be waived')
+    if not driver.observe_script("return document.querySelector('#final-professional-notes').matches(':disabled')"):
+        raise SmokeFailure('Missing evidence left final approval editable')
+    driver.scroll_to('.final-report-approval','start')
+    driver.screenshot(artifacts / 'native-final-approval-blocked.png')
+
+    # Independent complete example, isolated from the deliberately incomplete cases.
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click('.page-heading button')
+    driver.fill('#first-name','Jamie')
+    driver.fill('#last-name','Complete')
+    driver.fill('#household-size','1')
+    driver.fill('#goals','Fictional historical completed-period assessment only; no scenario recommendation requested.')
+    driver.click_button('Create client')
+    driver.wait_text('.editor-panel h2','Jamie Complete','separate fictional final-report client')
+    source=data_root / 'complete-final.csv'
+    source.write_text(f'Date,Description,Amount,Category,Type\n{period_start},Complete fictional wages,2000.01,Wages,income\n{period_start+dt.timedelta(days=1)},Complete fictional rent,-1200.02,Housing,expense\n',encoding='utf-8')
+    driver.fill('#csv-path',str(source))
+    driver.click_button('Inspect CSV')
+    driver.wait_text('.csv-preview',source.name,'complete example source')
+    driver.fill('#csv-account-label','Complete fictional checking')
+    for key,heading in [('date','1: Date'),('description','2: Description'),('amount','3: Amount'),('category','4: Category'),('kind','5: Type')]:
+        driver.select(f'#csv-map-{key}',heading)
+    for key,value in [('periodStart',str(period_start)),('periodEnd',str(period_end)),('openingBalance','1000.00'),('closingBalance','1799.99')]:
+        driver.fill(f'#csv-{key}',value)
+    driver.click("//label[contains(.,'Authorize retaining the complete original CSV')]/input",'xpath')
+    driver.click_button('Import into review queue')
+    driver.wait_text('.imports-progress','Pending 2','complete source not automatically approved')
+    for index in (1,2):
+        driver.click(f'.imports-table tbody tr:nth-child({index}) input[type=checkbox]')
+    driver.click_button('Approve selected validated rows (2)')
+    driver.wait_text('.imports-progress','Approved 2','individual source rows explicitly approved')
+    driver.click('.financial-facts-editor > summary')
+    set_fact_classification(driver,'Complete fictional wages','Verified take-home pay')
+    set_fact_classification(driver,'Complete fictional rent','Necessary expense')
+    driver.fill('#facts-as-of',str(period_end))
+    driver.click_button('Add verified balance')
+    driver.fill('#fact-balance-label-0','Complete fictional checking')
+    driver.select('#fact-balance-kind-0','Cash / checking')
+    driver.fill('#fact-balance-amount-0','1799.99')
+    driver.fill('#fact-balance-evidence-0','Fictional complete household balance verified at period end; no debts or other balances.')
+    driver.click('#facts-inventory')
+    save_financial_facts(driver,'Synthetic complete inventory and independently checked classifications')
+
+    def coverage_page() -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Financial Review']")
+        driver.click_button('Completeness & final validation')
+        driver.click('.saved-coverage-reviews > summary')
+        driver.interactive('#coverage-review-from')
+    coverage_page()
+    driver.fill('#coverage-review-from',month)
+    driver.fill('#coverage-review-through',month)
+    driver.fill('#coverage-inventory-notes','Fictional sole household checking account reviewed; no other assets, debts or obligations.')
+    driver.fill('#coverage-start-0',str(period_start))
+    driver.fill('#coverage-end-0',str(period_end))
+    driver.click(".saved-coverage-reviews input[aria-label^='Use ']")
+    driver.fill('#coverage-conclusion','Synthetic complete reconciled period evidence; no missing items.')
+    driver.click('#coverage-inventory-reviewed')
+    driver.click_button('Save completeness review')
+    driver.wait_text('.saved-coverage-reviews','Completeness review saved as version 1.','complete expected inventory recorded')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+    driver.click('.saved-assessments > summary')
+    driver.interactive('#record-title')
+    driver.fill('#record-from',month)
+    driver.fill('#record-through',month)
+    driver.fill('#record-title','Fictional final-ready completed-period assessment')
+    driver.fill('#record-findings','Verified fictional income USD 2000.01, necessary spending USD 1200.02, net operating cash USD 799.99 and checking USD 1799.99.')
+    driver.fill('#record-recommendations','Historical assessment only; discuss future objectives at the next appointment.')
+    driver.click('#record-include-completeness')
+    driver.click_button('Review saved completeness context')
+    driver.wait_text('.coverage-review-selection','no other assets, debts or obligations','exact inventory reviewed before capture')
+    driver.click('#record-ack')
+    driver.click_button('Save assessment record')
+    driver.wait_text('.saved-assessments','Assessment record saved with its supporting evidence.','complete immutable assessment captured')
+    parent=driver.observe_script("return document.querySelector('#saved-assessment').value")
+    driver.click_button('Final report checklist')
+
+    def open_approval() -> None:
+        driver.interactive('#checklist-report')
+        option=driver.observe_script("return Array.from(document.querySelector('#checklist-report').options).find(o=>o.value==="+json.dumps(parent)+")?.textContent")
+        if not option:
+            raise SmokeFailure('Final report parent disappeared from its client directory')
+        driver.select('#checklist-report',option)
+        driver.click_button('Review final-report readiness')
+    open_approval()
+    driver.wait_text('.final-readiness-status','Required checks passed','complete independent source passes every required gate')
+    driver.fill('#final-account-0','Full completed-period scope and original checking evidence inspected.')
+    planning='Historical assessment only; no scenario advice requested or captured. Fictional client agreed to these limits.'
+    professional='Fictional counselor checked original sources, account scope, possible duplicates, exclusions, classifications, exact balances and recommendations.'
+    driver.fill('#final-planning-notes',planning)
+    driver.fill('#final-professional-notes',professional)
+    for key in ['confirmClient','confirmSources','confirmInventory','confirmAssumptions']:
+        driver.click(f'#final-{key}')
+    if not driver.observe_script("return document.querySelector('#checklist-report').matches(':disabled')"):
+        raise SmokeFailure('An unsaved approval allowed its selected assessment to change')
+    driver.scroll_to('#final-professional-notes','start')
+    driver.screenshot(artifacts / 'native-final-approval-confirmations.png')
+    driver.click_button('Approve final counselor report')
+    driver.wait_text('.approved-final-report',professional,'explicit counselor approval preserved')
+    driver.wait_text('.final-report-current-status','supporting context matches','new approval context current')
+    identity=driver.text('.approved-final-report .field-help')
+
+    def export(label: str, historical: bool) -> None:
+        destination=artifacts / f'approved-final-{label}.pdf'
+        driver.fill_pdf_destination('#final-pdf-path',destination)
+        driver.click_button('Export approved final report PDF')
+        driver.wait_text('.final-report-approval > .success-message',str(destination),'approved final PDF written to a new local filename')
+        text=subprocess.run(['pdftotext','-layout',str(destination),'-'],check=True,capture_output=True,text=True).stdout
+        text=' '.join(text.split())
+        for expected in ['FINAL COUNSELOR REPORT','COUNSELOR APPROVED','Jamie Complete','counselor-final-report-v1','Operating cash flow: USD 799.99','Estimated net worth at balance date: USD 1799.99',planning,professional]:
+            if expected not in text:
+                raise SmokeFailure(f'Final PDF omitted {expected!r}')
+        if 'Final report validation / not eligible' in text:
+            raise SmokeFailure('Final PDF incorrectly retained the internal-only eligibility heading')
+        if historical and 'CURRENT CONTEXT NEEDS REVIEW' not in text:
+            raise SmokeFailure('Historical final PDF omitted its current review flag')
+    export('current',False)
+    driver.scroll_to('.approved-final-report','start')
+    driver.screenshot(artifacts / 'native-approved-final-report.png')
+    coverage_page()
+    driver.fill('#coverage-conclusion','Later fictional follow-up context; original approval must remain unchanged.')
+    driver.click_button('Save completeness review')
+    driver.wait_text('.saved-coverage-reviews','Completeness review saved as version 2.','later review retained without rewriting approval')
+    restart_driver()
+    driver.open(binary)
+    driver.fill('#password',password)
+    driver.click_button('Unlock workspace')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+    driver.select('#workspace-client','Jamie Complete')
+    driver.click_button('Final report checklist')
+    open_approval()
+    driver.wait_text('.final-report-current-status','Historical approval','original approval survives restart with changed-context flag')
+    if driver.text('.approved-final-report .field-help') != identity:
+        raise SmokeFailure('Restart or source context change replaced original approval identity')
+    driver.wait_text('.approved-final-report',professional,'restart retains original counselor notes')
+    backup_folder=data_root / 'final-report-backups'
+    backup_folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
+    driver.click_button('Backup & recovery')
+    driver.fill('#backup-folder',str(backup_folder))
+    driver.fill('#backup-password',password)
+    driver.click_button('Create encrypted backup')
+    driver.wait_text('.backup-success','Encrypted backup saved.','final approval encrypted backup created')
+    backup_path=Path(driver.text('.backup-file-path'))
+    driver.click_button('Lock workspace')
+    driver.click('.restore-panel > summary')
+    driver.fill('#restore-file',str(backup_path))
+    driver.fill('#restore-password',password)
+    driver.click_button('Verify backup for recovery')
+    driver.wait_text('.restore-review','Fictional Oak Counseling','final approval backup validated')
+    driver.fill('#restore-confirmation','RESTORE')
+    driver.click_button('Restore verified workspace')
+    driver.wait_text('.auth-card','Workspace restored. Unlock it','final approval backup restored')
+    driver.fill('#password',password)
+    driver.click_button('Unlock workspace')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+    driver.select('#workspace-client','Jamie Complete')
+    driver.click_button('Final report checklist')
+    open_approval()
+    driver.wait_text('.final-report-current-status','Historical approval','encrypted recovery retains original approval and current review flags')
+    if driver.text('.approved-final-report .field-help') != identity:
+        raise SmokeFailure('Encrypted recovery replaced original approval ID or digest')
+    export('restored-historical',True)
+    driver.scroll_to('.approved-final-report','start')
+    driver.screenshot(artifacts / 'native-final-report-restored.png')
+    status('final report blocked evidence, complete exact-cent approval, explicit confirmations, immutable PDF, changed-context flags, restart and encrypted recovery')
 
 
 def check_saved_coverage_reviews(driver: WebDriver, artifacts: Path, data_root: Path,

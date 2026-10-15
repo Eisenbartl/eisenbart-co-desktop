@@ -552,3 +552,7 @@ textarea { resize: vertical; min-height: 100px; }
 .firm-branding form > fieldset > label { margin-top: 16px; }
 .statement-accounts .checkbox-label { display: flex; flex-direction: row; align-items: center; gap: 10px; margin-top: 16px; }
 .statement-accounts .checkbox-label input { width: auto; margin: 0; }
+
+.final-report-approval { margin: 24px 0; padding: 20px; border: 1px solid var(--line); border-radius: 8px; }
+.final-report-approval label.check-label, .saved-coverage-reviews label.check-label { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin: 12px 0; }
+.final-report-approval .check-label input[type="checkbox"], .saved-coverage-reviews .check-label input[type="checkbox"] { width: 16px; height: 16px; min-height: 16px; padding: 0; margin: 2px 0; flex: 0 0 16px; }
