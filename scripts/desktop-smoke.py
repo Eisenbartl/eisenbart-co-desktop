@@ -1811,7 +1811,7 @@ def check_firm_branding(driver: WebDriver, artifacts: Path, data_root: Path, pas
     driver.element('.firm-brand-preview img')
     driver.click_button('Save firm branding')
     driver.wait_text('.firm-branding','Saved branding version 1','firm branding saved')
-    driver.wait_text('.workspace-label',firm,'workspace uses saved firm name')
+    driver.wait_content('.workspace-label strong',firm,'workspace uses saved firm name')
     driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
     driver.select('#workspace-client','Alex Fictional')
     driver.click('.saved-assessments > summary')
@@ -1846,7 +1846,7 @@ def check_firm_branding(driver: WebDriver, artifacts: Path, data_root: Path, pas
     driver.open(binary)
     driver.fill('#password',password)
     driver.click_button('Unlock workspace')
-    driver.wait_text('.workspace-label',firm,'firm display name survives restart')
+    driver.wait_content('.workspace-label strong',firm,'firm display name survives restart')
     settings()
     driver.wait_value('#firm-phone','555-0199','latest firm contact survives restart')
     backup_folder=data_root / 'branding-backups'
@@ -1876,6 +1876,7 @@ def check_firm_branding(driver: WebDriver, artifacts: Path, data_root: Path, pas
     driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
     driver.select('#workspace-client','Alex Fictional')
     driver.click('.saved-assessments > summary')
+    driver.interactive('#saved-assessment')
     choice=driver.observe_script("return Array.from(document.querySelector('#saved-assessment').options).find(o=>o.value==="+json.dumps(record_id)+")?.textContent")
     if not choice or 'Needs review' not in choice:
         raise SmokeFailure('The historical branded report did not flag its later branding change')

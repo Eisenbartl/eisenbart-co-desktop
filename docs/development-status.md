@@ -11,10 +11,31 @@ inherit it. Older report formats retain their payload bytes/digests; later edits
 flag historical context without substituting current branding. Product branding
 remains separate. See [firm-report-branding.md](firm-report-branding.md).
 
-Targeted branding/history/report/PDF/recovery tests and 158 interface tests have
-passed. Complete backend, native and Windows validation is in progress. The
-PNG/base64 dependencies now directly name versions already present in the lockfile;
-no package versions were upgraded. No installer is being created for this stage.
+Validated 2026-10-15 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 158 tests |
+| Complete Linux backend | Passed 184 library + 2 PDF process tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles |
+| Full native financial/branding/recovery workflows | Passed, exit 0: firm name/contact/PNG/disclosure, report and client-plan capture, restart, encrypted recovery and historical PDF export |
+| Windows source checks | Passed: 158 UI + 185 library + 2 PDF process tests; installer build/install/upload steps skipped |
+| Installer | Not created, per user instruction |
+
+The feature commit is `cd56f10c9e2c81dec59aea143a1244a25536570b`.
+Windows source validation passed in
+[run 38685047534](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38685047534).
+Native automation initially used a clipped text endpoint for the firm name and
+then read a report selector before its asynchronous directory loaded. The test
+now reads complete identity text and waits for the report control; application
+behavior and assertions were preserved. The complete desktop rerun passed with
+exit 0; the settings screen was also visually inspected. Application code was
+unchanged by these native-test corrections.
+Native artifacts use `/workspace/shared/desktop-smoke-branding-final`; validation logs
+use `/workspace/shared/branding-`. PNG/base64 now directly name versions already
+present in the lockfile; no package versions were upgraded.
 The previously requested installer remains 0.23.0; source 0.30.0 is a development
 build, with installed Windows/commercial acceptance still separate.
 
@@ -22,7 +43,7 @@ Next priority: financial completeness and final report validation, as defined in
 [prototype-development-map.md](prototype-development-map.md).
 
 
-## Current stage — statement account management (0.29.0, schema 19)
+## Statement account management — 0.29.0 source (schema 19)
 
 Implemented standalone checking/savings account creation, current-name editing,
 archive/reactivate, source counts and read-only metadata history in Documents →
