@@ -53,7 +53,7 @@ Restore validates every bounded, canonical historical snapshot and original
 account/source binding before activation. Review changes do not bump financial
 import revisions or alter plans, statement metadata, receipt statuses or totals.
 
-Format-7 internal assessments optionally attach the exact reviewed snapshot.
+Internal assessments optionally attach the exact reviewed snapshot using format 7.
 Capture requires the latest saved version, matching original source choices,
 import revision, client-profile timestamp and exact period. Reads/export/recovery
 compare the attachment to its scoped original history; a newer review flags the

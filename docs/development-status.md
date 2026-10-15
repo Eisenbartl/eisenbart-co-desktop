@@ -12,10 +12,28 @@ reports without replacing their bytes. Internal views/PDFs show captured context
 client-plan PDFs omit private review notes. See
 [saved-completeness-reviews.md](saved-completeness-reviews.md).
 
-Focused backend tests, all 172 UI tests, frontend build and warnings-denied Clippy
-have passed. Full backend, standalone desktop/native recovery and Windows source
-checks are pending. No installer was requested or created. Finalization remains
-unavailable; recording a review does not establish complete financial coverage.
+Validated 2026-10-15 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 172 tests |
+| Complete Linux backend | Passed 192 library + 2 PDF process tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles |
+| Full native workflows / saved completeness reviews | Passed, exit 0: financial flows, both recovery paths, review create/amend/read-only history, original report capture, restart, encrypted review recovery and historical PDF |
+| Windows source checks | Passed: 172 UI + 193 library + 2 PDF process tests; installer build/install/upload steps skipped |
+| Installer | Not created, per user instruction |
+
+Feature commit: `73afb25e2d0004e3038218096a38e97ccf80b4b5`.
+Windows source validation passed in
+[run 38753167954](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38753167954).
+Both saved-review and captured-report screens were visually inspected. Native
+artifacts use `/workspace/shared/desktop-smoke-coverage-review`; logs use
+`/workspace/shared/coverage-review-`. Source 0.32.0 remains a development build;
+the downloadable preview remains 0.23.0. Installed Windows/offline and commercial
+acceptance remain separate. Finalization remains unavailable: recording a review
+does not certify complete financial coverage.
 
 Next priority: final-report readiness and professional approval, with explicit
 applicability/exception gates and immutable audited final exports.
