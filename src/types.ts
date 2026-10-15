@@ -293,11 +293,13 @@ export interface ScenarioInput {
  emergencyContribution:ScenarioAmountChange|null;cashChanges:ScenarioCashChange[];
  debtExtras?:DatedAmount[];goalContributions?:ScenarioBudgetChange[];
  recurringExpenses?:ScenarioExpense[];
+ incomeReductions?:{budgetIndex:number;fromMonth:string;throughMonth:string;amount:string|null;cashSchedule:number|null}[];
 }
 export interface ScenarioOutcome {strategy:PlanningDebtStrategy;firstMonthBuffer:string|null;plans:AssessmentPlans}
 export interface ScenarioComparison {
  calculator:string;clientId:string;createdAt:string;revisions:PlanningRevisions;input:ScenarioInput;
  baseline:ScenarioOutcome;proposed:ScenarioOutcome;warnings:string[];
+ incomePeriods?:{month:string;reduced:boolean;normalIncome:string|null;income:string|null;debtReserved:string|null;savingsReserved:string|null;normalBuffer:string|null;buffer:string|null}[];
 }
 
 export interface SavedScenarioSelection {id:string;digest:string}

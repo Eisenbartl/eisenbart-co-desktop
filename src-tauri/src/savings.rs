@@ -192,7 +192,7 @@ struct GoalTerms {
     contribution: Option<i64>,
 }
 
-fn debt_reserved(context: &Context, number: i32) -> Result<Option<i64>, String> {
+pub(crate) fn debt_reserved(context: &Context, number: i32) -> Result<Option<i64>, String> {
     let Some(budget_debt) = aggregate(&context.budget_debt_payments)? else {
         return Ok(None);
     };

@@ -58,6 +58,120 @@ fn json<T: Serialize>(v: &T) -> serde_json::Value {
     serde_json::to_value(v).unwrap()
 }
 #[test]
+fn temporary_income_records_reports_and_recovery_keep_period_funding_and_block_unreviewed_agreements(
+) {
+    use super::super::scenario_tests::income_reduction;
+    let (root, mut w, id) = fixture();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let legacy = save(&mut w, &id);
+    let original = serde_json::to_vec(&legacy.payload).unwrap();
+    assert!(json(&legacy.payload)["comparison"]
+        .get("incomePeriods")
+        .is_none());
+    assert!(json(&legacy.payload)["comparison"]["input"]
+        .get("incomeReductions")
+        .is_none());
+    let mut proposal = input();
+    proposal.label = "Temporary November income".into();
+    proposal.income_reductions.push(income_reduction());
+    let r = w
+        .save_client_scenario(
+            &id,
+            Input {
+                expected_count: 1,
+                proposal,
+            },
+        )
+        .unwrap();
+    let i = report(&mut w, &id, &r);
+    let a = w.save_assessment_record(&id, i).unwrap();
+    assert_eq!(
+        r.payload.comparison.income_periods[0].buffer.as_deref(),
+        Some("183.33")
+    );
+    assert_eq!(a.payload.assessment.operating_cashflow, "0.00");
+    assert!(w
+        .review_client_action_plan(&id, &a.payload.id)
+        .err()
+        .unwrap()
+        .contains("temporary income"));
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    for field in ["buffer", "input", "date"] {
+        let mut forged = json(&r.payload);
+        match field {
+            "buffer" => forged["comparison"]["incomePeriods"][0]["buffer"] = "9999.99".into(),
+            "input" => {
+                forged["comparison"]["input"]["incomeReductions"][0]["amount"] = "900.00".into()
+            }
+            _ => {
+                forged["comparison"]["proposed"]["plans"]["cashflow"]["data"]["schedules"][1]
+                    ["firstDate"] = "2026-11-07".into()
+            }
+        }
+        let forged: Payload = serde_json::from_value(forged).unwrap();
+        assert!(saved_scenarios::validate(&forged, &id).is_err());
+    }
+    let out = tempfile::tempdir().unwrap();
+    let pdf = w
+        .export_assessment_pdf(
+            &id,
+            &a.payload.id,
+            out.path().join("income.pdf").to_str().unwrap(),
+        )
+        .unwrap();
+    let d = lopdf::Document::load(pdf.path).unwrap();
+    let text = d
+        .extract_text(&d.get_pages().keys().copied().collect::<Vec<_>>())
+        .unwrap()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    for value in [
+        "Temporary income funding and recovery",
+        "2026-11 / Reduced",
+        "2026-12 / Normal / recovery",
+        "USD 3250.00 / USD 1733.33",
+        "USD 1700.00 / USD 183.33",
+        "Baseline USD 3300.00 / proposed USD 1900.00",
+    ] {
+        assert!(text.contains(value), "Missing {value}");
+    }
+    let backup = w
+        .create_backup(out.path().to_string_lossy().into(), PASSWORD.into())
+        .unwrap();
+    w.lock_workspace();
+    let mut reopened = Workspace::new(root.path().into());
+    reopened.unlock_workspace(PASSWORD.into()).unwrap();
+    assert_eq!(
+        reopened
+            .get_client_scenario(&id, &r.payload.id)
+            .unwrap()
+            .digest,
+        r.digest
+    );
+    reopened.lock_workspace();
+    let review = reopened
+        .prepare_restore(backup.path, PASSWORD.into())
+        .unwrap();
+    reopened
+        .confirm_restore(review.token, "RESTORE".into())
+        .unwrap();
+    reopened.unlock_workspace(PASSWORD.into()).unwrap();
+    assert_eq!(
+        serde_json::to_vec(
+            &reopened
+                .get_client_scenario(&id, &legacy.payload.id)
+                .unwrap()
+                .payload
+        )
+        .unwrap(),
+        original
+    );
+    let restored = reopened.get_assessment_record(&id, &a.payload.id).unwrap();
+    assert_eq!(restored.digest, a.digest);
+    assert_eq!(json(&restored.scenario.unwrap().payload), json(&r.payload));
+}
+#[test]
 fn recurring_expense_scenarios_preserve_legacy_bytes_report_dates_and_recovery_provenance() {
     use super::super::scenario_tests::{expense, expense_dates};
     let (root, mut w, id) = fixture();

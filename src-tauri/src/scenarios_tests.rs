@@ -57,10 +57,215 @@ pub(super) fn input() -> Input {
         debt_extras: vec![],
         goal_contributions: vec![],
         recurring_expenses: vec![],
+        income_reductions: vec![],
     }
 }
 fn json<T: Serialize>(v: &T) -> serde_json::Value {
     serde_json::to_value(v).unwrap()
+}
+pub(super) fn income_reduction() -> crate::income_periods::Reduction {
+    crate::income_periods::Reduction {
+        budget_index: 0,
+        from_month: "2026-11".into(),
+        through_month: "2026-11".into(),
+        amount: Some("800".into()),
+        cash_schedule: Some(1),
+    }
+}
+#[test]
+fn income_periods_preserve_normal_models_and_paycheck_cadence_then_restore_normal_receipts() {
+    let (_dir, mut w, id) = fixture();
+    let mut cash = cashflow_input(1);
+    cash.data.end_date = "2026-12-31".into();
+    w.save_client_cashflow_plan(&id, cash).unwrap();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let audits = audit_count(&w);
+    let mut i = input();
+    i.expected_revisions.cashflow = 2;
+    i.income_reductions.push(income_reduction());
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    let m = &r.income_periods;
+    assert_eq!(m.len(), 2);
+    assert!(m[0].reduced);
+    assert!(!m[1].reduced);
+    assert_eq!(m[0].normal_income.as_deref(), Some("3250.00"));
+    assert_eq!(m[0].income.as_deref(), Some("1733.33"));
+    assert_eq!(m[0].normal_buffer.as_deref(), Some("1700.00"));
+    assert_eq!(m[0].buffer.as_deref(), Some("183.33"));
+    assert_eq!(m[1].month, "2026-12");
+    assert_eq!(m[1].income.as_deref(), Some("3250.00"));
+    assert_eq!(m[1].buffer.as_deref(), Some("1700.00"));
+    assert_eq!(r.proposed.plans.budget.summary.monthly_income, "3250.00");
+    assert_eq!(json(&r.proposed.plans.debt), before["debt"]);
+    assert_eq!(json(&r.proposed.plans.savings), before["savings"]);
+    let c = r.proposed.plans.cashflow.summary.as_ref().unwrap();
+    assert_eq!(c.combined_closing.as_deref(), Some("4900.00"));
+    let pay: Vec<_> = c
+        .ledger
+        .iter()
+        .filter(|e| e.kind == crate::cashflow::Kind::Paycheck)
+        .map(|e| (e.date.as_str(), e.amount.as_deref()))
+        .collect();
+    assert_eq!(
+        pay,
+        vec![
+            ("2026-11-06", Some("800.00")),
+            ("2026-11-20", Some("800.00")),
+            ("2026-12-04", Some("1500.00")),
+            ("2026-12-18", Some("1500.00"))
+        ]
+    );
+    assert_eq!(
+        r.input.income_reductions[0].amount.as_deref(),
+        Some("800.00")
+    );
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    assert_eq!(audit_count(&w), audits);
+}
+#[test]
+fn income_periods_keep_zero_unknown_deficits_and_completed_goal_commitments_explicit() {
+    let (_dir, mut w, id) = fixture();
+    for (amount, income, buffer) in [
+        (None, None, None),
+        (Some("0"), Some("0.00"), Some("-1550.00")),
+        (Some("400"), Some("866.67"), Some("-683.33")),
+    ] {
+        let mut i = input();
+        let mut reduction = income_reduction();
+        reduction.amount = amount.map(str::to_owned);
+        i.income_reductions.push(reduction);
+        let r = w.compare_financial_scenarios(&id, i).unwrap();
+        assert_eq!(r.income_periods[0].income.as_deref(), income);
+        assert_eq!(r.income_periods[0].buffer.as_deref(), buffer);
+        if amount.is_none() {
+            assert!(r
+                .proposed
+                .plans
+                .cashflow
+                .summary
+                .unwrap()
+                .combined_closing
+                .is_none());
+            assert!(r
+                .warnings
+                .iter()
+                .any(|w| w.contains("check is unavailable")));
+        } else {
+            assert!(r.warnings.iter().any(|w| w.contains("does not fund")));
+        }
+    }
+    let mut i = input();
+    let mut reduction = income_reduction();
+    reduction.cash_schedule = None;
+    reduction.from_month = "2027-09".into();
+    reduction.through_month = "2027-09".into();
+    i.income_reductions.push(reduction);
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    assert_eq!(
+        r.income_periods[0].savings_reserved.as_deref(),
+        Some("0.00")
+    );
+    assert_eq!(r.income_periods[0].buffer.as_deref(), Some("433.33"));
+    assert_eq!(
+        r.proposed
+            .plans
+            .cashflow
+            .summary
+            .unwrap()
+            .combined_closing
+            .as_deref(),
+        Some("3300.00")
+    );
+    let mut i = input();
+    let mut reduction = income_reduction();
+    reduction.cash_schedule = None;
+    reduction.from_month = "2076-11".into();
+    reduction.through_month = "2076-11".into();
+    i.income_reductions.push(reduction);
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    assert!(r.income_periods[0].buffer.is_none());
+}
+#[test]
+fn income_periods_reject_overlap_forgery_invalid_ranges_and_conflicting_or_excessive_dated_changes()
+{
+    let (_dir, mut w, id) = fixture();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let audits = audit_count(&w);
+    for key in [
+        "line",
+        "range",
+        "order",
+        "length",
+        "amount",
+        "increase",
+        "precision",
+        "negative",
+        "schedule",
+    ] {
+        let mut i = input();
+        let mut r = income_reduction();
+        match key {
+            "line" => r.budget_index = 1,
+            "range" => r.from_month = "2026-13".into(),
+            "order" => r.through_month = "2026-10".into(),
+            "length" => r.through_month = "2028-11".into(),
+            "amount" => r.amount = Some("1500".into()),
+            "increase" => r.amount = Some("1600".into()),
+            "precision" => r.amount = Some("12.345".into()),
+            "negative" => r.amount = Some("-1".into()),
+            _ => r.cash_schedule = Some(0),
+        }
+        i.income_reductions.push(r);
+        assert!(w.compare_financial_scenarios(&id, i).is_err());
+    }
+    let mut i = input();
+    i.income_reductions = vec![income_reduction(), income_reduction()];
+    assert!(w
+        .compare_financial_scenarios(&id, i)
+        .unwrap_err()
+        .contains("overlap"));
+    let mut i = input();
+    i.income_reductions = (0..7).map(|_| income_reduction()).collect();
+    assert!(w.compare_financial_scenarios(&id, i).is_err());
+    let mut i = input();
+    i.income_reductions.push(income_reduction());
+    i.cash_changes.push(CashChange {
+        index: 1,
+        amount: Some("1".into()),
+        first_date: "2026-11-06".into(),
+    });
+    assert!(w
+        .compare_financial_scenarios(&id, i)
+        .unwrap_err()
+        .contains("also edit"));
+    let mut raw = json(&input());
+    raw["incomeReductions"] = serde_json::json!([{"budgetIndex":0,"fromMonth":"2026-11","throughMonth":"2026-11","amount":"800","cashSchedule":null,"buffer":"9999"}]);
+    assert!(serde_json::from_value::<Input>(raw).is_err());
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    assert_eq!(audit_count(&w), audits);
+    let mut cash = cashflow_input(1);
+    cash.data.schedules[1].frequency = crate::cashflow::Frequency::Monthly;
+    w.save_client_cashflow_plan(&id, cash).unwrap();
+    let mut i = input();
+    i.expected_revisions.cashflow = 2;
+    i.income_reductions.push(income_reduction());
+    assert!(w
+        .compare_financial_scenarios(&id, i)
+        .unwrap_err()
+        .contains("frequency"));
+    let mut cash = cashflow_input(2);
+    cash.data.end_date = "2027-10-31".into();
+    cash.data
+        .schedules
+        .resize(99, cash.data.schedules[0].clone());
+    w.save_client_cashflow_plan(&id, cash).unwrap();
+    let mut i = input();
+    i.expected_revisions.cashflow = 3;
+    i.income_reductions.push(income_reduction());
+    assert!(w
+        .compare_financial_scenarios(&id, i)
+        .unwrap_err()
+        .contains("100 dated schedules"));
 }
 pub(super) fn expense() -> RecurringExpense {
     RecurringExpense {

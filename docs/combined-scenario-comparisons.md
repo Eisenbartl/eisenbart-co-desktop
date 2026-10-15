@@ -1,4 +1,4 @@
-# Combined financial scenarios — 0.22.0
+# Combined financial scenarios — 0.23.0
 
 The client panel compares authenticated saved budget/debt/savings/cash-flow
 models with hypothetical proposed inputs. Temporary comparisons are read-only;
@@ -124,9 +124,60 @@ separately 1,820.02. Saved reports name the new expense, classification, frequen
 account and date assumptions; the same facts survive restart and both recovery
 paths. [Development status](development-status.md) records actual checks.
 
+## Temporary income periods
+
+Up to six regular-income reductions fit within an inclusive 24-month span.
+Each names an existing income budget index, first/last month and reduced amount
+per payment; blank means unknown and zero means no income. Known reductions must
+be below known normal proposed amounts. Same-source overlaps, conflicting dated
+edits, unsupported annual/irregular income, malformed amounts/ranges and oversized
+input are rejected without writes. One following normal month is included when
+supported; months with missing or out-of-horizon information remain unavailable.
+
+The main proposed models retain normal recurring income and continuing debt and
+savings assumptions. `incomePeriods` separately captures normalized monthly income,
+normal/reduced funding buffers and the applicable debt/savings commitments.
+Integer-cent calculations reuse budget normalization and the savings model's
+capped contribution schedule and conservative debt reserve. Forecast targets and
+payoff/goal dates remain conditional on funding those commitments. This does not
+simulate savings withdrawals or automatically reduce payments/contributions.
+Client agreement creation from temporary-income reports is blocked until monthly
+allocations are reviewed in a separate planning report.
+
+Optional explicit paycheck selection must name an existing income schedule with
+matching frequency and a known higher normal receipt when the reduction is known.
+Only occurrences in the selected months change. Existing dates/cadence and normal
+receipts outside the period are preserved by materializing the selected forecast's
+occurrences as one-time schedules; the original inputs remain captured. The
+100-schedule cash-flow limit still applies. No selected occurrence means the
+original schedule remains unchanged. Unknown affected receipts keep account
+balances unknown thereafter. Monthly averages and actual receipt counts are
+separate assumptions; no paycheck/account is inferred.
+
+For example, normal biweekly income 1,500.00 averages 3,250.00 monthly. A November
+reduction to 800.00 averages 1,733.33. With spending 1,200.00, reserved debt 100.00
+and savings 250.00, funding is 183.33 instead of 1,700.00. December returns to normal.
+Two explicitly selected November receipts change from 1,500.00 to 800.00 while
+December receipts retain their original dates and amounts. Unknown is never zero.
+
+The integrated native proposal retains new expenses, debt extras and goal changes.
+Normal monthly income is 3,466.67; November at 800.00 biweekly gives 1,733.33 and a
+-975.00 funding buffer against the continuing commitments. December recovery has
+an 858.34 buffer. Two November dated receipts reduce closing by 1,400.00, from
+3,225.00 to 1,825.00. Normal budget values, debt costs and conditional savings
+milestones stay unchanged; approved operating activity remains separately 1,820.02.
+
+`incomeReductions` and returned `incomePeriods` default empty and are omitted when
+empty, preserving earlier canonical captures/warnings. Schema 16 is unchanged.
+Reads, report exports and staged recovery recompute the captured period results,
+receipt dates and original scenario links. PDFs include assumptions, monthly
+funding/recovery and conditional forecast limitations. See development status for
+actual checks and Windows package evidence.
+
 ## Remaining scope
 
-Temporary date-range income shocks, new-goal proposals, account-targeted extra
-payments, daily/variable/promotional debt terms and broader original reporting
-requirements remain open. This is a development build. No new dependency,
-migration or installer is introduced in this checkpoint.
+Savings drawdown/funding-source simulation, period-specific agreed client plans,
+new-goal proposals, account-targeted extras, daily/variable/promotional debt terms
+and broader original reporting requirements remain open. This is a development
+build. No new dependency or migration is introduced; a Windows preview installer
+is requested for the 0.23.0 checkpoint.

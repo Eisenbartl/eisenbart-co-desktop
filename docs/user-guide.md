@@ -1,9 +1,13 @@
 # Windows evaluation guide
 
-This development build provides a local workspace, client profiles, counseling
-statuses, dated session notes, client budgets, debt payoff comparisons, and (in the 0.10.0 source) savings planning, cash-flow calendars, encrypted backups, verified restore, CSV/selectable-text PDF transaction review, merchant/recurring-payment review, and statement running-balance checks. Use fictional records only. Advanced financial
-calculations, scanned-document OCR, institution adapters, advanced cash-flow models, PDF reports, and
-commercial licensing are still being developed. Password reset and independent security review remain unavailable.
+Version 0.23.0 is a Windows x64 evaluation build with encrypted local records,
+client notes, budgets, debt/savings/cash-flow plans, reviewed statement imports,
+approved-data charts, immutable scenarios, counselor reports and client-plan PDF
+export. New temporary-income periods show monthly funding shortfalls and recovery;
+new expenses, debt extras and savings-goal changes can be compared together.
+Use fictional records while evaluating. Scanned-document OCR, advanced terms,
+full intake/follow-up and commercial release requirements remain in development.
+There is no forgotten-password reset or completed independent security review.
 
 ## Install and open
 
@@ -41,8 +45,8 @@ There is no forgotten-password reset, and reinstalling cannot recover access.
 
 In **Clients**, use **Search name, email, or phone** to find a record. The dropdown
 beside it filters by counseling status; choose **All statuses** to remove that
-filter. **Archived** records remain available in the directory. The dashboard
-shows client counts and counseling stages; it does not calculate financial results.
+filter. **Archived** records remain available in the directory. The workspace dashboard summarizes client counts and counseling stages.
+Approved financial charts appear with the client’s reviewed statement data.
 
 ## Save session notes
 
@@ -82,8 +86,8 @@ If another window saved a newer budget, close and reopen that client's record
 before editing again. If loading fails, use **Retry loading budget**. Do not
 replace the data folder to work around an error.
 
-The current 0.3.0 version upgrades the database to schema 4. Older application
-versions cannot open it afterward, so keep using the newer version. Read
+This version uses schema 16. Preserve the existing workspace and keep using the
+newer application after upgrading; older versions may not open it. Read
 [budget-calculations.md](budget-calculations.md) for calculation rules and examples.
 
 ## Compare debt repayment plans
@@ -125,13 +129,11 @@ If another window changed a saved debt plan, close and reopen the client before
 editing again. Use **Retry loading debt plan** if loading fails. See
 [debt-calculations.md](debt-calculations.md) for exact assumptions and examples.
 
-Version 0.3.0 upgrades the database to schema 4. The older 0.1.0 and 0.2.0 apps
-cannot open it afterward; keep using the newer version.
+Version 0.23.0 uses schema 16; keep using the newer version after upgrading.
 
-## Plan savings and sinking funds — current source version
+## Plan savings and sinking funds
 
-This feature is in the 0.4.0 source checkpoint; the earlier 0.3.0 download does
-not include it. No new installer is being prepared for this milestone.
+Savings planning is included in the current installer.
 
 Open a saved client and scroll to **Savings planning**.
 
@@ -165,8 +167,7 @@ funding information. A negative remainder or **Exceeds entered funds** needs
 reduced allocations or verified additional funding.
 
 If a savings plan changed in another window, reopen the client before saving.
-Use **Retry loading savings plan** on a loading error. Version 0.4.0 upgrades to
-schema 5 when run; older apps cannot open that upgraded database. See
+Use **Retry loading savings plan** on a loading error. Keep using the current application after a schema upgrade. See
 [savings-calculations.md](savings-calculations.md) for exact rules and examples.
 
 ## Lock and return
@@ -198,9 +199,9 @@ a recovery shortcut. The [Windows guide](windows.md) explains where files live;
 the [security guide](security.md) explains password and recovery limits.
 
 
-## Forecast cash flow (0.5.0 source)
+## Forecast cash flow
 
-The earlier 0.3.0 downloadable installer does not contain this feature. Open a
+Open a
 saved fictional client and scroll to **Cash-flow calendar**.
 
 1. Enter a start/end date, up to 366 days inclusive.
@@ -235,26 +236,76 @@ savings transfers. No budget, debt, or savings plan is changed automatically.
 See [cash-flow-calculations.md](cash-flow-calculations.md) for exact assumptions.
 
 
-## Back up and recover (0.6.0 source)
+## Back up and recover
 
-Open **Settings**, choose a backup folder outside the app data folder, enter your current password, and choose **Create encrypted backup**. Keep multiple copies, preferably on a separate drive. To recover, lock the workspace and expand **Restore an encrypted backup**. Verify the selected file using its password, review the workspace, type **RESTORE**, and confirm. The app keeps prior files separately and does not merge newer records into the backup. Use the [backup and recovery guide](backup-recovery.md) for the complete procedure and password-loss consequences. The earlier 0.3.0 download does not contain these controls.
+Open **Settings**, choose a backup folder outside the app data folder, enter your current password, and choose **Create encrypted backup**. Keep multiple copies, preferably on a separate drive. To recover, lock the workspace and expand **Restore an encrypted backup**. Verify the selected file using its password, review the workspace, type **RESTORE**, and confirm. The app keeps prior files separately and does not merge newer records into the backup. Use the [backup and recovery guide](backup-recovery.md) for the complete procedure and password-loss consequences.
 
-## Import and review CSV statements (0.7.0 source)
+## Import and review CSV statements
 
 Open a saved client, choose a synthetic USD checking/savings CSV, and click **Inspect CSV**. Select the actual date, description, amount, and optional classification columns; select the account and enter only known statement metadata. The complete original file is retained only if you check its authorization box. Click **Import into review queue**, then review and explicitly approve eligible rows. Nothing is approved by importing.
 
-Refunds offset spending; paired internal transfers avoid extra income/expense. Corrections, conflicting rows, and reversals need individual review and reasons. Totals use only approved records and do not alter the client's planning inputs. See [CSV steps, supported formats, examples, and limits](csv-import-review.md). The old 0.3.0 installer does not contain this feature; no new download was created.
+Refunds offset spending; paired internal transfers avoid extra income/expense. Corrections, conflicting rows, and reversals need individual review and reasons. Totals use only approved records and do not alter the client's planning inputs. See [CSV steps, supported formats, examples, and limits](csv-import-review.md).
 
-## Import selectable-text PDF statements (0.8.0 source)
+## Import selectable-text PDF statements
 
 Choose **Selectable-text PDF** in the client statement panel, inspect a synthetic PDF, expand its pages, and select only transaction lines. Choose the account and actual date format; leave unknown metadata blank. Original-file retention requires its checkbox. Import, then verify each record against its original page, classify/category it, enter a reason, and explicitly approve or reject it. Every PDF row starts as Needs Clarification; bulk approval is unavailable.
 
-[PDF instructions, supported layout, examples, and limits](pdf-import-review.md) explain wrapped/ambiguous text, protected/scanned files, exact totals, and recovery. The older installer lacks this source checkpoint; no new download was created.
+[PDF instructions, supported layout, examples, and limits](pdf-import-review.md) explain wrapped/ambiguous text, protected/scanned files, exact totals, and recovery.
 
-## Review merchant groups and recurring payments (0.9.0 source)
+## Review merchant groups and recurring payments
 
-Approve the source transactions first. In the client's statement panel, scroll to **Merchant groups and recurring payments**, choose a group, and check its supporting payments. Correct verified Merchant fields to combine or separate names. Confirm or dismiss the pattern with a reason; choose the reviewed frequency and classify a subscription only after verifying it. Changed evidence requires another review. Decisions persist in encrypted storage and backups without changing planning inputs. See [steps, evidence rules, examples and limits](recurring-payment-review.md). No new installer was created.
+Approve the source transactions first. In the client's statement panel, scroll to **Merchant groups and recurring payments**, choose a group, and check its supporting payments. Correct verified Merchant fields to combine or separate names. Confirm or dismiss the pattern with a reason; choose the reviewed frequency and classify a subscription only after verifying it. Changed evidence requires another review. Decisions persist in encrypted storage and backups without changing planning inputs. See [steps, evidence rules, examples and limits](recurring-payment-review.md).
 
-## Check statement running balances (0.10.0 source)
+## Check statement running balances
 
-Map the CSV's actual after-transaction balance column and declare oldest/newest-first order. In **Statement running-balance checks**, choose the statement to compare original source steps with approved cumulative amounts. Unknown data stays unknown; rejected amounts and undecided rows never supply approved balances. Date/order conflicts and discrepancies require individual review. Correct or clear an order declaration with a reason; original source values and transaction decisions remain unchanged. See [steps, examples, limits and supported balance meaning](statement-balance-reconciliation.md). No new installer was created.
+Map the CSV's actual after-transaction balance column and declare oldest/newest-first order. In **Statement running-balance checks**, choose the statement to compare original source steps with approved cumulative amounts. Unknown data stays unknown; rejected amounts and undecided rows never supply approved balances. Date/order conflicts and discrepancies require individual review. Correct or clear an order declaration with a reason; original source values and transaction decisions remain unchanged. See [steps, examples, limits and supported balance meaning](statement-balance-reconciliation.md).
+
+## Compare scenarios and temporary income
+
+1. Save the client's normal budget and any debt, savings and cash-flow models.
+2. Open **Compare combined financial scenarios** and choose **Reload saved scenario
+   baseline**. Enter a useful proposal label and assumptions.
+3. Compare changes to existing amounts, extra debt payments, goal contributions
+   or new recurring expenses. Optional dates/accounts explicitly add proposed bills.
+4. In **Model temporary income reductions**, choose **Add temporary income period**.
+   Select a normal income line, reduced amount per payment, and inclusive first/last
+   months. Blank means unknown; zero means no income. Use `YYYY-MM`.
+5. Select a matching paycheck schedule only if you also want affected dated
+   receipts changed. Original payment dates and receipts outside the period remain.
+6. Choose **Compare temporary proposal**. Review the separate **Temporary income
+   funding and recovery** table and warnings. The main monthly model uses normal
+   recurring income; payoff and goal dates require the continuing commitments to
+   be funded. This does not model savings withdrawals or automatically cut payments.
+7. Choose **Save reviewed combined scenario** after review. Live plans and approved
+   transactions remain unchanged. Reopen it through **Saved combined scenarios**.
+
+Up to six reductions fit within a 24-month span; one following normal month is
+shown when supported. Unknowns remain unavailable. Annual/irregular income,
+overlapping reductions to one source and conflicting edits to the selected paycheck
+are rejected. Dated forecasts retain their own saved period and 100-schedule limit.
+
+## Save and export counselor reports
+
+Open the saved client's assessment/report panel. Review the approved-data period,
+title, findings and limitations. To attach a proposal, enable **Include a saved
+combined scenario**, review the directory and select a current saved record.
+Confirm the review acknowledgment and save the assessment. Use **Choose PDF
+destination** or enter a full private path and export the saved assessment PDF.
+Existing files are never overwritten. Reports retain their captured figures after
+later changes; **Needs review** flags changed context without rewriting history.
+
+Temporary-income reports include the funding/recovery table and conditional
+forecast warnings. A separate planning report with reviewed monthly allocations
+is required before recording a client agreement from temporary-income analysis.
+Other eligible current captured planning reports support **Client action plans**,
+three to five priorities, follow-up and separate client PDF export.
+
+## Suggested progress check
+
+Use a fictional household. Enter monthly income 3,000.00 and necessary expenses
+1,500.00, then model monthly income 1,000.00 for two months. Review the period
+figures and return to 3,000.00 afterward. Without a savings model, allocation checks
+use known budget allocations; missing information stays unavailable. Add a 75.00
+monthly necessary expense and compare again. Save a scenario/report, export a PDF,
+restart the app and reopen them. Create an encrypted backup in Settings before
+trying additional changes. Keep your password; backup encryption does not bypass it.

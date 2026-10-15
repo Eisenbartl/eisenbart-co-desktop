@@ -276,6 +276,7 @@ pub fn disclosures(a: &assessments::Payload, date: NaiveDate) -> Result<Vec<Stri
     Ok(warnings)
 }
 pub fn review(a: &assessments::Record, created: &str) -> Result<Review, String> {
+    income_basis(a)?;
     if a.needs_review {
         return Err("This assessment needs review. Record a new current assessment/scenario before creating a client action plan.".into());
     }
@@ -290,6 +291,7 @@ pub fn review(a: &assessments::Record, created: &str) -> Result<Review, String> 
     })
 }
 pub fn validate(p: &Payload, a: &assessments::Record) -> Result<(), String> {
+    income_basis(a)?;
     if p.format != 1
         || p.calculator != CALCULATOR
         || p.id.is_empty()
@@ -312,6 +314,15 @@ pub fn validate(p: &Payload, a: &assessments::Record) -> Result<(), String> {
         return Err(
             "Client action plan allocations or disclosures do not match its captured basis.".into(),
         );
+    }
+    Ok(())
+}
+fn income_basis(a: &assessments::Record) -> Result<(), String> {
+    if a.scenario
+        .as_ref()
+        .is_some_and(|s| !s.payload.comparison.input.income_reductions.is_empty())
+    {
+        return Err("This report includes temporary income changes. Review monthly allocations in a separate planning report before recording a client agreement.".into());
     }
     Ok(())
 }

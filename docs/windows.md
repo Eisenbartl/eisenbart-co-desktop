@@ -1,111 +1,87 @@
-# Windows build and installation guide
+# Windows development installer — 0.23.0
 
-## What is available now
+## Download and install
 
-The current 0.8.0 PDF import/review milestone is source-only, per the request to avoid another download. The existing 0.3.0 installer below does not include savings, cash flow, backup/recovery, or CSV review. Normal Windows CI now builds/tests the code without packaging; an installer requires a manual workflow run with **package_installer** enabled.
+The requested 0.23.0 Windows x64 preview is being packaged and checked. Its verified
+download link will be recorded here when the packaging run completes.
 
+1. Download the **windows-installer** ZIP from the verified build link. Sign in to
+   GitHub with access to the repository if prompted.
+2. Right-click the ZIP and choose **Extract All**. Read the included `README.txt`.
+3. Run the `.exe` in the extracted folder, then open **Eisenbart Counseling Suite**
+   from the Windows Start menu.
+4. Use fictional records and retain the password you choose. See the
+   [evaluation guide](user-guide.md) for the client, scenario, report and backup steps.
 
-The verified **0.3.0 Windows x64 development installer is available**, including client budgets and fixed-monthly debt payoff comparisons, from [build 38485910521](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521). Its 25 frontend and 32 backend tests, installation, responsive native-window launch, uninstall, and isolated cleanup passed on a disposable Windows Server 2025 runner. See [development-status.md](development-status.md) for evidence and remaining acceptance work.
+This is an unsigned development installer; Windows may show an unknown-publisher
+or SmartScreen warning. Confirm the build/version and repository before running
+it. No certificate or signing claim is supplied. The artifact is retained for
+14 days; an expired download requires a new build.
 
-[Download windows-installer](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521/artifacts/11859772481), sign in to GitHub if prompted, and choose **Extract All** for the ZIP. Read `README.txt` and run `Eisenbart Counseling Suite_0.3.0_x64-setup.exe`. Open **Eisenbart Counseling Suite** from the Start menu afterward. The download expires October 27, 2026. The [evaluation guide](user-guide.md) explains setup, fictional clients, budgets, debt plans, notes, locking, and troubleshooting. Version 0.3.0 upgrades the database to schema 4; do not switch back to older versions afterward.
+The current package includes budgets, debt/savings/cash-flow planning, encrypted
+recovery, reviewed CSV/selectable-text PDF imports, recurring and balance review,
+approved-data charts, saved scenarios and counselor/client-plan PDF export.
+Temporary income periods show funding deficits/recovery and explicitly selected
+paycheck changes. Scanned OCR, advanced terms, broader intake/follow-up and other
+commercial requirements remain open. This is not a production release.
 
-The first target is Windows 11 x64. This is a development application for fictional data, not a production financial-record system. Encrypted backup and verified restore are implemented in current source. Forgotten-password reset and clean installed Windows recovery acceptance remain unavailable.
+## Updating an earlier preview
 
-## Get an installer from GitHub
+Close the app before installing. Keep the existing workspace, its password and a
+backup. If the old preview has no backup controls, copy the entire closed-app data
+folder to a safe location first. Do not delete files to make setup appear again.
+Version 0.23.0 uses schema 16 and migrates supported older workspaces; earlier
+applications may not read upgraded or newly extended records. Keep using the new
+version afterward. Reinstalling cannot recover a forgotten encryption password.
 
-The source foundation has been uploaded to the repository. To download a successful Windows development build:
+The normal per-user data directory is `%LOCALAPPDATA%\com.eisenbart.counseling`.
+After recovery, `workspace-active.json` selects records under recovery generations.
+Keep that entire directory intact; do not edit or move individual database,
+metadata, pointer or recovery files. Use supported encrypted backup and restore.
 
-1. Open [Windows desktop build on GitHub](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/workflows/windows.yml). Sign in to GitHub with access to the repository if prompted.
-2. Open an existing successful packaging run for the desired checkpoint. When an installer is requested later, choose **Run workflow**, select the branch, enable **package_installer**, and start it. Normal pushes and pull requests run frontend/backend checks only.
-3. Wait for a packaging run to finish and verify its installer steps actually passed. A green tests-only run has no installer and does not validate package installation. A successful opted-in packaging run includes installation, native-window launch, and uninstall checks on a disposable GitHub-hosted Windows runner. It does not mean a person tested the complete client workflow or used the application offline on a clean Windows 11 computer.
-4. Open that run and download the **windows-installer** artifact near the bottom of the page.
-5. Extract the whole downloaded ZIP file into a folder. Read `README.txt`, then open the `.exe` inside to install the development application. `SHA256SUMS.txt` records its download checksum. The workflow retains artifacts for 14 days; an expired download requires a new successful build.
+## What validation establishes
 
-If no artifact appears, open the failed step's output and the **windows-validation-logs** artifact when present. Do not treat source files or a failed workflow as an installer. GitHub Actions access and usage limits depend on the repository's account.
+The packaging workflow runs on a disposable Windows Server 2025 x64 runner. It
+installs locked dependencies, builds/tests the frontend, tests Rust persistence
+and PDF workers, builds the actual NSIS installer, installs it into a private
+location, checks a responsive installed x64 native window, uninstalls it and
+cleans only its own data. SHA-256 download metadata is produced after those steps.
+The script refuses existing installations, processes or workspaces.
 
-## What the Windows package check proves
+This does not establish a complete installed Windows counseling workflow, a clean
+Windows 11 offline installation without preinstalled WebView2, or a security
+review. The installer is configured to carry Microsoft's WebView2 offline
+redistributable. Its inclusion and actual package results are recorded in
+[development status](development-status.md). Linux native workflow checks and
+Windows package checks are separate evidence.
 
-The workflow uses the GitHub-hosted `windows-2025` image, Node 24, stable MSVC Rust, x64 Visual Studio build tools, and Strawberry Perl when available. NASM is optional; the bundled OpenSSL source supports a build without assembly when it is unavailable. Locked dependency installation and Rust tests preserve the declared dependency versions. Tauri's default static Visual C++ runtime setting avoids requiring a separate runtime installer for the application itself.
+## Clean Windows 11 evaluation still needed
 
-`scripts/windows-package-smoke.ps1` runs only on disposable GitHub-hosted Windows runners. It refuses to proceed if the application's local data, installation, or process already exists. It validates the installer's Windows executable header and signature status, installs to a unique runner temporary directory, verifies the installed application is an x64 executable, waits for a responsive native window with the expected title, stops only its own application process, uninstalls, and verifies the installed files were removed. It cleans only application data created by that isolated run. It creates no counselor account, password, or client record. Its log is uploaded separately.
+Use a disposable fictional workspace to check setup, wrong passwords, client
+isolation, budgets/debt/savings/cash flow, CSV/PDF approvals and original evidence,
+recurring/balance review, approved dashboards, scenario periods, reports/client
+plans, lock/restart and encrypted recovery. Repeat offline. Test native file/folder
+dialogs, wrong/damaged backups, retained originals, error-screen recovery and an
+upgrade from a copied fictional older workspace. Check uninstall/reinstall data
+behavior separately. Preserve failures and their steps. Signing, accessibility,
+security, realistic data volume and commercial acceptance remain release work.
 
-These checks exercise the actual NSIS package and installed executable. They do not verify the full client workflow, database recovery, or fresh-machine offline WebView2 installation. GitHub's Windows image already supplies development software and a browser runtime. The Windows 11 manual acceptance checks below remain required.
+## Build instructions for a developer
 
-## Install and evaluate
-
-The verified 0.3.0 package includes Microsoft's WebView2 runtime installer: archive inspection found the 214,090,448-byte `MicrosoftEdgeWebView2RuntimeInstaller.exe` payload and passed the installer archive integrity check. A build downloads that redistributable in advance. A fresh-machine offline test must still confirm it installs and works without preinstalled WebView2.
-
-On a Windows 11 x64 evaluation computer:
-
-1. Run the extracted installer and follow its steps. Administrator rights may be requested by Windows or the runtime installer.
-2. Open **Eisenbart Counseling Suite** from the Start menu.
-3. Create a fictional organization and counselor, then choose a long password you can retain securely.
-4. Add a fictional client, edit the profile, add a note, and change the lifecycle status.
-5. Lock the app and unlock with the password. Verify a wrong password does not unlock it.
-6. Close and reopen the program, sign in, and confirm the client and note persist.
-7. Open a saved client's **Monthly budget**. Reproduce the [documented household example](budget-calculations.md), save, and verify the 716.67 USD unallocated result. Check a second client's budget remains separate.
-8. Open **Debt payoff planning** and reproduce the two-debt example in [debt-calculations.md](debt-calculations.md). Verify 43.10 USD snowball interest and 35.35 USD avalanche interest, inspect both monthly schedules, and check isolation after locking/reopening.
-9. Disconnect internet access and repeat sign-in, client editing, notes, budgets, debt plans, and reopening. Include an upgrade from a fictional 0.2.0 workspace and verify existing clients, notes, and budgets survive.
-
-The development installer is unsigned until a signing certificate is obtained and configured. Windows may display an unknown-publisher or SmartScreen prompt. Verify the download came from the expected repository build; signing and clean-machine testing are prerequisites for public distribution.
-
-Do not import real client information for this evaluation. Daily/variable/promotional interest, savings goals, dated cash-flow calendars, statement imports, reports, and recovery features are not part of the earlier 0.3.0 downloadable milestone. Current source adds savings, dated cash flow, encrypted recovery, and CSV review.
-
-## Where local records live
-
-The app uses Tauri's per-user local application-data directory, ordinarily `%LOCALAPPDATA%\com.eisenbart.counseling` on Windows. Paste that location into File Explorer's address bar to inspect the folder. Data belongs to the Windows user running the program and is not stored in the source repository. The files are `workspace.db` (encrypted records) and `workspace.json` (non-secret setup metadata).
-
-The encrypted database and its setup metadata must stay together. Never manually edit them, send them to another person, or delete them as a troubleshooting shortcut. Reinstalling the program does not supply a forgotten database password. This milestone has no supported recovery path if the password is lost.
-
-## Build locally on Windows
-
-This section is for a developer or technical helper. Install:
-
-- Node.js 24 with npm.
-- A current stable Rust toolchain for `x86_64-pc-windows-msvc`.
-- Microsoft Visual Studio Build Tools with **Desktop development with C++**, the MSVC compiler, and Windows SDK.
-- The WebView2 runtime for development. The distributable installer is bundled separately during packaging.
-- Strawberry Perl for the bundled SQLCipher/OpenSSL build. MSVC's `cl`, `nmake`, and `link` must be available in the developer terminal. NASM is optional; a source-build failure must be diagnosed rather than bypassing encryption.
-
-Open a developer PowerShell terminal in the repository and run:
+Install Node 24, stable MSVC Rust, Visual Studio C++ tools/Windows SDK, WebView2
+for development and Strawberry Perl for bundled SQLCipher/OpenSSL. NASM is optional.
+Use the repository checkout and locked commands:
 
 ```powershell
 npm ci
 npm run build
 npm test
 cargo test --manifest-path src-tauri/Cargo.toml --locked
-npm run tauri dev
-```
-
-To package after the checks pass:
-
-```powershell
 npm run tauri -- build --ci --bundles nsis -- --locked
 ```
 
-The expected installer output directory is `src-tauri\target\release\bundle\nsis`. Building uses the internet to download dependencies and the WebView2 offline redistributable. The installed core workflow is designed to work without those development services.
-
-## Windows release acceptance still required
-
-Before sharing a release, install on a clean Windows 11 x64 machine, including one without WebView2 and without internet access. Test setup, wrong-password handling, client isolation, lock/unlock, persistence after a restart, and uninstall/reinstall data behavior. Record actual results and failures. Complete recovery, security, accessibility, licensing, signing, and broader product criteria in [roadmap.md](roadmap.md) before calling the application production-ready.
-
-The 0.10.0 source upgrades local workspaces to schema 12 for encrypted statement balance-setting history. Recovered workspaces use the activation layout; use 0.10.0 or newer. Earlier applications cannot open schema 12. No new installer is created for this milestone.
-
-Windows manual recovery acceptance: create a backup on local/removable storage; reject wrong passwords and damaged files; cancel review; verify whole-workspace restore with retained original files; repeat after app restart and simulated missing metadata; verify all client plans and immutable history offline. Use a disposable fictional workspace. See [backup-recovery.md](backup-recovery.md). This installed Windows GUI/drive acceptance is separate from CI source tests.
-
-CSV acceptance must also exercise native file selection, explicit mapping, pending/clarification/approved/rejected states, duplicate handling, refunds, transfers, source retention, lock/restart isolation, and backup recovery on clean Windows 11 while offline. Linux native checks and Windows source tests establish separate results. See [csv-import-review.md](csv-import-review.md).
-
-Windows PDF acceptance must exercise native file selection, parser-job memory limits, malformed/protected/scanned rejection, explicit page/line selection, individual decisions, original-source retention, isolation, and backup recovery while offline. Source tests verify the worker executable/protocol; clean Windows 11 GUI acceptance remains unrun. See [pdf-import-review.md](pdf-import-review.md).
-
-Recurring-payment acceptance must exercise corrected merchant grouping, approved-only
-evidence, variable amounts/month-end suggestions, explicit confirmation/dismissal,
-subscription classification, stale-evidence invalidation including identical
-reapproval, client isolation, restart, and encrypted recovery on clean Windows 11
-offline. Source CI does not establish installed desktop acceptance. See
-[recurring-payment-review.md](recurring-payment-review.md).
-
-Running-balance acceptance must exercise explicit balance mapping/meaning and
-oldest/newest-first source order, missing figures, date conflicts, separate
-source/approved tracks, rejected/undecided exclusion, corrected amounts, setting
-history, client isolation, restart and encrypted recovery on clean Windows 11
-while offline. See [statement-balance-reconciliation.md](statement-balance-reconciliation.md).
+The output is under `src-tauri\target\release\bundle\nsis`. Building downloads
+dependencies and the offline WebView2 redistributable; essential installed
+operation is offline. Do not disable TLS, signatures or encryption to fix a build.
+A manual GitHub workflow run with `package_installer=true` performs packaging;
+ordinary source pushes only test. A green source-only run has no installer.

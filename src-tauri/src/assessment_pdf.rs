@@ -1091,6 +1091,68 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
         for warning in &c.warnings {
             l.text(warning, 10.0)?;
         }
+        if !c.income_periods.is_empty() {
+            l.section("Temporary income funding and recovery")?;
+            l.text("The main planning assumptions retain normal recurring income. These monthly checks apply temporary reductions against continuing debt and capped savings commitments. Negative buffers require funding or revised commitments. Payoff and goal dates remain conditional; no savings drawdown is simulated. Only explicitly selected paycheck schedules change dated receipts. Review allocations in a separate planning report before recording a client agreement.",10.0)?;
+            for input in &c.input.income_reductions {
+                let line = c
+                    .proposed
+                    .plans
+                    .budget
+                    .lines
+                    .get(input.budget_index)
+                    .ok_or("Missing temporary income basis.")?;
+                l.value(
+                    "Temporary income assumption",
+                    &format!(
+                        "{} / {} through {} / {} per {}",
+                        line.label,
+                        input.from_month,
+                        input.through_month,
+                        optional(&input.amount),
+                        plan_term(&line.frequency)
+                    ),
+                )?;
+            }
+            for month in &c.income_periods {
+                l.value(
+                    "Income period",
+                    &format!(
+                        "{} / {}",
+                        month.month,
+                        if month.reduced {
+                            "Reduced"
+                        } else {
+                            "Normal / recovery"
+                        }
+                    ),
+                )?;
+                l.value(
+                    "Normal / period monthly income",
+                    &format!(
+                        "{} / {}",
+                        optional(&month.normal_income),
+                        optional(&month.income)
+                    ),
+                )?;
+                l.value(
+                    "Continuing debt / savings reserved",
+                    &format!(
+                        "{} / {}",
+                        optional(&month.debt_reserved),
+                        optional(&month.savings_reserved)
+                    ),
+                )?;
+                l.value(
+                    "Normal / period funding buffer",
+                    &format!(
+                        "{} / {}",
+                        optional(&month.normal_buffer),
+                        optional(&month.buffer)
+                    ),
+                )?;
+            }
+        }
     }
     if let Some(s) = &p.planning {
         planning_pdf(&mut l, s)?;

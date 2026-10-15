@@ -199,3 +199,13 @@ run before adding the expense; the original saved proposal and older reports
 remain separately covered. The integrated expense record/report and explicit
 bill assumptions must survive restart and both recovery paths. Artifacts:
 `native-recurring-expenses-*.png` and `recurring-expense-*.pdf`.
+
+The 0.23.0 integrated proposal extends the existing expense/extra/goal checks with
+800.00 biweekly income for November only. It checks -975.00 monthly funding,
+December normal income/buffer 858.34, unchanged dated closing before explicit
+paycheck selection and 1,825.00 closing afterward. Reversed periods stay editable.
+The original baseline/normal models remain unchanged. Four integrated PDFs and
+restart/both recovery paths retain monthly assumptions, deficits, recovery and
+separate 1,820.02 approved operating activity. Older comparisons/client plans
+remain in the same complete run. Artifacts: `native-temporary-income-*.png` and
+`temporary-income-*.pdf`.

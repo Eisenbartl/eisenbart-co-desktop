@@ -151,3 +151,29 @@ it('permits budget-only annual expenses without a cash-flow model and clears new
  expect(mocks.compareFinancialScenarios.mock.calls[0][1].recurringExpenses).toEqual([{label:'Annual insurance',kind:'necessary',amount:'120.00',frequency:'annual',dated:null}]);
  view.rerender(<ScenarioComparisons {...p} clientId="client-b"/>);expect(screen.queryByLabelText('New expense 1 name')).not.toBeInTheDocument();expect(screen.queryByRole('region',{name:'Combined scenario comparison'})).not.toBeInTheDocument();
 });
+
+it('sends bounded temporary income assumptions and displays returned monthly deficit and recovery separately',async()=>{
+ const reduction={budgetIndex:0,fromMonth:'2026-11',throughMonth:'2026-11',amount:'400.00',cashSchedule:null};
+ const input={...initial,incomeReductions:[reduction]};
+ const incomePeriods=[{month:'2026-11',reduced:true,normalIncome:'3250.00',income:'866.67',debtReserved:'100.00',savingsReserved:'250.00',normalBuffer:'1700.00',buffer:'-683.33'},{month:'2026-12',reduced:false,normalIncome:'3250.00',income:'3250.00',debtReserved:'100.00',savingsReserved:'250.00',normalBuffer:'1700.00',buffer:'1700.00'}];
+ mocks.compareFinancialScenarios.mockResolvedValueOnce({...comparison,input,incomePeriods});
+ mocks.saveClientScenario.mockResolvedValueOnce({...saved,payload:{...saved.payload,comparison:{...saved.payload.comparison,input,incomePeriods}}});
+ render(<ScenarioComparisons {...props()}/>);await load();fireEvent.click(screen.getByText('Model temporary income reductions'));fireEvent.click(screen.getByRole('button',{name:'Add temporary income period'}));
+ fireEvent.change(screen.getByLabelText('Income period 1 budget line'),{target:{value:'0'}});fireEvent.change(screen.getByLabelText('Income period 1 reduced amount per payment (USD)'),{target:{value:'400'}});fireEvent.change(screen.getByLabelText('Income period 1 first month (YYYY-MM)'),{target:{value:'2026-11'}});fireEvent.change(screen.getByLabelText('Income period 1 last month (YYYY-MM)'),{target:{value:'2026-11'}});
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));const region=await screen.findByRole('region',{name:'Temporary income funding'});
+ expect(region).toHaveTextContent('-$683.33');expect(region).toHaveTextContent('Normal / recovery');expect(region).toHaveTextContent('2026-12');
+ const proposal={...initial,incomeReductions:[{...reduction,amount:'400'}]};expect(mocks.compareFinancialScenarios).toHaveBeenCalledWith('client-a',proposal);
+ fireEvent.click(screen.getByRole('button',{name:'Save reviewed combined scenario'}));await screen.findByRole('article',{name:'Saved combined scenario'});expect(mocks.saveClientScenario).toHaveBeenCalledWith('client-a',{expectedCount:0,proposal});
+});
+
+it('retains rejected income ranges and paycheck selections, sends unknown amounts explicitly and clears review on removal',async()=>{
+ const loaded=structuredClone(plans);loaded.cashflow.data!.schedules.push({...loaded.cashflow.data!.schedules[0],label:'Dated wages',kind:'paycheck',frequency:'biweekly',amount:'1500.00'});mocks.getAssessmentPlanning.mockResolvedValueOnce(loaded);
+ render(<ScenarioComparisons {...props()}/>);await load();fireEvent.click(screen.getByText('Model temporary income reductions'));fireEvent.click(screen.getByRole('button',{name:'Add temporary income period'}));fireEvent.change(screen.getByLabelText('Income period 1 budget line'),{target:{value:'0'}});fireEvent.change(screen.getByLabelText('Income period 1 first month (YYYY-MM)'),{target:{value:'2026-13'}});fireEvent.change(screen.getByLabelText('Income period 1 last month (YYYY-MM)'),{target:{value:'2026-11'}});fireEvent.change(screen.getByLabelText('Income period 1 paycheck schedule (optional)'),{target:{value:'1'}});
+ mocks.compareFinancialScenarios.mockRejectedValueOnce(new Error('Choose valid planning months'));
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));expect(await screen.findByRole('alert')).toHaveTextContent('valid planning months');expect(screen.getByLabelText('Income period 1 first month (YYYY-MM)')).toHaveValue('2026-13');expect(screen.getByLabelText('Income period 1 paycheck schedule (optional)')).toHaveValue('1');expect(mocks.compareFinancialScenarios.mock.calls[0][1].incomeReductions[0]).toEqual({budgetIndex:0,fromMonth:'2026-13',throughMonth:'2026-11',amount:null,cashSchedule:1});
+ expect(mocks.compareFinancialScenarios).toHaveBeenCalledTimes(1);fireEvent.click(screen.getByRole('button',{name:'Remove income period 1'}));expect(screen.queryByLabelText('Income period 1 first month (YYYY-MM)')).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Save reviewed combined scenario'})).not.toBeInTheDocument();
+});
+
+it('drops temporary income fields on client changes and explicit baseline reloads',async()=>{
+ const p=props(),view=render(<ScenarioComparisons {...p}/>);await load();fireEvent.click(screen.getByText('Model temporary income reductions'));fireEvent.click(screen.getByRole('button',{name:'Add temporary income period'}));fireEvent.change(screen.getByLabelText('Income period 1 reduced amount per payment (USD)'),{target:{value:'0'}});fireEvent.click(screen.getByRole('button',{name:'Reload saved scenario baseline'}));await waitFor(()=>expect(screen.queryByLabelText('Income period 1 reduced amount per payment (USD)')).not.toBeInTheDocument());fireEvent.click(screen.getByRole('button',{name:'Add temporary income period'}));view.rerender(<ScenarioComparisons {...p} clientId="client-b"/>);expect(screen.queryByLabelText('Income period 1 budget line')).not.toBeInTheDocument();expect(mocks.saveClientScenario).not.toHaveBeenCalled();
+});

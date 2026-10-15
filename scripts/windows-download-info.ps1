@@ -13,6 +13,10 @@ if (-not $IsWindows) {
 }
 $repository = Split-Path -Parent $PSScriptRoot
 $configuration = Get-Content -LiteralPath (Join-Path $repository 'src-tauri/tauri.conf.json') -Raw | ConvertFrom-Json
+$storageSource = Get-Content -LiteralPath (Join-Path $repository 'src-tauri/src/storage.rs') -Raw
+$schemaMatch = [regex]::Match($storageSource, 'const SCHEMA_VERSION:\s*i32\s*=\s*(\d+);')
+if (-not $schemaMatch.Success) { throw 'The workspace schema version could not be determined.' }
+$schemaVersion = $schemaMatch.Groups[1].Value
 $bundle = (Get-Item -LiteralPath $BundleDirectory -ErrorAction Stop).FullName
 $installers = @(Get-ChildItem -LiteralPath $bundle -Filter '*.exe' -File)
 if ($installers.Count -ne 1) {
@@ -57,23 +61,44 @@ INSTALL ON YOUR WINDOWS DESKTOP
 3. Open Eisenbart Counseling Suite from the Start menu.
 4. Use fictional records only and retain the password you choose securely.
 
-This development build provides local password sign-in, encrypted local
-storage, client profiles, notes, statuses, locking, and exact monthly budget
-planning with savings/debt payment allocations, saved debt accounts, and monthly
-snowball/avalanche payoff estimates, emergency savings, sinking-fund goals,
-savings contribution/affordability comparisons, and a paycheck-based cash-flow
-calendar with separate account balances, transfers, and chronological ledgers. The full financial
-application is still being developed. Encrypted backup and verified whole-workspace recovery are available. There is
-no supported forgotten-password reset. Do not store real client financial information.
+WHAT YOU CAN CHECK
+Client profiles and notes; exact budgets; debt payoff comparisons; emergency and
+sinking-fund savings; dated cash flow; encrypted backup/recovery; CSV and selectable-
+text PDF transaction review; recurring-payment and running-balance review; approved-
+data dashboards; saved scenarios; counselor and client-plan PDF reports.
 
-The Windows workflow runs frontend/backend tests and checks silent installation,
-the installed x64 program displaying a responsive native window, and uninstall.
-This is not a complete Windows client-workflow or security test. A clean Windows
-11 offline installation without preinstalled WebView2 still requires testing.
-The installer is configured to include the WebView2 offline redistributable.
+NEW IN THIS VERSION
+Temporary income reductions have explicit start/end months, funding deficits and
+normal recovery. Selecting a matching paycheck schedule changes only affected
+dated receipts. Normal debt/savings forecasts remain conditional on their entered
+commitments. New recurring expenses, extra debt payments and goal contributions
+can be compared and captured together without applying them to live plans.
 
-Version 0.6.0 upgrades the local database to schema 7. Restored workspaces use
-a new activation layout. Keep using 0.6.0 or newer; do not delete the data folder.
+TRY THIS
+1. Create a fictional client and save normal income and necessary expenses.
+2. Save debt, savings and cash-flow models if you want those forecasts.
+3. Open Compare combined financial scenarios and reload the saved baseline.
+4. Model a temporary income reduction and review its monthly funding/recovery.
+5. Save the reviewed scenario, select it in an internal counselor assessment and
+   export a PDF to a private folder. Restart and check the saved records.
+6. Create an encrypted backup in Settings using your workspace password.
+
+This is an evaluation build. Use fictional records only. There is no forgotten-
+password reset; reinstalling cannot recover a lost password. Scanned PDF OCR,
+advanced financial terms and other original product requirements remain open.
+
+The Windows workflow runs frontend/backend tests, silent installation, an installed
+x64 responsive native window, and uninstall. These checks do not establish the
+full Windows client workflow, a security review or clean Windows 11 offline install.
+The installer includes the WebView2 offline redistributable when packaging succeeds.
+
+UPDATING AN EARLIER VERSION
+Close the application before installing. Preserve your existing workspace and its
+password; never delete the data folder to fix setup. If an older preview has no
+backup controls, first copy the entire closed-app data folder to a safe location.
+This version uses database schema $schemaVersion. Older applications may not open
+it. Recovery generations and workspace-active.json select restored records; do
+not move or edit those files individually. Use supported encrypted backup/restore.
 
 VERIFY THE DOWNLOAD (optional)
 In PowerShell in this extracted folder:

@@ -63,6 +63,8 @@ pub struct Input {
     pub goal_contributions: Vec<GoalContributionChange>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recurring_expenses: Vec<RecurringExpense>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub income_reductions: Vec<crate::income_periods::Reduction>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -82,6 +84,8 @@ pub struct Comparison {
     pub baseline: Outcome,
     pub proposed: Outcome,
     pub warnings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub income_periods: Vec<crate::income_periods::Month>,
 }
 fn outcome(plans: planning::Plans, strategy: planning::Strategy) -> Outcome {
     let first_month_buffer = plans
@@ -107,6 +111,9 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
     }
     if input.recurring_expenses.len() > 20 {
         return Err("Use at most 20 new recurring expenses per proposal.".into());
+    }
+    if input.income_reductions.len() > 6 {
+        return Err("Use at most six temporary income reductions.".into());
     }
     input.label = input.label.trim().into();
     input.assumptions = input.assumptions.trim().into();
@@ -295,6 +302,25 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         proposed.cashflow.data = Some(data);
         proposed.cashflow.summary = Some(summary);
     }
+    let expense_start = baseline
+        .cashflow
+        .data
+        .as_ref()
+        .map_or(0, |d| d.schedules.len());
+    let expense_count = input
+        .recurring_expenses
+        .iter()
+        .filter(|e| e.dated.is_some())
+        .count();
+    let expense_without_occurrence = proposed.cashflow.summary.as_ref().is_some_and(|s| {
+        (expense_start..expense_start + expense_count)
+            .any(|index| s.ledger.iter().all(|e| e.schedule_index != index))
+    });
+    let income_periods = crate::income_periods::apply(
+        &mut proposed,
+        &mut input.income_reductions,
+        &input.cash_changes,
+    )?;
     // Recheck recalculated models as a complete set without requiring a supported debt result.
     let proposed = planning::capture(
         proposed,
@@ -316,7 +342,13 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
     ];
     if !input.debt_extras.is_empty() || !input.goal_contributions.is_empty() {
         let prefix = "Proposed extra payments are added to the shared repayment budget and follow the selected strategy, not a named account, with one extra per month and at most 24 in total. Only explicitly changed goal contributions are replaced; targets, reserves, future base payment changes and other goals remain in effect. Extras reserve funding even if repayment finishes early. Funding sources are not verified";
-        let ending = if input.recurring_expenses.iter().any(|e| e.dated.is_some()) {
+        let ending = if input
+            .income_reductions
+            .iter()
+            .any(|i| i.cash_schedule.is_some())
+        {
+            "; only explicitly selected expense dates and temporary paycheck periods change dated activity."
+        } else if input.recurring_expenses.iter().any(|e| e.dated.is_some()) {
             "; only explicitly dated new expenses add cash-flow bills."
         } else {
             " and dated cash-flow schedules are unchanged."
@@ -325,20 +357,20 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
     }
     if !input.recurring_expenses.is_empty() {
         warnings.push("New recurring expenses are estimated additions, not replacements for existing bills. Monthly budget normalization applies throughout the model; first/last payment dates limit only the explicitly selected dated forecast, not the budget, debt capacity or emergency target. Check for duplicate obligations. Annual amounts are budget-only. Missing amounts stay unknown; dated payments use the same entered amount/frequency and only counselor-selected accounts/dates. No live plan or approved transaction is created.".into());
-        let start = baseline
-            .cashflow
-            .data
-            .as_ref()
-            .map_or(0, |d| d.schedules.len());
-        let count = input
-            .recurring_expenses
-            .iter()
-            .filter(|e| e.dated.is_some())
-            .count();
-        if proposed.cashflow.summary.as_ref().is_some_and(|s| {
-            (start..start + count).any(|index| s.ledger.iter().all(|e| e.schedule_index != index))
-        }) {
+        if expense_without_occurrence {
             warnings.push("At least one new expense has no dated occurrence within the saved forecast period. Its monthly budget assumption still applies; review payment dates and the forecast horizon.".into());
+        }
+    }
+    if !income_periods.is_empty() {
+        warnings.push("Temporary income periods are monthly funding checks against continuing debt and savings commitments, including capped goal contributions. The main model table retains normal recurring income; payoff and savings milestones remain conditional on continuing the entered commitments. No drawdown or automatic payment/contribution reduction is inferred. One following normal month is shown when supported. Only an explicitly selected matching paycheck schedule changes dated receipts; those occurrences retain their original dates and return to normal amounts outside the period. Unknown receipts keep affected balances unknown. Review monthly funding before recording a separate client agreement.".into());
+        if income_periods
+            .iter()
+            .any(|m| m.buffer.as_ref().is_some_and(|v| v.starts_with('-')))
+        {
+            warnings.push("Reduced income does not fund the continuing debt and savings commitments in at least one month. Review the monthly deficits and confirm funding or revise the proposed commitments.".into());
+        }
+        if income_periods.iter().any(|m| m.buffer.is_none()) {
+            warnings.push("At least one temporary-income monthly funding check is unavailable. Review missing amounts, model start months and forecast horizons; unknown is not zero.".into());
         }
     }
     Ok(Comparison {
@@ -350,5 +382,6 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         proposed: outcome(proposed, input.proposed_strategy.clone()),
         input,
         warnings,
+        income_periods,
     })
 }

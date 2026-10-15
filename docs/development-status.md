@@ -1,5 +1,51 @@
 # Development status
 
+## Stage 3J: temporary income funding/recovery and Windows preview — 0.23.0
+
+Bounded temporary income reductions now retain explicit month ranges, reduced
+per-payment assumptions, monthly funding deficits and normal recovery. Normal
+budget/debt/savings forecasts remain conditional on continuing commitments;
+no savings drawdown or automatic payment cut is inferred. Explicitly selected
+matching paycheck schedules change only affected dated receipts, preserving
+original dates and normal amounts outside the period. Saved scenarios/reports
+and recovery validate captured period results and receipt provenance. Client
+agreements require a separate reviewed monthly-allocation report. Older empty-
+extension records remain unchanged; schema 16 and dependencies are unchanged.
+See [combined-scenario-comparisons.md](combined-scenario-comparisons.md).
+
+The native integrated example keeps all prior expense/extra/goal assertions,
+then models November at 800.00 biweekly: monthly income 1,733.33 and funding
+-975.00; December normal recovery buffer 858.34. Explicit receipt selection cuts
+dated closing from 3,225.00 to 1,825.00. Approved activity stays 1,820.02. Earlier
+normal plans and conditional payoff/goal milestones stay unchanged.
+
+| Check | Result |
+|---|---|
+| Locked setup | Passed; existing configuration/dependencies reused |
+| Focused financial checks | Three temporary-income comparison checks passed |
+| Focused saved/report/recovery check | Passed; original bytes/period integrity, PDF, restart/recovery and agreement guard |
+| Focused interface checks | 22 passed across comparison and client-plan components |
+| Production frontend / complete interface suite | Passed build and 117 tests |
+| Complete Linux backend / PDF processes | Passed: 161 library + 2 process tests (163 total) |
+| Formatting / Clippy, warnings denied | Passed |
+| Standalone native build / complete workflow | Standalone debug build passed; complete workflow running |
+| Windows installer workflow | Requested; validation pending |
+| Clean Windows 11 offline/full GUI release acceptance | Not run |
+
+The first saved-record test compile failed because its error assertion required
+Debug on the successful review type. The fixture now inspects the error Option
+without changing production types or relaxing the assertion; its focused rerun
+passed. The first compile log is retained. No financial rule or timeout changed.
+Logs use `/workspace/shared/income-period-*.log`; native artifacts will be in
+`desktop-smoke-income-periods`. Current Windows/evaluation/download instructions
+are updated together for this preview, including schema 16 and recovery layout.
+The packaging run will supply the exact version, source commit and SHA-256 file.
+
+Next priority after this preview: practical household intake and follow-up
+workflow for pilot use, then remaining model/report requirements and Windows
+acceptance feedback. Seven major roadmap areas remain; this is an evaluation
+build, not completion of the original specification or commercial readiness.
+
 ## Stage 3I: recurring-expense proposals and explicit dated bills — 0.22.0 source
 
 New necessary/discretionary recurring expenses now recalculate combined budget,

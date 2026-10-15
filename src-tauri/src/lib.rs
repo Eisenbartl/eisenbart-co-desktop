@@ -8,6 +8,7 @@ mod dashboard;
 mod debt;
 mod financial_facts;
 mod imports;
+mod income_periods;
 mod models;
 mod pdf;
 #[cfg(test)]
