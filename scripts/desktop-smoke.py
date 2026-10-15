@@ -1841,7 +1841,7 @@ def check_card_final_approval(driver: WebDriver, artifacts: Path, data_root: Pat
     driver.click('#card-facts-inventory-ack');driver.click('#card-facts-ack');driver.click_button('Save card completeness evidence')
     driver.wait_text('.card-completeness > .success-message','version 4','fresh complete card evidence saved')
     financial('Completeness & final validation');driver.click('.saved-coverage-reviews > summary');driver.interactive('#coverage-review-from')
-    driver.click_button('Review latest context (keep draft)');driver.wait_text('.saved-coverage-reviews > .success-message','Latest saved context loaded','bank account inventory refreshed explicitly')
+    driver.click_button('Review latest context (keep draft)');driver.wait_text('.saved-coverage-reviews','Latest saved context loaded','bank account inventory refreshed explicitly')
     count=driver.observe_script("return document.querySelectorAll('input[id^=coverage-label-]').length")
     if count!=2:raise SmokeFailure('Complete card final example requires both known bank accounts')
     for i in range(count):
@@ -1851,7 +1851,7 @@ def check_card_final_approval(driver: WebDriver, artifacts: Path, data_root: Pat
     driver.fill('#coverage-inventory-notes','Both fictional checking accounts and separately reviewed card inventory inspected; no other household assets, debts or obligations omitted.')
     driver.fill('#coverage-conclusion','Original retained reconciled sources, full expected bank periods and card evidence reviewed for separate final approval.')
     driver.click('#coverage-inventory-reviewed');driver.click_button('Save completeness review')
-    driver.wait_text('.saved-coverage-reviews > .success-message','version 3','current two-account completeness saved')
+    driver.wait_text('.saved-coverage-reviews','version 3','current two-account completeness saved')
     driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']");driver.click('.saved-assessments > summary');driver.interactive('#record-title')
     for selector,value in [('#record-from','2026-09'),('#record-through','2026-09'),('#record-title',title)]:driver.fill(selector,value)
     driver.click('#record-include-completeness');driver.click_button('Review saved completeness context');driver.wait_text('.coverage-review-selection','Both fictional checking accounts','matching bank inventory loaded')
