@@ -98,8 +98,9 @@ receipt mismatches, duplicate approval, atomic audit failure, migration rollback
 immutability, PDF output/no overwrite, restart, encrypted recovery and forged
 history. UI checks cover retained drafts, renewed confirmations, scope mismatches,
 late replies, read-only historical approvals and global navigation/lock guards.
-The native workflow includes both an incomplete blocked household and a separate
-complete example: USD 2,000.01 income, USD 1,200.02 spending, USD 799.99 operating
+Live backend/native approval fixtures use the previous completed month so the
+freshness policy does not expire the tests. The native workflow includes both an
+incomplete blocked household and a separate complete example: USD 2,000.01 income, USD 1,200.02 spending, USD 799.99 operating
 cash and USD 1,799.99 closing cash. It exports before and after changed context,
 restart and encrypted restore. Executed results are in development-status.md.
 

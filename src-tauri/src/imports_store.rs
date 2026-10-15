@@ -1894,10 +1894,21 @@ mod tests {
             .starts_with(".tmp")));
     }
     fn final_candidate(w: &mut Workspace, c: &Client, dir: &Path) -> crate::assessments::Record {
+        use chrono::Datelike;
+        // Keep live approval fixtures inside the freshness policy after this release.
+        let today = Utc::now()
+            .with_timezone(&chrono_tz::America::Chicago)
+            .date_naive();
+        let end = today.with_day(1).unwrap().pred_opt().unwrap();
+        let start = end.with_day(1).unwrap();
+        let month = start.format("%Y-%m").to_string();
         let mut d = doc("Final fictional checking");
+        d.period_start = Some(start.to_string());
+        d.period_end = Some(end.to_string());
         d.retain_source = true;
         d.closing_balance = Some("1799.99".into());
-        let s=stage(w,&c.id,dir,"final-facts.csv","Date,Description,Amount,Category,Type\n2026-09-01,Fictional payroll,2000.01,Wages,income\n2026-09-02,Fictional rent,-1200.02,Housing,expense\n",d);
+        let csv = format!("Date,Description,Amount,Category,Type\n{start},Fictional payroll,2000.01,Wages,income\n{},Fictional rent,-1200.02,Housing,expense\n", start.succ_opt().unwrap());
+        let s = stage(w, &c.id, dir, "final-facts.csv", &csv, d);
         for id in s.records.iter().map(|r| r.id.clone()).collect::<Vec<_>>() {
             review(
                 w,
@@ -1911,13 +1922,14 @@ mod tests {
         }
         let s = w.get_client_imports(&c.id).unwrap();
         let mut data = facts_data(&s);
+        data.as_of = Some(end.to_string());
         data.balances.truncate(1);
         data.balances[0].amount = Some("1799.99".into());
         let s = w
             .review_financial_facts(&c.id, facts_input(&s, data))
             .unwrap();
         let choices = crate::coverage_review::choices(&s);
-        let data=crate::coverage_review::Data{from_month:"2026-09".into(),through_month:"2026-09".into(),inventory_reviewed:true,inventory_notes:"Verified fictional one-account household; no other assets, debts or accounts apply.".into(),accounts:vec![crate::coverage_review::Expectation{account_id:Some(s.accounts[0].id.clone()),label:s.accounts[0].label.clone(),kind:"checking".into(),expected_start:Some("2026-09-01".into()),expected_end:Some("2026-09-30".into()),exception:String::new(),source_ids:choices.sources.iter().map(|d|d.id.clone()).collect()}],missing_information:String::new(),conclusion:"Ready for the fictional counselor's final review.".into()};
+        let data=crate::coverage_review::Data{from_month:month.clone(),through_month:month.clone(),inventory_reviewed:true,inventory_notes:"Verified fictional one-account household; no other assets, debts or accounts apply.".into(),accounts:vec![crate::coverage_review::Expectation{account_id:Some(s.accounts[0].id.clone()),label:s.accounts[0].label.clone(),kind:"checking".into(),expected_start:Some(start.to_string()),expected_end:Some(end.to_string()),exception:String::new(),source_ids:choices.sources.iter().map(|d|d.id.clone()).collect()}],missing_information:String::new(),conclusion:"Ready for the fictional counselor's final review.".into()};
         w.save_coverage_review(
             &c.id,
             crate::coverage_review::Input {
@@ -1929,6 +1941,9 @@ mod tests {
         )
         .unwrap();
         let mut input = assessment_input(&s, c);
+        input.from_month = month.clone();
+        input.through_month = month;
+        input.title = "Fictional completed-period assessment".into();
         input.completeness = Some(crate::coverage_review::Selection { revision: 1 });
         w.save_assessment_record(&c.id, input).unwrap()
     }
@@ -2074,7 +2089,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let c = w.save_client(client_input()).unwrap();
         let a = final_candidate(&mut w, &c, dir.path());
-        let today = chrono::NaiveDate::from_ymd_opt(2026, 10, 15).unwrap();
+        let end = crate::imports::iso_date(&a.payload.assessment.period_end).unwrap();
+        let today = end + chrono::Duration::days(15);
         assert!(
             crate::final_reports::readiness(&a.payload, &a.digest, false, today)
                 .unwrap()
@@ -2086,21 +2102,16 @@ mod tests {
                 .ready
         );
         assert!(
-            !crate::final_reports::readiness(
-                &a.payload,
-                &a.digest,
-                false,
-                chrono::NaiveDate::from_ymd_opt(2026, 9, 30).unwrap()
-            )
-            .unwrap()
-            .ready
+            !crate::final_reports::readiness(&a.payload, &a.digest, false, end)
+                .unwrap()
+                .ready
         );
         assert!(
             !crate::final_reports::readiness(
                 &a.payload,
                 &a.digest,
                 false,
-                chrono::NaiveDate::from_ymd_opt(2027, 2, 1).unwrap()
+                end + chrono::Duration::days(91)
             )
             .unwrap()
             .ready
@@ -2145,8 +2156,8 @@ mod tests {
         let mut p: crate::assessments::Payload =
             serde_json::from_slice(&serde_json::to_vec(&a.payload).unwrap()).unwrap();
         let e = &mut p.completeness.as_mut().unwrap().data.accounts[0];
-        e.expected_end = Some("2026-09-29".into());
-        e.exception = "Verified fictional limited applicability through September 29.".into();
+        e.expected_end = Some(end.pred_opt().unwrap().to_string());
+        e.exception = "Verified fictional limited applicability through the preceding day.".into();
         let r = crate::final_reports::readiness(&p, &a.digest, false, today).unwrap();
         assert!(r.ready);
         assert!(r.accounts[0].reason_required);

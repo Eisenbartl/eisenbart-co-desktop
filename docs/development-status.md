@@ -10,7 +10,7 @@ current-context flags preserve history. Offline final PDFs retain original
 financial evidence, limitations and any later review flags. Complete financial
 gates cannot be waived. See [workflow and bounded v1 policy](final-report-approval.md).
 
-Validation in progress, 2026-10-15 (America/Chicago):
+Validated 2026-10-15 (America/Chicago):
 
 | Check | Result |
 |---|---|
@@ -18,9 +18,34 @@ Validation in progress, 2026-10-15 (America/Chicago):
 | Production frontend / complete UI suite | Passed build and 179 tests |
 | Complete Linux backend | Passed 195 library + 2 PDF process tests |
 | Formatting / Clippy | Passed; all targets with warnings denied |
-| Standalone native build / full desktop workflow | Pending |
-| Windows source checks | Pending; installer steps must remain skipped |
+| Standalone native build | Passed debug/no bundles |
+| Full desktop workflow | Passed, exit 0: original financial workflows, blocked incomplete case, complete final approval, exact PDF, changed-context flags, restart and encrypted recovery |
+| Windows source checks | Passed: 179 UI + 196 library + 2 PDF process tests; all five installer/checksum steps skipped |
 | Installer | Not created, per user instruction |
+
+Feature commit: `3768fd7537f2867307d96a8fa1f4866b685c51d1`.
+An initial standalone build exposed an incomplete typed UI test fixture. The
+fixture was corrected in `4994305576567b50cece804f76df937cd137a019`;
+its six tests and the production/standalone builds then passed. The superseded
+Windows run was cancelled; validation targets the corrected source. Application
+behavior did not change in the fixture correction.
+
+Windows source validation passed for the corrected application in
+[run 38758710446](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38758710446).
+The final follow-up changes only documentation and test fixtures: live approval
+fixtures now use the previous completed month; explicit freshness boundaries
+remain independently checked. All three focused backend tests passed again;
+Clippy and the standalone build were repeated. Application behavior is unchanged
+from the source validated on Windows and in the full native workflow.
+
+Native artifacts: `/workspace/shared/desktop-smoke-final-report`; logs:
+`/workspace/shared/final-report-`. Approval confirmations, restored history and
+the exported PDF's first page were visually inspected. The final native exit file
+records `0`. No new dependency or installer was introduced. Clean source/history
+checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-final-report-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-final-report-source.bundle`, verified
+against the final clean commit and remote main.
 
 This source remains a development build; the downloadable preview remains 0.23.0.
 Final counselor approval under this policy does not certify the application for
@@ -2362,17 +2387,12 @@ source checkpoints, not backups of application client data. A fresh-task restore
 has not been verified; retain or upload the source before relying on a new remote
 clone.
 
-## Next development priority
+## Current priority reference
 
-Encrypted backup/restore is implemented with authenticated files, retained
-previous workspaces, and tested interrupted/failure recovery. Clean installed
-Windows acceptance and independent security review remain prerequisites for
-actual client use. The first local CSV import/review checkpoint is implemented with bounded parsing, immutable provenance, duplicate/statement checks, explicit decisions, approved-only exact totals, refunds, transfers, and encrypted recovery. Selectable-text PDF extraction now feeds the same review workflow with source page/line locators and mandatory individual verification. Merchant grouping and recurring-payment review now add conservative suggestions and explicit evidence-bound counselor decisions. Statement running-balance reconciliation now adds source/approved comparisons and immutable order settings. The approved-transaction dashboard now provides explicit periods, local category/monthly/cash-flow charts and completeness flags. Explicit approved classifications and dated balance facts now supply the remaining recorded dashboard metrics. Immutable internal assessment records now preserve approved figures and evidence. The next application priority is **offline PDF report export and scenario-backed client action plans**; keep scanned OCR and broad institution adapters in later checkpoints.
-
-Advanced financial models, broader scenarios, finalized PDF reports, multiple counselor roles,
-password change/reset, exports, licensing, signing, retained-copy selection,
-scheduled backups, and commercial readiness remain incomplete. See
-[roadmap.md](roadmap.md) and [windows.md](windows.md) for staged criteria.
+The current stage and next priority are recorded at the top of this document.
+Earlier milestone sections retain their historical plans; they are not a list of
+features still missing today. Use the prototype development map for current
+working page areas and future implementation entry points.
 
 ## Distance to the complete product
 
@@ -2382,10 +2402,10 @@ package also completes part of Stage 7. Stages 3–8 are still open:
 
 | Specification stage | Remaining work |
 |---|---|
-| 3: Financial core | Exact budgets, fixed-monthly debt schedules, savings goals, and dated cash-flow calendars implemented; optional budget methods, advanced debt terms, delayed transfer settlement, and broader scenario engines remain |
+| 3: Financial core | Exact budgets, optional budget methods, fixed-monthly debt, savings, dated cash flow and bounded combined scenarios implemented; advanced debt terms, transfer settlement and broader goal/funding scenarios remain |
 | 4: Document processing | CSV, selected text-PDF review, recurring/grouped payment review and running-balance reconciliation implemented; scanned OCR and broader institution adapters remain |
-| 5: Dashboard and reports | Approved activity and debt charts plus recorded balance/classification metrics implemented; savings progress, completed scenario-backed counselor reports/client plans and reproducible offline PDFs remain; internal immutable assessments are implemented |
-| 6: Security/commercial | Encrypted backup/restore implemented; clean Windows recovery, password safeguards, accounts/roles, branding, licensing and independent review remain |
+| 5: Dashboard and reports | Approved dashboards, immutable scenario-backed counselor reports, client plans, offline PDFs and bounded final counselor approval implemented; savings progress, native printing and broader report policies remain |
+| 6: Security/commercial | Encrypted backup/restore and firm/report branding implemented; clean Windows recovery, password lifecycle, accounts/roles, export/deletion, licensing and independent review remain |
 | 7: Production packaging | Signed distribution, upgrade behavior, remaining administrator/recovery/support guides |
 | 8: Final verification | Complete installed workflows, clean Windows 11 offline tests, usability and release acceptance |
 

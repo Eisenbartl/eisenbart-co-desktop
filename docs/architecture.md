@@ -156,5 +156,7 @@ Encrypted restore validates each bounded approval and its original parent.
 `FinalReportApproval` collects decisions without financial overrides, participates
 in global draft/busy guards and ignores late private responses. Final PDF export
 adds approval/scope/limitations and current flags, preserving original evidence;
-legacy internal and client-plan formats remain unchanged. See
+legacy internal and client-plan formats remain unchanged. Preserve v1 policy
+recomputation for historical approvals; future policies need explicit version
+dispatch rather than changing the meaning of already approved gates. See
 [final-report-approval.md](final-report-approval.md).
