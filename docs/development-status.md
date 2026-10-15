@@ -19,8 +19,8 @@ See [client-intake-followups.md](client-intake-followups.md) for limits and usag
 | Focused interface | Five component checks passed |
 | Production frontend / full interface suite | Final build and 123 tests passed, including intake navigation/lock privacy |
 | Complete backend / formatting / Clippy | Passed: 166 library + 2 PDF process tests; formatting and warnings-denied Clippy |
-| Standalone native build / workflow | Standalone debug build passed; full native workflow running |
-| Windows source checks | Pending |
+| Standalone native build / workflow | Passed: full workflow, restart, encrypted restore and missing-metadata recovery; final spacing build/save/layout check also passed |
+| Windows source checks | Passed: 123 UI tests, 167 library + 2 PDF process tests; installer steps intentionally skipped |
 | New Windows installer / clean Windows 11 offline acceptance | Not run; existing 0.23.0 package remains separate |
 
 Old-schema test fixtures now remove the schema-17 table when constructing an
@@ -30,9 +30,36 @@ removed. The first complete backend run passed 165 tests and failed only an
 older migration assertion expecting schema 16 instead of the actual schema 17.
 That expectation now uses the current schema constant; the full rerun passed all
 166 library and both PDF process checks.
-The original failed log remains `intake-backend.log`. Logs use
-`/workspace/shared/intake-*.log`; native artifacts will use
-`desktop-smoke-client-intake`. No new dependency or cloud runtime is introduced.
+The original failed log remains `intake-backend.log`.
+
+The first native run reached intake saving but submitted invalid years from the
+Linux date widget: typing ISO produced `0003-01-02` in an isolated probe; native
+month/day/year and segmented typing both produced the intended `2100-02-03`.
+The application rejected the invalid input. The harness now uses the observed
+widget format and verifies the complete ISO value before any save, without
+retrying typing or saves. First-run logs/screenshots and the successful isolated
+probe are retained; the fresh full native run passed (exit 0), including all four
+intake/appointment/task checks and all pre-existing financial/PDF assertions.
+The feature source checkpoint is `3856e38b21bc14b2b28886f43603bbfec15cf951`;
+Windows source checks use that commit.
+[Run 38671790102](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38671790102)
+completed successfully; it produced no 0.24.0 installer.
+
+Visual review found the intake card needed the same inner spacing as adjacent
+panels. The final follow-up changes only CSS spacing/disclosure display, the date
+entry harness and these verification notes. The standalone app was rebuilt with
+that CSS, then a separate scoped native check saved intake and a dated follow-up,
+verified overdue-to-completed behavior and captured both form sections for visual
+inspection. The complete financial/recovery workflow ran before this CSS-only
+adjustment; the final scoped check is not a second full workflow claim.
+Logs/screenshots use `intake-final-layout*`. No backend rule or dependency changed.
+A source archive and verified full-history bundle are retained under
+`/workspace/shared/checkpoints/eisenbart-client-intake-source.*`, checked against
+the final committed source. The repository and remote main point to that final
+checkpoint after the results are recorded.
+Logs use `/workspace/shared/intake-*.log`; native artifacts remain in
+`desktop-smoke-client-intake` (first run) and `desktop-smoke-client-intake-verified`
+(fresh run). No new dependency or cloud runtime is introduced.
 
 Next priority: a practice-wide appointment/follow-up overview, then report/intake
 integration and remaining original model/document/release requirements. These

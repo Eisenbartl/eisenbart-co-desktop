@@ -24,6 +24,9 @@ test observes the empty field, types the new destination once and verifies the
 complete value before clicking export. It never retries typing or export clicks,
 and verifies the resulting file and its independently expected report contents.
 
+Native date fields use the observed Linux widget typing format, followed by an
+exact ISO value read before saving. No typing or saves are retried.
+
 The 0.24.0 workflow also saves optional household/employment intake, a dated
 appointment with time, an overdue task and completion/cancellation outcomes. It
 checks second-client isolation, lock privacy, restart, encrypted restore and

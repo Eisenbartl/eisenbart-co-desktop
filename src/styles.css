@@ -476,7 +476,9 @@ textarea { resize: vertical; min-height: 100px; }
 .budget-methods label { margin-top: 12px; }
 .budget-method-results h4 { margin: 20px 0 12px; }
 
-.client-care > summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; }
+.client-care { padding: 24px; }
+.client-care > summary { cursor: pointer; display: list-item; line-height: 1.6; }
+.client-care > summary > span { display: block; margin-top: 6px; }
 .client-care-body { margin-top: 1.25rem; }
 .client-care-body label { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1rem; }
 .care-reminders { padding: .8rem 1rem; background: var(--background, #f4f7f8); border-left: 3px solid #ad8a46; }

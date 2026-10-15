@@ -250,6 +250,15 @@ class WebDriver:
         self.command("POST", f"/element/{element}/value", {"text": str(destination)})
         self.wait_value(selector, str(destination), "complete PDF destination before export")
 
+    def fill_native_date(self, selector: str, iso: str) -> None:
+        # This Linux WebKit date widget types month/day/year, while its DOM
+        # value is ISO. Sending an ISO string types the wrong year. Use the
+        # observed widget format, then read back the complete ISO value before
+        # any save. Neither typing nor a save is retried.
+        year, month, day = iso.split("-")
+        self.fill(selector, f"{month}/{day}/{year}")
+        self.wait_value(selector, iso, "complete native date before saving")
+
     def select(self, selector: str, value: str, using: str = "css selector") -> None:
         # WebDriver clicks the HTML option rather than calling application code.
         select = self.interactive(selector, using)
@@ -1740,12 +1749,12 @@ def check_client_care(driver: WebDriver, artifacts: Path, label: str, initial: b
         driver.click_button("Add follow-up")
         driver.select("#follow-kind-0", "Appointment")
         driver.fill("#follow-title-0", "Review fictional statements")
-        driver.fill("#follow-date-0", "2100-02-03")
+        driver.fill_native_date("#follow-date-0", "2100-02-03")
         driver.fill("#follow-time-0", "09:30")
         driver.wait_value("#follow-time-0", "09:30", "explicit appointment time")
         driver.click_button("Add follow-up")
         driver.fill("#follow-title-1", "Collect missing fictional documents")
-        driver.fill("#follow-date-1", "1900-01-01")
+        driver.fill_native_date("#follow-date-1", "1900-01-01")
         driver.click_button("Save intake and follow-ups")
         driver.wait_text(".client-care .success-message", "saved locally", "initial encrypted client intake save")
         driver.wait_text(".care-reminders", "1 overdue", "only open past task generates reminder")
@@ -1753,7 +1762,7 @@ def check_client_care(driver: WebDriver, artifacts: Path, label: str, initial: b
         driver.fill("#follow-notes-1", "Reviewed the synthetic documents")
         driver.click_button("Add follow-up")
         driver.fill("#follow-title-2", "Cancelled fictional call")
-        driver.fill("#follow-date-2", "1900-01-01")
+        driver.fill_native_date("#follow-date-2", "1900-01-01")
         driver.select("#follow-status-2", "Cancelled")
         driver.click_button("Save intake and follow-ups")
         driver.wait_text(".care-reminders", "0 overdue", "completed and cancelled tasks stop reminders")
@@ -1859,6 +1868,11 @@ def main() -> int:
                     driver.wait(ready, "native WebDriver readiness", seconds=25)
                     run_checks(driver, binary, password, wrong_password, artifacts, restart_driver, root)
                 except (SmokeFailure, OSError, ValueError):
+                    try:
+                        if driver.visible(".client-care [role=alert]"):
+                            print("Intake diagnostic: " + driver.safe(driver.text(".client-care [role=alert]")), flush=True)
+                    except SmokeFailure:
+                        pass
                     try:
                         if driver.visible(".imports-panel [role=alert]"):
                             print("CSV diagnostic: " + driver.safe(driver.text(".imports-panel [role=alert]")), flush=True)
