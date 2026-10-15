@@ -1536,6 +1536,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".editor-panel .status-tag", "Planning", "updated workflow status")
     driver.screenshot(artifacts / "native-desktop.png")
     status("client edits saved")
+    check_workspace_pages(driver, artifacts)
 
     driver.click_button("Lock workspace")
     driver.element("#password")
@@ -1652,7 +1653,8 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     # commands are invoked directly; passwords and paths use visible controls.
     backup_folder=data_root / "external-backups"
     backup_folder.mkdir()
-    driver.click("nav[aria-label='Main navigation'] button:nth-child(3)")
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
+    driver.click("nav[aria-label='Settings sections'] button:nth-child(3)")
     driver.fill("#backup-folder", str(backup_folder))
     driver.fill("#backup-password", password)
     driver.click_button("Create encrypted backup")
@@ -1776,6 +1778,51 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")
+
+
+def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:
+    count = driver.observe_script("return document.querySelectorAll('nav[aria-label=\"Main navigation\"] button').length")
+    if count != 12:
+        raise SmokeFailure("The original twelve workspace sections are not all reachable")
+    for page, heading in [("Financial Review", "Client financial review"), ("Transactions", "Transaction review queue"), ("Documents", "Documents and statement accounts")]:
+        driver.click(f"nav[aria-label='Main navigation'] button[aria-label='{page}']")
+        driver.wait_text("#imports-title", heading, f"focused {page} page")
+        driver.element(".imports-totals" if page != "Documents" else "#csv-path")
+        if page != "Documents" and driver.visible("#csv-path"):
+            raise SmokeFailure(f"Document import controls leaked into {page}")
+    driver.click(".imports-sources > summary")
+    driver.wait_text(".imports-sources", "checking.csv", "saved source inventory in Documents")
+    driver.click("nav[aria-label='Documents sections'] button:nth-child(2)")
+    driver.wait_text(".planned-module-page", "mandatory verification", "future OCR area is explicitly planned")
+    driver.click("nav[aria-label='Documents sections'] button:first-child")
+    driver.wait_text("#imports-title", "Documents and statement accounts", "return from planned area")
+    for page, selector, expected in [("Budget Planner", ".budget-totals", "$3,250.00"), ("Debt Planner", "#debt-label-0", "Alex synthetic small debt"), ("Savings Planner", "#savings-priorities", "Alex synthetic reserve priority"), ("Cash-Flow Calendar", "#cashflow-account-label-0", "Alex synthetic checking")]:
+        driver.click(f"nav[aria-label='Main navigation'] button[aria-label='{page}']")
+        if selector.startswith("#"):
+            driver.wait_value(selector, expected, f"persisted {page} data")
+        else:
+            driver.wait_text(selector, expected, f"persisted {page} figures")
+    driver.select("#workspace-client", "Robin Synthetic")
+    driver.wait_text(".cashflow-panel", "No saved cash-flow plan yet", "client context switches to isolated empty plan")
+    if driver.visible("#cashflow-account-label-0"):
+        raise SmokeFailure("Prior client's cash-flow rows remained in a module page")
+    driver.select("#workspace-client", "Alex Fictional")
+    driver.wait_value("#cashflow-account-label-0", "Alex synthetic checking", "client context returns to saved plan")
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Financial Scenarios']")
+    driver.wait_text(".combined-scenarios", "Compare combined financial scenarios", "scenario page available")
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+    driver.wait_text(".saved-assessments", "Saved counselor assessments", "report page available")
+    if driver.visible("#csv-path") or driver.visible(".imports-table"):
+        raise SmokeFailure("Reports page contains unrelated import/review controls")
+    driver.scroll_to(".page-heading", "start")
+    driver.command("POST", "/execute/async", {"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));", "args":[]})
+    driver.screenshot(artifacts / "native-workspace-pages.png")
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
+    driver.click("nav[aria-label='Settings sections'] button:nth-child(4)")
+    driver.wait_text(".planned-page", "Editing is planned", "branding page is a labeled future feature")
+    driver.open_client("Alex Fictional")
+    driver.interactive("#first-name")
+    status("all twelve main pages, saved planner data, isolated client context, future areas and report/admin separation")
 
 
 def check_client_care(driver: WebDriver, artifacts: Path, label: str, initial: bool = False) -> None:

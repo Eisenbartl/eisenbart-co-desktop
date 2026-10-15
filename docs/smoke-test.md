@@ -238,3 +238,13 @@ recovery retain original selected context. Internal PDF text includes selected
 household/employer/disclosure and excludes later/omitted values; client action-plan
 PDFs exclude internal intake. Existing financial/PDF expected amounts remain.
 Artifacts: `/workspace/shared/desktop-smoke-intake-report` for this checkpoint.
+
+## Complete page structure (0.27.0 source)
+
+The native workflow now opens all twelve main navigation destinations, checks
+focused document/review/transaction separation, reads original saved planner
+values, switches client context to an empty plan and back, opens a labeled OCR
+future area and branding page, and returns to the complete record. Settings
+backup is reached by name and its dedicated Backup & recovery area. Existing
+financial, PDF, restart and both encrypted recovery paths remain enabled.
+Artifacts use `/workspace/shared/desktop-smoke-prototype` for this checkpoint.

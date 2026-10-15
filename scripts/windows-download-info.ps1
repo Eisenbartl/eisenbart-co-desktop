@@ -68,12 +68,13 @@ text PDF transaction review; recurring-payment and running-balance review; appro
 data dashboards; saved scenarios; counselor and client-plan PDF reports.
 
 NEW IN THIS VERSION
-Internal counselor reports can include explicitly selected saved address, household
-and employment/income context. Review saved intake, select sections and acknowledge
-before recording. Later selected-detail changes permanently flag the original
-report, including after reversion. Unselected fields and follow-up outcomes are
-excluded; client action-plan PDFs omit internal intake. Financial models use their
-separate inputs. Existing dashboard follow-ups remain available.
+All twelve main application sections are available in the sidebar, with focused
+client pages for review, transactions, documents, planners, scenarios and reports.
+Select a client at the top of a focused page. Clients also has profile, intake,
+notes, history and a complete-record view. Settings has dedicated administration
+areas. Future functionality is clearly labeled Planned; it does not save data.
+Current CRUD coverage and remaining implementation work are recorded in the source
+repository's docs/prototype-development-map.md.
 
 TRY THIS
 1. Create a fictional client; open Intake and follow-ups to try the new controls.

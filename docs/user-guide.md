@@ -1,6 +1,6 @@
 # Windows evaluation guide
 
-The installer below is 0.23.0. Current 0.26.0 source additionally supports optional
+The installer below is 0.23.0. Current 0.27.0 source additionally supports optional
 client intake, dated follow-ups, a filtered dashboard overview and selected intake
 in immutable internal reports;
 see [the intake guide](client-intake-followups.md) [overview guide](follow-up-overview.md) and [report intake](report-intake-context.md).
@@ -14,6 +14,27 @@ new expenses, debt extras and savings-goal changes can be compared together.
 Use fictional records while evaluating. Scanned-document OCR, advanced terms,
 full intake/follow-up and commercial release requirements remain in development.
 There is no forgotten-password reset or completed independent security review.
+
+## Prototype navigation (0.27.0 source)
+
+The sidebar has Dashboard, Clients, Financial Review, Transactions, Documents,
+Budget Planner, Debt Planner, Savings Planner, Cash-Flow Calendar, Financial
+Scenarios, Reports, and Settings and Administration. Choose a client at the top
+of a focused page; their context carries between pages until changed or locked.
+Use Clients for Profile, Intake & follow-ups, Session notes and History & records.
+Complete record retains the integrated workflow. Save editable records before
+leaving, or explicitly confirm discarding edits. Temporary unsaved scenario
+previews reset on leaving; record a reviewed scenario to keep it.
+
+Import statements in Documents, review their rows in Transactions and use
+Financial Review for approved-data charts, facts, balance and payment checks.
+Reports contains assessments and their client action-plan history/PDF controls.
+Settings → Backup & recovery creates backups and routes you to locked-screen
+verification for restore. Other settings areas include security, firm branding,
+accounts/roles, data management, licensing and help. Future areas say **Planned**
+and do not save data. See [the development map](prototype-development-map.md)
+for working CRUD behavior versus remaining features. Archiving preserves history;
+permanent deletion is not implemented.
 
 ## Install and open
 

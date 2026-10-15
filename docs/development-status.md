@@ -1,5 +1,30 @@
 # Development status
 
+## Prototype structure: all main sections and future areas — 0.27.0 source
+
+The user reprioritized a coherent CRUD prototype and complete page structure.
+All twelve original main sections are now navigable. Focused client-context
+pages reuse saved financial/document/report workflows; client profile/intake/
+notes/history subsections and the complete record remain available. Settings
+now has workspace, security, backup/recovery, branding, counselor/role, data,
+licensing and help areas. Unimplemented features have named **Planned** pages.
+The durable [prototype development map](prototype-development-map.md) records
+current CRUD coverage, implementation entry points and per-feature acceptance
+criteria for returning to each unfinished part. No backend/schema/dependency or
+financial calculation change is introduced. No installer is being created.
+
+Validation is in progress. Locked setup, production frontend build and all 138
+interface tests passed, including six new navigation/CRUD/administration tests.
+Formatting and warnings-denied Clippy passed. An incorrect test label, unsupported
+role-query options and an incomplete saved-budget fixture were corrected; behavior
+assertions stayed enabled. Vite reports an advisory about the existing single
+application chunk exceeding 500 kB. Full backend, native navigation/workflows and
+Windows source checks will be recorded after completion.
+
+Next priority: persistent document collection checklist CRUD, followed by account
+metadata/lifecycle work and remaining report/firm branding requirements. Page
+coverage does not mean all original functionality or production release is done.
+
 ## Stage 3M: selected intake in immutable counselor reports — 0.26.0 source
 
 Internal assessments now optionally capture explicitly reviewed address,

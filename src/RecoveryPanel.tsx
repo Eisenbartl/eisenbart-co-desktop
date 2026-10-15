@@ -2,9 +2,10 @@ import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {api} from './api';
 import type {BackupResult,RestoreReview,RestoreResult} from './types';
 const message=(error:unknown)=>error instanceof Error?error.message:String(error);
-export function BackupPanel() {
+export function BackupPanel({onBusy}:{onBusy?:(busy:boolean)=>void}={}) {
   const [directory,setDirectory]=useState(''),[password,setPassword]=useState('');
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<BackupResult|null>(null);
+  useEffect(()=>{onBusy?.(busy);return()=>onBusy?.(false);},[busy,onBusy]);
   const current=useRef(true);useEffect(()=>{current.current=true;return()=>{current.current=false;};},[]);
   async function choose(){setBusy(true);setError('');try{const folder=await api.chooseBackupFolder();if(current.current&&folder)setDirectory(folder);}catch(e){if(current.current)setError(message(e));}finally{if(current.current)setBusy(false);}}
   async function backup(event:FormEvent){

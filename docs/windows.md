@@ -1,7 +1,8 @@
 # Windows development installer — 0.23.0
 
-Current development source is **0.26.0**, with schema 17 intake/follow-ups, a practice-wide
-dashboard overview and selected intake in immutable internal reports (format 5). No new installer is created until requested.
+Current development source is **0.27.0**, with all twelve main sections, focused client pages,
+settings/admin areas and labeled future-feature pages. Schema 17 and report
+format 5 remain supported. No new installer is created until requested.
 The downloadable **0.23.0** preview below predates those changes. Do not open a
 schema-17 workspace or format-5 reports with the older application.
 

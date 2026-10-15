@@ -82,3 +82,13 @@ changes. Format-5 payloads retain only selected intake fields. Optional omission
 preserves formats 1–4 bytes/digests; schema 17 is unchanged. Internal PDF export
 prints counselor context separately from financial facts. The client-plan PDF
 renderer excludes it. See [report-intake-context.md](report-intake-context.md).
+
+`workspaceNavigation.ts` defines the twelve specification sections. `App` retains
+an authenticated in-memory client context across focused pages, ignores late
+selection responses and guards persistent drafts/busy operations. Page/area
+changes focus the heading. `ClientEditor` remounts the relevant existing workflow;
+`ImportsEditor` presents document/transaction/review/report views over the same
+scoped Rust data. Complete record remains available. `AdministrationPages` and
+`PlannedWorkspaceAreas` distinguish working tools from named future sections;
+[prototype-development-map.md](prototype-development-map.md) records implementation
+entry points and acceptance criteria. Schema 17 and report formats are unchanged.

@@ -1,4 +1,4 @@
-# Remaining original requirements after 0.26.0 source
+# Remaining original requirements after 0.27.0 source
 
 The application has an encrypted offline desktop foundation, isolated clients and
 notes, exact entered budgets/debt/savings/cash-flow plans, encrypted recovery,
@@ -11,6 +11,12 @@ explicitly selected for counselor reports. Proposals now also add extra debt pay
 workflow passed through direct WebKit transport before this feature stage; see
 [development-status.md](development-status.md) for new-stage verification.
 
+
+All twelve main navigation sections and named future/admin areas are present in
+0.27.0 source. See [prototype-development-map.md](prototype-development-map.md)
+for working CRUD coverage, missing behavior and acceptance criteria. The next
+implementation priority is the document collection checklist. Planned pages do
+not implement their future features.
 
 | Work area | Main remaining work |
 |---|---|

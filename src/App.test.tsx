@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import type { Client, ClientNote, WorkspaceInfo } from './types';
@@ -358,4 +358,52 @@ describe('desktop workspace', () => {
     expect(screen.getByLabelText('Counseling goals')).toHaveValue('A revised fictional goal');
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
   });
+});
+
+
+it('opens all twelve sections and retains the selected client across focused working pages',async()=>{
+ render(<App/>);await unlock();const nav=screen.getByRole('navigation',{name:'Main navigation'});expect(within(nav).getAllByRole('button')).toHaveLength(12);
+ fireEvent.click(within(nav).getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Select a client to open Documents'})).toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});await screen.findByText('No source documents yet. Inspect a local statement above to begin.');expect(mocks.getClientImports).toHaveBeenLastCalledWith(alice.id);expect(screen.queryByText('Client review queue')).not.toBeInTheDocument();expect(screen.queryByText('Saved counselor assessments')).not.toBeInTheDocument();
+ for(const page of ['Financial Review','Transactions','Budget Planner','Debt Planner','Savings Planner','Cash-Flow Calendar','Financial Scenarios','Reports']){
+  fireEvent.click(within(nav).getByRole('button',{name:page}));await waitFor(()=>expect(screen.getByLabelText(`Client for ${page}`)).toHaveValue(alice.id));expect(within(nav).getByRole('button',{name:page})).toHaveAttribute('aria-current','page');
+  await waitFor(()=>expect(screen.queryByText('Loading imported records…')).not.toBeInTheDocument());
+ }
+ expect(screen.getByText('Saved counselor assessments')).toBeInTheDocument();expect(screen.queryByLabelText('Local CSV file')).not.toBeInTheDocument();expect(screen.queryByText('Client review queue')).not.toBeInTheDocument();
+ fireEvent.click(within(nav).getByRole('button',{name:'Settings'}));expect(screen.getByRole('heading',{name:'Organization & counselor'})).toBeInTheDocument();
+ fireEvent.click(within(nav).getByRole('button',{name:'Clients'}));await screen.findByRole('heading',{name:'Alice Able'});
+ fireEvent.click(screen.getByRole('button',{name:'Profile'}));expect(screen.getByLabelText(/First name/)).toHaveValue('Alice');expect(screen.queryByText('No saved budget yet')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'History & records'}));expect(screen.getByRole('heading',{name:'Client history and records'})).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Open report and action-plan history'}));await screen.findByText('Saved counselor assessments');
+});
+it('guards page, future-area and client changes, then discards explicitly without saving private drafts',async()=>{
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Budget Planner'}));fireEvent.change(screen.getByLabelText('Client for Budget Planner'),{target:{value:alice.id}});await screen.findByText('No saved budget yet');fireEvent.click(screen.getByRole('button',{name:'Add income'}));fireEvent.change(screen.getByLabelText('Category or source'),{target:{value:'Private prototype draft'}});
+ vi.mocked(window.confirm).mockReturnValue(false);
+ fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByLabelText('Category or source')).toHaveValue('Private prototype draft');
+ fireEvent.click(screen.getByRole('button',{name:/Paycheck allocation/}));expect(screen.getByLabelText('Category or source')).toHaveValue('Private prototype draft');
+ fireEvent.change(screen.getByLabelText('Client for Budget Planner'),{target:{value:bob.id}});expect(screen.getByLabelText('Client for Budget Planner')).toHaveValue(alice.id);expect(mocks.getClient).toHaveBeenCalledTimes(1);
+ vi.mocked(window.confirm).mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:/Paycheck allocation/}));expect(screen.getByRole('region',{name:'Paycheck allocation planned feature'})).toHaveTextContent('does not create records');expect(screen.queryByDisplayValue('Private prototype draft')).not.toBeInTheDocument();expect(mocks.saveClientBudget).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Working tools'}));await screen.findByText('No saved budget yet');expect(screen.queryByDisplayValue('Private prototype draft')).not.toBeInTheDocument();
+ await act(async()=>mocks.lockHandler?.());expect(screen.queryByLabelText('Client for Budget Planner')).not.toBeInTheDocument();expect(document.documentElement.outerHTML).not.toContain('Private prototype draft');
+});
+it('ignores a delayed client selection after leaving a module page and permits retry after a read error',async()=>{
+ const pending=deferred<Client>();mocks.getClient.mockReturnValueOnce(pending.promise);render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});expect(screen.getByRole('status')).toHaveTextContent('Opening client record');fireEvent.click(screen.getByRole('button',{name:'Reports'}));await act(async()=>pending.resolve(alice));expect(screen.getByLabelText('Client for Reports')).toHaveValue('');expect(screen.queryByText('Saved counselor assessments')).not.toBeInTheDocument();
+ mocks.getClient.mockRejectedValueOnce(new Error('Synthetic selection failure'));fireEvent.change(screen.getByLabelText('Client for Reports'),{target:{value:alice.id}});expect(await screen.findByRole('alert')).toHaveTextContent('Synthetic selection failure');fireEvent.change(screen.getByLabelText('Client for Reports'),{target:{value:bob.id}});await screen.findByText('Saved counselor assessments');expect(screen.getByLabelText('Client for Reports')).toHaveValue(bob.id);
+});
+it('exposes labeled future areas and every administration page without fake save controls',async()=>{
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.click(screen.getByRole('button',{name:/Scanned documents \/ OCR/}));expect(screen.getByRole('region',{name:'Scanned documents / OCR planned feature'})).toHaveTextContent('mandatory verification');expect(screen.queryByRole('button',{name:/Save OCR/})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Settings'}));
+ for(const tab of ['Branding','Counselors & roles','Data management','Licensing','Help & about','Security','Backup & recovery']){
+  fireEvent.click(screen.getByRole('button',{name:tab}));expect(screen.getByRole('button',{name:tab})).toHaveAttribute('aria-current','page');
+ }
+ expect(screen.getByRole('heading',{name:'Encrypted workspace backup'})).toBeInTheDocument();expect(screen.getByRole('button',{name:'Lock workspace to restore a backup'})).toBeInTheDocument();
+});
+
+it('creates, reloads and removes a saved budget row through its dedicated page',async()=>{
+ let budget=await mocks.getClientBudget(alice.id);mocks.getClientBudget.mockImplementation(async()=>budget);mocks.saveClientBudget.mockImplementation(async(clientId,input)=>{budget={...budget,clientId,revision:budget.revision+1,lines:input.lines,summary:{...budget.summary,monthlyAmounts:input.lines.length?['2500.00']:[],monthlyIncome:input.lines.length?'2500.00':'0.00',surplusBeforeAllocations:input.lines.length?'2500.00':'0.00',availableForDebt:input.lines.length?'2500.00':'0.00',unallocated:input.lines.length?'2500.00':'0.00'}};return budget;});
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Budget Planner'}));fireEvent.change(screen.getByLabelText('Client for Budget Planner'),{target:{value:alice.id}});await screen.findByText('No saved budget yet');fireEvent.click(screen.getByRole('button',{name:'Add income'}));fireEvent.change(screen.getByLabelText('Category or source'),{target:{value:'Fictional prototype wages'}});fireEvent.change(screen.getByLabelText('Amount (USD)'),{target:{value:'2500.00'}});fireEvent.click(screen.getByRole('button',{name:'Save budget and calculate'}));await screen.findByText('Budget saved and calculated.');expect(mocks.saveClientBudget).toHaveBeenLastCalledWith(alice.id,{expectedRevision:0,lines:[{label:'Fictional prototype wages',kind:'income',amount:'2500.00',frequency:'monthly',estimated:false}]});
+ fireEvent.click(screen.getByRole('button',{name:'Documents'}));await screen.findByText('No source documents yet. Inspect a local statement above to begin.');fireEvent.click(screen.getByRole('button',{name:'Budget Planner'}));await screen.findByDisplayValue('Fictional prototype wages');fireEvent.click(screen.getByRole('button',{name:'Remove line 1'}));fireEvent.click(screen.getByRole('button',{name:'Save budget and calculate'}));await screen.findByText('Budget saved and calculated.');expect(mocks.saveClientBudget).toHaveBeenLastCalledWith(alice.id,{expectedRevision:1,lines:[]});
+});
+
+it('keeps backup operations on their page until completion and clears the password immediately',async()=>{
+ const pending=deferred<{path:string;createdAt:string;auditRecorded:boolean;durabilityWarning:boolean}>();mocks.createWorkspaceBackup.mockReturnValueOnce(pending.promise);render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Backup & recovery'}));fireEvent.change(screen.getByLabelText('Backup folder'),{target:{value:'/fictional/backups'}});fireEvent.change(screen.getByLabelText('Current workspace password'),{target:{value:'Fictional-test-password-123'}});fireEvent.click(screen.getByRole('button',{name:'Create encrypted backup'}));expect(screen.getByLabelText('Current workspace password')).toHaveValue('');expect(screen.getByRole('button',{name:'Branding'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Encrypted workspace backup'})).toBeInTheDocument();await act(async()=>pending.resolve({path:'/fictional/backups/test.ebcbackup',createdAt:'2026-10-15T00:00:00Z',auditRecorded:true,durabilityWarning:false}));expect(await screen.findByText('Encrypted backup saved.')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Select a client to open Documents'})).toBeInTheDocument();
 });
