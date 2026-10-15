@@ -537,3 +537,11 @@ textarea { resize: vertical; min-height: 100px; }
 .planned-page li, .settings-page li { margin-bottom: 12px; line-height: 1.6; }
 @media (max-width: 1050px) { .module-context { grid-template-columns: 1fr; gap: 15px; } }
 @media (max-height: 750px) { .sidebar .brand { margin-top: 18px; margin-bottom: 12px; } .sidebar .workspace-label { margin-top: 0; padding-top: 12px; margin-bottom: 12px; } .sidebar-bottom .local-indicator { display: none; } }
+.document-collection { padding: 26px; }
+.collection-controls { margin: 18px 0; }
+.collection-counts { font-size: 12px; color: #586a74; }
+.collection-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+.collection-table th, .collection-table td { text-align: left; vertical-align: top; padding: 12px 10px; border-bottom: 1px solid var(--line); }
+.collection-table td span { display: block; margin-top: 5px; font-size: 11px; color: #647680; }
+.collection-editor { margin-top: 20px; padding: 20px; border: 1px solid var(--line); border-radius: 4px; }
+.collection-editor > label { margin-top: 16px; }

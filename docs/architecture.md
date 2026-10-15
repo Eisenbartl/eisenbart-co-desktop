@@ -92,3 +92,13 @@ scoped Rust data. Complete record remains available. `AdministrationPages` and
 `PlannedWorkspaceAreas` distinguish working tools from named future sections;
 [prototype-development-map.md](prototype-development-map.md) records implementation
 entry points and acceptance criteria. Schema 17 and report formats are unchanged.
+
+`document_collection.rs` validates workflow-only request metadata, status, dates
+and bounds; `storage::document_collection_store` assigns IDs and captures scoped
+schema-18 append-only snapshots inside an immediate revision/audit transaction.
+Reads expose bounded account/source choices and read-only historical versions.
+Source links are checked against the same client/account; received status never
+changes import revisions or approvals. Encrypted restore checks every historical
+version, source binding and retained request ID before activation. React's
+`DocumentCollection` uses existing navigation guards and clears late/private
+responses. See [document-collection.md](document-collection.md).

@@ -1,3 +1,4 @@
+import DocumentCollection from './DocumentCollection';
 import AdministrationPages from './AdministrationPages';
 import PlannedWorkspaceArea,{plannedAreas} from './PlannedWorkspaceAreas';
 import {workspacePages,clientSections,isModule,type View,type ClientSection} from './workspaceNavigation';
@@ -473,7 +474,7 @@ export default function App() {
     clearSelection();
     const request = selectionRequest.current;
     const currentSession = session.current;
-    setView(targetView);setModuleArea('Working tools');
+    setView(targetView);if(targetView!==view)setModuleArea('Working tools');
     if(followUpId)setClientSection('record');
     setSelectionLoading(true);
     try {
@@ -548,9 +549,9 @@ export default function App() {
         {isModule(view)&&<>
          {view==='Financial Scenarios'&&<p className="field-help">Temporary previews reset when leaving this page. Save a reviewed scenario to retain it.</p>}
          <section className="panel module-context" aria-label="Current client context"><div><label htmlFor="workspace-client">Client for {view}<select id="workspace-client" value={selected?.id??''} disabled={clientsLoading||selectionLoading||Boolean(clientsError)} onChange={e=>{if(e.target.value)void openClient(e.target.value,undefined,view);else if(canLeave())clearSelection();}}><option value="">Choose a client</option>{clients.map(c=><option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.status==='Archived'?' — Archived':''}</option>)}</select></label></div><div>{selected?<><strong>{selected.firstName} {selected.lastName}</strong><Status status={selected.status}/><p className="field-help">Only this client’s records are shown. Save changes before moving to another section.</p></>:<p className="muted small">Choose an existing client or use Add client to start a record.</p>}</div></section>
-         <nav className="section-navigation" aria-label={`${view} sections`}>{['Working tools',...plannedAreas[view].map(a=>a.title)].map(area=><button key={area} type="button" aria-current={moduleArea===area?'page':undefined} onClick={()=>{if(moduleArea!==area&&canLeave()){setModuleArea(area);dirty.current=false;}}}>{area}{area!=='Working tools'&&<span className="planned-tab-label">Planned</span>}</button>)}</nav>
+         <nav className="section-navigation" aria-label={`${view} sections`}>{['Working tools',...plannedAreas[view].map(a=>a.title),...(view==='Documents'?['Collection checklist']:[])].map(area=><button key={area} type="button" aria-current={moduleArea===area?'page':undefined} onClick={()=>{if(moduleArea!==area&&canLeave()){setModuleArea(area);dirty.current=false;}}}>{area}{area!=='Working tools'&&area!=='Collection checklist'&&<span className="planned-tab-label">Planned</span>}</button>)}</nav>
          {selectionError&&<ErrorMessage>{selectionError}</ErrorMessage>}
-         {selectionLoading?<p className="panel settings-panel" role="status">Opening client record…</p>:moduleArea!=='Working tools'?<PlannedWorkspaceArea view={view} title={moduleArea}/>:selected?<ClientEditor key={`${selected.id}:${view}`} section={view} client={selected} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onNavigate={navigate} onCancel={()=>{if(canLeave())clearSelection();}}/>:<section className="panel module-empty"><Icon name={workspacePages.find(p=>p.id===view)?.icon??'file'} size={32}/><h2>Select a client to open {view}</h2><p className="muted">{clientsLoading?'Loading the client directory…':clientsError?'Reload the client directory using the retry above.':clients.length?'Select a client above. Their saved data will load here.':'No clients yet. Add a fictional client to try this workflow.'}</p></section>}
+         {selectionLoading?<p className="panel settings-panel" role="status">Opening client record…</p>:moduleArea!=='Working tools'&&!(view==='Documents'&&moduleArea==='Collection checklist')?<PlannedWorkspaceArea view={view} title={moduleArea}/>:selected?view==='Documents'&&moduleArea==='Collection checklist'?<DocumentCollection key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:<ClientEditor key={`${selected.id}:${view}`} section={view} client={selected} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onNavigate={navigate} onCancel={()=>{if(canLeave())clearSelection();}}/>:<section className="panel module-empty"><Icon name={workspacePages.find(p=>p.id===view)?.icon??'file'} size={32}/><h2>Select a client to open {view}</h2><p className="muted">{clientsLoading?'Loading the client directory…':clientsError?'Reload the client directory using the retry above.':clients.length?'Select a client above. Their saved data will load here.':'No clients yet. Add a fictional client to try this workflow.'}</p></section>}
         </>}
         {view==='Settings'&&<AdministrationPages workspace={workspace} onLock={()=>void lock()} onBusy={onBusy}/>}
 

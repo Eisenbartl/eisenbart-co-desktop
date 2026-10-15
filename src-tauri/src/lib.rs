@@ -7,6 +7,7 @@ mod cashflow;
 mod client_care;
 mod dashboard;
 mod debt;
+mod document_collection;
 mod financial_facts;
 mod follow_up_overview;
 mod imports;
@@ -586,6 +587,22 @@ fn get_assessment_intake(
 }
 
 #[tauri::command]
+fn get_document_collection(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    revision: Option<i64>,
+) -> Result<document_collection::Record, String> {
+    access(&state, |w| w.get_document_collection(&client_id, revision))
+}
+#[tauri::command]
+fn save_document_collection(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: document_collection::Input,
+) -> Result<document_collection::Record, String> {
+    access(&state, |w| w.save_document_collection(&client_id, input))
+}
+#[tauri::command]
 fn get_client_care(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -857,6 +874,8 @@ pub fn run() {
             get_client,
             save_client,
             get_client_care,
+            get_document_collection,
+            save_document_collection,
             get_follow_up_overview,
             save_client_care,
             add_client_note,

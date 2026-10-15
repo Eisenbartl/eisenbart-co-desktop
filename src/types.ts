@@ -338,3 +338,16 @@ export interface ScenarioComparison {
 export interface SavedScenarioSelection {id:string;digest:string}
 export interface SavedScenario {clientId:string;digest:string;needsReview:boolean;reviewReasons:string[];payload:{id:string;format:number;appVersion:string;workspace:WorkspaceInfo;comparison:ScenarioComparison}}
 export interface ScenarioDirectory {clientId:string;records:{id:string;label:string;createdAt:string;digest:string;needsReview:boolean}[]}
+
+export interface DocumentRequest {
+ id:string;title:string;kind:'statement'|'creditCard'|'loan'|'paystub'|'tax'|'other';
+ status:'missing'|'received';accountId:string|null;sourceDocumentId:string|null;
+ periodStart:string|null;periodEnd:string|null;dueDate:string|null;receivedDate:string|null;
+ notes:string;archived:boolean;
+}
+export interface DocumentCollection {
+ clientId:string;revision:number;latestRevision:number;updatedAt:string|null;reviewDate:string;
+ items:DocumentRequest[];history:{revision:number;updatedAt:string}[];
+ accounts:{id:string;label:string;kind:string}[];sources:{id:string;accountId:string;fileName:string}[];
+ missing:number;received:number;archived:number;
+}

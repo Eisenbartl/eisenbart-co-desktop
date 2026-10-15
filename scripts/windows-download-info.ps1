@@ -68,13 +68,11 @@ text PDF transaction review; recurring-payment and running-balance review; appro
 data dashboards; saved scenarios; counselor and client-plan PDF reports.
 
 NEW IN THIS VERSION
-All twelve main application sections are available in the sidebar, with focused
-client pages for review, transactions, documents, planners, scenarios and reports.
-Select a client at the top of a focused page. Clients also has profile, intake,
-notes, history and a complete-record view. Settings has dedicated administration
-areas. Future functionality is clearly labeled Planned; it does not save data.
-Current CRUD coverage and remaining implementation work are recorded in the source
-repository's docs/prototype-development-map.md.
+Documents -> Collection checklist now saves requests, missing/received status,
+explicit received dates and optional links to the client's imported sources.
+Archive/reactivate requests and inspect read-only version history. Receipt does
+not approve financial figures. Existing twelve-section navigation and other
+working tools remain available. Schema 18 workspaces need the newer application.
 
 TRY THIS
 1. Create a fictional client; open Intake and follow-ups to try the new controls.

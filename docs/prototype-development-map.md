@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.27.0 source
+# Prototype structure and development map — 0.28.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -23,7 +23,7 @@ Rust-backed data. Do not add another persistence layer or copy the calculators.
 | Clients | Directory/search/filter, create/edit/status/archive; Profile, Intake & follow-ups, Session notes, History & records, Complete record (`App.tsx`, `ClientCare.tsx`) |
 | Financial Review | Approved-data dashboard, explicit financial facts, running-balance checks and recurring-payment review (`ImportsEditor.tsx` review page) |
 | Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers (`ImportsEditor.tsx` transactions page) |
-| Documents | CSV/selectable-text PDF import, statement account inventory, source documents and statement checks (`ImportsEditor.tsx` documents page) |
+| Documents | CSV/selectable-text PDF import, statement account inventory, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`) |
 | Budget Planner | Saved income/expenses/allocations, remove/edit rows, optional budget method comparisons (`BudgetEditor.tsx`) |
 | Debt Planner | Saved debts, payment changes/extras and monthly snowball/avalanche projections (`DebtEditor.tsx`) |
 | Savings Planner | Saved reserves, emergency targets, sinking-fund goals and contribution comparisons (`SavingsEditor.tsx`) |
@@ -46,11 +46,11 @@ No workspace or confidential data is stored in browser local storage or a URL.
 | Entity | Create/read/update | Remove/archive behavior and remaining gaps |
 |---|---|---|
 | Clients | Create, directory/search/open, edit profile and lifecycle status | Archive via status; reactivate via another status. Permanent deletion not implemented |
-| Intake and follow-ups | Save/edit optional intake and task/appointment versions; complete/cancel outcomes | Current task removal is versioned; previous care snapshots remain retained |
+| Intake and follow-ups | Save/edit optional intake and task/appointment versions; complete/cancel outcomes | Remove unsaved tasks only; saved tasks stay in history and can be cancelled |
 | Session notes | Append authored dated notes and read history | Silent edit/delete not offered; reviewed amendments and a combined activity view remain future work |
 | Budget/debt/savings/cash-flow inputs | Save/reload/edit and remove current plan rows or goals | Removal changes the current saved plan; previously recorded report/scenario snapshots remain historical |
 | Statement accounts | Created during statement import; inventory and filters available | Standalone account metadata CRUD/archive remains future work |
-| Documents | Inspect/import and read original provenance/statement metadata | Cancel an unsaved preview. Saved source replacement/deletion is not implemented |
+| Documents / collection | Inspect/import sources and read provenance; create/edit requests, mark receipt and view versions | Cancel unsaved previews/requests; archive/reactivate saved requests. Saved source replacement/deletion is not implemented |
 | Transactions | Import, inspect, correct fields and change review decisions | Reject/reverse with retained decision history; no silent destruction of source evidence |
 | Scenarios/reports/client plans | Explicitly record, reopen and export immutable snapshots | Retained history; amend by recording a new reviewed version, not editing old financial claims |
 | Organization/admin | Read setup identity; password access, lock, backup/verified recovery | Identity editing, counselor/role CRUD, password changes, portable export/deletion and licensing remain planned |
@@ -61,14 +61,15 @@ retention policy, source dependency checks, audit and recovery acceptance.
 
 ## Future feature areas: return here before implementing
 
-All areas below have a named UI home with a visible **Planned** state. They do not
-save records, run unfinished calculations or claim readiness. Reuse existing
+Future areas below have a named UI home with a visible **Planned** state. The
+collection checklist is now working, and its row records the implementation.
+Planned areas do not save records, run unfinished calculations or claim readiness. Reuse existing
 client/organization authorization, exact-money arithmetic, optimistic revisions,
 atomic audit and encrypted recovery. Add migrations only when the data needs them.
 
 | UI home | Next implementation files / dependencies | Acceptance before marking working |
 |---|---|---|
-| Documents → Collection checklist | Add collection component and Rust scoped inventory store beside `imports_store`; link receipt to sources rather than inventing transactions | Create/reopen/edit/archive requests; missing/received status; wrong-client, stale-save, audit rollback, restart and encrypted restore |
+| Documents → Collection checklist — working in 0.28.0 | `DocumentCollection.tsx`, `document_collection.rs`, `document_collection_store.rs`, schema 18; see [usage and limits](document-collection.md) | Implemented create/reopen/edit/archive/reactivate, explicit receipt and scoped source links, history, stale-save/audit rollback, restart/recovery checks; expand limits and usability only with evidence |
 | Documents → Additional document types | `pdf.rs`, `imports.rs`, supervised parser adapters and import UI | Synthetic card/loan/paystub/institution fixtures, bounded parse, original locators, individual review, duplicate/sign/balance controls |
 | Documents → Scanned documents / OCR | Extend supervised `pdf_process.rs`; vetted offline OCR assets/dependencies | Scanned/mixed/rotated/low-quality fixtures, time/memory/page limits, no guessed facts, explicit review, offline/license checks |
 | Transactions → Classification assistance | Pure local suggestions plus scoped decision/rule persistence; `RecurringReview.tsx` conventions | Suggestions never auto-approve; immutable provenance, false-positive correction, undo/reversal and client isolation |
@@ -99,9 +100,10 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Make **Documents → Collection checklist** functional as a small persistent CRUD
-milestone, including create/read/edit/archive, explicit missing/received status,
-scoped ownership and recovery. Follow with standalone account metadata/lifecycle
-work and the remaining report/organization branding requirements. Consult this
-map, [remaining requirements](remaining-requirements.md) and the original spec
-before selecting the following stage; update this map after each working commit.
+Implement **standalone statement-account metadata/lifecycle CRUD** next: create,
+read, rename and archive/reactivate accounts, with scoped ownership, version
+checks, audit and recovery. Preserve original source/report associations and
+block destructive deletion of referenced evidence. Then continue report/firm
+branding and the other named future areas. Consult this map, [remaining
+requirements](remaining-requirements.md) and the original spec before selecting
+the following stage; update this map after each working commit.

@@ -248,3 +248,12 @@ future area and branding page, and returns to the complete record. Settings
 backup is reached by name and its dedicated Backup & recovery area. Existing
 financial, PDF, restart and both encrypted recovery paths remain enabled.
 Artifacts use `/workspace/shared/desktop-smoke-prototype` for this checkpoint.
+
+## Document collection (0.28.0 source)
+
+The native run adds two requests, saves missing status, archives one, records an
+explicit receipt and original source/account link, checks read-only original
+history and switches clients to verify isolation. Initial, restart, encrypted
+restore and error-screen recovery repeat receipt, archive, source/history and
+client-isolation assertions. Prior financial/PDF assertions remain enabled.
+Artifacts: `/workspace/shared/desktop-smoke-collection`.

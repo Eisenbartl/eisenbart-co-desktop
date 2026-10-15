@@ -1,5 +1,29 @@
 # Development status
 
+## Document collection checklist — 0.28.0 source
+
+Documents → Collection checklist now supports saved create/read/edit requests,
+missing/received status with explicit receipt dates, optional scoped account and
+source links, archive/reactivate, filters/counts and read-only version history.
+Receipt remains separate from financial approval. Rust owns validation, assigned
+IDs, authorization, revision checks and atomic audit. Schema 18 adds append-only
+snapshots; encrypted restore validates original versions and links before
+activation. No financial models, report payload formats or dependencies changed.
+See [document-collection.md](document-collection.md).
+
+Validation in progress: locked setup, four focused Rust checks, production UI
+build and all 144 interface tests passed (31 focused checklist/desktop checks).
+Formatting and warnings-denied Clippy passed. Full backend/native/Windows checks
+will be recorded after completion. Initial compiler errors in new record debug derivation
+and a test session borrow were corrected without weakening assertions. Existing
+legacy migration fixtures now also remove the newly added table when simulating
+older schemas. The development map's earlier description of saved follow-up
+removal was corrected: only unsaved follow-ups can be removed; saved items can
+be cancelled and remain retained. No follow-up behavior changed.
+
+Next priority: standalone statement-account metadata/lifecycle CRUD, then firm
+branding and the remaining mapped functionality. No installer is being created.
+
 ## Prototype structure: all main sections and future areas — 0.27.0 source
 
 The user reprioritized a coherent CRUD prototype and complete page structure.

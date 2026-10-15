@@ -1,6 +1,6 @@
 # Windows evaluation guide
 
-The installer below is 0.23.0. Current 0.27.0 source additionally supports optional
+The installer below is 0.23.0. Current 0.28.0 source additionally supports optional
 client intake, dated follow-ups, a filtered dashboard overview and selected intake
 in immutable internal reports;
 see [the intake guide](client-intake-followups.md) [overview guide](follow-up-overview.md) and [report intake](report-intake-context.md).
@@ -35,6 +35,16 @@ accounts/roles, data management, licensing and help. Future areas say **Planned*
 and do not save data. See [the development map](prototype-development-map.md)
 for working CRUD behavior versus remaining features. Archiving preserves history;
 permanent deletion is not implemented.
+
+## Track requested documents (0.28.0 source)
+
+Open Documents → Collection checklist, select a client and add a request. Save
+its title, type and optional account, requested period, due date and notes.
+Mark received only after receipt and enter the received date; optionally link an
+imported source belonging to that client/account. Receipt does not approve the
+financial contents. Archive saved requests to keep them out of the active view;
+uncheck Archive to reactivate. Past versions are read-only. See
+[document collection](document-collection.md) for history, limits and recovery.
 
 ## Install and open
 

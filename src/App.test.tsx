@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
   listClientScenarios:vi.fn(),getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
-  getClientCare:vi.fn(),saveClientCare:vi.fn(),getFollowUpOverview:vi.fn(),
+  getDocumentCollection:vi.fn(),saveDocumentCollection:vi.fn(),getClientCare:vi.fn(),saveClientCare:vi.fn(),getFollowUpOverview:vi.fn(),
 }));
 
 vi.mock('./api', () => ({
@@ -44,6 +44,7 @@ function deferred<T>() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
+  mocks.getDocumentCollection.mockImplementation(async(clientId:string)=>({clientId,revision:0,latestRevision:0,updatedAt:null,reviewDate:'2026-10-14',items:[],history:[],accounts:[],sources:[],missing:0,received:0,archived:0}));
   mocks.getClientCare.mockImplementation(async(clientId:string)=>({clientId,revision:0,updatedAt:null,reviewDate:'2026-10-15',overdue:0,dueToday:0,data:{intake:{address:'',household:'',employment:'',employer:'',occupation:'',incomeNotes:''},followUps:[]}}));
   mocks.listClientScenarios.mockImplementation(async(clientId:string)=>({clientId,records:[]}));
   mocks.getClientImports.mockImplementation(async (clientId:string)=>({clientId,revision:0,accounts:[],documents:[],records:[],history:[],merchantGroups:[],recurringHistory:[],summary:{pending:0,needsClarification:0,approved:0,rejected:0,income:'0.00',spending:'0.00',refunds:'0.00',netSpending:'0.00',netCash:'0.00',accountNet:[],warnings:[]}}));
@@ -406,4 +407,8 @@ it('creates, reloads and removes a saved budget row through its dedicated page',
 
 it('keeps backup operations on their page until completion and clears the password immediately',async()=>{
  const pending=deferred<{path:string;createdAt:string;auditRecorded:boolean;durabilityWarning:boolean}>();mocks.createWorkspaceBackup.mockReturnValueOnce(pending.promise);render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Backup & recovery'}));fireEvent.change(screen.getByLabelText('Backup folder'),{target:{value:'/fictional/backups'}});fireEvent.change(screen.getByLabelText('Current workspace password'),{target:{value:'Fictional-test-password-123'}});fireEvent.click(screen.getByRole('button',{name:'Create encrypted backup'}));expect(screen.getByLabelText('Current workspace password')).toHaveValue('');expect(screen.getByRole('button',{name:'Branding'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Encrypted workspace backup'})).toBeInTheDocument();await act(async()=>pending.resolve({path:'/fictional/backups/test.ebcbackup',createdAt:'2026-10-15T00:00:00Z',auditRecorded:true,durabilityWarning:false}));expect(await screen.findByText('Encrypted backup saved.')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Select a client to open Documents'})).toBeInTheDocument();
+});
+
+it('keeps the collection area when selecting a client and guards checklist drafts on navigation and lock',async()=>{
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.click(screen.getByRole('button',{name:'Collection checklist'}));fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});await screen.findByText('No document requests yet. Add a request to begin.');fireEvent.click(screen.getByRole('button',{name:'Add document request'}));fireEvent.change(screen.getByLabelText('Request title'),{target:{value:'Private fictional collection draft'}});vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Reports'}));expect(screen.getByLabelText('Request title')).toHaveValue('Private fictional collection draft');fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:bob.id}});expect(screen.getByLabelText('Client for Documents')).toHaveValue(alice.id);await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional collection draft');expect(mocks.saveDocumentCollection).not.toHaveBeenCalled();
 });

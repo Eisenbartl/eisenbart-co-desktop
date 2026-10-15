@@ -1,4 +1,4 @@
-# Remaining original requirements after 0.27.0 source
+# Remaining original requirements after 0.28.0 source
 
 The application has an encrypted offline desktop foundation, isolated clients and
 notes, exact entered budgets/debt/savings/cash-flow plans, encrypted recovery,
@@ -15,7 +15,8 @@ workflow passed through direct WebKit transport before this feature stage; see
 All twelve main navigation sections and named future/admin areas are present in
 0.27.0 source. See [prototype-development-map.md](prototype-development-map.md)
 for working CRUD coverage, missing behavior and acceptance criteria. The next
-implementation priority is the document collection checklist. Planned pages do
+implementation priority is standalone statement-account metadata/lifecycle CRUD.
+The document collection checklist is working in 0.28.0 source. Planned pages do
 not implement their future features.
 
 | Work area | Main remaining work |

@@ -1537,11 +1537,12 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.screenshot(artifacts / "native-desktop.png")
     status("client edits saved")
     check_workspace_pages(driver, artifacts)
+    check_document_collection(driver, artifacts, "initial", initial=True)
 
     driver.click_button("Lock workspace")
     driver.element("#password")
     private_values = [f"{first_name} {first_last}", f"{second_name} {second_last}",
-                      first_goal, edited_goal, note, organization, counselor, "Alex fictional employer", "Reviewed the synthetic documents", "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve", "Alex synthetic checking", "Alex synthetic cash-flow priority", "Alex synthetic dated pay", "Synthetic reserve transfer", "Synthetic incoming transfer", "Synthetic checking", "checking.csv", "Fictional payroll", "Synthetic PDF checking"]
+                      first_goal, edited_goal, note, organization, counselor, "Alex fictional employer", "Reviewed the synthetic documents", "Alex synthetic wages", "Alex synthetic small debt", "Alex synthetic high APR debt", "Alex synthetic reserve priority", "Alex synthetic insurance reserve", "Alex synthetic checking", "Alex synthetic cash-flow priority", "Alex synthetic dated pay", "Synthetic reserve transfer", "Synthetic incoming transfer", "Synthetic checking", "checking.csv", "Fictional September checking statement", "Fictional optional pay stub", "Fictional receipt recorded; financial approval remains separate.", "Fictional payroll", "Synthetic PDF checking"]
 
     def assert_locked() -> None:
         markup = str(driver.observe_script("return document.documentElement.outerHTML"))
@@ -1635,6 +1636,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.click_button("Unlock workspace")
     assert_recurring_restored(driver)
     check_client_care(driver, artifacts, "restart")
+    check_document_collection(driver, artifacts, "restart")
     assert_statement_balances_restored(driver, artifacts, "restart")
     assert_captured_planning_restored(driver, artifacts, "restart")
     check_budget_methods(driver, artifacts, "restart")
@@ -1731,6 +1733,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".review-history", "Needs Clarification → Approved", "restored immutable PDF approval history")
     assert_recurring_restored(driver)
     check_client_care(driver, artifacts, "encrypted-restore")
+    check_document_collection(driver, artifacts, "encrypted-restore")
     assert_statement_balances_restored(driver, artifacts, "encrypted-restore")
     assert_captured_planning_restored(driver, artifacts, "encrypted-restore")
     check_budget_methods(driver, artifacts, "encrypted-restore")
@@ -1769,6 +1772,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".imports-progress", "Approved 6 · Rejected 1", "storage-error recovery includes imported records")
     assert_recurring_restored(driver)
     check_client_care(driver, artifacts, "error-screen-restore")
+    check_document_collection(driver, artifacts, "error-screen-restore")
     assert_statement_balances_restored(driver, artifacts, "error-screen-restore")
     assert_captured_planning_restored(driver, artifacts, "error-screen-restore")
     check_budget_methods(driver, artifacts, "error-screen-restore")
@@ -1778,6 +1782,70 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.open_client("Alex Fictional")
     assert_alex_dashboard(driver)
     status("fresh-process activation and error-screen recovery after simulated metadata loss, including recurring decisions")
+
+
+def check_document_collection(driver: WebDriver, artifacts: Path, label: str, initial: bool = False) -> None:
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Documents']")
+    driver.click_button("Collection checklist")
+    driver.element(".document-collection")
+    if initial:
+        driver.click_button("Add document request")
+        driver.fill("#collection-request-title", "Fictional September checking statement")
+        driver.select("#collection-account", "Synthetic checking")
+        driver.fill_native_date("#collection-periodStart", "2026-09-01")
+        driver.fill_native_date("#collection-periodEnd", "2026-09-30")
+        driver.fill_native_date("#collection-dueDate", "2026-10-30")
+        driver.fill("#collection-notes", "Original fictional collection request.")
+        driver.click_button("Save document checklist")
+        driver.wait_text(".collection-counts", "Saved version 1", "missing request saved")
+        driver.click_button("Add document request")
+        driver.fill("#collection-request-title", "Fictional optional pay stub")
+        driver.select("#collection-kind", "Pay stub")
+        driver.click_button("Save document checklist")
+        driver.wait_text(".collection-counts", "Saved version 2", "second request saved")
+        driver.click("button[aria-label='Open request Fictional optional pay stub']")
+        driver.click("#collection-archived")
+        driver.click_button("Save document checklist")
+        driver.wait_text(".collection-counts", "Saved version 3", "request archive preserves history")
+        driver.click("button[aria-label='Open request Fictional September checking statement']")
+        driver.select("#collection-status", "Received (not financially approved)")
+        driver.fill_native_date("#collection-receivedDate", "2026-10-14")
+        driver.select("#collection-source", "checking.csv — Synthetic checking")
+        driver.fill("#collection-notes", "Fictional receipt recorded; financial approval remains separate.")
+        driver.click_button("Save document checklist")
+        driver.wait_text(".collection-counts", "Saved version 4", "received request and source link saved")
+    driver.wait_text(".collection-counts", "0 missing", f"saved missing count ({label})")
+    driver.wait_text(".collection-counts", "1 received", f"saved receipt count ({label})")
+    driver.wait_text(".collection-counts", "1 archived", f"saved archive count ({label})")
+    driver.click("button[aria-label='Open request Fictional September checking statement']")
+    driver.wait_value("#collection-receivedDate", "2026-10-14", f"original received date ({label})")
+    driver.wait_value("#collection-notes", "Fictional receipt recorded; financial approval remains separate.", f"receipt notes persisted ({label})")
+    chosen=driver.observe_script("const s=document.querySelector('#collection-source');return s.options[s.selectedIndex].textContent")
+    if chosen != "checking.csv — Synthetic checking":
+        raise SmokeFailure("Checklist lost its original scoped source link")
+    version=driver.observe_script("return Array.from(document.querySelector('#collection-history').options).find(o=>o.value==='1')?.textContent")
+    if not version:
+        raise SmokeFailure("Checklist original version missing")
+    driver.select("#collection-history", version)
+    driver.wait_text(".document-collection", "Historical checklist version 1 of 4", f"original collection history ({label})")
+    driver.click("button[aria-label='Open request Fictional September checking statement']")
+    driver.wait_value("#collection-status", "missing", f"original status remains missing ({label})")
+    driver.wait_value("#collection-notes", "Original fictional collection request.", f"original request notes unchanged ({label})")
+    if driver.observe_script("return document.querySelector('#collection-request-title').matches(':disabled')") is not True:
+        raise SmokeFailure("Historical checklist fields are editable")
+    driver.select("#collection-history", "Current checklist")
+    driver.wait_text(".collection-counts", "Saved version 4", "return to current checklist")
+    driver.select("#collection-filter", "Archived")
+    driver.wait_text(".collection-table", "Fictional optional pay stub", "archived request remains available")
+    driver.select("#workspace-client", "Robin Synthetic")
+    driver.wait_text(".document-collection", "No document requests yet", "other client has no collection requests")
+    driver.select("#workspace-client", "Alex Fictional")
+    driver.wait_text(".collection-counts", "1 received", "original client collection restored")
+    driver.scroll_to(".document-collection", "start")
+    driver.command("POST", "/execute/async", {"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));", "args":[]})
+    driver.screenshot(artifacts / f"native-document-collection-{label}.png")
+    driver.open_client("Alex Fictional")
+    status(f"document collection create/edit/receipt/archive/history, scoped source and client isolation ({label})")
 
 
 def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:

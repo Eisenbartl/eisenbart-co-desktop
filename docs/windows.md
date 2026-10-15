@@ -1,10 +1,10 @@
 # Windows development installer — 0.23.0
 
-Current development source is **0.27.0**, with all twelve main sections, focused client pages,
-settings/admin areas and labeled future-feature pages. Schema 17 and report
-format 5 remain supported. No new installer is created until requested.
+Current development source is **0.28.0**, with all twelve main sections and a persistent
+document collection checklist. Schema 18 adds retained request history; report
+format 5 remains supported. No new installer is created until requested.
 The downloadable **0.23.0** preview below predates those changes. Do not open a
-schema-17 workspace or format-5 reports with the older application.
+schema-18 workspace or format-5 reports with the older application.
 
 ## Download and install
 
