@@ -56,10 +56,312 @@ pub(super) fn input() -> Input {
         cash_changes: vec![],
         debt_extras: vec![],
         goal_contributions: vec![],
+        recurring_expenses: vec![],
     }
 }
 fn json<T: Serialize>(v: &T) -> serde_json::Value {
     serde_json::to_value(v).unwrap()
+}
+pub(super) fn expense() -> RecurringExpense {
+    RecurringExpense {
+        label: " Proposed care ".into(),
+        kind: budget::Kind::Necessary,
+        amount: Some("75".into()),
+        frequency: budget::Frequency::Monthly,
+        dated: None,
+    }
+}
+pub(super) fn expense_dates() -> ExpenseDates {
+    ExpenseDates {
+        account_id: "checking".into(),
+        first_date: "2026-11-15".into(),
+        second_day: None,
+        until_date: None,
+    }
+}
+#[test]
+fn recurring_expenses_recalculate_normalized_contexts_and_only_explicit_estimated_bills_without_writes(
+) {
+    let (_dir, mut w, id) = fixture();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let audits = audit_count(&w);
+    for (frequency, monthly) in [
+        (budget::Frequency::Weekly, "52.04"),
+        (budget::Frequency::Biweekly, "26.02"),
+        (budget::Frequency::Semimonthly, "24.02"),
+        (budget::Frequency::Monthly, "12.01"),
+        (budget::Frequency::Annual, "1.00"),
+    ] {
+        let mut i = input();
+        let mut e = expense();
+        e.amount = Some(" 12.01 ".into());
+        e.frequency = frequency;
+        i.recurring_expenses.push(e);
+        let r = w.compare_financial_scenarios(&id, i).unwrap();
+        assert_eq!(
+            r.proposed.plans.budget.summary.monthly_amounts[3].as_deref(),
+            Some(monthly)
+        );
+        assert_eq!(r.input.recurring_expenses[0].label, "Proposed care");
+        assert_eq!(
+            r.input.recurring_expenses[0].amount.as_deref(),
+            Some("12.01")
+        );
+        assert!(r.proposed.plans.budget.lines[3].estimated);
+        assert_eq!(
+            json(&r.proposed.plans.cashflow.data),
+            before["cashflow"]["data"]
+        );
+    }
+    let mut i = input();
+    let mut e = expense();
+    e.amount = Some("12.01".into());
+    e.frequency = budget::Frequency::Weekly;
+    let mut dates = expense_dates();
+    dates.first_date = "2026-11-05".into();
+    e.dated = Some(dates);
+    i.recurring_expenses.push(e);
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    let p = &r.proposed.plans;
+    // Weekly 12.01 * 52/12 rounds to 52.04; four actual November bills total 48.04.
+    assert_eq!(p.budget.summary.necessary_expenses, "1052.04");
+    assert_eq!(p.debt.budget_context.monthly_capacity, "1997.96");
+    assert_eq!(
+        p.savings
+            .summary
+            .as_ref()
+            .unwrap()
+            .emergency_target
+            .as_deref(),
+        Some("3156.12")
+    );
+    assert_eq!(r.proposed.first_month_buffer.as_deref(), Some("1647.96"));
+    assert_eq!(
+        p.cashflow
+            .summary
+            .as_ref()
+            .unwrap()
+            .combined_closing
+            .as_deref(),
+        Some("3251.96")
+    );
+    let rows: Vec<_> = p
+        .cashflow
+        .summary
+        .as_ref()
+        .unwrap()
+        .ledger
+        .iter()
+        .filter(|e| e.schedule_index == 3)
+        .collect();
+    assert_eq!(
+        rows.iter().map(|e| e.date.as_str()).collect::<Vec<_>>(),
+        vec!["2026-11-05", "2026-11-12", "2026-11-19", "2026-11-26"]
+    );
+    assert!(rows.iter().all(|e| e.kind == crate::cashflow::Kind::Bill
+        && e.certainty == crate::cashflow::Certainty::Estimated
+        && e.account_id == "checking"
+        && e.destination_id.is_none()));
+    assert_eq!(
+        p.cashflow.summary.as_ref().unwrap().closing_balances[1]
+            .amount
+            .as_deref(),
+        Some("1200.00")
+    );
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    assert_eq!(audit_count(&w), audits);
+}
+#[test]
+fn recurring_expenses_keep_unknown_zero_deficits_and_separate_forecast_windows_explicit() {
+    let (_dir, mut w, id) = fixture();
+    for (amount, buffer) in [
+        (None, None),
+        (Some("0"), Some("1700.00")),
+        (Some("3000"), Some("-1300.00")),
+    ] {
+        let mut i = input();
+        let mut e = expense();
+        e.amount = amount.map(str::to_owned);
+        i.recurring_expenses.push(e);
+        let r = w.compare_financial_scenarios(&id, i).unwrap();
+        assert_eq!(r.proposed.first_month_buffer.as_deref(), buffer);
+        if amount.is_none() {
+            assert!(r
+                .proposed
+                .plans
+                .savings
+                .summary
+                .as_ref()
+                .unwrap()
+                .emergency_target
+                .is_none());
+        }
+    }
+    let mut i = input();
+    let mut e = expense();
+    e.amount = None;
+    e.dated = Some(expense_dates());
+    i.recurring_expenses.push(e);
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    let c = r.proposed.plans.cashflow.summary.unwrap();
+    assert!(c.combined_closing.is_none());
+    assert!(c.closing_balances[0].amount.is_none());
+    assert_eq!(c.closing_balances[1].amount.as_deref(), Some("1200.00"));
+    let mut i = input();
+    let mut e = expense();
+    let mut d = expense_dates();
+    d.first_date = "2026-12-15".into();
+    e.dated = Some(d);
+    i.recurring_expenses.push(e);
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    assert_eq!(r.proposed.first_month_buffer.as_deref(), Some("1625.00"));
+    assert_eq!(
+        r.proposed
+            .plans
+            .cashflow
+            .summary
+            .unwrap()
+            .combined_closing
+            .as_deref(),
+        Some("3300.00")
+    );
+    assert!(r.warnings.iter().any(|w| w.contains("no dated occurrence")));
+    let mut i = input();
+    let mut e = expense();
+    e.amount = Some("12.01".into());
+    e.frequency = budget::Frequency::Weekly;
+    let mut d = expense_dates();
+    d.first_date = "2026-11-05".into();
+    d.until_date = Some("2026-11-15".into());
+    e.dated = Some(d);
+    i.recurring_expenses.push(e);
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    assert_eq!(r.proposed.first_month_buffer.as_deref(), Some("1647.96"));
+    assert_eq!(
+        r.proposed
+            .plans
+            .cashflow
+            .summary
+            .unwrap()
+            .combined_closing
+            .as_deref(),
+        Some("3275.98")
+    );
+    let mut i = input();
+    let mut e = expense();
+    e.frequency = budget::Frequency::Semimonthly;
+    e.amount = Some("10".into());
+    let mut d = expense_dates();
+    d.first_date = "2026-11-01".into();
+    d.second_day = Some(15);
+    e.dated = Some(d);
+    i.recurring_expenses.push(e);
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    assert_eq!(
+        r.proposed
+            .plans
+            .cashflow
+            .summary
+            .unwrap()
+            .combined_closing
+            .as_deref(),
+        Some("3280.00")
+    );
+}
+#[test]
+fn recurring_expenses_reject_invalid_purposes_dates_accounts_precision_and_limits_without_partial_writes(
+) {
+    let (_dir, mut w, id) = fixture();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let audits = audit_count(&w);
+    let mut invalid = vec![];
+    for kind in [
+        budget::Kind::Income,
+        budget::Kind::Savings,
+        budget::Kind::DebtPayment,
+    ] {
+        let mut e = expense();
+        e.kind = kind;
+        invalid.push(e);
+    }
+    for value in ["12.345", "-1"] {
+        let mut e = expense();
+        e.amount = Some(value.into());
+        invalid.push(e);
+    }
+    for label in ["".to_owned(), "x".repeat(121), "bad\nname".into()] {
+        let mut e = expense();
+        e.label = label;
+        invalid.push(e);
+    }
+    let mut e = expense();
+    e.frequency = budget::Frequency::Irregular;
+    invalid.push(e);
+    for key in ["account", "date", "until", "second", "annual"] {
+        let mut e = expense();
+        let mut d = expense_dates();
+        match key {
+            "account" => d.account_id = "other-client-account".into(),
+            "date" => d.first_date = "2026-02-30".into(),
+            "until" => d.until_date = Some("2026-11-01".into()),
+            "second" => e.frequency = budget::Frequency::Semimonthly,
+            _ => e.frequency = budget::Frequency::Annual,
+        }
+        e.dated = Some(d);
+        invalid.push(e);
+    }
+    for e in invalid {
+        let mut i = input();
+        i.recurring_expenses.push(e);
+        assert!(w.compare_financial_scenarios(&id, i).is_err());
+    }
+    let mut i = input();
+    i.recurring_expenses = (0..21).map(|_| expense()).collect();
+    assert!(w.compare_financial_scenarios(&id, i).is_err());
+    let mut raw = json(&input());
+    raw["recurringExpenses"] = serde_json::json!([{"label":"forged","kind":"necessary","amount":"1","frequency":"monthly","dated":null,"monthlyTotal":"0"}]);
+    assert!(serde_json::from_value::<Input>(raw).is_err());
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    assert_eq!(audit_count(&w), audits);
+    let mut budget = budget_input(1);
+    budget.lines.resize(100, budget.lines[0].clone());
+    w.save_client_budget(&id, budget).unwrap();
+    let mut i = input();
+    i.expected_revisions.budget = 2;
+    i.recurring_expenses.push(expense());
+    assert!(w
+        .compare_financial_scenarios(&id, i)
+        .unwrap_err()
+        .contains("100 lines"));
+    let mut cash = cashflow_input(1);
+    cash.data
+        .schedules
+        .resize(100, cash.data.schedules[0].clone());
+    w.save_client_cashflow_plan(&id, cash).unwrap();
+    let mut i = input();
+    i.expected_revisions.budget = 2;
+    i.expected_revisions.cashflow = 2;
+    let mut e = expense();
+    e.dated = Some(expense_dates());
+    i.recurring_expenses.push(e);
+    // Restore room in the budget to reach the independent cash-flow capacity guard.
+    w.save_client_budget(&id, budget_input(2)).unwrap();
+    i.expected_revisions.budget = 3;
+    assert!(w
+        .compare_financial_scenarios(&id, i)
+        .unwrap_err()
+        .contains("100 activity"));
+    let other = w.save_client(client_input()).unwrap();
+    w.save_client_budget(&other.id, budget_input(0)).unwrap();
+    let mut i = input();
+    i.expected_revisions = w.get_assessment_planning(&other.id).unwrap().revisions();
+    let mut e = expense();
+    e.dated = Some(expense_dates());
+    i.recurring_expenses.push(e);
+    assert!(w
+        .compare_financial_scenarios(&other.id, i)
+        .unwrap_err()
+        .contains("Save a cash-flow plan"));
 }
 #[test]
 fn extra_payments_and_goal_contributions_recalculate_exactly_without_replacing_saved_commitments() {

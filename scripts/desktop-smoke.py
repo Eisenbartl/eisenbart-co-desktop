@@ -791,7 +791,7 @@ def check_scenario_commitment_controls(driver: WebDriver, artifacts: Path, label
     driver.fill("#scenario-extra-amount-0", "300")
     driver.click(".scenario-goal-contributions > summary")
     driver.fill("#scenario-goal-0", "100")
-    driver.fill("#scenario-label", "Alex extra payment and goal proposal")
+    driver.fill("#scenario-label", "Alex recurring expense proposal")
     driver.click_button("Compare temporary proposal")
     for value in ["$833.34", "$12.20", "2026-12", "2026-12-31", "$500.00", "$3,300.00"]:
         driver.wait_text(".combined-scenario-results table", value, "exact extra-payment and savings-goal comparison")
@@ -807,13 +807,44 @@ def check_scenario_commitment_controls(driver: WebDriver, artifacts: Path, label
         driver.fill("#scenario-extra-amount-0", "300")
         driver.click_button("Compare temporary proposal")
         driver.wait_text(".combined-scenario-results table", "$833.34", "corrected proposal explicitly recomputed")
+    check_recurring_expense_controls(driver, artifacts, label)
+    if label == "initial":
         driver.click_button("Save reviewed combined scenario")
-        driver.wait_text(".saved-scenario-history article", "$833.34", "extended immutable scenario recorded")
+        driver.wait_text(".saved-scenario-history article", "$758.34", "integrated recurring-expense scenario recorded")
     status(f"extra debt payment and savings-goal controls preserve independent funding, milestones and live plans ({label})")
 
 
+def check_recurring_expense_controls(driver: WebDriver, artifacts: Path, label: str) -> None:
+    driver.click(".scenario-new-expenses > summary")
+    driver.click_button("Add proposed recurring expense")
+    driver.fill("#scenario-expense-label-0", "Alex proposed child care")
+    driver.fill("#scenario-expense-amount-0", "75")
+    driver.click_button("Compare temporary proposal")
+    for value in ["$758.34", "$5,124.99", "2027-12-31", "$3,300.00"]:
+        driver.wait_text(".combined-scenario-results table", value, "recurring budget expense recalculates shared funding and emergency target without inventing dates")
+    driver.click("#scenario-expense-dated-0")
+    driver.select("#scenario-expense-account-0", "Alex synthetic checking")
+    driver.fill("#scenario-expense-first-0", "2026-11-15")
+    driver.fill("#scenario-expense-until-0", "2026-11-30")
+    if label == "initial":
+        driver.fill("#scenario-expense-first-0", "2026-02-30")
+        driver.click_button("Compare temporary proposal")
+        driver.wait_text(".combined-scenarios [role=alert]", "calendar date", "invalid new expense date rejected")
+        driver.wait_value("#scenario-expense-first-0", "2026-02-30", "rejected expense date retained")
+        driver.fill("#scenario-expense-first-0", "2026-11-15")
+    driver.click_button("Compare temporary proposal")
+    for value in ["$758.34", "$3,225.00", "$12.20", "2026-12-31"]:
+        driver.wait_text(".combined-scenario-results table", value, "explicit new expense bill and combined controls preserve exact independent outcomes")
+    driver.wait_value("#budget-amount-0", "1500.00", "new expense does not change the live budget")
+    if driver.visible("#budget-amount-6"):
+        raise SmokeFailure("New proposal expense unexpectedly entered the live budget")
+    driver.scroll_to(".combined-scenario-results table", "start")
+    driver.screenshot(artifacts / f"native-recurring-expenses-{label}.png")
+    status(f"new recurring expense updates shared funding and only explicitly selected dated bills ({label})")
+
+
 def export_scenario_controls_pdf(driver: WebDriver, artifacts: Path, label: str) -> None:
-    destination = artifacts / f"scenario-controls-{label}.pdf"
+    destination = artifacts / f"recurring-expense-{label}.pdf"
     if destination.exists():
         raise SmokeFailure("Extended scenario PDF destination must be new")
     driver.fill("#assessment-pdf-path", str(destination))
@@ -821,10 +852,10 @@ def export_scenario_controls_pdf(driver: WebDriver, artifacts: Path, label: str)
     driver.wait_text(".saved-assessments > .success-message", str(destination), "extended scenario PDF completion")
     text = subprocess.run(["pdftotext", "-layout", str(destination), "-"], check=True, capture_output=True, text=True).stdout
     text = " ".join(text.split())
-    for value in ["Alex extra payment and goal proposal", "Additional proposed debt payment: 2026-11 / USD 300.00", "Proposed goal monthly contribution: Alex synthetic insurance reserve / USD 100.00", "Baseline USD 766.67 / proposed USD 833.34", "Projected total interest: USD 12.20", "Projected payoff month: 2026-12", "2026-12-31", "Operating cash flow: USD 1820.02"]:
+    for value in ["Alex recurring expense proposal", "Additional proposed debt payment: 2026-11 / USD 300.00", "Proposed goal monthly contribution: Alex synthetic insurance reserve / USD 100.00", "Baseline USD 766.67 / proposed USD 758.34", "Projected total interest: USD 12.20", "Projected payoff month: 2026-12", "2026-12-31", "New proposed recurring expense: Alex proposed child care / Necessary / USD 75.00 per Monthly / estimated", "Explicit expense payment dates: Alex synthetic checking / first 2026-11-15", "Baseline USD 3300.00 / proposed USD 3225.00", "Primary emergency completion: 2027-12-31", "Operating cash flow: USD 1820.02"]:
         if value not in text:
             raise SmokeFailure(f"Extended scenario PDF missing {value}")
-    status(f"extended scenario PDF preserves added payment, changed goal and separate approved activity ({label})")
+    status(f"integrated expense PDF preserves expense, dated bill, added payment, goal and separate approved activity ({label})")
 
 
 def save_scenario_controls_report(driver: WebDriver, artifacts: Path) -> None:
@@ -832,16 +863,16 @@ def save_scenario_controls_report(driver: WebDriver, artifacts: Path) -> None:
     driver.wait(lambda: driver.visible("#saved-assessment") is not None, "extended report directory")
     driver.fill("#record-from", "2026-09")
     driver.fill("#record-through", "2026-10")
-    driver.fill("#record-title", "Alex extra payment and goal report")
+    driver.fill("#record-title", "Alex recurring expense report")
     driver.fill("#record-findings", "Review extra payment funding and goal commitments; live plans stay unchanged.")
     driver.click("#record-include-saved-scenario")
     driver.click_button("Review saved combined scenarios")
-    driver.select("#record-saved-scenario", "Alex extra payment and goal proposal — Baseline unchanged")
-    driver.wait_text(".report-saved-scenario", "$833.34", "explicit extended scenario selection")
+    driver.select("#record-saved-scenario", "Alex recurring expense proposal — Baseline unchanged")
+    driver.wait_text(".report-saved-scenario", "$758.34", "explicit extended scenario selection")
     driver.click("#record-ack")
     driver.click_button("Save assessment record")
-    driver.wait_text(".saved-assessment-view h3", "Alex extra payment and goal report", "extended scenario report recorded")
-    driver.wait_text(".selected-combined-scenario", "$833.34", "extended scenario linked by server")
+    driver.wait_text(".saved-assessment-view h3", "Alex recurring expense report", "extended scenario report recorded")
+    driver.wait_text(".selected-combined-scenario", "$758.34", "extended scenario linked by server")
     export_scenario_controls_pdf(driver, artifacts, "initial")
     driver.click(".saved-assessments > summary")
 
@@ -849,17 +880,17 @@ def save_scenario_controls_report(driver: WebDriver, artifacts: Path) -> None:
 def assert_scenario_controls_restored(driver: WebDriver, artifacts: Path, label: str) -> None:
     driver.click(".combined-scenarios > details > summary")
     driver.click_button("Reload saved scenario history")
-    driver.select("#saved-scenario", "Alex extra payment and goal proposal — Needs review")
-    driver.wait_text(".saved-scenario-history article", "$833.34", "original extended outcome survives recovery")
+    driver.select("#saved-scenario", "Alex recurring expense proposal — Needs review")
+    driver.wait_text(".saved-scenario-history article", "$758.34", "original extended outcome survives recovery")
     driver.wait_text(".saved-scenario-history article", "2026-12-31", "original goal milestone survives recovery")
     driver.wait_value("#savings-goal-monthlyContribution-0", "50.00", "reopened goal proposal never applies live changes")
     driver.click(".combined-scenarios > details > summary")
     driver.click(".saved-assessments > summary")
-    driver.select("#saved-assessment", "Alex extra payment and goal report — 2026-09-01 to 2026-10-31 — Needs review")
-    driver.wait_text(".selected-combined-scenario", "$833.34", "immutable extended report restored")
+    driver.select("#saved-assessment", "Alex recurring expense report — 2026-09-01 to 2026-10-31 — Needs review")
+    driver.wait_text(".selected-combined-scenario", "$758.34", "immutable extended report restored")
     export_scenario_controls_pdf(driver, artifacts, label)
     driver.click(".saved-assessments > summary")
-    status(f"extended saved scenario and report retain original extra payment and goal across recovery ({label})")
+    status(f"recurring expense scenario and report retain original assumptions across recovery ({label})")
 
 
 def export_saved_combined_pdf(driver: WebDriver, artifacts: Path, label: str) -> None:

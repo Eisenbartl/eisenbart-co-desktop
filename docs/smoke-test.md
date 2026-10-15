@@ -189,3 +189,13 @@ paths with original milestones and Needs review flags. Four additional PDFs
 verify added-payment/goal assumptions separately from approved operating activity
 1,820.02 and unchanged dated closing 3,300.00. Artifacts include
 `native-scenario-controls-*.png` and `scenario-controls-*.pdf`.
+
+The 0.22.0 run extends the existing extra-payment/goal proposal and its four
+selected-report exports with 75.00 monthly child care. It checks budget-only
+758.34 buffer / 5,124.99 target / December 2027 emergency completion before
+explicitly selecting the payment account and dates, then checks 3,225.00 dated
+closing. Invalid dates remain editable. All earlier 833.34/12.20 extra/goal checks
+run before adding the expense; the original saved proposal and older reports
+remain separately covered. The integrated expense record/report and explicit
+bill assumptions must survive restart and both recovery paths. Artifacts:
+`native-recurring-expenses-*.png` and `recurring-expense-*.pdf`.

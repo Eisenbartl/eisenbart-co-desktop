@@ -1,7 +1,7 @@
 import {act,fireEvent,render,screen,waitFor,within} from '@testing-library/react';
 import {beforeEach,expect,it,vi} from 'vitest';
 import ScenarioComparisons from './ScenarioComparisons';
-import type {AssessmentPlans,ScenarioComparison,ScenarioInput} from './types';
+import type {AssessmentPlans,ScenarioComparison,ScenarioInput,ScenarioExpense} from './types';
 const mocks=vi.hoisted(()=>({getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),listClientScenarios:vi.fn(),getClientScenario:vi.fn(),saveClientScenario:vi.fn()}));
 vi.mock('./api',()=>({api:mocks}));
 const plans:AssessmentPlans={clientId:'client-a',budget:{clientId:'client-a',revision:2,updatedAt:'2026-10-14T14:00:00Z',lines:[{label:'Entered wages',kind:'income',amount:'1500.00',frequency:'biweekly',estimated:false}],summary:{monthlyIncome:'3250.00',necessaryExpenses:'0.00',discretionaryExpenses:'0.00',totalSpending:'0.00',surplusBeforeAllocations:'3250.00',proposedSavings:'0.00',availableForDebt:'3250.00',plannedDebtPayments:'0.00',unallocated:'3250.00',monthlyAmounts:['3250.00'],missingCount:0,estimatedCount:0,warnings:['Entered estimates only']}},debt:{clientId:'client-a',revision:0,updatedAt:null,data:null,comparison:null,budgetContext:{revision:2,monthlyCapacity:'3250.00',plannedDebtPayments:'0.00',warnings:[]}},savings:{clientId:'client-a',revision:0,updatedAt:null,data:null,summary:null,context:{budgetRevision:2,debtRevision:0,necessaryExpenses:null,monthlySurplus:null,budgetSavings:'0.00',budgetDebtPayments:'0.00',debtStartMonth:null,debtMonthlyPayment:null,debtChanges:[],debtExtras:[],warnings:[]}},cashflow:{clientId:'client-a',revision:0,updatedAt:null,data:null,summary:null,context:{budgetRevision:2,debtRevision:0,savingsRevision:0,monthlySurplus:null,budgetDebt:'0.00',budgetSavings:'0.00',debtMonthlyPayment:null,savingsMonthlyContribution:null}}};
@@ -104,4 +104,50 @@ it('limits proposed extras using the saved event count and discards all new inpu
  expect(screen.queryByLabelText('Proposed Car repair monthly contribution (USD)')).not.toBeInTheDocument();
  expect(screen.queryByRole('button',{name:'Add proposed extra payment'})).not.toBeInTheDocument();
  expect(mocks.compareFinancialScenarios).not.toHaveBeenCalled();
+});
+
+it('reviews and saves a new expense with only explicitly selected dated account and payment assumptions',async()=>{
+ const expense:ScenarioExpense={label:'Child care',kind:'necessary',amount:'75.00',frequency:'monthly',dated:{accountId:'checking',firstDate:'2026-11-15',secondDay:null,untilDate:'2026-11-30'}};
+ const input={...initial,recurringExpenses:[expense]};
+ mocks.compareFinancialScenarios.mockResolvedValueOnce({...comparison,input});
+ mocks.saveClientScenario.mockResolvedValueOnce({...saved,payload:{...saved.payload,comparison:{...saved.payload.comparison,input}}});
+ render(<ScenarioComparisons {...props()}/>);await load();fireEvent.click(screen.getByText('Add new recurring expenses'));fireEvent.click(screen.getByRole('button',{name:'Add proposed recurring expense'}));
+ fireEvent.change(screen.getByLabelText('New expense 1 name'),{target:{value:'Child care'}});
+ fireEvent.change(screen.getByLabelText('New expense 1 amount (USD)'),{target:{value:'75'}});
+ expect(screen.queryByLabelText('New expense 1 payment account')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByLabelText('Also add new expense 1 to the dated forecast'));
+ expect(screen.getByLabelText('New expense 1 payment account')).toHaveValue('');expect(screen.getByLabelText('New expense 1 first date (YYYY-MM-DD)')).toHaveValue('');
+ fireEvent.change(screen.getByLabelText('New expense 1 payment account'),{target:{value:'checking'}});
+ fireEvent.change(screen.getByLabelText('New expense 1 first date (YYYY-MM-DD)'),{target:{value:'2026-11-15'}});
+ fireEvent.change(screen.getByLabelText('New expense 1 last date (optional)'),{target:{value:'2026-11-30'}});
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));const region=await screen.findByRole('region',{name:'Combined scenario comparison'});
+ const proposal={...initial,recurringExpenses:[{...expense,amount:'75'}]};
+ expect(mocks.compareFinancialScenarios).toHaveBeenCalledWith('client-a',proposal);
+ expect(region).toHaveTextContent('New necessary expense Child care: $75.00 per monthly');expect(region).toHaveTextContent('Dated forecast: Checking, first 2026-11-15');
+ fireEvent.click(screen.getByRole('button',{name:'Save reviewed combined scenario'}));await screen.findByRole('article',{name:'Saved combined scenario'});
+ expect(mocks.saveClientScenario).toHaveBeenCalledWith('client-a',{expectedCount:0,proposal});expect(proposal.recurringExpenses[0]).not.toHaveProperty('monthlyTotal');
+});
+
+it('retains rejected dates and unknown expense amounts, distinguishes zero, and invalidates review on removal',async()=>{
+ render(<ScenarioComparisons {...props()}/>);await load();fireEvent.click(screen.getByText('Add new recurring expenses'));fireEvent.click(screen.getByRole('button',{name:'Add proposed recurring expense'}));
+ fireEvent.change(screen.getByLabelText('New expense 1 name'),{target:{value:'Uncertain bill'}});fireEvent.click(screen.getByLabelText('Also add new expense 1 to the dated forecast'));
+ fireEvent.change(screen.getByLabelText('New expense 1 payment account'),{target:{value:'checking'}});fireEvent.change(screen.getByLabelText('New expense 1 first date (YYYY-MM-DD)'),{target:{value:'2026-02-30'}});
+ mocks.compareFinancialScenarios.mockRejectedValueOnce(new Error('Enter a real calendar date'));
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));expect(await screen.findByRole('alert')).toHaveTextContent('calendar date');
+ expect(mocks.compareFinancialScenarios).toHaveBeenCalledTimes(1);expect(mocks.compareFinancialScenarios.mock.calls[0][1].recurringExpenses[0].amount).toBeNull();expect(screen.getByLabelText('New expense 1 first date (YYYY-MM-DD)')).toHaveValue('2026-02-30');
+ fireEvent.change(screen.getByLabelText('New expense 1 first date (YYYY-MM-DD)'),{target:{value:'2026-11-15'}});fireEvent.change(screen.getByLabelText('New expense 1 amount (USD)'),{target:{value:'0.00'}});
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));await screen.findByRole('region',{name:'Combined scenario comparison'});expect(mocks.compareFinancialScenarios.mock.calls[1][1].recurringExpenses[0].amount).toBe('0.00');
+ fireEvent.click(screen.getByRole('button',{name:'Remove proposed expense 1'}));expect(screen.queryByRole('region',{name:'Combined scenario comparison'})).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Save reviewed combined scenario'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));await screen.findByRole('region',{name:'Combined scenario comparison'});expect(mocks.compareFinancialScenarios.mock.calls[2][1]).not.toHaveProperty('recurringExpenses');
+});
+
+it('permits budget-only annual expenses without a cash-flow model and clears new expense drafts across clients',async()=>{
+ const p=props(),loaded={...plans,cashflow:{...plans.cashflow,revision:0,data:null,summary:null}};mocks.getAssessmentPlanning.mockResolvedValueOnce(loaded);
+ const view=render(<ScenarioComparisons {...p}/>);await load();fireEvent.click(screen.getByText('Add new recurring expenses'));fireEvent.click(screen.getByRole('button',{name:'Add proposed recurring expense'}));
+ expect(screen.getByLabelText('Also add new expense 1 to the dated forecast')).toBeDisabled();
+ fireEvent.change(screen.getByLabelText('New expense 1 name'),{target:{value:'Annual insurance'}});fireEvent.change(screen.getByLabelText('New expense 1 amount (USD)'),{target:{value:'120.00'}});fireEvent.change(screen.getByLabelText('New expense 1 frequency'),{target:{value:'annual'}});
+ mocks.compareFinancialScenarios.mockImplementationOnce(async (_id,input)=>({...comparison,input,revisions:{...comparison.revisions,cashflow:0},baseline:{...comparison.baseline,plans:loaded},proposed:{...comparison.proposed,plans:loaded}}));
+ fireEvent.click(screen.getByRole('button',{name:'Compare temporary proposal'}));await waitFor(()=>expect(mocks.compareFinancialScenarios).toHaveBeenCalled());
+ expect(mocks.compareFinancialScenarios.mock.calls[0][1].recurringExpenses).toEqual([{label:'Annual insurance',kind:'necessary',amount:'120.00',frequency:'annual',dated:null}]);
+ view.rerender(<ScenarioComparisons {...p} clientId="client-b"/>);expect(screen.queryByLabelText('New expense 1 name')).not.toBeInTheDocument();expect(screen.queryByRole('region',{name:'Combined scenario comparison'})).not.toBeInTheDocument();
 });

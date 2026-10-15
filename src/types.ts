@@ -281,12 +281,18 @@ export interface BudgetMethodComparison {clientId:string;revision:number;calcula
 export interface ScenarioAmountChange {amount:string|null}
 export interface ScenarioBudgetChange {index:number;amount:string|null}
 export interface ScenarioCashChange {index:number;amount:string|null;firstDate:string}
+export interface ScenarioExpense {
+ label:string;kind:'necessary'|'discretionary';amount:string|null;
+ frequency:'weekly'|'biweekly'|'semimonthly'|'monthly'|'annual';
+ dated:{accountId:string;firstDate:string;secondDay:number|null;untilDate:string|null}|null;
+}
 export interface ScenarioInput {
  expectedRevisions:PlanningRevisions;label:string;assumptions:string;
  baselineStrategy:PlanningDebtStrategy;proposedStrategy:PlanningDebtStrategy;
  budgetChanges:ScenarioBudgetChange[];debtPayment:ScenarioAmountChange|null;
  emergencyContribution:ScenarioAmountChange|null;cashChanges:ScenarioCashChange[];
  debtExtras?:DatedAmount[];goalContributions?:ScenarioBudgetChange[];
+ recurringExpenses?:ScenarioExpense[];
 }
 export interface ScenarioOutcome {strategy:PlanningDebtStrategy;firstMonthBuffer:string|null;plans:AssessmentPlans}
 export interface ScenarioComparison {

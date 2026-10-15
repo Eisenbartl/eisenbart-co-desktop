@@ -995,6 +995,43 @@ pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String>
             &chicago_time(&c.created_at)?,
         )?;
         l.text("Original baseline and proposal are preserved in the encrypted scenario record. This selection does not change approved financial facts, live plans or client agreements. The planning section below uses the selected proposal, not the live baseline.",10.0)?;
+        for expense in &c.input.recurring_expenses {
+            l.value(
+                "New proposed recurring expense",
+                &format!(
+                    "{} / {} / {} per {} / estimated",
+                    expense.label,
+                    plan_term(&expense.kind),
+                    optional(&expense.amount),
+                    plan_term(&expense.frequency)
+                ),
+            )?;
+            if let Some(dates) = &expense.dated {
+                let account = c
+                    .proposed
+                    .plans
+                    .cashflow
+                    .data
+                    .as_ref()
+                    .and_then(|p| p.accounts.iter().find(|a| a.id == dates.account_id))
+                    .ok_or("The proposed expense account is unavailable.")?;
+                l.value(
+                    "Explicit expense payment dates",
+                    &format!(
+                        "{} / first {} / second day {} / through {}",
+                        account.label,
+                        dates.first_date,
+                        dates
+                            .second_day
+                            .map(|d| d.to_string())
+                            .unwrap_or_else(|| "Not applicable".into()),
+                        dates.until_date.as_deref().unwrap_or("End of forecast")
+                    ),
+                )?;
+            } else {
+                l.value("Expense dated forecast", "Budget only; no dated bill added")?;
+            }
+        }
         for extra in &c.input.debt_extras {
             l.value(
                 "Additional proposed debt payment",

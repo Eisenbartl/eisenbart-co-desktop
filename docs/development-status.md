@@ -1,5 +1,54 @@
 # Development status
 
+## Stage 3I: recurring-expense proposals and explicit dated bills — 0.22.0 source
+
+New necessary/discretionary recurring expenses now recalculate combined budget,
+debt capacity, emergency targets and savings affordability. Optional explicit
+account/first/last/second-day inputs add estimated bills to the proposed dated
+forecast with the same amount/frequency. Existing obligations stay in effect;
+no live plan, approved fact or agreement changes. Saved scenarios and selected
+reports retain classifications, payment bindings, canonical inputs and outcomes.
+Earlier empty-extension records/warnings remain compatible; schema 16 is unchanged.
+See [combined-scenario-comparisons.md](combined-scenario-comparisons.md) for scope,
+exact examples, calendar limits and monthly versus dated forecast assumptions.
+
+The integrated native example retains earlier extra-payment/goal controls and
+adds 75.00 child care: buffer 833.34 → 758.34, emergency target 5,124.99 with
+December 2027 completion. Explicitly scheduling the November bill changes closing
+3,300.00 → 3,225.00; debt interest stays 12.20, goal completion December 2026 and
+approved operating activity separately 1,820.02. Budget-only additions preserve
+dated closing. A separate weekly 12.01 example verifies monthly 52.04 versus four
+actual payments totaling 48.04. Unknowns, zero, deficits, limits and out-of-period
+schedules remain explicit. Annual expenses are budget-only.
+
+| Check | Result |
+|---|---|
+| Locked setup | Passed; existing environment configuration/dependencies reused |
+| Focused backend | Three new comparison checks and one saved-record/PDF/recovery check passed |
+| Focused interface | 14 comparison/control tests passed, including three new expense checks |
+| Production frontend / complete interface suite | Passed build and 113 tests |
+| Complete Linux backend / PDF workers | Passed: 157 library + 2 PDF-process tests (159 total) |
+| Formatting / Clippy, warnings denied | Passed |
+| Standalone native build / complete workflow | Standalone debug build passed; complete workflow running |
+| Windows source CI | Validation in progress; installer not requested |
+| Clean Windows installation/offline release acceptance | Not run |
+
+The existing integrated native proposal/report workflow is extended rather than
+creating another parallel report workflow. Prior extra/goal assertions run before
+the expense is added; older proposals and client reports remain separate. Full
+regression checks still follow repository requirements. Feature details are
+consolidated in the existing combined-scenario document.
+
+Validation logs use `/workspace/shared/recurring-expense-*.log`; native artifacts
+will be in `desktop-smoke-recurring-expenses`. The original extra/goal warning
+was separately checked byte for byte against the prior source for proposals
+without new dated expenses. Final results and checkpoint details follow validation.
+
+Next priority: **temporary income-reduction scenarios** with explicit period scope,
+then remaining financial-model/report requirements. Seven major roadmap areas
+remain; this checkpoint does not complete the master specification or commercial
+release acceptance. No new installer is created during feature work.
+
 ## Stage 3H: extra debt payments and savings-goal proposal controls — 0.21.0 source
 
 Combined proposals now support additive dated debt extras and explicit monthly

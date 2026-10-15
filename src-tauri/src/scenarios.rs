@@ -29,6 +29,23 @@ pub struct GoalContributionChange {
 }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExpenseDates {
+    pub account_id: String,
+    pub first_date: String,
+    pub second_day: Option<u32>,
+    pub until_date: Option<String>,
+}
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RecurringExpense {
+    pub label: String,
+    pub kind: budget::Kind,
+    pub amount: Option<String>,
+    pub frequency: budget::Frequency,
+    pub dated: Option<ExpenseDates>,
+}
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Input {
     pub expected_revisions: planning::Revisions,
     pub label: String,
@@ -44,6 +61,8 @@ pub struct Input {
     pub debt_extras: Vec<debt::DatedAmount>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub goal_contributions: Vec<GoalContributionChange>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recurring_expenses: Vec<RecurringExpense>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -86,6 +105,9 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
     if input.debt_extras.len() > 24 || input.goal_contributions.len() > 50 {
         return Err("Use at most 24 extra payments and 50 goal contribution changes.".into());
     }
+    if input.recurring_expenses.len() > 20 {
+        return Err("Use at most 20 new recurring expenses per proposal.".into());
+    }
     input.label = input.label.trim().into();
     input.assumptions = input.assumptions.trim().into();
     // Validate the original identity, revision, canonical calculations and shared contexts.
@@ -116,11 +138,33 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         line.amount = change.amount.clone();
         line.estimated = true;
     }
+    let original_budget_count = proposed.budget.lines.len();
+    for expense in &input.recurring_expenses {
+        if !matches!(
+            expense.kind,
+            budget::Kind::Necessary | budget::Kind::Discretionary
+        ) || expense.frequency == budget::Frequency::Irregular
+        {
+            return Err("New recurring expenses must be necessary or discretionary spending with a regular frequency.".into());
+        }
+        proposed.budget.lines.push(budget::BudgetLine {
+            label: expense.label.clone(),
+            kind: expense.kind,
+            amount: expense.amount.clone(),
+            frequency: expense.frequency,
+            estimated: true,
+        });
+    }
     let (lines, summary) = budget::calculate(proposed.budget.lines)?;
     proposed.budget.lines = lines;
     proposed.budget.summary = summary;
     for change in &mut input.budget_changes {
         change.amount = proposed.budget.lines[change.index].amount.clone();
+    }
+    for (index, expense) in input.recurring_expenses.iter_mut().enumerate() {
+        let line = &proposed.budget.lines[original_budget_count + index];
+        expense.label = line.label.clone();
+        expense.amount = line.amount.clone();
     }
     if let Some(change) = &input.debt_payment {
         proposed
@@ -213,6 +257,35 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         row.first_date = change.first_date.clone();
         row.certainty = cashflow::Certainty::Estimated;
     }
+    for expense in &input.recurring_expenses {
+        if let Some(dates) = &expense.dated {
+            let frequency = match expense.frequency {
+                budget::Frequency::Weekly => cashflow::Frequency::Weekly,
+                budget::Frequency::Biweekly => cashflow::Frequency::Biweekly,
+                budget::Frequency::Semimonthly => cashflow::Frequency::Semimonthly,
+                budget::Frequency::Monthly => cashflow::Frequency::Monthly,
+                _ => return Err("Annual expenses support budget estimates only; remove their dated forecast selection.".into()),
+            };
+            proposed
+                .cashflow
+                .data
+                .as_mut()
+                .ok_or("Save a cash-flow plan before adding an explicitly dated expense.")?
+                .schedules
+                .push(cashflow::Schedule {
+                    label: expense.label.clone(),
+                    account_id: dates.account_id.clone(),
+                    destination_id: None,
+                    kind: cashflow::Kind::Bill,
+                    amount: expense.amount.clone(),
+                    first_date: dates.first_date.clone(),
+                    frequency,
+                    second_day: dates.second_day,
+                    until_date: dates.until_date.clone(),
+                    certainty: cashflow::Certainty::Estimated,
+                });
+        }
+    }
     proposed.cashflow.context = planning::cashflow_context(&proposed.savings);
     if let Some(data) = proposed.cashflow.data.take() {
         let (data, summary) = cashflow::calculate(data)?;
@@ -242,7 +315,31 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         "Debt uses supported fixed monthly terms; savings assumes no investment yield. Unknown or unsupported terms remain unavailable; no outcome is guaranteed or automatically recommended.".into(),
     ];
     if !input.debt_extras.is_empty() || !input.goal_contributions.is_empty() {
-        warnings.push("Proposed extra payments are added to the shared repayment budget and follow the selected strategy, not a named account, with one extra per month and at most 24 in total. Only explicitly changed goal contributions are replaced; targets, reserves, future base payment changes and other goals remain in effect. Extras reserve funding even if repayment finishes early. Funding sources are not verified and dated cash-flow schedules are unchanged.".into());
+        let prefix = "Proposed extra payments are added to the shared repayment budget and follow the selected strategy, not a named account, with one extra per month and at most 24 in total. Only explicitly changed goal contributions are replaced; targets, reserves, future base payment changes and other goals remain in effect. Extras reserve funding even if repayment finishes early. Funding sources are not verified";
+        let ending = if input.recurring_expenses.iter().any(|e| e.dated.is_some()) {
+            "; only explicitly dated new expenses add cash-flow bills."
+        } else {
+            " and dated cash-flow schedules are unchanged."
+        };
+        warnings.push(format!("{prefix}{ending}"));
+    }
+    if !input.recurring_expenses.is_empty() {
+        warnings.push("New recurring expenses are estimated additions, not replacements for existing bills. Monthly budget normalization applies throughout the model; first/last payment dates limit only the explicitly selected dated forecast, not the budget, debt capacity or emergency target. Check for duplicate obligations. Annual amounts are budget-only. Missing amounts stay unknown; dated payments use the same entered amount/frequency and only counselor-selected accounts/dates. No live plan or approved transaction is created.".into());
+        let start = baseline
+            .cashflow
+            .data
+            .as_ref()
+            .map_or(0, |d| d.schedules.len());
+        let count = input
+            .recurring_expenses
+            .iter()
+            .filter(|e| e.dated.is_some())
+            .count();
+        if proposed.cashflow.summary.as_ref().is_some_and(|s| {
+            (start..start + count).any(|index| s.ledger.iter().all(|e| e.schedule_index != index))
+        }) {
+            warnings.push("At least one new expense has no dated occurrence within the saved forecast period. Its monthly budget assumption still applies; review payment dates and the forecast horizon.".into());
+        }
     }
     Ok(Comparison {
         calculator: "combined-preview-v1".into(),

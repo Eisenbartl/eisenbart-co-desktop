@@ -58,6 +58,118 @@ fn json<T: Serialize>(v: &T) -> serde_json::Value {
     serde_json::to_value(v).unwrap()
 }
 #[test]
+fn recurring_expense_scenarios_preserve_legacy_bytes_report_dates_and_recovery_provenance() {
+    use super::super::scenario_tests::{expense, expense_dates};
+    let (root, mut w, id) = fixture();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let legacy = save(&mut w, &id);
+    let legacy_bytes = serde_json::to_vec(&legacy.payload).unwrap();
+    assert!(json(&legacy.payload)["comparison"]["input"]
+        .get("recurringExpenses")
+        .is_none());
+    let decoded: Payload = serde_json::from_slice(&legacy_bytes).unwrap();
+    saved_scenarios::validate(&decoded, &id).unwrap();
+    assert_eq!(serde_json::to_vec(&decoded).unwrap(), legacy_bytes);
+    let mut proposal = input();
+    proposal.label = "Recurring care expense".into();
+    let mut e = expense();
+    e.dated = Some(expense_dates());
+    proposal.recurring_expenses.push(e);
+    let record = w
+        .save_client_scenario(
+            &id,
+            Input {
+                expected_count: 1,
+                proposal,
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        record
+            .payload
+            .comparison
+            .proposed
+            .first_month_buffer
+            .as_deref(),
+        Some("1625.00")
+    );
+    let i = report(&mut w, &id, &record);
+    let a = w.save_assessment_record(&id, i).unwrap();
+    assert_eq!(a.payload.assessment.operating_cashflow, "0.00");
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    let out = tempfile::tempdir().unwrap();
+    let pdf = w
+        .export_assessment_pdf(
+            &id,
+            &a.payload.id,
+            out.path().join("expense.pdf").to_str().unwrap(),
+        )
+        .unwrap();
+    let d = lopdf::Document::load(pdf.path).unwrap();
+    let text = d
+        .extract_text(&d.get_pages().keys().copied().collect::<Vec<_>>())
+        .unwrap()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    for value in ["New proposed recurring expense: Proposed care / Necessary / USD 75.00 per Monthly / estimated", "Synthetic checking / first 2026-11-15", "Baseline USD 1700.00 / proposed USD 1625.00", "Baseline USD 3300.00 / proposed USD 3225.00"]{
+        assert!(text.contains(value),"Missing {value}");
+    }
+    for part in ["amount", "account", "date", "outcome"] {
+        let mut forged = json(&record.payload);
+        let e = &mut forged["comparison"]["input"]["recurringExpenses"][0];
+        match part {
+            "amount" => e["amount"] = "76.00".into(),
+            "account" => e["dated"]["accountId"] = "foreign".into(),
+            "date" => e["dated"]["firstDate"] = "2026-11-16".into(),
+            _ => forged["comparison"]["proposed"]["firstMonthBuffer"] = "9999.99".into(),
+        }
+        let forged: Payload = serde_json::from_value(forged).unwrap();
+        assert!(saved_scenarios::validate(&forged, &id).is_err());
+    }
+    let mut budget = budget_input(1);
+    budget.lines = w.get_client_budget(&id).unwrap().lines;
+    budget.lines[0].amount = Some("1600".into());
+    w.save_client_budget(&id, budget).unwrap();
+    assert!(
+        w.get_client_scenario(&id, &record.payload.id)
+            .unwrap()
+            .needs_review
+    );
+    let backup = w
+        .create_backup(out.path().to_string_lossy().into(), PASSWORD.into())
+        .unwrap();
+    w.lock_workspace();
+    let mut reopened = Workspace::new(root.path().into());
+    reopened.unlock_workspace(PASSWORD.into()).unwrap();
+    assert_eq!(
+        reopened
+            .get_assessment_record(&id, &a.payload.id)
+            .unwrap()
+            .digest,
+        a.digest
+    );
+    reopened.lock_workspace();
+    let review = reopened
+        .prepare_restore(backup.path, PASSWORD.into())
+        .unwrap();
+    reopened
+        .confirm_restore(review.token, "RESTORE".into())
+        .unwrap();
+    reopened.unlock_workspace(PASSWORD.into()).unwrap();
+    for original in [&legacy, &record] {
+        let restored = reopened
+            .get_client_scenario(&id, &original.payload.id)
+            .unwrap();
+        assert_eq!(restored.digest, original.digest);
+        assert_eq!(json(&restored.payload), json(&original.payload));
+        assert!(restored.needs_review);
+    }
+    let restored = reopened.get_assessment_record(&id, &a.payload.id).unwrap();
+    assert_eq!(restored.scenario.unwrap().digest, record.digest);
+    assert!(restored.needs_review);
+}
+#[test]
 fn extended_and_legacy_scenarios_keep_canonical_history_reports_and_encrypted_recovery() {
     let (root, mut w, id) = fixture();
     let legacy = save(&mut w, &id);

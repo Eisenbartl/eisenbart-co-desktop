@@ -1,12 +1,13 @@
-# Combined scenario comparisons — 0.19.0
+# Combined financial scenarios — 0.22.0
 
-The client panel can compare an authenticated saved budget/debt/savings/cash-flow
-baseline with one temporary proposal. Load the baseline explicitly, enter a label
-and assumptions, then compare. This is an offline read-only preview. Inputs and
-outcomes are not saved; leaving the client, locking, restarting, editing a live
-plan or reloading the baseline clears temporary context. No plan, source decision,
-audit entry, counselor assessment or client agreement is created or changed.
-Persistent scenario selection and report capture are the next checkpoint.
+The client panel compares authenticated saved budget/debt/savings/cash-flow
+models with hypothetical proposed inputs. Temporary comparisons are read-only;
+leaving the client, locking, restarting, editing a live plan or reloading the
+baseline clears their inputs/results. Explicitly saving a reviewed proposal
+creates an immutable scenario, with original assumptions and both model sets.
+Selecting it in a counselor report captures the proposed models and original
+comparison for offline PDF export. Later baseline revisions flag history without
+rewriting it. See [saved-combined-scenarios.md](saved-combined-scenarios.md).
 
 ## Supported proposal inputs
 
@@ -15,8 +16,12 @@ Persistent scenario selection and report capture are the next checkpoint.
   and expense/allocation changes. Changed lines are estimates.
 - Independently selected baseline/proposed snowball or avalanche references, or
   no debt projection; a change to the debt model's base monthly payment.
-- A change to the primary emergency-savings monthly contribution. Saved goal
-  contributions, targets and reserved funds stay in effect.
+- A change to the primary emergency-savings or an existing goal’s monthly
+  contribution. Goal targets, dates and reserved funds stay in effect.
+- Additive dated extras to the shared debt repayment budget; existing debt
+  events remain effective. See [scenario-payment-goal-controls.md](scenario-payment-goal-controls.md).
+- New recurring necessary/discretionary expenses, optionally including explicitly
+  selected estimated bill schedules in the proposed cash-flow model.
 - Explicit amount/first-date changes to existing dated cash-flow schedules.
   Account bindings, frequency, second payday, end dates and forecast period stay
   in effect. Changed entries are estimates; paired transfers remain paired.
@@ -79,13 +84,49 @@ A separate retained-commitment check keeps a November extra of 50.00 and a Decem
 payment change of 2,000.00: a proposed 200.00 base payment reserves 250.00 in
 November and 2,000.00 in December; the later deficit stays visible.
 
-## Limits of this checkpoint
+## New recurring expenses
 
-This does not save named alternative scenarios, select them for reports or client
-agreements, add/remove budget lines, create extra-loan entries, change goal
-contributions, implement temporary date-range income shocks, automatically
-recommend an allocation, model daily/variable/promotional debt, infer missing
-statement coverage or establish a commercial release. Future controls and saved
-records must preserve the same separation and provenance. No migration, new
-dependency or installer is introduced. See [development-status.md](development-status.md)
-for the checks actually completed.
+Each expense has a name, necessary/discretionary purpose, optional known amount
+and weekly/biweekly/semimonthly/monthly/annual frequency. Up to 20 additions are
+supported, within the existing 100-line budget limit. Rust marks them estimated,
+normalizes each line half-up to cents and recalculates debt capacity, emergency
+targets and savings affordability. Blank means unknown; zero is known zero.
+
+Optional dated details require a saved cash-flow model, an explicitly selected
+owned account and real first date. An optional last date and semimonthly second
+day use the existing calendar rules; the same amount/frequency supplies an
+estimated Bill, with no invented transfer or balance change. Annual expenses are
+budget-only because annual calendar recurrence is not implemented. Existing and
+new schedules together retain the 100-schedule limit. A selected new schedule
+with no occurrence in the forecast adds a visible warning.
+
+Payment dates bound only the dated forecast. The normalized recurring budget
+assumption applies throughout the other models, including emergency targets.
+These are additions: existing bills remain effective, and counselors must check
+for duplicate obligations. No live plan or approved transaction is written.
+The optional `recurringExpenses` array defaults empty and is omitted when empty;
+schema 16 and existing calculator/payload formats stay unchanged. Earlier captured
+input order and warnings stay unchanged without new expenses. Reads/recovery
+validate new expense assumptions and generated bills against the original capture.
+
+Independent example: 12.01 weekly normalizes to 52.04 monthly, while four November
+payments total 48.04. Necessary spending 1,000.00 becomes 1,052.04; a three-month
+emergency target becomes 3,156.12; a 1,700.00 buffer becomes 1,647.96. A separately
+entered dated closing of 3,300.00 becomes 3,251.96 only when those bills are
+explicitly selected. Unaffected accounts remain independently known.
+
+The integrated native proposal also retains the earlier income, debt extra and
+goal controls. Adding 75.00 monthly necessary spending changes its 833.34 buffer
+to 758.34, emergency target to 5,124.99 and completion to December 31, 2027. An
+explicit November 15 bill changes dated closing to 3,225.00. Debt interest stays
+12.20 and goal completion December 31, 2026. Approved operating activity remains
+separately 1,820.02. Saved reports name the new expense, classification, frequency,
+account and date assumptions; the same facts survive restart and both recovery
+paths. [Development status](development-status.md) records actual checks.
+
+## Remaining scope
+
+Temporary date-range income shocks, new-goal proposals, account-targeted extra
+payments, daily/variable/promotional debt terms and broader original reporting
+requirements remain open. This is a development build. No new dependency,
+migration or installer is introduced in this checkpoint.
