@@ -1808,7 +1808,15 @@ def check_card_final_approval(driver: WebDriver, artifacts: Path, data_root: Pat
     def financial(area: str, select_client: bool = False) -> None:
         driver.click("nav[aria-label='Main navigation'] button[aria-label='Financial Review']")
         if select_client:driver.select('#workspace-client','Jamie Complete')
+        driver.interactive('#workspace-client')
+        # Client selection mounts the current section and loads its data before
+        # navigation is permitted. Wait for its actual controls, not just the
+        # always-visible tab button; never replay a possibly ignored click.
+        current=driver.observe_script("return document.querySelector('.section-navigation button[aria-current=page]')?.textContent")
+        control={'Working tools':'#assessment-from','Card completeness':'#card-facts-from','Bank & card activity':'#card-link-action'}.get(current)
+        if control:driver.interactive(control)
         driver.click_button(area)
+        driver.wait(lambda:driver.observe_script("return document.querySelector('.section-navigation button[aria-current=page]')?.textContent") == area,'selected financial review section')
     financial('Working tools',True)
     driver.click('.financial-facts-editor > summary');driver.interactive('#facts-as-of')
     index=driver.observe_script("return Array.from(document.querySelectorAll('input[id^=fact-balance-label-]')).findIndex(e=>e.value==='Fictional mapped card debt')")
@@ -1852,6 +1860,10 @@ def check_card_final_approval(driver: WebDriver, artifacts: Path, data_root: Pat
     driver.click('#record-ack');driver.click_button('Save assessment record');driver.wait_text('.saved-assessments > .success-message','Assessment record saved','complete format-nine candidate saved')
     driver.wait(lambda:driver.observe_script("const s=document.querySelector('#saved-assessment');return s?.value&&s.selectedOptions[0]?.textContent.startsWith('Fictional approved bank/card assessment')?s.value:false;"),'new final parent selected after directory refresh')
     def open_approval() -> None:
+        driver.interactive('#workspace-client')
+        driver.interactive('.saved-assessments > summary')
+        if not driver.observe_script("return document.querySelector('.saved-assessments').open"):driver.click('.saved-assessments > summary')
+        driver.interactive('#saved-assessment')
         driver.click_button('Final report checklist');driver.interactive('#checklist-report')
         choice=driver.observe_script("return Array.from(document.querySelector('#checklist-report').options).find(o=>o.textContent.startsWith('Fictional approved bank/card assessment'))?.textContent")
         if not choice:raise SmokeFailure('Card final parent is missing')
