@@ -23,13 +23,13 @@ Rust-backed data. Do not add another persistence layer or copy the calculators.
 | Clients | Directory/search/filter, create/edit/status/archive; Profile, Intake & follow-ups, Session notes, History & records, Complete record (`App.tsx`, `ClientCare.tsx`) |
 | Financial Review | Approved-data dashboard, explicit financial facts, running-balance checks, recurring-payment review and live completeness diagnostics and versioned reviews (`ImportsEditor.tsx`, `CompletenessReview.tsx`, `SavedCoverageReviews.tsx`) |
 | Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers (`ImportsEditor.tsx` transactions page) |
-| Documents | CSV/selectable-text PDF import, statement account management, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`, `StatementAccounts.tsx`) |
+| Documents | Bank CSV/selectable-text PDF import, separate signed-card CSV review, statement account management, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`, `StatementAccounts.tsx`) |
 | Budget Planner | Saved income/expenses/allocations, remove/edit rows, optional budget method comparisons (`BudgetEditor.tsx`) |
 | Debt Planner | Saved debts, payment changes/extras and monthly snowball/avalanche projections (`DebtEditor.tsx`) |
 | Savings Planner | Saved reserves, emergency targets, sinking-fund goals and contribution comparisons (`SavingsEditor.tsx`) |
 | Cash-Flow Calendar | Saved account balances, dated schedules/transfers, calendar/ledger and non-writing previews (`CashflowEditor.tsx`) |
 | Financial Scenarios | Temporary comparisons, explicitly saved scenarios and historical review (`ScenarioComparisons.tsx`) |
-| Reports | Immutable internal assessments, selected intake/evidence/scenarios, client action plans, PDF exports and captured-source final-report checklists (`AssessmentRecords.tsx`, `ClientActionPlans.tsx`, `CompletenessReview.tsx`) |
+| Reports | Immutable internal assessments, selected intake/evidence/scenarios, client action plans, PDF exports, captured-source final-report checklists and audited counselor approval (`AssessmentRecords.tsx`, `ClientActionPlans.tsx`, `CompletenessReview.tsx`) |
 | Settings and Administration | Workspace identity, security/lock, encrypted backup, lock-to-restore route, help; working firm/report branding and named future roles/data/licensing pages (`AdministrationPages.tsx`) |
 
 Client pages require a selected client and display that context. Switching a

@@ -92,12 +92,14 @@ activated through recovery. No financial calculations use JavaScript or binary
 floating point. No dependencies, network services or installer were added.
 
 Next priority: integrate card spending/liability evidence and explicitly linked
-bank repayments into financial review and versioned report snapshots. Define the
-cash-versus-spending views first, verify independent combined examples, retain
-legacy report bytes, and require complete evidence before a new final policy can
-approve card-inclusive reports. Do not remove the conservative bank-report block
-until that acceptance passes. Card PDF extraction and true card-account identity,
-renaming/archive and planning mappings follow as separate bounded work.
+bank repayments into financial review and versioned report snapshots. Introduce
+durable, reviewed card-account links before aggregating successive statements.
+Define the cash-versus-spending views, verify independent combined examples,
+retain legacy report bytes, and require complete evidence before a new final
+policy can approve card-inclusive reports. Do not remove the conservative
+bank-report block until that acceptance passes. Card PDF extraction and full
+card-account renaming/archive and planning mappings follow as separate bounded
+work.
 
 Verification covers exact amounts and signs, mandatory decisions, source mapping,
 unknown/date/zero/limit failures, scope, stale revisions, duplicate files, atomic

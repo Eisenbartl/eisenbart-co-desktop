@@ -10,7 +10,7 @@ flags bank-based reports and blocks v1 final approval until integrated card
 reporting is implemented, preserving old payloads/digests. See
 [credit-card-review.md](credit-card-review.md) for workflow, bounds and rules.
 
-Validation in progress, 2026-10-15 (America/Chicago):
+Validated 2026-10-15 (America/Chicago):
 
 | Check | Result |
 |---|---|
@@ -19,8 +19,8 @@ Validation in progress, 2026-10-15 (America/Chicago):
 | Complete Linux backend | Passed 200 library + 2 PDF process tests |
 | Formatting / Clippy | Passed; all targets with warnings denied |
 | Standalone native build | Passed debug/no bundles |
-| Complete native workflow | Pending |
-| Windows source checks | Pending; installer steps must stay skipped |
+| Complete native workflow | Passed, exit 0: all prior workflows plus card mapping/decisions, exact liability/spending/payment totals, correction/rejection history, bank-report guard, restart, encrypted recovery and isolation |
+| Windows source checks | Passed: 186 UI + 201 library + 2 PDF process tests; all five installer/checksum steps skipped |
 | Installer | Not created, per user instruction |
 
 The initial full UI run exposed an existing asynchronous test clicking the payment
@@ -28,6 +28,21 @@ review control while it was disabled during loading. It now waits until enabled,
 retaining every assertion; the full rerun passed. Initial card recovery fixtures
 used an in-workspace backup destination and were corrected to use a separate
 folder, preserving the application's backup safeguard.
+
+Feature commit: `2f955258fa40d2aa2234d0a690f64288cf0ae593`.
+Windows source validation passed in
+[run 38765328851](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38765328851).
+All five focused card/report tests also passed after the final input-revision
+boundary check; Clippy and the standalone build passed afterward. Native card
+reconciliation and restored-history screens were visually inspected.
+
+Native artifacts: `/workspace/shared/desktop-smoke-card-review`; logs:
+`/workspace/shared/card-`. The final native exit file records `0`.
+Clean source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-card-review-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-card-review-source.bundle`, verified
+against the final clean commit and remote main. The final follow-up commit changes
+only documentation and validation records.
 
 This stage supports bounded signed UTF-8 CSV input, not card PDFs or combined
 bank/card reports. The source remains a development build; the downloadable
