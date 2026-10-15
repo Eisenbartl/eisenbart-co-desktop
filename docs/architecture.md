@@ -102,3 +102,13 @@ changes import revisions or approvals. Encrypted restore checks every historical
 version, source binding and retained request ID before activation. React's
 `DocumentCollection` uses existing navigation guards and clears late/private
 responses. See [document-collection.md](document-collection.md).
+
+`storage::statement_accounts_store` separates current workflow names/lifecycle
+from immutable source account identities. Schema 19 stores per-account append-only
+metadata history, compound ownership links, account/audit immutability and atomic
+revision/audit writes. Standalone creation bumps source inventory revision;
+metadata updates leave financial source payloads and revisions untouched. Import
+staging checks archive status transactionally. Recovery validates all metadata
+versions. `StatementAccounts` exposes guarded CRUD/archive and read-only history;
+new-import choices show active current labels. See
+[statement-account-management.md](statement-account-management.md).

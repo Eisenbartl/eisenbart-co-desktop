@@ -257,3 +257,8 @@ history and switches clients to verify isolation. Initial, restart, encrypted
 restore and error-screen recovery repeat receipt, archive, source/history and
 client-isolation assertions. Prior financial/PDF assertions remain enabled.
 Artifacts: `/workspace/shared/desktop-smoke-collection`.
+
+The account-management native workflow adds a standalone account, renames it,
+archives/reactivates it, checks original/current metadata and all four history
+versions, switches to an empty second client, and rechecks persistence after
+restart and both encrypted recovery paths. No new installer is needed.

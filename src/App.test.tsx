@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   lockWorkspace: vi.fn(), workspaceInfo: vi.fn(), listClients: vi.fn(),
   getClient: vi.fn(), saveClient: vi.fn(), addClientNote: vi.fn(), listClientNotes: vi.fn(),
   chooseBackupFolder:vi.fn(), chooseRestoreFile:vi.fn(), createWorkspaceBackup:vi.fn(), prepareWorkspaceRestore:vi.fn(), confirmWorkspaceRestore:vi.fn(), cancelWorkspaceRestore:vi.fn(),
-  chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),getClientImports:vi.fn(),reviewRecurringPayment:vi.fn(),reviewStatementBalances:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn(),
+  chooseClientCsv:vi.fn(),inspectClientCsv:vi.fn(),cancelClientCsv:vi.fn(),getStatementAccounts:vi.fn(),getClientImports:vi.fn(),reviewRecurringPayment:vi.fn(),reviewStatementBalances:vi.fn(),stageClientCsv:vi.fn(),reviewTransaction:vi.fn(),bulkApproveTransactions:vi.fn(),pairTransferTransactions:vi.fn(),
   resetApiSession: vi.fn(), getClientBudget: vi.fn(), saveClientBudget: vi.fn(), getClientDebtPlan: vi.fn(), saveClientDebtPlan: vi.fn(), getClientCashflowPlan: vi.fn(), previewClientCashflowPlan: vi.fn(), saveClientCashflowPlan: vi.fn(),
   listClientScenarios:vi.fn(),getAssessmentPlanning:vi.fn(),compareFinancialScenarios:vi.fn(),
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
@@ -42,6 +42,7 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  mocks.getStatementAccounts.mockImplementation(async(clientId:string)=>({clientId,importRevision:0,accounts:[]}));
   vi.clearAllMocks();
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
   mocks.getDocumentCollection.mockImplementation(async(clientId:string)=>({clientId,revision:0,latestRevision:0,updatedAt:null,reviewDate:'2026-10-14',items:[],history:[],accounts:[],sources:[],missing:0,received:0,archived:0}));
@@ -139,6 +140,22 @@ describe('desktop workspace', () => {
     expect(document.documentElement.outerHTML).not.toContain('Alice private scenario');
     expect(screen.queryByText('Compare combined financial scenarios')).not.toBeInTheDocument();
     expect(mocks.compareFinancialScenarios).not.toHaveBeenCalled();
+  });
+
+  it('guards standalone account drafts across client/page changes and clears private labels on lock',async()=>{
+    render(<App/>);await unlock();
+    fireEvent.click(screen.getByRole('button',{name:'Documents'}));
+    fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});
+    fireEvent.click(screen.getByRole('button',{name:'Statement accounts'}));
+    fireEvent.click(await screen.findByRole('button',{name:'Add statement account'}));
+    fireEvent.change(screen.getByLabelText('Current account name'),{target:{value:'Private Alice account'}});
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:bob.id}});
+    expect(screen.getByLabelText('Client for Documents')).toHaveValue(alice.id);
+    expect(screen.getByLabelText('Current account name')).toHaveValue('Private Alice account');
+    vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByRole('button',{name:'Collection checklist'}));
+    expect(screen.getByLabelText('Current account name')).toHaveValue('Private Alice account');
+    await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private Alice account');
   });
 
   it('guards unsaved CSV selection and clears private source paths on lock',async()=>{

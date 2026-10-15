@@ -398,7 +398,7 @@ mod tests {
         let a = w.save_client(client_input()).unwrap();
         {
             let s = w.session().unwrap();
-            s.connection.execute_batch("DROP TABLE document_collection_snapshots; PRAGMA user_version=17; CREATE TABLE document_collection_snapshots(blocked TEXT);").unwrap();
+            s.connection.execute_batch("DROP TABLE statement_account_history; DROP TRIGGER statement_accounts_no_update; DROP TRIGGER statement_accounts_no_delete; DROP TABLE document_collection_snapshots; PRAGMA user_version=17; CREATE TABLE document_collection_snapshots(blocked TEXT);").unwrap();
             assert!(migrate(&mut s.connection, false).is_err());
             assert_eq!(
                 s.connection
@@ -414,7 +414,7 @@ mod tests {
                 s.connection
                     .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
                     .unwrap(),
-                18
+                SCHEMA_VERSION
             );
         }
         let mut i = item();

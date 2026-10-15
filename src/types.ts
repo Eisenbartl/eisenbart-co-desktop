@@ -351,3 +351,8 @@ export interface DocumentCollection {
  accounts:{id:string;label:string;kind:string}[];sources:{id:string;accountId:string;fileName:string}[];
  missing:number;received:number;archived:number;
 }
+
+export interface StatementAccountVersion {revision:number;label:string;archived:boolean;updatedAt:string}
+export interface ManagedStatementAccount {id:string;label:string;originalLabel:string;kind:'checking'|'savings';archived:boolean;revision:number;sourceCount:number;history:StatementAccountVersion[]}
+export interface StatementAccountsDirectory {clientId:string;importRevision:number;accounts:ManagedStatementAccount[]}
+export interface StatementAccountInput {id:string|null;expectedRevision:number;expectedImportRevision:number;label:string;kind:'checking'|'savings';archived:boolean}

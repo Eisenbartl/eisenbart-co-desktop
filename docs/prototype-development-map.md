@@ -23,7 +23,7 @@ Rust-backed data. Do not add another persistence layer or copy the calculators.
 | Clients | Directory/search/filter, create/edit/status/archive; Profile, Intake & follow-ups, Session notes, History & records, Complete record (`App.tsx`, `ClientCare.tsx`) |
 | Financial Review | Approved-data dashboard, explicit financial facts, running-balance checks and recurring-payment review (`ImportsEditor.tsx` review page) |
 | Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers (`ImportsEditor.tsx` transactions page) |
-| Documents | CSV/selectable-text PDF import, statement account inventory, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`) |
+| Documents | CSV/selectable-text PDF import, statement account management, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`, `StatementAccounts.tsx`) |
 | Budget Planner | Saved income/expenses/allocations, remove/edit rows, optional budget method comparisons (`BudgetEditor.tsx`) |
 | Debt Planner | Saved debts, payment changes/extras and monthly snowball/avalanche projections (`DebtEditor.tsx`) |
 | Savings Planner | Saved reserves, emergency targets, sinking-fund goals and contribution comparisons (`SavingsEditor.tsx`) |
@@ -49,7 +49,7 @@ No workspace or confidential data is stored in browser local storage or a URL.
 | Intake and follow-ups | Save/edit optional intake and task/appointment versions; complete/cancel outcomes | Remove unsaved tasks only; saved tasks stay in history and can be cancelled |
 | Session notes | Append authored dated notes and read history | Silent edit/delete not offered; reviewed amendments and a combined activity view remain future work |
 | Budget/debt/savings/cash-flow inputs | Save/reload/edit and remove current plan rows or goals | Removal changes the current saved plan; previously recorded report/scenario snapshots remain historical |
-| Statement accounts | Created during statement import; inventory and filters available | Standalone account metadata CRUD/archive remains future work |
+| Statement accounts | Standalone creation, current-name edits, archive/reactivate and change history; immutable original source identity | Other account types/institution metadata and planning-account mappings remain future work |
 | Documents / collection | Inspect/import sources and read provenance; create/edit requests, mark receipt and view versions | Cancel unsaved previews/requests; archive/reactivate saved requests. Saved source replacement/deletion is not implemented |
 | Transactions | Import, inspect, correct fields and change review decisions | Reject/reverse with retained decision history; no silent destruction of source evidence |
 | Scenarios/reports/client plans | Explicitly record, reopen and export immutable snapshots | Retained history; amend by recording a new reviewed version, not editing old financial claims |
@@ -84,7 +84,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Reports → Final report checklist | `assessments.rs`, `assessments_store.rs`, report UI | Client/period/calculator/source decisions/account assignments/completeness/scenario gates; original snapshot and review flags retained |
 | Reports → Print & presentation | `assessment_pdf.rs`, branding snapshots and native printing | Embedded/offline assets, exact totals, private internal evidence excluded from client plans, page margins and Windows print acceptance |
 | Clients → History & records | Add bounded cross-module timeline and reviewed note amendments beside note storage | Authorship, original notes retained, reason/audit, scope/pagination, stale edits, restart and encrypted recovery |
-| Documents → Statement accounts (working inventory; future CRUD) | Existing statement-account ownership and source references in `imports_store` | Create/edit/archive metadata without breaking historical sources, wrong-client and dependency safeguards; no deletion of referenced facts |
+| Documents → Statement accounts (working) | `StatementAccounts.tsx`, `statement_accounts_store`, schema 19 | Scoped standalone create/rename/archive/reactivate, revision/audit/recovery checks; original source/report associations preserved; no destructive deletion |
 | Settings → Branding | Versioned organization contact/logo store and immutable report captures | Validated bounded local logo/contact fields, atomic scoped save, source identity captured on record, old report bytes and restore preserved |
 | Settings → Counselors & roles | Auth/session/storage ownership and role model before UI CRUD | Explicit account lifecycle and permissions for reads/writes/approvals/reports/admin, fail-closed access, isolation and recovery drills |
 | Settings → Security | Existing password/key/session model | Password rekey/rollback/recovery, inactivity settings, no password disclosure and independent security acceptance |
@@ -100,10 +100,9 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **standalone statement-account metadata/lifecycle CRUD** next: create,
-read, rename and archive/reactivate accounts, with scoped ownership, version
-checks, audit and recovery. Preserve original source/report associations and
-block destructive deletion of referenced evidence. Then continue report/firm
-branding and the other named future areas. Consult this map, [remaining
-requirements](remaining-requirements.md) and the original spec before selecting
-the following stage; update this map after each working commit.
+Implement **firm/report branding** next: authenticated organization display-name
+editing and explicit saved report branding, preserving original report formats,
+bytes and provenance. Keep commercial licensing and multi-counselor permissions
+planned until their own implementation and verification. Account institution
+metadata, additional account/document types and planning mappings are recorded in
+[statement-account-management.md](statement-account-management.md).

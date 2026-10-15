@@ -22,6 +22,8 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getStatementAccounts:(clientId:string)=>command<import('./types').StatementAccountsDirectory>('get_statement_accounts',{clientId}),
+  saveStatementAccount:(clientId:string,input:import('./types').StatementAccountInput)=>command<import('./types').StatementAccountsDirectory>('save_statement_account',{clientId,input}),
   getDocumentCollection:(clientId:string,revision:number|null=null)=>command<import('./types').DocumentCollection>('get_document_collection',{clientId,revision}),
   saveDocumentCollection:(clientId:string,input:{expectedRevision:number;items:import('./types').DocumentRequest[]})=>command<import('./types').DocumentCollection>('save_document_collection',{clientId,input}),
   getAssessmentIntake:(clientId:string)=>command<import('./types').ReportIntakePreview>('get_assessment_intake',{clientId}),

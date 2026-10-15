@@ -587,6 +587,21 @@ fn get_assessment_intake(
 }
 
 #[tauri::command]
+fn get_statement_accounts(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<storage::statement_accounts_store::Directory, String> {
+    access(&state, |w| w.get_statement_accounts(&client_id))
+}
+#[tauri::command]
+fn save_statement_account(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::statement_accounts_store::Input,
+) -> Result<storage::statement_accounts_store::Directory, String> {
+    access(&state, |w| w.save_statement_account(&client_id, input))
+}
+#[tauri::command]
 fn get_document_collection(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -874,6 +889,8 @@ pub fn run() {
             get_client,
             save_client,
             get_client_care,
+            get_statement_accounts,
+            save_statement_account,
             get_document_collection,
             save_document_collection,
             get_follow_up_overview,

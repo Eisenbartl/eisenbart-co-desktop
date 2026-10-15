@@ -1,5 +1,25 @@
 # Development status
 
+## Current stage — statement account management (0.29.0, schema 19)
+
+Implemented standalone checking/savings account creation, current-name editing,
+archive/reactivate, source counts and read-only metadata history in Documents →
+Statement accounts. Rust enforces client/organization/counselor scope, stale-write
+checks, canonical/unique names, fixed original types and atomic audit. New imports
+exclude archived accounts and staging rechecks status transactionally. Original
+source identity, collection links, financial totals and saved report bytes remain
+unchanged by metadata edits. Encrypted recovery validates every metadata version.
+See [statement-account-management.md](statement-account-management.md).
+
+Validation is in progress; final counts/native/Windows results will be recorded
+when complete. No installer was requested or created for this stage. The latest
+previous installer remains 0.23.0; source 0.29.0 is a development build.
+
+Next priority: firm/report branding with preserved historical report payloads.
+Remaining specification work is tracked in
+[prototype-development-map.md](prototype-development-map.md).
+
+
 ## Document collection checklist — 0.28.0 source
 
 Documents → Collection checklist now supports saved create/read/edit requests,

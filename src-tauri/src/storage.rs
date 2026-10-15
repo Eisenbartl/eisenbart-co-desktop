@@ -16,6 +16,8 @@ pub mod imports_store;
 pub mod report_intake_store;
 #[path = "scenarios_store.rs"]
 pub mod scenarios_store;
+#[path = "statement_accounts_store.rs"]
+pub mod statement_accounts_store;
 
 use crate::budget::{self, BudgetInput, BudgetLine, ClientBudget};
 use crate::cashflow::{self, ClientCashflowPlan};
@@ -40,7 +42,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 18;
+const SCHEMA_VERSION: i32 = 19;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -1107,6 +1109,12 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
         transaction
             .execute_batch(include_str!("document-collection-schema.sql"))
             .map_err(storage_error)?;
+        version = 18;
+    }
+    if version == 18 {
+        transaction
+            .execute_batch(include_str!("statement-accounts-schema.sql"))
+            .map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;
     integrity_check(connection)
@@ -2132,7 +2140,7 @@ mod tests {
         let count: i64 = connection
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        connection.execute_batch("DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices;
+        connection.execute_batch("DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices;
             DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state;
             CREATE TABLE audit_events_old (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
@@ -2217,7 +2225,7 @@ mod tests {
         let count: i64 = connection
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        connection.execute_batch("DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans;
+        connection.execute_batch("DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans;
             CREATE TABLE audit_events_v5 (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved')),
@@ -2427,7 +2435,7 @@ mod tests {
 
     fn restore_version_four_schema(connection: &Connection) {
         connection.execute_batch(
-            "DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans;
+            "DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans;
              CREATE TABLE audit_events_v4 (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved')),
@@ -2656,7 +2664,7 @@ mod tests {
 
     fn restore_version_three_schema(connection: &Connection) {
         connection.execute_batch(
-            "DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans;
+            "DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans;
              CREATE TABLE audit_events_v3 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added', 'budget_saved')),
@@ -2843,7 +2851,7 @@ mod tests {
     fn restore_version_two_schema(connection: &Connection) {
         // Recreate the actual old audit constraint, not just its version number.
         connection.execute_batch(
-            "DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets;
+            "DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets;
              CREATE TABLE audit_events_v2 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added')),
@@ -2976,7 +2984,7 @@ mod tests {
             .unwrap()
             .connection
             .execute_batch(
-                "DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
+                "DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
             )
             .unwrap();
         workspace.lock_workspace();
