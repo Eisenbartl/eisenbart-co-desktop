@@ -1197,8 +1197,13 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.click_button("Save assessment record")
     driver.wait_text(".saved-assessment-view h3","Alex saved planning scenario","saved scenario-backed assessment")
     driver.wait_text(".saved-assessment-status","Recorded context matches","new captured scenario context")
+    # The report status can render before its post-save directory refresh has
+    # finished. That refresh temporarily protects the adjacent intake editor.
+    driver.interactive("#saved-assessment")
     if driver.command("GET", f"/element/{driver.element('.client-care')}/property/open") is not True:
         driver.click(".client-care > summary")
+    driver.click("#intake-address")
+    driver.wait(lambda:driver.observe_script("return document.activeElement?.id==='intake-address'"),"native intake field focused after report refresh")
     driver.fill("#intake-address", "Later omitted fictional address")
     driver.fill("#follow-notes-0", "Unrelated fictional appointment outcome")
     driver.wait_value("#intake-address", "Later omitted fictional address", "omitted address replacement")
