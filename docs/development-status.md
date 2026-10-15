@@ -11,12 +11,45 @@ Financial calculations are unchanged. Schema 17/dependencies are unchanged;
 format 5 adds intake while preserving absent-field legacy serialization.
 See [report-intake-context.md](report-intake-context.md).
 
-Validation in progress: locked setup, three focused backend checks, production
-frontend build and all 132 interface tests passed (including 19 report tests).
-Formatting and warnings-denied Clippy passed. Initial fixture compilation, PDF
-whitespace assertions and a test initializer lint were corrected without removing
-behavior checks. Full backend, native workflow and Windows source checks will be
-recorded after completion. No installer is being created, per user instruction.
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing setup/dependencies reused |
+| Focused backend / report interface | Three backend and 19 report interface tests passed |
+| Production frontend / full interface suite | Build and all 132 tests passed |
+| Complete backend | 172 library + 2 PDF process tests passed |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone desktop build | Passed, debug with no bundles |
+| Integrated native workflow | Passed, exit 0: initial save, restart, encrypted restore and storage-error recovery |
+| Windows source checks | Passed: 132 interface + 173 library + 2 PDF process tests; all installer steps skipped |
+| Installer | Not created, per user instruction |
+
+Initial fixture compilation, PDF whitespace assertions and a test initializer
+lint were corrected without removing behavior checks. The PDF assertion now
+normalizes extracted line wrapping while retaining the exact disclosure phrase.
+Logs use `/workspace/shared/intake-report-*.log`; synthetic desktop artifacts
+are in `/workspace/shared/desktop-smoke-intake-report`. No environment draft or
+dependency changes were required. The new native intake selection, ignored
+unselected-address/outcome edits, selected employer change/reversion and internal
+versus client PDF checks passed before restart. The rendered internal intake PDF
+page was visually inspected: original selected household/employment, version and
+disclosure are readable within the page margins, above separate approved totals.
+The attempted native intake screenshot captured the neighboring planning section;
+it is not evidence of visual intake layout. DOM/value checks and the PDF checks
+are the behavior evidence. The complete workflow passed (exit 0), including
+selected intake and internal/client PDF assertions before restart and after
+restart, encrypted restore and missing-metadata recovery. Existing financial
+expected values and source-review assertions remained enabled.
+
+[Windows source run 38675974295](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38675974295)
+passed for feature source `4d8b0328d719390d5b4baa7035a63a7c5914b895`.
+Installer build, installation smoke, metadata and artifact uploads were skipped.
+This verifies source checks on Windows; clean installed Windows 11 offline
+acceptance and commercial readiness remain open. This final follow-up commit
+only records validation; application source is the tested feature checkpoint.
+A tracked-source archive and complete Git-history bundle are retained at
+`/workspace/shared/checkpoints/eisenbart-intake-report-source.tar.gz` and
+`eisenbart-intake-report-source.bundle`, verified against final clean/pushed HEAD.
+These are source recovery checkpoints, not client-data backups.
 
 Next priority: organization contact details and branding in saved reports/client
 plans, followed by remaining report/model/document and release requirements.
