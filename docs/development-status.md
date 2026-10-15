@@ -36,8 +36,8 @@ operating activity remains separately 1,820.02 and dated closing 3,300.00.
 | Focused backend checks | Nine comparison and nine saved-record/report/recovery checks passed, including four new tests |
 | Complete Linux backend / worker suite | Passed: 153 library + 2 PDF worker tests (155 total) |
 | Formatting / Clippy, warnings denied | Passed |
-| Native compile / complete workflow | Standalone debug build passed; complete workflow running |
-| Windows source CI | Validation in progress; no installer requested |
+| Native compile / complete workflow | Passed standalone debug build and complete direct native run, exit 0: four extended comparison/PDF checks, restart, normal encrypted restore and damaged-workspace recovery; all prior workflows retained |
+| Windows source CI | [Run 38664552864](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38664552864) passed: production frontend build, 110 interface tests, 154 library + 2 PDF worker tests (156 total); installer/package/upload steps skipped |
 | Clean Windows installation/offline release acceptance | Not run |
 
 Initial focused checks exposed two fixture errors: the absent-plan test needed a
@@ -55,8 +55,34 @@ Logs under `/workspace/shared`: `scenario-controls-setup.log`,
 `scenario-controls-ui-final.log` and `scenario-controls-native-build.log`. Final
 comparison/recovery tests were repeated after the last warning/PDF validation
 wording adjustment. No arithmetic or model limits changed.
-The two initial focused failures have the `-first.log` suffix. Native and Windows
-results and checkpoint details will be recorded when validation completes.
+The two initial focused failures have the `-first.log` suffix. Complete native
+results are `scenario-controls-native.log`/`.exit`; artifacts are in
+`desktop-smoke-scenario-controls`. Four `scenario-controls-*.pdf` exports preserve
+833.34, 12.20 interest, December payoff/goal completion and separate approved
+1,820.02 operating activity. The earlier four selected-proposal PDFs and all
+prior report/client-plan/source/recovery checks also passed in the same run.
+Rendered PDF inspection confirmed readable added-payment/goal descriptions,
+scenario identity and comparison figures; the native screenshot confirmed the
+new goal comparison rows and 500.00 debt reserve.
+
+Application source checkpoint:
+`381fc8a6db58a7c2601f9d283c9e991ddd82fbe3`. Linux full-suite checks passed before
+the final explanatory warning and defensive PDF goal lookup adjustment; affected
+comparison and saved-record/PDF/recovery checks were repeated successfully on
+this final source. Formatting/Clippy also passed, followed by the standalone
+native build/run.
+Windows source validation completed successfully on that exact commit in
+[run 38664552864](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38664552864),
+including the Windows-specific library check. Logs under `/workspace/shared`:
+`scenario-controls-windows-validation.log`, `scenario-controls-windows-job.log`
+and `scenario-controls-windows-result.json`. No installer was built or uploaded.
+Internal source/full-history checkpoints are
+`checkpoints/eisenbart-scenario-controls-source.tar.gz` and
+`checkpoints/eisenbart-scenario-controls.bundle` under `/workspace/shared`.
+Final documentation updates do not change the validated application source.
+The final source archive is checked against all 156 tracked files byte for byte;
+the bundle retains complete history. Clean Windows installation/offline release
+acceptance remains a separate pending requirement.
 
 Next priority: **new recurring-expense proposals**, then temporary income changes,
 with exact monthly/datetime scope and unchanged historical facts. Seven major
