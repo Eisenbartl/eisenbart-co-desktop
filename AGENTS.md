@@ -1,8 +1,12 @@
 # Development guidance
 
 Read `docs/development-status.md`, `docs/architecture.md`, and the relevant part
-of `docs/product-specification.md` before changing the application. Work in the
-existing checkout; cloud tasks are already isolated and do not need a worktree.
+of `docs/product-specification.md` before changing the application. Read
+`docs/prototype-development-map.md` before selecting or implementing a new feature;
+it records the user-prioritized CRUD structure, existing entry points, planned
+page areas and their acceptance criteria. Update it when a planned area becomes
+functional. Work in the existing checkout; cloud tasks are already isolated and
+do not need a worktree.
 
 - Build one manageable milestone at a time. Preserve the functioning foundation
   and commit tested milestones. Update the development status with what actually

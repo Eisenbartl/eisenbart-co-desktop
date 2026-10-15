@@ -13,13 +13,45 @@ current CRUD coverage, implementation entry points and per-feature acceptance
 criteria for returning to each unfinished part. No backend/schema/dependency or
 financial calculation change is introduced. No installer is being created.
 
-Validation is in progress. Locked setup, production frontend build and all 138
-interface tests passed, including six new navigation/CRUD/administration tests.
-Formatting and warnings-denied Clippy passed. An incorrect test label, unsupported
-role-query options and an incomplete saved-budget fixture were corrected; behavior
-assertions stayed enabled. Vite reports an advisory about the existing single
-application chunk exceeding 500 kB. Full backend, native navigation/workflows and
-Windows source checks will be recorded after completion.
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; unchanged configuration/dependencies |
+| Production frontend / full interface suite | Passed build and 138 tests, including six new navigation/CRUD/administration checks |
+| Complete backend | Passed 172 library + 2 PDF process tests |
+| Formatting / Clippy | Passed, all targets with warnings denied |
+| Standalone native desktop build | Passed, debug/no bundles |
+| Native focused pages and integrated workflow | Passed, exit 0: all twelve pages, financial/PDF workflows, restart and both recovery paths |
+| Windows source checks | Passed: 138 interface + 173 library + 2 PDF process tests; installer steps skipped |
+| Installer | Not created, per user instruction |
+
+An incorrect test label, unsupported role-query options and an incomplete saved-
+budget fixture were corrected; behavior assertions stayed enabled. Vite reports
+an advisory about the existing single application chunk exceeding 500 kB. Logs
+use `/workspace/shared/prototype-*.log`; synthetic desktop artifacts are retained
+in `/workspace/shared/desktop-smoke-prototype`. No environment draft change was
+needed. Source checks do not establish clean installed Windows acceptance.
+The native page check passed for all twelve sections, original saved planner
+values, switching to an isolated empty client and back, planned OCR/branding
+areas and report/admin separation. A 1200px desktop screenshot was visually
+inspected for navigation/context/layout. Focused-page descriptions were then
+clarified (text only); the production frontend build and all 40 App/import
+interface checks passed again. Native functional and Windows checks target the
+feature checkpoint; this later text/documentation refinement is tracked separately.
+The complete native run finished with exit 0, including encrypted restore and
+fresh-process error-screen recovery; all prior assertions remained enabled.
+The final guidance-only revision also rebuilt successfully as a standalone native
+application without bundles.
+`AGENTS.md` now directs future development to consult and update the map.
+
+[Windows source run 38678099058](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38678099058)
+passed for feature source `5db67832f314b5116bc97d95639afc3c0c43a848`.
+All installer build/install-test/metadata/upload steps were skipped. This does
+not establish a new installed build, clean Windows 11 offline acceptance or
+commercial readiness. The final refinement changes focused-page guidance and
+development documentation only; no workflow/financial behavior was altered.
+Source recovery checkpoints are retained under
+`/workspace/shared/checkpoints/eisenbart-prototype-source.*`, verified against
+final clean source and remote main; they are not client-data backups.
 
 Next priority: persistent document collection checklist CRUD, followed by account
 metadata/lifecycle work and remaining report/firm branding requirements. Page
