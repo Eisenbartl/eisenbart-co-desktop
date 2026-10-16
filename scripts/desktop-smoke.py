@@ -1804,10 +1804,10 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_integrated_card_review(driver, artifacts, data_root, password, binary, restart_driver)
     check_card_completeness(driver, artifacts, data_root, password, binary, restart_driver)
     check_card_final_approval(driver, artifacts, data_root, password, binary, restart_driver)
-    check_transaction_history(driver, artifacts, password, binary, restart_driver)
+    check_transaction_history(driver, artifacts, data_root, password, binary, restart_driver)
 
 
-def check_transaction_history(driver: WebDriver, artifacts: Path, password: str,
+def check_transaction_history(driver: WebDriver, artifacts: Path, data_root: Path, password: str,
                               binary: Path, restart_driver: Callable[[], None]) -> None:
     def ready() -> None:
         driver.interactive('#workspace-client')
@@ -1817,8 +1817,21 @@ def check_transaction_history(driver: WebDriver, artifacts: Path, password: str,
         driver.fill('#activity-text',text);driver.click_button('Search activity');ready()
     def open_first() -> None:
         driver.click('.activity-event > summary')
+    # Create enough pending fictional import events for a real second page.
+    # Existing financial decisions and all preceding assertions stay intact.
+    source=data_root / 'history-pagination.csv'
+    source.write_text('Date,Description,Amount,Category,Type\n'+''.join(f'2026-09-10,Fictional pagination row {i:02d},-0.01,Food,expense\n' for i in range(31)),encoding='utf-8')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Documents']")
+    driver.interactive('#csv-path');driver.fill('#csv-path',str(source));driver.click_button('Inspect CSV')
+    driver.wait_text('.csv-preview',source.name,'pagination fixture original source captured')
+    driver.fill('#csv-account-label','Fictional pagination checking')
+    for key,heading in [('date','1: Date'),('description','2: Description'),('amount','3: Amount'),('category','4: Category'),('kind','5: Type')]:driver.select(f'#csv-map-{key}',heading)
+    for key,value in [('periodStart','2026-09-01'),('periodEnd','2026-09-30'),('openingBalance','100.00'),('closingBalance','99.69')]:driver.fill(f'#csv-{key}',value)
+    driver.click_button('Import into review queue');driver.wait_text('.imports-panel > .success-message','CSV imported into the review queue','pending pagination fixture imported without approval')
+    driver.interactive('#csv-path')
     driver.click("nav[aria-label='Main navigation'] button[aria-label='Transactions']")
     driver.interactive('.imports-table tbody button')
+    progress=driver.text('.imports-progress')
     driver.click_button('Activity history');ready()
     first=driver.observe_script("return Array.from(document.querySelectorAll('.activity-event')).map(e=>e.dataset.eventId)")
     driver.click_button('Next activity page');ready()
@@ -1826,10 +1839,13 @@ def check_transaction_history(driver: WebDriver, artifacts: Path, password: str,
     if not first or not second or set(first)&set(second):raise SmokeFailure('Activity pagination repeated or omitted the next page')
     driver.click_button('Previous activity page');ready()
     if driver.observe_script("return Array.from(document.querySelectorAll('.activity-event')).map(e=>e.dataset.eventId)")!=first:raise SmokeFailure('Stable activity page changed without a source change')
+    driver.click_button('Working tools');driver.interactive('.imports-table tbody button')
+    if driver.text('.imports-progress')!=progress:raise SmokeFailure('Read-only activity paging changed review decisions')
+    driver.click_button('Activity history');ready()
     search('Synthetic reserve transfer');open_first()
     driver.wait_text('.activity-event[open]','Current bank transfer counterpart','bank transfer history exposes reciprocal source')
     driver.click_button('Open counterpart history');ready();open_first()
-    driver.wait_text('.activity-event[open]','Synthetic reserve arrival','other transfer leg history is independently available')
+    driver.wait_text('.activity-event[open]','Synthetic incoming transfer','other transfer leg history is independently available')
     driver.select('#workspace-client','Jamie Complete');ready()
     driver.select('#activity-kind','Card');driver.select('#activity-status','Approved')
     driver.fill('#activity-from','2026-09-01');driver.fill('#activity-through','2026-09-30')
