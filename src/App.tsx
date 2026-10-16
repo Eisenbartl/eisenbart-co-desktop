@@ -319,6 +319,10 @@ function Initials({ client }: { client: Client }) {
   return <span className="avatar" aria-hidden="true">{client.firstName.slice(0, 1)}{client.lastName.slice(0, 1)}</span>;
 }
 
+function passwordNotice(durabilityWarning:boolean):string {
+  return `Workspace password changed. Unlock with the new password. Older backups and retained copies still require their original passwords.${durabilityWarning?' The disk did not confirm directory synchronization. Keep both passwords and your backups until restart verifies the active workspace.':''}`;
+}
+
 export default function App() {
   const [phase, setPhase] = useState<Phase>('checking');
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
@@ -358,7 +362,14 @@ export default function App() {
       setAuthError('');
     };
     window.addEventListener('workspace-access-expired', expire);
-    listen('workspace-locked', expire).then(remove => { if (cancelled) remove(); else unlisten = remove; }).catch(() => {
+    const locked = (event?: {payload?: unknown}) => {
+      expire();
+      const payload = event?.payload;
+      if (payload && typeof payload === 'object' && 'reason' in payload && payload.reason === 'password_changed' && 'durabilityWarning' in payload && typeof payload.durabilityWarning === 'boolean') {
+        setRecoveryNotice(passwordNotice(payload.durabilityWarning));
+      }
+    };
+    listen('workspace-locked', locked).then(remove => { if (cancelled) remove(); else unlisten = remove; }).catch(() => {
       // The command layer still enforces locking if event delivery is unavailable.
     });
     return () => { cancelled = true; unlisten?.(); window.removeEventListener('workspace-access-expired', expire); };
@@ -449,7 +460,7 @@ export default function App() {
 
   function passwordChanged(result:import('./types').PasswordChangeResult) {
     clearWorkspace();setAuthError('');setAuthBusy(false);setPhase('locked');
-    setRecoveryNotice(`Workspace password changed. Unlock with the new password. Older backups and retained copies still require their original passwords.${result.durabilityWarning?' The disk did not confirm directory synchronization. Keep both passwords and your backups until restart verifies the active workspace.':''}`);
+    setRecoveryNotice(passwordNotice(result.durabilityWarning));
   }
 
   function restored(result:RestoreResult) {

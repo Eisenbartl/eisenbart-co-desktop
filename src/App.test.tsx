@@ -508,3 +508,13 @@ it('locks and clears workspace state after password change and shows retained-co
  expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('original passwords');expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('Keep both passwords');
  expect(screen.queryByLabelText('New password')).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Settings'})).not.toBeInTheDocument();
 });
+
+it('clears private UI on password-change lock notification before the command response arrives',async()=>{
+ const pending=deferred<{durabilityWarning:boolean}>();mocks.changeWorkspacePassword.mockReturnValueOnce(pending.promise);
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Security'}));
+ for(const [label,value] of [['Current password','Synthetic-original-123'],['New password','Synthetic-new-456'],['Confirm new password','Synthetic-new-456']])fireEvent.change(screen.getByLabelText(label),{target:{value}});
+ fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'Change password and lock'}));
+ act(()=>{(mocks.lockHandler as unknown as (event:{payload:unknown})=>void)({payload:{reason:'password_changed',durabilityWarning:true}});});
+ expect(await screen.findByRole('button',{name:'Unlock workspace'})).toBeInTheDocument();expect(screen.queryByLabelText('New password')).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Settings'})).not.toBeInTheDocument();expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('Keep both passwords');
+ await act(async()=>pending.resolve({durabilityWarning:false}));expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('Keep both passwords');
+});

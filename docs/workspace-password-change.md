@@ -31,6 +31,9 @@ multi-counselor accounts are not implemented.
    report success and a distinct directory-sync warning if durability could not
    be confirmed. No fallible operation follows the committed switch. The app locks.
    Restart selects a complete old or new pair, never mixed key metadata/pages.
+   A separate credential-free lock event carries success/durability status to the
+   interface independently of the command response; late responses cannot revive
+   private UI or erase a committed durability warning.
 
 The IPC operation lock covers whole commands, including waiting database writes,
 so a cooperating second app cannot pass a generation check then write into the

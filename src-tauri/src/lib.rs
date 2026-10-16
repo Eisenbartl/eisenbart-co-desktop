@@ -945,7 +945,16 @@ async fn change_workspace_password(
 ) -> Result<storage::password_change::PasswordChangeResult, String> {
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        access(&state, |w| w.change_workspace_password(input))
+        let result = access(&state, |w| w.change_workspace_password(input))?;
+        // Lock notification is independent of command-response delivery. It
+        // carries no credentials and preserves the committed durability status.
+        let _ = state.handle.emit(
+            "workspace-locked",
+            serde_json::json!({
+                "reason": "password_changed", "durabilityWarning": result.durability_warning
+            }),
+        );
+        Ok(result)
     })
     .await
     .map_err(|_| {

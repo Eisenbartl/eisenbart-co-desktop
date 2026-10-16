@@ -280,5 +280,6 @@ recovery activation. `lib::access` serializes complete managed IPC commands with
 the OS operation lock before rechecking session generation, preventing stale
 cooperating writes after activation. `PasswordChange` clears submitted secrets,
 requires explicit retained-copy password acknowledgment and returns to locked
-UI after success. No in-place rekey, new KDF, reset service or financial mutation
+UI after success. A separate credential-free lock event communicates committed
+password changes even before the IPC response arrives. No in-place rekey, new KDF, reset service or financial mutation
 is introduced. See [password-change design](workspace-password-change.md).

@@ -20,13 +20,13 @@ Validation on 2026-10-16 (America/Chicago):
 | Check | Result |
 |---|---|
 | Locked cloud setup | Reused the tested repository setup from this environment; Node 24 and stable Rust |
-| Production frontend / UI | Passed build and all 253 tests |
-| Focused backend | Passed seven fixtures, including WAL values/source BLOBs/report digests, pending preview clearing, stale instances, old/new backup passwords, schema-27 rollback and actual subprocess exits |
-| Complete Linux backend | Passed 237 library + 2 PDF-worker tests, exit 0 |
+| Production frontend / UI | Passed final build and all 254 tests, including lock notification before the response and ignoring a late response after unmount |
+| Focused backend | Passed all seven fixtures again after the notification follow-up: WAL values/source BLOBs/report digests, pending preview clearing, stale instances, old/new backup passwords, schema-27 rollback and actual subprocess exits |
+| Complete Linux backend | Passed 237 library + 2 PDF-worker tests, exit 0, for core feature source `4e29c96`; notification follow-up rechecked with the focused suite |
 | Formatting / Clippy | Passed; all targets with warnings denied |
 | Standalone native build | Passed debug build with embedded assets, no bundles |
-| Focused native / visual inspection | Passed exit 0 with the password-change marker and final completion marker; real controls, restart and both backup passwords. Security screen visually checked for readable disclosure/fields and no horizontal overflow |
-| Complete native workflow | Running; not yet counted as passing |
+| Focused native / visual inspection | Passed exit 0 on both core and final notification source, with password-change and completion markers; real controls, private UI clearing, restart and both backup passwords. Final Security screen visually checked for readable disclosure/fields and no horizontal overflow |
+| Complete native workflow | Passed exit 0 on core source `4e29c96`, including all prior workflows and password rotation on the populated recovered workspace. Final notification follow-up separately verified by the focused native run |
 | Windows source validation | Not run: network proxy rejects CONNECT to api.github.com with HTTP 403; Git read access works |
 | Installer | Not created, per user instruction |
 
@@ -43,8 +43,27 @@ and clean installed Windows offline recovery are still unverified. Windows sourc
 CI is also pending for this stage; existing 0.43.0 Windows results do not validate
 0.44.0. No branch or source has been pushed to trigger external CI.
 
-Validation logs use `/tmp/password-` in this current machine. No real client data
-or credentials were used. Focused native artifacts are under `/workspace/shared/desktop-smoke-password-focused`; the complete run is under `/workspace/shared/desktop-smoke-password-change`. Complete-run results will be recorded after completion.
+Core source is committed as `4e29c96`. The complete native run retained every
+financial/source/report/history/recovery assertion and finished with the new
+password-change marker and final completion marker. It ran with WebKit sandboxing
+enabled. Its test processes stopped and its temporary synthetic data was removed.
+
+Final review added a credential-free backend lock event so private UI clears even
+when the command response is delayed/lost. The UI retains the committed success/
+durability notice and ignores late responses after unmount. This follow-up changes
+the command notification and UI handling; the storage/key-transition implementation
+from the complete regression run is unchanged. Final validation repeated the full
+254-test UI suite, all seven password backend fixtures, Clippy, standalone build
+and the focused native password/restart/old-and-new-backup workflow. No Cargo
+commands ran after either standalone build while native checks were running.
+
+Logs and the independent focused-run helper are preserved under
+`/workspace/shared/password-change-validation`. Complete native artifacts use
+`/workspace/shared/desktop-smoke-password-change`; initial focused artifacts use
+`/workspace/shared/desktop-smoke-password-focused`; final notification artifacts use
+`/workspace/shared/desktop-smoke-password-notification`. The final Security image
+was visually inspected. All driver ports were closed afterward. No real client
+data or credentials were used.
 
 Next bounded implementation priority after the outstanding acceptance checks:
 backend-owned configurable inactivity locking with validated limits and preserved
