@@ -17,12 +17,43 @@ source/decision bindings. Existing transaction and report JSON remains unchanged
 Legacy test fixtures now remove schema-26 sidecars when constructing genuinely
 older databases; their migration assertions remain intact.
 
-Validation in progress (2026-10-16, America/Chicago): locked setup, production
-frontend and 238 UI tests passed; all three focused rule fixtures passed. The
-complete Linux suite passed 227 library and 2 PDF-worker tests; formatting and
-all-target Clippy with warnings denied passed. Standalone native build/full native
-workflow and Windows source CI will be recorded here once completed. No installer
-is created.
+Validation on 2026-10-16 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing reusable environment configuration |
+| Production frontend / UI | Passed build and all 238 tests |
+| Focused backend | Passed all three rule fixtures: CRUD/application/recovery, schema-25 migration rollback and archived-account stale context |
+| Complete Linux backend | Passed 227 library + 2 PDF-worker tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug build, no bundles |
+| Complete native workflow | Passed, exit 0 and final completion marker: all prior workflows plus rule CRUD, protected category-only draft, explicit unapproved application, unchanged approved totals, original-version history, lock/restart/encrypted recovery and client isolation |
+| Native visual inspection | Passed actual version history and original-version application screen |
+| Windows source validation | Passed 238 UI + 228 library + 2 PDF-worker tests; all five installer/checksum/upload steps skipped |
+| Installer | Not created, per user instruction |
+
+Feature/source commit: `735b0d271368a8c8b27f0772e0fc46dd7c1d8b80`.
+[Windows run 38897245801](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38897245801)
+passed for that exact source. Raw metadata/logs were checked for the source SHA,
+actual counts and five skipped installer steps; the library suite completed in
+397.02 seconds. Windows source tests do not establish installed Windows offline
+or viewer/printer acceptance. Validation logs and verified Windows evidence use
+`/workspace/shared/category-rules-`.
+
+Native artifacts are in `/workspace/shared/desktop-smoke-category-rules`.
+The run has exit `0`, the specific rule-lifecycle PASS and the final complete-workflow
+marker. `native-category-rule-history.png` was visually checked for readable
+versions 1–4, archive/reactivation reasons and the saved original version 2 despite
+current version 4, with wrapped text and no horizontal overflow. No Cargo checks
+ran after the standalone build or during the native workflow.
+
+Clean source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-category-rules-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-category-rules-source.bundle`.
+The helper verifies every tracked file against final clean HEAD and actual remote
+main. Only this final validation record follows the exact application source
+checked on Windows. No installer was created; installed Windows acceptance and
+commercial readiness remain unverified.
 
 Next priority: **Clients → History & records with reviewed note amendments**.
 Reuse original notes and existing source/history workflows, retain old report
