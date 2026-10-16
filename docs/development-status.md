@@ -8,10 +8,33 @@ decision timeline, account/source/date/status and literal text filters, stable
 and explicit current/obsolete relationship labels. Existing source review and
 financial calculations remain unchanged. See [usage and limits](transaction-activity-history.md).
 
-Locked setup and the three focused backend fixtures passed. Full frontend, backend,
-format/Clippy, standalone native workflow and Windows source verification are
-in progress; do not treat this stage as verified until their actual results are
-recorded here. No installer is requested or being created.
+Validation on 2026-10-15 (America/Chicago), current progress:
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 211 tests |
+| Complete Linux backend | Passed 215 library + 2 PDF-worker tests |
+| Focused history fixtures | Passed all three mixed-history, scope/recovery and relationship/error fixtures |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles |
+| Complete native workflow | Rerun in progress; see fixture correction below |
+| Windows source validation | Passed: 211 UI + 216 library + 2 PDF-worker tests; all five installer/checksum/upload steps skipped |
+| Installer | Not created, per user instruction |
+
+Feature commit: `ec562c7f4b7e4d937996557776a964a1d80e15a4`.
+Windows source validation passed for that exact application source in
+[run 38828170921](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38828170921);
+its Rust library tests completed in 746.47 seconds.
+
+The first native run passed every earlier workflow, then its new pagination
+fixture assumed the selected synthetic client had more than 25 timeline events.
+The disabled Next button correctly prevented paging. Test-only commit `0cb9651`
+imports 31 pending fictional rows through the existing Documents UI, verifies
+page navigation does not change review counts, and uses the original fixture's
+actual incoming-transfer description. All earlier assertions and application
+source remain unchanged. A complete rerun is required before this stage is
+marked finished. First-attempt diagnostics are retained separately.
 
 Next priority: Reports → Print & presentation, placing client/period and financial
 summary first, with approval audit detail in an appendix and separate Windows
