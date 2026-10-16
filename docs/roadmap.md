@@ -2,13 +2,15 @@
 
 The complete product specification is [product-specification.md](product-specification.md). [Development status](development-status.md) records the verified checkpoint. Each stage needs working behavior, meaningful tests, updated documentation, and a Git commit before the next feature group.
 
-Source 0.39.0 includes exact financial planners and comparisons, reviewed CSV/text
+Source 0.40.0 includes exact financial planners and comparisons, reviewed CSV/text
 PDF sources, client intake/follow-ups, collection/account management, branded
 immutable internal and client-plan reports, saved bank/card completeness reviews,
 bounded versioned final approval, reviewed signed-CSV card liability and repayment
 integration, searchable client-wide transaction history, and summary-first counselor PDF
-presentation with full original evidence. The next priority is bounded native
-Windows printing with explicit failure/cancellation and installed acceptance. See the [prototype map](prototype-development-map.md)
+presentation with full original evidence and an explicit unchanged-file Windows
+PDF-viewer handoff for printing. Windows opening acceptance is not print success;
+installed viewer/printer checks remain open. The next implementation priority is
+bounded local transaction classification assistance. See the [prototype map](prototype-development-map.md)
 for current working areas, planned functions and acceptance; the original product
 stages below describe scope rather than a remaining-stage count.
 

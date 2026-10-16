@@ -558,6 +558,9 @@ textarea { resize: vertical; min-height: 100px; }
 .final-report-approval .check-label input[type="checkbox"], .saved-coverage-reviews .check-label input[type="checkbox"] { width: 16px; height: 16px; min-height: 16px; padding: 0; margin: 2px 0; flex: 0 0 16px; }
 .card-statements .check-label { display:flex; align-items:flex-start; gap:10px; margin:14px 0; }
 .card-statements .check-label input[type="checkbox"] {width:16px;height:16px;min-height:16px;margin:3px 0 0;flex:0 0 16px;}
+.saved-pdf-viewer label { display:flex; align-items:flex-start; gap:10px; margin:14px 0; }
+.saved-pdf-viewer input[type="checkbox"] { width:16px; height:16px; min-height:16px; padding:0; margin:3px 0 0; flex:0 0 16px; }
+.saved-pdf-path { overflow-wrap:anywhere; }
 .card-preview,.card-statement-view,.card-transaction-review {margin-top:20px;}
 .card-reconciliation {padding:16px;border:1px solid var(--line);border-radius:8px;margin:16px 0;}
 

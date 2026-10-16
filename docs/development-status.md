@@ -27,10 +27,15 @@ Validation in progress on 2026-10-15 (America/Chicago):
 | Focused handoff fixture | Passed final scope/receipt/file/expiry/lock/restart/external-restore fixture |
 | Full Linux backend | Passed 223 library + 2 PDF-worker tests; final expanded handoff fixture also passed separately |
 | Formatting / Clippy | Passed; all targets with warnings denied |
-| Standalone native build / complete native workflow | Build starting; complete smoke pending |
-| Windows source suite | Starting on feature push; no installer requested |
+| Standalone native build / complete native workflow | Initial build passed; initial smoke deliberately interrupted for consent-checkbox CSS correction; corrected build/full smoke pending |
+| Windows source suite | Initial run superseded for the CSS correction; corrected-source run starting; no installer requested |
 | Installed Windows viewer/printer acceptance | Not run in this Linux cloud environment |
 | Installer | Not created, per user instruction |
+
+Review found the new Windows consent checkbox inheriting the text-input width.
+Scoped checkbox sizing and wrapping for long saved paths correct that layout.
+The first native/Windows checks were deliberately stopped/superseded; incomplete
+runs are not counted as passes. Corrected-source checks follow below.
 
 No schema migration or new package was added. Existing `windows-sys` enables the
 Shell/COM/Registry/window API features required by the narrow native adapter.
