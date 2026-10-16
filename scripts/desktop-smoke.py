@@ -1842,6 +1842,7 @@ def check_transaction_history(driver: WebDriver, artifacts: Path, password: str,
     driver.wait_text('.activity-event[open]','Renamed fictional household card (archived)','current card identity is separate from original')
     driver.wait_text('.activity-event[open]','Historical event','prior corrected approval remains historical')
     driver.scroll_to('.transaction-activity','start');driver.screenshot(artifacts / 'native-transaction-activity.png')
+    driver.scroll_to('.activity-event[open]','start');driver.screenshot(artifacts / 'native-transaction-evidence.png')
     driver.click_button('Clear activity filters');ready();search('Fictional card payment');open_first()
     driver.wait_text('.activity-event[open]','Latest recorded repayment link','card payment retains bank approval locator')
     driver.click_button('Open linked decision');ready();open_first()

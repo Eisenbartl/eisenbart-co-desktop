@@ -101,11 +101,11 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **Transactions → Activity history** with bounded, scoped read queries
-over existing bank/card records and decisions. Include text/date/source/status
-filters, stable pagination, exact source and approval locators, corrections and
-transfer context, empty/error states and client isolation. This is a search/read
-workflow; do not duplicate review CRUD, parsers or financial calculations.
+Implement **Reports → Print & presentation**: put client identity, assessment
+period and a readable financial summary first; move approval audit details into
+an appendix without changing captured figures or original financial claims.
+Preserve existing historical exports, bounded offline rendering and scope checks.
+Direct Windows printing needs explicit acceptance before it is called complete.
 
 Card account CRUD, assignments, repayments, completeness/roles/debt mappings and
 bounded versioned final approval are implemented through 0.37.0 below. Build on
@@ -176,13 +176,13 @@ audit, receipt/date rechecks, PDF preflight and recovery reuse the existing fina
 report service. Original v1 receipts and calculators stay frozen. See
 [policy and limitations](card-inclusive-final-approval.md).
 
-Next priority: implement Transactions → Activity history using bounded read-only
-queries across existing bank/card decisions. Include text/date/source/status
-filters, stable pagination, exact source/approval locators, corrections, transfer
-counterparts, safe empty/error states and client isolation; preserve private data
-on navigation/lock. Do not redo review CRUD or silently change financial figures.
-Unsupported loan obligations, early closure, credits and split/cross-period
-repayments remain blocked until their own modeled evidence workflows. Broader
-adapters/OCR/printing/advanced models and installed/commercial acceptance remain.
+### 0.38.0 — client-wide transaction activity history
 
-Next priority after 0.38.0: Reports → Print & presentation, with client/period and financial summary first, approval audit details in an appendix, and explicit Windows printing acceptance. Do not rebuild the completed transaction review/history workflows.
+`activity_store.rs` derives read-only bank/card import and decision events from
+existing scoped readers in one transaction. `TransactionActivity.tsx` provides
+literal text/date/account/source/status filters, stable fingerprint-bound pages,
+original/corrected evidence and exact counterpart decision searches. Current
+transfer/repayment context is explicitly separate from historical event state.
+No new storage, review mutations or financial calculator is introduced. See
+[usage and limits](transaction-activity-history.md). Build on this completed page;
+the next priority is report presentation/printing above.

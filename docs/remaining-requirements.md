@@ -1,10 +1,4 @@
-> 0.38.0 update: Transactions → Activity history now provides scoped, searchable,
-> paginated bank/card import and decision history with original provenance and
-> current/obsolete counterpart locators. See [usage and limits](transaction-activity-history.md).
-> The future combined client timeline, note amendments and commercial acceptance
-> remain separate work. Next priority: report presentation/printing.
-
-# Remaining original requirements after 0.37.0 source
+# Remaining original requirements after 0.38.0 source
 
 The [original product specification](product-specification.md) governs the full
 application. This is a tested development checkpoint, not a commercial release.
@@ -30,6 +24,8 @@ still identify functionality that is unavailable.
   roles and distinct existing-debt mappings, captured in internal reports/PDFs.
 - Versioned card-inclusive final counselor approval, exact combined spending/cash
   figures and preserved original approvals/PDFs within its supported scope.
+- Searchable client-wide bank/card import/decision history with stable pages,
+  original/corrected provenance and exact transfer/repayment decision navigation.
 - Encrypted backup/recovery and bounded integrity validation of historical records.
 
 Do not repeat these foundations. See [development-status.md](development-status.md)
@@ -39,10 +35,9 @@ entry points and acceptance criteria.
 
 ## Next development priority
 
-Implement searchable client-wide bank/card transaction history over existing
-source and decision records, with stable filters/pagination, exact provenance,
-corrections, transfer context and client isolation. No new parser or approval
-mutation is needed for this read workflow.
+Improve Reports → Print & presentation: a client/period financial summary first,
+with approval audit details in an appendix and explicit Windows printing
+acceptance. Preserve original financial capture and historical exports.
 
 Card-inclusive final approval now works for the [bounded v2 policy](card-inclusive-final-approval.md).
 Unsupported other loan obligations, bank-refund role treatments, credits, early
@@ -56,7 +51,7 @@ receipts when extending these rules.
 |---|---|
 | Financial review and reports | Broader obligation/card-policy support; further comparative measures; dated savings-progress charts; direct desktop printing; final full-product report acceptance. Existing branding and bank-only final validation already work. |
 | Financial models | Savings funding/drawdown, paycheck allocation, proposed new goals and account-targeted extra payments, advanced daily/variable/promotional debt terms and fees, delayed transfer settlement and finer account reserves. Verified gross-income metrics only where their basis exists. |
-| Documents and transactions | Card PDF, loan/paystub and broader institution adapters, scanned PDF/OCR, local category suggestions/reusable rules and client-wide searchable activity history, all with provenance and explicit review. No universal parser compatibility is claimed. |
+| Documents and transactions | Card PDF, loan/paystub and broader institution adapters, scanned PDF/OCR, local category suggestions/reusable rules, all with provenance and explicit review. Transaction activity history is implemented. No universal parser compatibility is claimed. |
 | Client workflow and administration | Configurable time zones, remaining workflow refinements and realistic counselor usability/accessibility acceptance. Client intake, reminders, follow-up overview and account CRUD already exist. |
 | Security/privacy | Configurable password/lock policies, multiple counselor accounts and roles, export/deletion controls and broader audit/recovery options; independent security, privacy and dependency/license reviews. |
 | Commercial product | Offline licensing, commercial documentation/disclosures/legal review, signing and update/support procedures. Basic organization presentation is already implemented. |
