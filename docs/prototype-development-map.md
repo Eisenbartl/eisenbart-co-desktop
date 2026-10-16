@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.34.0 source
+# Prototype structure and development map — 0.37.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -101,16 +101,18 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **integrated card financial review and report capture** next. Keep card
-spending distinct from bank cash movements; explicitly link repayment counterparts
-without double-counting expenses or treating borrowing as income. Capture reviewed
-card evidence in a new report version with unchanged legacy bytes, independently
-checked combined examples and complete-basis gates before expanding final approval.
-The conservative bank-report block must remain until this passes. Signed CSV card
-review is working in 0.34.0; [its guide](credit-card-review.md) records future card
-PDF parsing, durable card identity/metadata CRUD and planning-account mappings.
-Broader loan/paystub adapters, OCR, printing, commercial licensing, multiple
-counselors and installed Windows acceptance remain separate.
+Implement **Transactions → Activity history** with bounded, scoped read queries
+over existing bank/card records and decisions. Include text/date/source/status
+filters, stable pagination, exact source and approval locators, corrections and
+transfer context, empty/error states and client isolation. This is a search/read
+workflow; do not duplicate review CRUD, parsers or financial calculations.
+
+Card account CRUD, assignments, repayments, completeness/roles/debt mappings and
+bounded versioned final approval are implemented through 0.37.0 below. Build on
+them. Other loan obligations, unsupported refund roles, credits, early closure
+and split/cross-period repayments stay blocked until modeled and tested. Broader
+adapters/OCR/printing/advanced models, security/commercial review and installed
+Windows acceptance remain separate original requirements.
 
 ### 0.35.0 — integrated provisional bank/card review
 

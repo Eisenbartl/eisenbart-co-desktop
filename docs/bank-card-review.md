@@ -111,3 +111,13 @@ category name. Final approval must require all applicable bank/card evidence,
 current review bindings, resolved exceptions and fresh professional confirmation.
 Keep unsupported cross-period/split repayments blocked until their semantics are
 defined and independently checked.
+
+
+## Subsequent approval policy (0.37.0)
+
+The original `bank-card-review-v1` calculator and provisional capture above remain
+unchanged. A separately implemented [card-inclusive final policy](card-inclusive-final-approval.md)
+can now approve complete supported format-9 evidence with saved bank and card
+completeness, current repayment bindings and fresh professional decisions. Old
+calculator disclosures remain historical; its supplement alone cannot authorize
+approval. Unsupported cases remain blocked under the new policy.

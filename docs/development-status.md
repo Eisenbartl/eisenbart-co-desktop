@@ -10,11 +10,55 @@ cash movement, spending and debt distinct. Old v1 approvals and original interna
 report/calculator bytes retain their interpretation. See
 [card-inclusive-final-approval.md](card-inclusive-final-approval.md).
 
-Validation is in progress. Locked setup, production interface build and all
-205 UI tests passed, along with 212 library + 2 PDF-worker tests. Expanded focused
-backend cases and the final PDF basis labels were checked again afterward;
-formatting/Clippy passed with warnings denied. Standalone native and Windows source
-results will be recorded before completion. No installer is being created.
+Validation on 2026-10-15 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 205 tests |
+| Complete Linux backend | Passed 212 library + 2 PDF-worker tests |
+| Expanded policy/PDF checks | Passed all three focused tests, including ten blocked-evidence fixture cases and final bank-only basis labels |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles |
+| Complete native workflow | Passed, exit 0: all earlier workflows plus v2 approval, independent combined figures, explicit repayment renewal/card confirmation, immutable PDFs, later-review flags, restart, v1/v2 encrypted recovery and client isolation |
+| Windows source validation | Passed: 205 UI + 213 library + 2 PDF-worker tests; all five installer/checksum/upload steps skipped |
+| Installer | Not created, per user instruction |
+
+Feature commit: `34331f501449dd5202122956864058742f04d311`.
+Windows source validation passed for that exact source in
+[run 38804540401](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38804540401).
+Its Rust library tests completed successfully in 762.03 seconds.
+
+The first full native run passed all earlier workflows, then exposed the new
+fixture clicking a section while its selected client's existing section was
+still loading. Test-only commit `a56951b` waits for real enabled section controls
+and loaded report selectors before navigating. A later run reached the updated card evidence but exposed two new fixture
+selectors assuming a success-message CSS class that the older completeness
+component does not use. Test-only commit `a559051` checks the actual notice
+container with the same required text. No assertion or application behavior
+changed. An older intake fixture also needed to wait for the report's
+post-save directory refresh before editing an adjacent field; test-only commit
+`88c42a3` waits for its enabled selector and real native field focus. The final
+complete native rerun passed with all original assertions retained.
+
+Native artifacts: `/workspace/shared/desktop-smoke-card-final`; validation logs
+use `/workspace/shared/card-final-`. Failed-attempt diagnostics are retained
+separately. The native exit file records `0`. Current and restored historical
+approval screens were visually inspected; actual PDF text extraction verified
+independently known figures and the explicit original-bank-only basis labels.
+No dependency, schema migration or installer was added.
+
+Clean source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-card-final-approval-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-card-final-approval-source.bundle`, verified
+against the final clean commit and remote main. Follow-up commits change only
+native test fixtures and validation/development notes; application source remains
+the exact feature commit validated on Windows.
+
+The supported scope remains bounded: other loan/debt obligations, unsupported
+bank-refund roles, card credits, early opening/closure and split/cross-period
+repayments stay blocked. Installed Windows and commercial acceptance remain open.
+The last downloadable preview remains 0.23.0.
 
 Next priority: searchable client-wide bank/card transaction history, using the
 existing retained sources and immutable decisions with bounded filters/pagination,
