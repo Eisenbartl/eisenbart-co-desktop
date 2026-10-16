@@ -1,6 +1,6 @@
 {
   "name": "eisenbart-counseling-suite",
-  "version": "0.46.0",
+  "version": "0.47.0",
   "private": true,
   "description": "Offline financial counseling desktop foundation",
   "type": "module",

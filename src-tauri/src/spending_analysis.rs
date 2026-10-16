@@ -64,6 +64,8 @@ pub struct Row {
     #[serde(skip)]
     cents: i64,
     #[serde(skip)]
+    purchase: bool,
+    #[serde(skip)]
     record_id: String,
     #[serde(skip)]
     card: Option<(String, usize)>,
@@ -263,6 +265,7 @@ fn rows(c: &Context) -> Result<(Vec<Row>, usize, usize), String> {
             source_label: "Bank statement".into(),
             editable: spending,
             cents: if spending { -n } else { n },
+            purchase: r.fields.kind == imports::Kind::Expense,
             record_id: r.id.clone(),
             card: None,
         });
@@ -353,6 +356,7 @@ fn rows(c: &Context) -> Result<(Vec<Row>, usize, usize), String> {
                 } else {
                     -n
                 },
+                purchase: r.fields.kind == cards::Kind::Purchase,
                 record_id: String::new(),
                 card: Some((s.source.id.clone(), r.row)),
             });
@@ -621,7 +625,7 @@ fn analyze(c: &Context, q: &Input) -> Result<Analysis, String> {
     let mut opportunities = vec![];
     let small = discretionary
         .iter()
-        .filter(|r| r.cents > 0 && r.cents < 1500)
+        .filter(|r| r.purchase && r.cents > 0 && r.cents < 1500)
         .copied()
         .collect::<Vec<_>>();
     if small.len() >= 5 {
@@ -852,7 +856,7 @@ impl Workspace {
             data.inventory_reviewed = false;
             // Keep the counselor's conclusion and only replace our own latest annotation.
             // Every preceding annotation remains in the immutable card-facts history.
-            const MARKER: &str = " [Spending Analysis discussion] ";
+            const MARKER: &str = "[Spending Analysis discussion] ";
             const END: &str = " Card inventory/completeness requires renewed review.";
             let base = if data.conclusion.ends_with(END) {
                 data.conclusion
@@ -861,8 +865,10 @@ impl Workspace {
             } else {
                 data.conclusion.as_str()
             };
+            let base = base.trim_end();
             data.conclusion = format!(
-                "{base}{MARKER}{}{END}",
+                "{base}{}{MARKER}{}{END}",
+                if base.is_empty() { "" } else { " " },
                 reason.split_whitespace().collect::<Vec<_>>().join(" ")
             );
             self.save_card_facts(
@@ -1210,6 +1216,33 @@ mod tests {
                 .unwrap()
                 .data
                 .inventory_reviewed
+        );
+        // Repeated discussion changes keep all snapshots without growing the current
+        // conclusion with obsolete annotations or exhausting its text bound.
+        for _ in 0..3 {
+            classify(&mut w, &client.id, "Fictional groceries", Role::Necessary);
+            classify(
+                &mut w,
+                &client.id,
+                "Fictional groceries",
+                Role::Discretionary,
+            );
+        }
+        let card_history = w.get_card_facts(&client.id).unwrap();
+        assert_eq!(card_history.history.len(), 8);
+        assert_eq!(
+            card_history
+                .snapshot
+                .unwrap()
+                .data
+                .conclusion
+                .matches("[Spending Analysis discussion]")
+                .count(),
+            1
+        );
+        assert_eq!(
+            serde_json::to_vec(&w.get_card_statements(&client.id).unwrap()).unwrap(),
+            original_card
         );
         w.lock_workspace();
         assert!(w.get_spending_analysis(&client.id, query()).is_err());

@@ -91,7 +91,7 @@ preserves formats 1–4 bytes/digests; schema 17 is unchanged. Internal PDF expo
 prints counselor context separately from financial facts. The client-plan PDF
 renderer excludes it. See [report-intake-context.md](report-intake-context.md).
 
-`workspaceNavigation.ts` defines three global pages and twelve client-local
+`workspaceNavigation.ts` defines three global pages and thirteen client-local
 sections. `App` retains stable-ID client tabs and per-client section/subtab metadata
 only while unlocked. The selected section mounts its existing scoped editor;
 late responses are ignored and dirty/busy guards precede navigation or tab closing.
@@ -298,3 +298,14 @@ and shared Settings draft/busy aggregation protect concurrent forms. The normal
 15-second timer and existing keyboard/pointer heartbeat remain, while pending
 review/inspection lifetimes remain fixed at 15 minutes. See
 [inactivity policy design and limits](inactivity-locking.md).
+
+`spending_analysis.rs` reads scoped approved bank/card rows and current approval-
+bound purposes in one authenticated SQLite snapshot. It calculates checked integer
+cent totals, exact category allocations, prior-period comparisons and evidence-
+based opportunities in Rust. Changes reuse existing audited bank financial-facts
+and card-completeness writes, with full-context receipts and source approvals.
+Card edits require renewed completeness review. Imported source bytes and captured
+reports remain immutable. `SpendingAnalysis` renders local accessible charts,
+filters and a discussion-bound Type editor, clears private state on client/lock
+changes and never retries writes. [Rules and limits](spending-analysis.md). No new
+schema, application dependency, report format or remote service is introduced.

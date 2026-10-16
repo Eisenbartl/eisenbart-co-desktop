@@ -2012,8 +2012,70 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_category_assistance(driver, artifacts, data_root, password, binary, restart_driver)
     check_category_rules(driver, artifacts, data_root, password, binary, restart_driver)
     check_client_history(driver, artifacts, data_root, password, binary, restart_driver)
+    check_spending_analysis(driver, artifacts, data_root, password, binary, restart_driver)
     check_inactivity_policy(driver, artifacts, data_root, password, binary, restart_driver)
     check_password_change(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_spending_analysis(driver: WebDriver, artifacts: Path, data_root: Path,
+                            password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """Visible native controls only; independent figures and actual encrypted recovery."""
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click_button('Add client');driver.fill('#first-name','Quinn');driver.fill('#last-name','Analysis')
+    driver.click_button('Create client');driver.wait_text('.client-workspace-header','Quinn Analysis','separate spending fixture client')
+    driver.client_section('Monthly budget');driver.click_button('Add expense');driver.fill('#budget-label-0','Reviewed monthly discretionary target');driver.fill('#budget-amount-0','100');driver.select('#budget-kind-0','Discretionary expense');driver.click_button('Save budget and calculate');driver.wait_text('.budget-panel','Budget saved and calculated.','real saved discretionary target')
+    path=data_root/'spending-fictional.csv'
+    path.write_text('Date,Description,Amount,Category,Type\n2026-07-09,Native subscription,-10,Memberships,expense\n2026-08-09,Native subscription,-10,Memberships,expense\n2026-09-01,Native rent,-1000,Housing,expense\n2026-09-02,Native dining,-100,Dining,expense\n'+''.join(f'2026-09-0{i+2},Native coffee {i},-10,Coffee,expense\n' for i in range(1,6))+'2026-09-09,Native subscription,-10,Memberships,expense\n2026-09-10,Native refund,20,Dining,refund\n2026-09-11,Native pending,-999,Dining,expense\n',encoding='utf-8')
+    driver.client_section('Import statements');driver.fill('#csv-path',str(path));driver.click_button('Inspect CSV');driver.wait_text('.csv-preview',path.name,'synthetic spending source inspected')
+    driver.fill('#csv-account-label','Native analysis checking')
+    for key,heading in [('date','1: Date'),('description','2: Description'),('amount','3: Amount'),('category','4: Category'),('kind','5: Type')]:driver.select(f'#csv-map-{key}',heading)
+    driver.click_button('Import into review queue');driver.wait_text('.imports-panel > .success-message','CSV imported into the review queue','source stays separate from analysis')
+    driver.client_section('Spending Analysis')
+    if driver.observe_script("return document.querySelectorAll('nav[aria-label=\"Client workspace sections\"] button').length")!=13:raise SmokeFailure('Expected thirteen client-local sections')
+    def ready():driver.interactive('#spending-search')
+    def period():
+        driver.fill('#spending-from','');driver.fill('#spending-from','2026-09');driver.fill('#spending-through','');driver.fill('#spending-through','2026-09');driver.click_button('Update analysis');ready()
+    ready();period();driver.wait_text('.sa-metrics','$0.00','pending sources never enter analysis')
+    driver.click('.sa-boundaries > summary');driver.click_button('Open separate review & reconciliation');driver.interactive('.imports-table tbody button')
+    for number in range(2,13):
+        driver.click_button(f'Review {path.name} record {number}');driver.select('#review-status','Approved');driver.fill('#review-reason','Fictional source and category individually verified for spending analysis');driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','explicit approved categorized fact');driver.interactive('.imports-table tbody button')
+    driver.click_button('Recurring payments');driver.click_button('Review payments for Native subscription');driver.fill('#recurring-label','Verified fictional service');driver.select('#recurring-frequency','Monthly');driver.click('#recurring-subscription');driver.fill('#recurring-reason','Client confirmed these three fictional monthly payments are an active subscription');driver.click_button('Save payment pattern decision');driver.wait_text('.recurring-review','Counselor-classified subscription','subscription evidence confirmed separately')
+    status('spending fixture: explicit source approvals and confirmed subscription saved')
+    driver.client_section('Spending Analysis');ready();period();driver.wait_text('.sa-metrics','$1,160.00','approved spending excludes pending and refund');driver.wait_text('.sa-reconciliation','Unclassified spending purpose $1,160.00','categories never infer spending purpose');driver.wait_text('.sa-reconciliation','Net spending after refunds $1,140.00','exact refund reconciliation')
+    def change(merchant,date,role,reason):
+        driver.select(f"select[aria-label='Type for {merchant} on {date}']",role);driver.interactive('#spending-reason');driver.fill('#spending-reason',reason);driver.click('#spending-ack');driver.click_button('Save spending type');driver.wait_text('.spending-analysis > .success-message','Spending type saved.','purpose save explicitly confirmed');ready()
+    change('Native rent','2026-09-01','Necessary','Client verified rent is necessary housing')
+    change('Native dining','2026-09-02','Discretionary','Initial discussion classified the meal as discretionary')
+    for i in range(1,6):change(f'Native coffee {i}',f'2026-09-0{i+2}','Discretionary','Client verified this fictional coffee purchase was discretionary')
+    change('Native subscription','2026-09-09','Discretionary','Client verified this service is discretionary')
+    driver.wait_text('.sa-metrics','$160.00','all discretionary purposes saved');driver.wait_text('.sa-reconciliation','Unclassified spending purpose $0.00','all eligible expense purposes explicit')
+    driver.wait_text('.sa-opportunities','Frequent small purchases','six small discretionary purchases flagged');driver.wait_text('.sa-opportunities','$60.00 · 6 transactions','independent exact small-purchase total');driver.wait_text('.sa-opportunities','Reviewed discretionary subscriptions','confirmed subscription enters opportunity panel');driver.wait_text('.sa-opportunities','$10.00 · 1 transaction','period subscription charge only');driver.wait_text('.sa-opportunities','Discretionary spending above saved budget','actual spending above real target')
+    status('spending fixture: exact classified totals and all three opportunity areas verified')
+    driver.command('POST','/window/rect',{'width':1536,'height':1024});driver.scroll_to('.sa-heading','start');driver.screenshot(artifacts/'native-spending-desktop.png')
+    if driver.observe_script('return document.documentElement.scrollWidth>document.documentElement.clientWidth'):raise SmokeFailure('Spending desktop has horizontal page overflow')
+    # Draft is guarded, and cancellation retains discussion without persisting it.
+    driver.select("select[aria-label='Type for Native dining on 2026-09-02']",'Necessary');driver.fill('#spending-reason','Unsaved private discussion');driver.click("nav[aria-label='Client workspace sections'] button[aria-label='Import statements']");driver.wait_text('[role=alertdialog]','Discard unsaved changes?','purpose navigation guard');driver.click_button('Keep editing');driver.wait_value('#spending-reason','Unsaved private discussion','guard cancellation preserves unsaved reason');driver.click_button('Cancel type change');driver.wait_value("select[aria-label='Type for Native dining on 2026-09-02']",'discretionary','cancel restores saved type in the native widget')
+    change('Native dining','2026-09-02','Necessary','After discussing essential travel, client verified this meal was necessary')
+    driver.wait_text('.sa-metrics','$1,100.00','necessary amount recalculated');driver.wait_text('.sa-metrics','$60.00','discretionary amount recalculated');driver.wait_text('.sa-metrics','94.83%','necessary share recalculated');driver.wait_text('.sa-metrics','5.17%','discretionary share recalculated')
+    if 'Dining' in driver.text('.sa-bars') or 'Discretionary spending above saved budget' in driver.text('.sa-opportunities'):raise SmokeFailure('Stale discretionary chart or budget opportunity remained')
+    driver.wait_text('.sa-metrics','$1,160.00','purpose change preserves gross spending');driver.wait_text('.sa-reconciliation','$1,140.00','purpose change preserves net spending')
+    driver.click("button[aria-label='Classification history for Native dining on 2026-09-02']");driver.wait_text('.sa-history','-100','original imported sign and value retained');driver.wait_text('.sa-history','Initial discussion classified the meal as discretionary','initial purpose retained');driver.wait_text('.sa-history','After discussing essential travel','amended purpose retained');driver.wait_text('.sa-history','America/Chicago','history date zone explicit');driver.scroll_to('.sa-history h3','start');driver.screenshot(artifacts/'native-spending-history.png');driver.click_button('Close classification history')
+    driver.fill('#spending-search','Native coffee 1');driver.click_button('Filter transactions');ready();driver.wait_text('.sa-pagination','1–1 of 1','table-only search')
+    driver.wait_text('.sa-metrics','$1,160.00','table search does not narrow snapshot');driver.click_button('Clear table filters');ready()
+    driver.command('POST','/window/rect',{'width':800,'height':700});driver.scroll_to('.sa-heading','start');driver.screenshot(artifacts/'native-spending-narrow.png')
+    if driver.observe_script('return document.documentElement.scrollWidth>document.documentElement.clientWidth'):raise SmokeFailure('Spending 800px layout has horizontal page overflow')
+    driver.command('POST','/window/rect',{'width':1200,'height':800})
+    status('spending fixture: type amendment, updated metrics/charts, original history, guard, table scope and responsive layout verified')
+    firm=driver.text('.workspace-label strong');folder=data_root/'spending-backups';folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','purpose history included in encrypted backup');backup=driver.text('.backup-file-path')
+    driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','spending workspace locked')
+    if driver.observe_script("return document.querySelector('.spending-analysis,.sa-history')!==null"):raise SmokeFailure('Private spending analysis remained on lock')
+    restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Quinn Analysis');driver.client_section('Spending Analysis');ready();period();driver.wait_text('.sa-metrics','$1,100.00','purpose saved across complete process restart')
+    driver.click('.lock-button');driver.wait_text('.auth-card','Welcome back','restart result locked before recovery');driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review',firm,'spending backup verified');driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','spending backup activated');driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Quinn Analysis');driver.client_section('Spending Analysis');ready();period();driver.wait_text('.sa-metrics','$1,100.00','purpose restored from encrypted backup');driver.wait_text('.sa-metrics','$60.00','discretionary totals restored exactly');driver.click("button[aria-label='Classification history for Native dining on 2026-09-02']");driver.wait_text('.sa-history','Initial discussion classified the meal as discretionary','original purpose history restored');driver.wait_text('.sa-history','After discussing essential travel','amendment reason restored');driver.click_button('Close classification history')
+    driver.open_client('Robin Synthetic');driver.client_section('Spending Analysis');ready()
+    if 'Native dining' in driver.text('.spending-analysis') or 'Native analysis checking' in driver.text('.spending-analysis'):raise SmokeFailure('Spending evidence crossed client boundary')
+    driver.open_client('Alex Fictional');driver.client_section('Profile & intake')
+    status('Spending Analysis: approved-only exact totals, real budget/subscription/small-purchase opportunities, discussion-bound purpose edits, all affected metrics and charts refreshed, guard cancellation, immutable original/history, table scope, desktop/800px layout, lock privacy, full restart, encrypted recovery and client isolation')
 
 
 def check_inactivity_policy(driver: WebDriver, artifacts: Path, data_root: Path,
@@ -3613,7 +3675,7 @@ def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:
     driver.wait_text(".firm-branding", "No branding changes yet", "branding page is a working saved form")
     driver.open_client("Alex Fictional")
     driver.interactive("#first-name")
-    status("three main pages and twelve client sections, saved planner data, isolated client context, future areas and report/admin separation")
+    status("three main pages and thirteen client sections, saved planner data, isolated client context, future areas and report/admin separation")
 
 
 def check_client_care(driver: WebDriver, artifacts: Path, label: str, initial: bool = False) -> None:

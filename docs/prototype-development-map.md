@@ -1,12 +1,12 @@
-# Prototype structure and development map — 0.46.0 source
+# Prototype structure and development map — 0.47.0 source
 
 The user requested the [client workspace redesign](client-workspace-redesign.md)
 using a supplied layout reference. The global sidebar now contains Dashboard,
 Clients and Settings. A directory-only Clients page opens stable-ID in-app client
-tabs. Each client workspace exposes twelve focused sections in a local rail:
+tabs. Each client workspace exposes thirteen focused sections in a local rail:
 Overview, Profile & intake, Session notes, Monthly budget, Debt payoff, Savings &
 sinking funds, Cash-flow calendar, Scenario comparisons, Import statements,
-Review & reconciliation, Financial dashboard and Assessments & reports.
+Review & reconciliation, Spending Analysis, Financial dashboard and Assessments & reports.
 
 `App.tsx` owns scoped active-tab navigation and draft/busy guards;
 `ClientDirectory.tsx`, `ClientWorkspaceLayout.tsx`, `ClientOverview.tsx` and
@@ -41,7 +41,7 @@ A CRUD-oriented interface does not justify deleting audit evidence or rewriting
 an assessment already given to a client. Destructive lifecycle work needs explicit
 retention policy, source dependency checks, audit and recovery acceptance.
 
-## Spending Analysis — working implementation, native acceptance in progress
+## Spending Analysis — working, focused native acceptance passed
 
 The client workspace has a thirteenth section, **Spending Analysis**. It reuses
 approved bank/card sources and existing purpose-review histories, with exact
@@ -259,3 +259,12 @@ access. Existing workspaces/older backups retain the 15-minute default. Recovery
 validates history, password changes preserve it and UI locking clears private
 state. Pending review/preview expiry remains fixed. See
 [design and validation scope](inactivity-locking.md).
+
+### 0.47.0 — approved spending analysis and reviewed Type changes
+
+`SpendingAnalysis.tsx` and `spending_analysis.rs` supply exact live bank/card
+spending, category charts, table filters, comparison and supported opportunities.
+Discussion-bound Necessary/Discretionary changes reuse existing immutable purpose
+stores, preserve source evidence and captured reports, recalculate current results
+and require renewed card completeness review. Schema 29 remains unchanged.
+See [scope and limits](spending-analysis.md) and [executed validation](development-status.md).

@@ -442,3 +442,18 @@ and debt inputs, checks the $200/$0 mismatch and unknown balances, cancels and
 accepts the actual in-app discard dialog, verifies isolation/tab deduplication/MRU
 close, inspects an 800px window and tests locking plus a full offline restart.
 Keep WebKit sandboxing enabled. See development status for actual run outcomes.
+
+The 0.47.0 workflow adds a separate Quinn Analysis client with synthetic bank
+statements. It checks pending exclusion, explicit individual approvals, source-
+confirmed subscriptions and a saved discretionary budget. It classifies eight
+expenses via the Spending Analysis Type control, independently checks $1,160 gross,
+$1,140 net, $160 discretionary, six small purchases totaling $60, a $10 reviewed
+subscription and $60 above the real target. A $100 change to Necessary preserves
+gross/net, updates necessary to $1,100 (94.83%) and discretionary to $60 (5.17%),
+removes the discretionary Dining bar and budget flag, and preserves both purposes
+and original imported values in History. It exercises the actual discard dialog,
+table-only filtering, thirteen client sections, desktop/800px page overflow,
+private lock clearing, full process restart, encrypted backup restoration of
+classifications/reasons and second-client isolation. Screenshots:
+`native-spending-desktop.png`, `native-spending-history.png`,
+`native-spending-narrow.png`. Results are recorded only after the run finishes.

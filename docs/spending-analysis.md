@@ -94,7 +94,7 @@ savings. Select a prompt to inspect its contributing transactions.
   payments. Merchant names alone never establish a subscription. Card subscription
   confirmation is not implemented; card recurring activity can be a candidate.
 - **Frequent small purchases:** at least five discretionary expenses strictly
-  under $15 in the selected period. Exactly $15 is outside this threshold.
+  under $15 in the selected period. Exactly $15, fees and interest are outside this threshold.
 - **Discretionary spending above saved budget:** actual discretionary spending
   above the saved monthly discretionary budget times the selected month count.
   Available for All accounts only, with at least one saved discretionary line and
@@ -107,6 +107,7 @@ savings. Select a prompt to inspect its contributing transactions.
 Evidence stays within the authenticated firm/counselor/client scope and existing
 encrypted workspace/backup stores. Schema 29 and old report formats are unchanged.
 Existing safety limits remain: 20,000 eligible analysis rows, 10/25/50 table rows,
-100 bank financial-facts reviews and 50 card-completeness snapshots per client.
+100 bank financial-facts reviews and 50 card-completeness snapshots per client;
+500 bank purposes and 4,000 card purposes per snapshot.
 Reaching a limit fails safely and retains history; history is never truncated.
 This page is a live analysis view, with no new saved-analysis or export format.

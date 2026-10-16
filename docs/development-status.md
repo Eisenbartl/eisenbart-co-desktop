@@ -1,6 +1,6 @@
 # Development status
 
-## Current work — client Spending Analysis
+## Current stage — client Spending Analysis (0.47.0, schema 29 unchanged)
 
 Implemented the user-requested approved/categorized spending workspace with exact
 Rust totals, category charts, evidence-based opportunities, source-bound purpose
@@ -8,10 +8,32 @@ edits, retained original data and existing immutable history. See
 [usage, calculation basis and limits](spending-analysis.md). The client rail now
 has thirteen sections. Schema 29 and historical report formats are unchanged.
 
-Working milestone checks: production frontend build, all 281 UI tests (38 files),
-and five focused Rust analysis tests passed. Complete Rust/Clippy and native
-desktop checks are in progress; this milestone does not yet claim those checks or
-a new tested installer.
+Executed source checks on 2026-10-16 (America/Chicago): production frontend build,
+all 281 UI tests (38 files), all 251 Rust library + 2 PDF-worker tests and Clippy
+all targets with warnings denied passed. Final focused UI and Rust tests also
+passed after the native fixes. The standalone debug build embeds frontend assets.
+
+The focused native workflow passed with exit 0 and its final completion marker.
+It verified original pending exclusion, source approvals, a real saved budget and
+confirmed subscription, exact gross/refund/net amounts, all three opportunity
+areas, discussion-bound edits and affected shares/bars/flags, original/history
+preservation, explicit Cancel/discard guards, table scope, thirteen client sections,
+desktop/800px layouts, lock privacy, full process restart, encrypted recovery and
+client isolation. Desktop and narrow screenshots were visually inspected.
+Artifacts: `/workspace/shared/desktop-smoke-spending-focused-final`.
+
+Two earlier native attempts are retained separately and are not passes. The first
+driver tried to click the separate-review link inside a closed details panel; it
+now opens the panel. The second exposed a WebKit native dropdown retaining an
+unsaved visible selection after Cancel. Remounting the native select on draft/
+saved-type transitions fixes cancellation and a second edit; unit/native checks
+assert the restored saved value. Checkbox sizing and heading scroll offsets were
+also corrected from actual rendered views. Repeated card edits retain only the
+latest annotation in the current conclusion, with all earlier snapshots unchanged.
+Fees/interest are excluded from the frequent-small-purchase count.
+
+Complete native regression and the updated Windows installer are the remaining
+acceptance checks. No new installer is claimed tested until those checks finish.
 
 
 ## Previous stage — client workspace redesign (0.46.0, schema 29 unchanged)

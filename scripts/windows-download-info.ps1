@@ -68,8 +68,15 @@ text PDF transaction review; recurring-payment and running-balance review; appro
 data dashboards; saved scenarios; counselor and client-plan PDF reports.
 
 NEW IN THIS VERSION
+Spending Analysis adds approved/categorized spending cards, a category donut,
+discretionary bars, transaction Type editing and evidence-based opportunities.
+Discuss necessary/discretionary purpose with the client, enter a reason and save;
+all current results refresh. Original imports and purpose history are retained.
+Import and approval remain separate. Card purpose changes require renewed card
+completeness review; this page does not silently renew final readiness.
+
 Clients is now a searchable directory. Open workspace creates an in-app client
-tab, with twelve focused sections and separate review subtabs. Overview uses real
+tab, with thirteen focused sections and separate review subtabs. Overview uses real
 saved planning figures with source labels, unknown amounts and debt/budget mismatch
 warnings. Existing calculations, statement approvals and historical reports remain
 available. Settings includes password changes and 1-60 minute inactivity locking.
@@ -86,8 +93,11 @@ TRY THIS
    Temporary inputs reset when leaving; saved snapshots and live plans are separate.
 5. Import statements, then approve individual source facts in Review & reconciliation.
    Financial dashboard shows approved period activity, separate from planning estimates.
-6. Use Assessments & reports to record an assessment/action plan and export a PDF.
-7. Create an encrypted backup in Settings. Keep its original password even after
+6. Open Spending Analysis, choose months/accounts and review approved spending.
+   Change an expense Type after discussion, save and inspect refreshed metrics and
+   History. Opportunity prompts use actual evidence and saved planning targets.
+7. Use Assessments & reports to record an assessment/action plan and export a PDF.
+8. Create an encrypted backup in Settings. Keep its original password even after
    changing the current workspace password; backups keep the password from creation.
 
 This is an evaluation build. Use fictional records only. There is no forgotten-

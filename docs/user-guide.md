@@ -1,11 +1,20 @@
 # Windows evaluation guide
 
-This guide describes the **0.46.0 client workspace**. See the [Windows download
+This guide describes the **0.47.0 client workspace**. See the [Windows download
 instructions](windows.md) for the exact verified installer/build; source tests
 alone do not establish a downloadable package. Use fictional records while
 evaluating this unsigned development build. Independent security review and clean
 installed Windows 11 offline acceptance remain pending. There is no forgotten-
 password reset.
+
+## Spending Analysis
+
+Open a client tab and select **Spending Analysis** for approved, categorized
+spending cards, category charts, transaction details and opportunity prompts.
+Choose the date/account scope. After discussing a spending purpose, select its
+Type, enter the reason, confirm the discussion and save. All current results
+refresh together; original imports and prior classifications stay in History.
+Import/approval controls remain separate. [Usage, exact totals and safeguards](spending-analysis.md).
 
 ## Client directory and workspaces
 
@@ -15,10 +24,10 @@ client in an in-app tab; reopening the same stable ID focuses the existing tab.
 Close the active tab to return to the most recently used remaining client, or All
 clients. Tabs and private drafts clear when the workspace locks.
 
-A client's first visit opens **Overview**. Choose one of twelve sections in the
+A client's first visit opens **Overview**. Choose one of thirteen sections in the
 local rail: Overview, Profile & intake, Session notes, Monthly budget, Debt payoff,
 Savings & sinking funds, Cash-flow calendar, Scenario comparisons, Import
-statements, Review & reconciliation, Financial dashboard and Assessments & reports.
+statements, Review & reconciliation, Spending Analysis, Financial dashboard and Assessments & reports.
 At narrower window sizes the rail scrolls horizontally. Only the selected section
 is shown. Save edits before switching; choose **Keep editing** in a discard dialog
 to return and save, or explicitly choose **Discard changes**. Ongoing writes hold
