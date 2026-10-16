@@ -17,7 +17,7 @@ Backups retain their captured policy, and password rotation preserves it. Fixed
 15-minute preview/restore-review lifetimes remain independent. History retains at
 most 1,000 changes and displays the latest ten. See [behavior and limits](inactivity-locking.md).
 
-Validation in progress on 2026-10-16 (America/Chicago):
+Validation on 2026-10-16 (America/Chicago):
 
 | Check | Result |
 |---|---|
@@ -27,8 +27,8 @@ Validation in progress on 2026-10-16 (America/Chicago):
 | Complete Linux backend | Passed 244 library + 2 PDF-worker tests, exit 0 |
 | Formatting / Clippy | Passed formatting and all-target Clippy with warnings denied |
 | Standalone native build | Passed debug build with embedded assets, no bundles |
-| Focused native workflow / visual inspection | Passed exit 0 and final completion marker: actual one-minute idle lock, private UI clearing, restart, encrypted policy recovery and unchanged notes; Security screen readable without horizontal overflow |
-| Complete native workflow | Rerun in progress against core application source `ab29591` with explicit driver subtab selection |
+| Focused native workflow / visual inspection | Passed core and final `5914512` follow-up with exit 0 and final markers: actual one-minute idle lock, private UI clearing, restart, encrypted policy recovery, unchanged notes and password rotation; final Security screen readable without horizontal overflow |
+| Complete native workflow | Passed exit 0, durable exit file `0` and final completion marker on core application source `ab29591`, with explicit driver subtab selection; all prior assertions plus real one-minute idle lock, restart, encrypted policy recovery and password rotation |
 | Windows source validation | Not run: proxy still rejects api.github.com with HTTP 403 |
 | Installer | Not created, per user instruction |
 
@@ -63,20 +63,31 @@ assertions (`/workspace/shared/desktop-smoke-inactivity-diagnostic`). The timeou
 was not reproduced by the fast-read unit fixture. Final UI review nevertheless
 explicitly pairs synchronous parent busy assertions with completion releases in
 both security forms, covering fast promise settlement within a render batch.
-All 260 UI tests and the production build pass for that follow-up. Final native
-verification of the follow-up is pending; the complete run uses the unchanged
-core binary. No storage, key, timeout or financial implementation changed.
+All 260 UI tests and the production build pass for that follow-up (`5914512`).
+A new standalone build and the final focused native workflow also passed exit 0,
+durable exit file `0` and both specific feature markers plus the final completion
+marker. It starts from History & records and verifies real idle locking, private
+UI clearing, restart, encrypted policy recovery, password rotation and both
+original-password backup generations. The complete run tests the core binary;
+this final focused run tests the busy-guard follow-up. No storage, key, timeout or
+financial implementation changed.
 
 A narrow environment network draft adding only `api.github.com` was saved for
 review; it does not apply until reviewed/saved and published in environment
 settings. Existing package-manager access and setup configuration were preserved.
 
-Feature source is committed as `ab29591`. All Cargo checks finished before the
-standalone build; no Cargo commands run during native verification. Focused native
-artifacts use `/workspace/shared/desktop-smoke-inactivity-focused`; complete-run
-artifacts use `/workspace/shared/desktop-smoke-inactivity`. Logs and the independent
-focused helper are preserved under `/workspace/shared/inactivity-validation`.
-Only fictional data and generated test passwords were used.
+Feature source is committed as `ab29591`, with the UI/driver follow-up in
+`5914512`. All Cargo checks finished before the first standalone build; no Cargo
+commands ran during any native verification. The final rebuild ran only after the
+complete native process finished. Core focused artifacts use
+`/workspace/shared/desktop-smoke-inactivity-focused`; complete-run artifacts use
+`/workspace/shared/desktop-smoke-inactivity`; final follow-up artifacts use
+`/workspace/shared/desktop-smoke-inactivity-final`. Core/full/final Security images
+were visually inspected. Logs, durable exit files and independent focused helpers
+are preserved under `/workspace/shared/inactivity-validation`. Every native test
+process stopped, temporary synthetic application data was removed and all driver
+ports were closed. WebKit sandboxing stayed enabled. Only fictional data and
+generated test passwords were used.
 
 No source has been pushed. Installed Windows offline recovery, physical
 power-loss/full-disk/removable-drive drills, independent security review and
