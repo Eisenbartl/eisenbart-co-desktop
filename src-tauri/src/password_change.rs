@@ -406,8 +406,13 @@ mod tests {
         let note = w
             .add_client_note(&client.id, "Synthetic migration note")
             .unwrap();
-        let before = contents(&w.session().unwrap().connection);
-        let c = &mut w.session().unwrap().connection;
+        w.session()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TABLE workspace_security_history;")
+            .unwrap();
+        let before = contents(&w.session.as_ref().unwrap().connection);
+        let c = &mut w.session.as_mut().unwrap().connection;
         c.execute_batch("PRAGMA user_version=27; CREATE TABLE audit_events_v28(collision TEXT);")
             .unwrap();
         assert!(migrate(c, false).is_err());
@@ -422,9 +427,15 @@ mod tests {
         assert_eq!(
             c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
                 .unwrap(),
-            28
+            SCHEMA_VERSION
         );
-        assert_eq!(contents(c), before);
+        assert_eq!(
+            contents(c)
+                .into_iter()
+                .filter(|(name, _)| name != "workspace_security_history")
+                .collect::<Vec<_>>(),
+            before
+        );
         assert_eq!(w.list_client_notes(&client.id).unwrap(), vec![note]);
     }
 }

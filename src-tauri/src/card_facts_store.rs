@@ -643,7 +643,7 @@ mod tests {
         let r = fixture(&mut w, &c.id, root.path());
         let before = json(&r.choices).unwrap();
         let conn = &mut w.session().unwrap().connection;
-        conn.execute_batch("DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE card_facts_history; PRAGMA user_version=24; CREATE TABLE audit_events_v25(collision TEXT);").unwrap();
+        conn.execute_batch("DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE card_facts_history; PRAGMA user_version=24; CREATE TABLE audit_events_v25(collision TEXT);").unwrap();
         assert!(migrate(conn, false).is_err());
         assert_eq!(
             conn.pragma_query_value(None, "user_version", |r| r.get::<_, i32>(0))

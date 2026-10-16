@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.44.0 source
+# Prototype structure and development map — 0.45.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -89,7 +89,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Documents → Statement accounts (working) | `StatementAccounts.tsx`, `statement_accounts_store`, schema 19 | Scoped standalone create/rename/archive/reactivate, revision/audit/recovery checks; original source/report associations preserved; no destructive deletion |
 | Settings → Branding — working in 0.30.0 | `FirmBranding.tsx`, `branding.rs`, `branding_store.rs`, schema 20, format-6 assessments | Implemented bounded normalized local PNG/contact/disclosure, guarded revision/audit saves, exact immutable capture, old payload/digest preservation and recovery; see [limits and future work](firm-report-branding.md) |
 | Settings → Counselors & roles | Auth/session/storage ownership and role model before UI CRUD | Explicit account lifecycle and permissions for reads/writes/approvals/reports/admin, fail-closed access, isolation and recovery drills |
-| Settings → Security — password change working in 0.44.0 | `PasswordChange.tsx`, `password_change.rs`, generation activation and command operation lock; schema 28 | Current-password authentication, new confirmation, retained-copy disclosure, verified copy-before-switch, failure rollback, interrupted processes, stale instances, old/new backup passwords and private UI clearing. Configurable inactivity and independent/installed Windows acceptance remain open. [Usage](workspace-password-change.md) |
+| Settings → Security — password change and configurable inactivity working through 0.45.0 | `PasswordChange.tsx`, `password_change.rs`, `InactivitySettings.tsx`, `security_policy.rs`, generation activation and command operation lock; schema 29 | Current-password authentication, new confirmation, retained-copy disclosure, verified copy-before-switch, failure rollback, interrupted processes, stale instances, old/new backup passwords and private UI clearing. Versioned 1–60 minute inactivity settings now preserve the legacy 15-minute default, use no-refresh background reads, enforce other-instance shortening, and survive restart/recovery; independent/installed Windows acceptance remains open. [Usage](workspace-password-change.md) |
 | Settings → Backup & recovery | `backup.rs`; current verified recovery flow already works | Scheduled backups/retained-copy selection need bounded local scheduling, failures, durable restore and clean Windows offline drills |
 | Settings → Data management | Authorized client export/retention/deletion services | Reviewable scope/dependencies, encryption/disclosure, audit, no cross-client data loss, cancellation and recovery tests |
 | Settings → Licensing | Offline license/update architecture and distribution metadata | Offline grace/expiry rules, signed updates/installers, third-party license inventory, support/legal review; no certification claims |
@@ -102,7 +102,7 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-The 0.44.0 source implements **local workspace password change and recovery safeguards** in Settings → Security. Complete independent security and installed Windows interruption/recovery acceptance before real use. Next bounded implementation priority: configurable inactivity locking, with backend-owned bounds and timeout enforcement, preserved lock privacy and existing fixed-timeout compatibility. Scheduled backups and retained-copy selection/pruning remain separate work. See [password-change usage and design](workspace-password-change.md).
+The 0.44.0 source implements **local workspace password change and recovery safeguards** in Settings → Security. Complete independent security and installed Windows interruption/recovery acceptance before real use. Configurable inactivity locking is implemented in 0.45.0; see [policy and limits](inactivity-locking.md). Next bounded implementation priority after outstanding acceptance: explicitly reviewed retained-workspace recovery selection with original-password verification and validation before activation. Destructive pruning and scheduled backups remain separate work. See [password-change usage and design](workspace-password-change.md).
 
 Client history and reviewed note corrections are implemented in 0.43.0; see [usage and limits](client-history.md).
 
@@ -249,3 +249,13 @@ cooperating stale instances from writing to a retired generation. Older backups
 and retained copies keep their original passwords; no forgotten-password reset
 is introduced. Schema 28 only extends immutable audit events. See
 [design and limits](workspace-password-change.md) and executed development status.
+
+### 0.45.0 — encrypted configurable inactivity policy
+
+Settings → Security saves immutable revisioned 1–60 minute policy changes with
+atomic audit. Rust uses the latest policy for every authenticated access and
+background expiry; observation does not refresh activity and corruption locks
+access. Existing workspaces/older backups retain the 15-minute default. Recovery
+validates history, password changes preserve it and UI locking clears private
+state. Pending review/preview expiry remains fixed. See
+[design and validation scope](inactivity-locking.md).

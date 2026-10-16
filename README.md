@@ -1,5 +1,7 @@
 # Eisenbart & Co. Financial Counseling Suite
 
+Version **0.45.0 source** adds [configurable inactivity locking](docs/inactivity-locking.md): a backend-enforced 1–60 minute workspace policy, encrypted history, stale-save protection and policy-preserving recovery. Existing workspaces default to 15 minutes. No installer was created.
+
 Version **0.44.0 source** adds [workspace password changes and recovery safeguards](docs/workspace-password-change.md): current-password verification, a verified new encrypted generation, atomic activation and locking. Older backups and retained copies keep their original passwords. No installer was created.
 
 Version **0.43.0 source** adds [client history and reviewed note corrections](docs/client-history.md): searchable dated records, explicit corrections with original versions retained, and current-note selection for new reports while old reports keep their exact evidence. No installer was created.

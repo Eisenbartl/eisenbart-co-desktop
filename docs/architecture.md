@@ -283,3 +283,13 @@ requires explicit retained-copy password acknowledgment and returns to locked
 UI after success. A separate credential-free lock event communicates committed
 password changes even before the IPC response arrives. No in-place rekey, new KDF, reset service or financial mutation
 is introduced. See [password-change design](workspace-password-change.md).
+
+`storage::security_policy` validates encrypted schema-29 immutable inactivity
+history and atomically saves revision-checked 1–60 minute settings with audit.
+Existing workspaces default to 15 minutes. Session expiry reads the latest policy
+without activity refresh and locks on invalid/unreadable data. Unlock/recovery
+validate the policy; password generation changes preserve it. `InactivitySettings`
+and shared Settings draft/busy aggregation protect concurrent forms. The normal
+15-second timer and existing keyboard/pointer heartbeat remain, while pending
+review/inspection lifetimes remain fixed at 15 minutes. See
+[inactivity policy design and limits](inactivity-locking.md).

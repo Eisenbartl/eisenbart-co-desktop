@@ -639,7 +639,7 @@ mod tests {
             .unwrap();
         let rules = serde_json::to_vec(&w.get_category_rules(&client.id).unwrap()).unwrap();
         let c = &mut w.session.as_mut().unwrap().connection;
-        c.execute_batch("DROP TABLE note_amendments; DROP INDEX note_amendment_scope; PRAGMA user_version=26; CREATE TABLE audit_events_v27(collision TEXT);").unwrap();
+        c.execute_batch("DROP TABLE IF EXISTS workspace_security_history; DROP TABLE note_amendments; DROP INDEX note_amendment_scope; PRAGMA user_version=26; CREATE TABLE audit_events_v27(collision TEXT);").unwrap();
         assert!(migrate(c, false).is_err());
         assert_eq!(
             c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))

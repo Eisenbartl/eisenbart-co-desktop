@@ -939,6 +939,20 @@ async fn unlock_workspace(
 }
 
 #[tauri::command]
+fn get_security_policy(
+    state: State<'_, DesktopState>,
+) -> Result<storage::security_policy::Policy, String> {
+    access(&state, Workspace::get_security_policy)
+}
+#[tauri::command]
+fn save_security_policy(
+    state: State<'_, DesktopState>,
+    input: storage::security_policy::Input,
+) -> Result<storage::security_policy::Policy, String> {
+    access(&state, |w| w.save_security_policy(input))
+}
+
+#[tauri::command]
 async fn change_workspace_password(
     state: State<'_, DesktopState>,
     input: storage::password_change::PasswordChangeInput,
@@ -1381,6 +1395,8 @@ pub fn run() {
             unlock_workspace,
             lock_workspace,
             change_workspace_password,
+            get_security_policy,
+            save_security_policy,
             workspace_info,
             list_clients,
             get_client,

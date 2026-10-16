@@ -552,6 +552,7 @@ impl Workspace {
         if ids.len() > 1000 {
             return Err("This backup exceeds the current 1,000-client recovery limit. Your current workspace has not been changed.".into());
         }
+        security_policy::read(&connection, &workspace_info)?;
         branding_store::read(&connection, &workspace_info)?;
         for id in &ids {
             scoped_client(&connection, &workspace_info, id)?;
@@ -1051,12 +1052,48 @@ mod tests {
             .is_err());
     }
     #[test]
+    fn authenticated_container_with_corrupt_security_history_cannot_replace_workspace() {
+        let (root, mut w, _) = configured();
+        let target = tempdir().unwrap();
+        w.save_security_policy(security_policy::Input {
+            expected_revision: 0,
+            idle_minutes: "5".into(),
+        })
+        .unwrap();
+        let meta = w.read_metadata().unwrap();
+        let key = derive_key(PASSWORD, &meta.salt).unwrap();
+        let snapshot = target.path().join("security-corrupt.db");
+        export_snapshot(&w.session.as_ref().unwrap().connection, &snapshot, &key).unwrap();
+        let connection = open_encrypted(&snapshot, &key).unwrap();
+        connection.execute_batch("DROP TRIGGER workspace_security_no_update; UPDATE workspace_security_history SET saved_at='invalid';").unwrap();
+        drop(connection);
+        let header = Header {
+            version: 1,
+            metadata: meta,
+            created_at: timestamp(),
+            backup_id: Uuid::new_v4().to_string(),
+            schema_version: SCHEMA_VERSION,
+        };
+        let backup = target.path().join("security-corrupt.ebcbackup");
+        write_container(&backup, &header, &snapshot, &key).unwrap();
+        w.lock_workspace();
+        let original = fs::read(root.path().join(DATABASE_NAME)).unwrap();
+        assert!(w
+            .prepare_restore(backup.display().to_string(), PASSWORD.into())
+            .is_err());
+        assert!(w.pending_restore.is_none());
+        assert_eq!(fs::read(root.path().join(DATABASE_NAME)).unwrap(), original);
+        assert!(!root.path().join(POINTER).exists());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(w.get_security_policy().unwrap().idle_minutes, 5);
+    }
+    #[test]
     fn older_schema_snapshot_migrates_in_staging_and_failure_preserves_active_files() {
         let (root, mut w, _) = configured();
         let client = all_records(&mut w);
         let target = tempdir().unwrap();
         let connection = &w.session.as_ref().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; CREATE TABLE audit_events_v6 (
+        connection.execute_batch("DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; CREATE TABLE audit_events_v6 (
             id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
             event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved','cashflow_plan_saved')),
             entity_id TEXT,created_at TEXT NOT NULL,

@@ -614,7 +614,7 @@ mod tests {
         );
         let original = serde_json::to_vec(&s).unwrap();
         let conn = &mut w.session().unwrap().connection;
-        conn.execute_batch("DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE category_rule_applications; DROP TABLE category_rule_versions; DROP INDEX review_history_rule_scope; PRAGMA user_version=25; CREATE TABLE audit_events_v26(collision TEXT);").unwrap();
+        conn.execute_batch("DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE category_rule_applications; DROP TABLE category_rule_versions; DROP INDEX review_history_rule_scope; PRAGMA user_version=25; CREATE TABLE audit_events_v26(collision TEXT);").unwrap();
         assert!(migrate(conn, false).is_err());
         assert_eq!(
             conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))

@@ -439,3 +439,5 @@ export interface ClientHistoryPage {clientId:string;snapshot:string;offset:numbe
 
 export interface PasswordChangeResult {durabilityWarning:boolean}
 export interface PasswordChangeInput {currentPassword:string;newPassword:string;confirmation:string;acknowledgeRetainedCopies:boolean}
+
+export interface SecurityPolicy {revision:number;idleMinutes:number;totalChanges:number;history:{revision:number;idleMinutes:number;savedAt:string}[]}

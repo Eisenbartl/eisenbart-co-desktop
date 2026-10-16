@@ -1,6 +1,58 @@
 # Development status
 
-## Current stage — workspace password change and recovery safeguards (0.44.0, schema 28)
+## Current stage — configurable inactivity locking (0.45.0, schema 29)
+
+Settings → Security now saves an encrypted, versioned inactivity timeout from 1
+through 60 whole minutes. Automatic locking cannot be disabled; existing
+workspaces default to 15 minutes. Rust enforces the latest policy before workspace
+access and on the existing 15-second timer, without treating policy reads or
+background checks as activity. A corrupt policy locks the session. Other idle
+instances running this version honor shorter limits without resetting activity.
+Close older application versions before upgrading or changing the policy.
+
+Policy saves check the exact revision and atomically append immutable history and
+an audit event. The UI preserves uncertain drafts for explicit reload, coordinates
+busy/dirty state with password changes, and clears private state on locking.
+Backups retain their captured policy, and password rotation preserves it. Fixed
+15-minute preview/restore-review lifetimes remain independent. History retains at
+most 1,000 changes and displays the latest ten. See [behavior and limits](inactivity-locking.md).
+
+Validation in progress on 2026-10-16 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Reused tested repository setup; dependency versions unchanged |
+| Production frontend / UI | Passed build and all 259 tests in 34 files |
+| Focused backend | Passed seven security fixtures, including authenticated corrupt-backup rejection |
+| Complete Linux backend | Passed 244 library + 2 PDF-worker tests, exit 0 |
+| Formatting / Clippy | Passed formatting and all-target Clippy with warnings denied |
+| Standalone native build | Passed debug build with embedded assets, no bundles |
+| Focused native workflow / visual inspection | Passed exit 0 and final completion marker: actual one-minute idle lock, private UI clearing, restart, encrypted policy recovery and unchanged notes; Security screen readable without horizontal overflow |
+| Complete native workflow | In progress |
+| Windows source validation | Not run: proxy still rejects api.github.com with HTTP 403 |
+| Installer | Not created, per user instruction |
+
+The first complete backend attempt passed 243 tests and failed one legacy
+migration fixture. That fixture deliberately removed later security tables but
+then expected authenticated API access after failed migration. The corrected
+fixture directly verifies retained model bytes and additionally verifies that
+normal access locks when the security policy is missing. No production behavior
+or data-preservation assertion was weakened. Its focused rerun and the
+complete backend rerun passed.
+
+A narrow environment network draft adding only `api.github.com` was saved for
+review; it does not apply until reviewed/saved and published in environment
+settings. Existing package-manager access and setup configuration were preserved.
+
+No source has been pushed. Installed Windows offline recovery, physical
+power-loss/full-disk/removable-drive drills, independent security review and
+commercial acceptance remain unverified. The last installer remains 0.23.0.
+
+After this stage and its outstanding acceptance checks, the next bounded priority
+is explicit retained-workspace recovery selection with original-password
+verification. Destructive pruning and scheduled backups remain separate work.
+
+## Workspace password change and recovery safeguards (0.44.0, schema 28)
 
 Settings → Security now requires the current password, a different confirmed new
 password and explicit acknowledgment of retained-copy passwords. Rust creates a

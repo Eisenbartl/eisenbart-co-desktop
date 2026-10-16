@@ -18,7 +18,7 @@ The initial password must have at least 12 characters and at most 1,024 characte
 
 ## Sessions and access
 
-The interface provides a manual lock and locks after 15 minutes of inactivity. Locking removes the active database session from application state and requires the password again. The timeout is fixed in this milestone; user-configurable policies come later. Client-data commands and backup creation reject operations without an authenticated session and enforce organization ownership independently of the selected interface record. Restore verification is deliberately available while locked and authenticates the selected backup using its password; activation requires a verified, current review and explicit confirmation.
+The interface provides a manual lock and a saved 1–60 minute inactivity policy, defaulting to 15 minutes. See [inactivity locking](inactivity-locking.md) for enforcement, original-backup policy and retained history. Locking removes the active database session from application state and requires the password again. Automatic locking cannot be disabled. Timer/policy reads do not refresh activity, and invalid policy history locks access. Close older application versions before changing the policy. Client-data commands and backup creation reject operations without an authenticated session and enforce organization ownership independently of the selected interface record. Restore verification is deliberately available while locked and authenticates the selected backup using its password; activation requires a verified, current review and explicit confirmation.
 
 Initial accounts do not provide separate administrator, counselor, and read-only reviewer roles. Future multi-user work must add and test explicit permissions; organization identifiers alone are not a completed permissions product.
 
@@ -52,7 +52,7 @@ production requirement.
 - Independently review the implemented generation-based password change and retained-copy/original-backup password policy; no reset bypass or master key exists.
 - Extend validated migration failure handling, corruption detection, and interrupted restore tests to installed Windows and future attachments.
 - Test client and organization isolation throughout future imports, calculations, exports, and reports.
-- Add role enforcement, configurable inactivity settings, safe archival/deletion, and data export.
+- Add role enforcement, safe archival/deletion, and data export; independently review and verify installed Windows behavior for the implemented inactivity policy.
 - Review key lifecycle, memory handling, dependency vulnerabilities and licenses, installer signing, and local file permissions.
 - Perform independent security and privacy review before using or selling a production release.
 

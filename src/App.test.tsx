@@ -4,7 +4,7 @@ import App from './App';
 import type { Client, ClientNote, WorkspaceInfo } from './types';
 
 const mocks = vi.hoisted(() => ({
-  changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
+  getSecurityPolicy:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
   getReportPresentation:vi.fn(),chooseReportPresentationPdf:vi.fn(),exportReportPresentation:vi.fn(),
   getCategoryRules:vi.fn(),saveCategoryRule:vi.fn(),reviewRuleCategory:vi.fn(),queryCategorySuggestions:vi.fn(),prepareCategoryDraft:vi.fn(),queryTransactionActivity:vi.fn(),
   desktop: true,
@@ -44,7 +44,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-beforeEach(() => {mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
+beforeEach(() => {mocks.getSecurityPolicy.mockResolvedValue({revision:0,idleMinutes:15,totalChanges:0,history:[]});mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
   mocks.getStatementAccounts.mockImplementation(async(clientId:string)=>({clientId,importRevision:0,accounts:[]}));
   vi.clearAllMocks();
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
@@ -500,7 +500,7 @@ it('guards reviewed note corrections across pages and clients and clears private
 
 it('locks and clears workspace state after password change and shows retained-copy semantics',async()=>{
  const pending=deferred<{durabilityWarning:boolean}>();mocks.changeWorkspacePassword.mockReturnValueOnce(pending.promise);
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Security'}));
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Security'}));await screen.findByLabelText('Inactivity timeout (minutes)');
  for(const [label,value] of [['Current password','Synthetic-original-123'],['New password','Synthetic-new-456'],['Confirm new password','Synthetic-new-456']])fireEvent.change(screen.getByLabelText(label),{target:{value}});
  fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'Change password and lock'}));
  expect(screen.getByRole('button',{name:'Branding'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Change workspace password'})).toBeInTheDocument();
@@ -511,10 +511,19 @@ it('locks and clears workspace state after password change and shows retained-co
 
 it('clears private UI on password-change lock notification before the command response arrives',async()=>{
  const pending=deferred<{durabilityWarning:boolean}>();mocks.changeWorkspacePassword.mockReturnValueOnce(pending.promise);
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Security'}));
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Security'}));await screen.findByLabelText('Inactivity timeout (minutes)');
  for(const [label,value] of [['Current password','Synthetic-original-123'],['New password','Synthetic-new-456'],['Confirm new password','Synthetic-new-456']])fireEvent.change(screen.getByLabelText(label),{target:{value}});
  fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'Change password and lock'}));
  act(()=>{(mocks.lockHandler as unknown as (event:{payload:unknown})=>void)({payload:{reason:'password_changed',durabilityWarning:true}});});
  expect(await screen.findByRole('button',{name:'Unlock workspace'})).toBeInTheDocument();expect(screen.queryByLabelText('New password')).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Settings'})).not.toBeInTheDocument();expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('Keep both passwords');
  await act(async()=>pending.resolve({durabilityWarning:false}));expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('Keep both passwords');
+});
+it('preserves inactivity drafts when a sibling password form clears and guards other security controls while saving',async()=>{
+ const pending=deferred<import('./types').SecurityPolicy>();mocks.saveSecurityPolicy.mockReturnValueOnce(pending.promise);
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Security'}));
+ const minutes=await screen.findByLabelText('Inactivity timeout (minutes)');fireEvent.change(minutes,{target:{value:'5'}});fireEvent.change(screen.getByLabelText('New password'),{target:{value:'Synthetic-private-password-draft'}});fireEvent.click(screen.getByRole('button',{name:'Clear password fields'}));
+ vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByRole('button',{name:'Branding'}));expect(screen.getByLabelText('Inactivity timeout (minutes)')).toHaveValue(5);
+ fireEvent.click(screen.getByRole('button',{name:'Save inactivity timeout'}));expect(screen.getByRole('button',{name:'Change password and lock'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Inactivity locking'})).toBeInTheDocument();
+ await act(async()=>pending.resolve({revision:1,idleMinutes:5,totalChanges:1,history:[{revision:1,idleMinutes:5,savedAt:'2026-10-16T13:00:00Z'}]}));expect(screen.getByRole('status')).toHaveTextContent('Inactivity timeout saved');
+ act(()=>mocks.lockHandler?.());expect(screen.queryByLabelText('Inactivity timeout (minutes)')).not.toBeInTheDocument();expect(document.documentElement.outerHTML).not.toContain('Synthetic-private-password-draft');
 });

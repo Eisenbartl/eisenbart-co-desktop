@@ -1822,7 +1822,61 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_category_assistance(driver, artifacts, data_root, password, binary, restart_driver)
     check_category_rules(driver, artifacts, data_root, password, binary, restart_driver)
     check_client_history(driver, artifacts, data_root, password, binary, restart_driver)
+    check_inactivity_policy(driver, artifacts, data_root, password, binary, restart_driver)
     check_password_change(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_inactivity_policy(driver: WebDriver, artifacts: Path, data_root: Path,
+                            password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    def security() -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
+        driver.click_button('Security')
+        driver.interactive('#inactivity-minutes')
+    def save(minutes: str) -> None:
+        driver.fill('#inactivity-minutes',minutes)
+        driver.click_button('Save inactivity timeout')
+        driver.wait_text('.inactivity-settings [role=status]','Inactivity timeout saved.','explicit timeout save')
+    security()
+    driver.wait_value('#inactivity-minutes','15','legacy fifteen-minute default')
+    save('1')
+    driver.click('.inactivity-history > summary')
+    driver.wait_text('.inactivity-history','Revision 1: 1 minutes','immutable policy version')
+    driver.scroll_to('.inactivity-settings','start')
+    driver.screenshot(artifacts/'native-inactivity-policy.png')
+    if driver.observe_script('return document.documentElement.scrollWidth > document.documentElement.clientWidth'):
+        raise SmokeFailure('Security policy screen overflows horizontally')
+    driver.open_client('Alex Fictional')
+    driver.wait_text('.notes-history','Synthetic private note for Alex only.','private client visible before inactivity')
+    started=time.monotonic()
+    # Read-only WebDriver DOM observations neither invoke app commands nor send
+    # keyboard/pointer activity. Exercise the actual Rust timer, without a clock
+    # override or shortened product timeout.
+    driver.wait(lambda:driver.visible('#password'),'real one-minute inactivity lock',seconds=95)
+    if time.monotonic()-started<45:
+        raise SmokeFailure('Workspace locked before a real one-minute idle interval')
+    if driver.visible('.notes-history') or driver.visible('#inactivity-minutes'):
+        raise SmokeFailure('Private UI remained after inactivity locking')
+    driver.fill('#password',password);driver.click_button('Unlock workspace')
+    security();driver.wait_value('#inactivity-minutes','1','saved policy after unlock')
+    restart_driver();driver.open(binary)
+    driver.fill('#password',password);driver.click_button('Unlock workspace')
+    security();driver.wait_value('#inactivity-minutes','1','saved policy after full restart')
+    folder=data_root/'inactivity-policy-backup';folder.mkdir()
+    driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password)
+    driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','custom policy backed up')
+    backups=list(folder.glob('*.ebcbackup'))
+    if len(backups)!=1:raise SmokeFailure('Expected one custom-policy backup')
+    security();save('15')
+    driver.click('.lock-button');driver.click('.restore-panel > summary')
+    driver.fill('#restore-file',str(backups[0]));driver.fill('#restore-password',password)
+    driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review','Verified backup','policy backup review')
+    driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace')
+    driver.wait_text('.auth-card','Workspace restored.','policy backup restored')
+    driver.fill('#password',password);driver.click_button('Unlock workspace')
+    security();driver.wait_value('#inactivity-minutes','1','backup retains original policy rather than later fifteen-minute setting')
+    save('15')
+    driver.open_client('Alex Fictional');driver.wait_text('.notes-history','Synthetic private note for Alex only.','policy restore preserves original notes')
+    status('configurable inactivity policy, default and version history, real one-minute Rust timer lock and private UI clearing, full restart, encrypted policy recovery and unchanged client notes')
 
 
 def check_password_change(driver: WebDriver, artifacts: Path, data_root: Path,

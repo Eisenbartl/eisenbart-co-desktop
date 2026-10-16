@@ -416,3 +416,14 @@ After verifying termination of its own private process group, driver restart
 waits up to 75 seconds for closed TCP ports to be released. Initial occupied-port
 checks still fail before creating test data. This addresses observed WebKit
 TIME_WAIT timing; UI writes, clicks and assertions are never replayed.
+
+## Configurable inactivity (0.45.0 source)
+
+Before the password-change extension, the full harness saves a one-minute
+policy, inspects immutable history and waits for the real Rust timer with only
+read-only DOM observations. No product clock/timeout is overridden. It checks
+private UI clearing, unlock/full restart, encrypted recovery of the originally
+captured one-minute policy after a later change, and original client notes. It
+returns the policy to 15 minutes for the remaining workflow. Screenshot:
+`native-inactivity-policy.png`. The focused wrapper uses a separate synthetic
+workspace and the same visible-control check function.

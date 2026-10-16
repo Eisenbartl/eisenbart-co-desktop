@@ -157,3 +157,12 @@ Unrun or future work includes actual removable-drive/power-loss drills, a clean
 installed Windows 11 recovery workflow, independent crypto/security review,
 scheduled backups, retained-copy selection/pruning, independent password-change security acceptance,
 and inclusion of future document/report file attachments. Authorized original CSVs and PDFs are stored inside SQLCipher, so current backups include their BLOBs, provenance, decisions, and immutable history. There are no separate file attachments yet; the format covers the whole existing database.
+
+## Inactivity policy in backups (0.45.0 source)
+
+Backups retain their original encrypted inactivity policy and its immutable
+history. Restore validates that history before activation. Restoring an older
+backup can restore an older timeout; backups before schema 29 use the original
+15-minute default. Review Settings → Security after recovery. Password changes
+preserve the active policy; original backup-password semantics are unchanged.
+Restore review expiration remains 15 minutes regardless of the workspace policy.
