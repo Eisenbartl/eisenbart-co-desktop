@@ -1810,6 +1810,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
 def check_transaction_history(driver: WebDriver, artifacts: Path, password: str,
                               binary: Path, restart_driver: Callable[[], None]) -> None:
     def ready() -> None:
+        driver.interactive('#workspace-client')
         driver.interactive('#activity-text')
         driver.wait(lambda:driver.visible('.activity-results') is not None,'activity search completed')
     def search(text: str) -> None:
