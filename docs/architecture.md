@@ -309,3 +309,21 @@ reports remain immutable. `SpendingAnalysis` renders local accessible charts,
 filters and a discussion-bound Type editor, clears private state on client/lock
 changes and never retries writes. [Rules and limits](spending-analysis.md). No new
 schema, application dependency, report format or remote service is introduced.
+
+
+## Transaction-focused extraction and atomic dispositions (0.48.0)
+
+The bounded PDF worker still owns text decoding; `statement_pdf.rs` identifies
+transaction candidates and returns read-only suggested selections and exact draft
+sums. The shared React inspector presents those results and sends manual locator
+overrides. Import reparses the captured capability-owned pages, binds the current
+declared statement period, and stores minimal canonical v2 evidence; store reads
+and backup validation replay it. Schema 30 gates older writers without rewriting
+v1/CSV sources or historical report payloads. Card PDF sources use format 2.
+
+Source review plus an optional necessary/discretionary disposition uses one
+immediate SQLite transaction. The exact new approval ID binds the appended bank
+financial-facts or card-facts version, and audit failure rolls back both writes.
+Card saves validate source, facts and profile revisions and clear inventory review.
+Live analysis consumes existing authoritative facts; no parallel financial ledger
+or frontend money arithmetic is introduced. Import and approval remain distinct.

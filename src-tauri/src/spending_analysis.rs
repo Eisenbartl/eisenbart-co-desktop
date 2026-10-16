@@ -813,63 +813,17 @@ impl Workspace {
             {
                 return Err("Card source changed. Reload before changing its type.".into());
             }
-            let mut data = current
-                .snapshot
-                .as_ref()
-                .map(|s| s.data.clone())
-                .unwrap_or_else(|| cf::Data {
-                    from_month: input.query.from_month.clone(),
-                    through_month: input.query.through_month.clone(),
-                    inventory_reviewed: false,
-                    inventory_notes: String::new(),
-                    missing_information: String::new(),
-                    accounts: current
-                        .choices
-                        .accounts
-                        .iter()
-                        .map(|a| cf::Expected {
-                            account_id: Some(a.id.clone()),
-                            label: a.label.clone(),
-                            applicability: cf::Applicability::Unknown,
-                            start: None,
-                            end: None,
-                            notes: String::new(),
-                            source_ids: vec![],
-                            closing_source_id: None,
-                            balance_label: None,
-                        })
-                        .collect(),
-                    classifications: vec![],
-                    conclusion: String::new(),
-                });
-            data.classifications
-                .retain(|x| x.statement_id != statement_id || x.row != row);
-            data.classifications.push(cf::Classification {
+            let data = crate::storage::card_facts_store::purpose_data(
+                &current,
                 statement_id,
                 row,
-                approval_id: input.approval_id,
-                role: match input.role {
+                input.approval_id,
+                match input.role {
                     Role::Necessary => cf::Role::Necessary,
                     Role::Discretionary => cf::Role::Discretionary,
                 },
-            });
-            data.inventory_reviewed = false;
-            // Keep the counselor's conclusion and only replace our own latest annotation.
-            // Every preceding annotation remains in the immutable card-facts history.
-            const MARKER: &str = "[Spending Analysis discussion] ";
-            const END: &str = " Card inventory/completeness requires renewed review.";
-            let base = if data.conclusion.ends_with(END) {
-                data.conclusion
-                    .rsplit_once(MARKER)
-                    .map_or(data.conclusion.as_str(), |(base, _)| base)
-            } else {
-                data.conclusion.as_str()
-            };
-            let base = base.trim_end();
-            data.conclusion = format!(
-                "{base}{}{MARKER}{}{END}",
-                if base.is_empty() { "" } else { " " },
-                reason.split_whitespace().collect::<Vec<_>>().join(" ")
+                &reason,
+                (&input.query.from_month, &input.query.through_month),
             );
             self.save_card_facts(
                 id,

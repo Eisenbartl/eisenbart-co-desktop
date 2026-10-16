@@ -113,7 +113,7 @@ pub(super) fn capture(
     }
     Ok(s)
 }
-fn read(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<Record, String> {
+pub(super) fn read(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<Record, String> {
     let profile = scoped_client(c, w, client)?;
     let history = versions(c, w, client)?;
     let (choices, source) = current_choices(c, w, client)?;
@@ -137,6 +137,128 @@ fn read(c: &Connection, w: &WorkspaceInfo, client: &str) -> Result<Record, Strin
         review_reasons: reasons,
     })
 }
+pub(super) fn save_in_transaction(
+    tx: &Transaction<'_>,
+    info: &WorkspaceInfo,
+    client: &str,
+    input: Input,
+) -> Result<Record, String> {
+    if !input.acknowledge {
+        return Err("Confirm card evidence before saving.".into());
+    }
+    let profile = scoped_client(tx, info, client)?;
+    let previous = versions(tx, info, client)?;
+    let (choices, source) = current_choices(tx, info, client)?;
+    if previous.len() as i64 != input.expected_revision
+        || source != input.expected_source_revision
+        || profile.updated_at != input.expected_profile_updated_at
+    {
+        return Err("Card review, source or client context changed elsewhere. Review latest evidence; your draft was not saved.".into());
+    }
+    if previous.len() >= 50 {
+        return Err("This client reached the 50-version card completeness limit.".into());
+    }
+    let data = review::canonical(input.data, &choices)?;
+    let evaluation = review::evaluate(&data, &choices)?;
+    let snapshot = Snapshot {
+        format: 1,
+        client_id: client.into(),
+        revision: input.expected_revision + 1,
+        source_revision: source,
+        profile_updated_at: profile.updated_at,
+        updated_at: timestamp(),
+        counselor_name: info.counselor_name.clone(),
+        choices,
+        data,
+        evaluation,
+    };
+    review::validate(&snapshot)?;
+    let body = json(&snapshot)?;
+    let total = previous
+        .iter()
+        .map(|s| json(s).map(|b| b.len()))
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
+        .sum::<usize>();
+    if body.len() > review::MAX_JSON || total + body.len() > 16 * 1024 * 1024 {
+        return Err(
+            "Card completeness exceeds the 4 MiB review or 16 MiB client-history limit.".into(),
+        );
+    }
+    tx.execute("INSERT INTO card_facts_history(client_id,organization_id,counselor_id,revision,payload_json,digest) VALUES(?1,?2,?3,?4,?5,?6)",params![client,info.organization_id,info.counselor_id,snapshot.revision,body,hash(&body)]).map_err(storage_error)?;
+    audit(tx, info, "card_facts_saved", Some(client))?;
+    let result = read(tx, info, client)?;
+    Ok(result)
+}
+
+pub(super) fn purpose_data(
+    current: &Record,
+    statement_id: String,
+    row: usize,
+    approval_id: String,
+    role: crate::card_facts::Role,
+    reason: &str,
+    period: (&str, &str),
+) -> crate::card_facts::Data {
+    use crate::card_facts as cf;
+    let mut data = current
+        .snapshot
+        .as_ref()
+        .map(|s| s.data.clone())
+        .unwrap_or_else(|| cf::Data {
+            from_month: period.0.to_owned(),
+            through_month: period.1.to_owned(),
+            inventory_reviewed: false,
+            inventory_notes: String::new(),
+            missing_information: String::new(),
+            accounts: current
+                .choices
+                .accounts
+                .iter()
+                .map(|a| cf::Expected {
+                    account_id: Some(a.id.clone()),
+                    label: a.label.clone(),
+                    applicability: cf::Applicability::Unknown,
+                    start: None,
+                    end: None,
+                    notes: String::new(),
+                    source_ids: vec![],
+                    closing_source_id: None,
+                    balance_label: None,
+                })
+                .collect(),
+            classifications: vec![],
+            conclusion: String::new(),
+        });
+    data.classifications
+        .retain(|x| x.statement_id != statement_id || x.row != row);
+    data.classifications.push(cf::Classification {
+        statement_id,
+        row,
+        approval_id,
+        role,
+    });
+    data.inventory_reviewed = false;
+    // Keep the counselor's conclusion and only replace our own latest annotation.
+    // Every preceding annotation remains in the immutable card-facts history.
+    const MARKER: &str = "[Spending Analysis discussion] ";
+    const END: &str = " Card inventory/completeness requires renewed review.";
+    let base = if data.conclusion.ends_with(END) {
+        data.conclusion
+            .rsplit_once(MARKER)
+            .map_or(data.conclusion.as_str(), |(base, _)| base)
+    } else {
+        data.conclusion.as_str()
+    };
+    let base = base.trim_end();
+    data.conclusion = format!(
+        "{base}{}{MARKER}{}{END}",
+        if base.is_empty() { "" } else { " " },
+        reason.split_whitespace().collect::<Vec<_>>().join(" ")
+    );
+    data
+}
+
 impl Workspace {
     pub fn get_card_facts(&mut self, client: &str) -> Result<Record, String> {
         let s = self.session()?;
@@ -154,48 +276,7 @@ impl Workspace {
             .connection
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(storage_error)?;
-        let profile = scoped_client(&tx, &s.info, client)?;
-        let previous = versions(&tx, &s.info, client)?;
-        let (choices, source) = current_choices(&tx, &s.info, client)?;
-        if previous.len() as i64 != input.expected_revision
-            || source != input.expected_source_revision
-            || profile.updated_at != input.expected_profile_updated_at
-        {
-            return Err("Card review, source or client context changed elsewhere. Review latest evidence; your draft was not saved.".into());
-        }
-        if previous.len() >= 50 {
-            return Err("This client reached the 50-version card completeness limit.".into());
-        }
-        let data = review::canonical(input.data, &choices)?;
-        let evaluation = review::evaluate(&data, &choices)?;
-        let snapshot = Snapshot {
-            format: 1,
-            client_id: client.into(),
-            revision: input.expected_revision + 1,
-            source_revision: source,
-            profile_updated_at: profile.updated_at,
-            updated_at: timestamp(),
-            counselor_name: s.info.counselor_name.clone(),
-            choices,
-            data,
-            evaluation,
-        };
-        review::validate(&snapshot)?;
-        let body = json(&snapshot)?;
-        let total = previous
-            .iter()
-            .map(|s| json(s).map(|b| b.len()))
-            .collect::<Result<Vec<_>, _>>()?
-            .iter()
-            .sum::<usize>();
-        if body.len() > review::MAX_JSON || total + body.len() > 16 * 1024 * 1024 {
-            return Err(
-                "Card completeness exceeds the 4 MiB review or 16 MiB client-history limit.".into(),
-            );
-        }
-        tx.execute("INSERT INTO card_facts_history(client_id,organization_id,counselor_id,revision,payload_json,digest) VALUES(?1,?2,?3,?4,?5,?6)",params![client,s.info.organization_id,s.info.counselor_id,snapshot.revision,body,hash(&body)]).map_err(storage_error)?;
-        audit(&tx, &s.info, "card_facts_saved", Some(client))?;
-        let result = read(&tx, &s.info, client)?;
+        let result = save_in_transaction(&tx, &s.info, client, input)?;
         tx.commit().map_err(storage_error)?;
         Ok(result)
     }

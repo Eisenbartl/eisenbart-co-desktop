@@ -242,6 +242,8 @@ class WebDriver:
 
     def click_button(self, text: str) -> None:
         locator=f"//button[normalize-space(.)={json.dumps(text)}]"
+        if text.startswith('Review card row ') and not self.visible(locator,'xpath'):
+            self.client_section('Review & reconciliation');self.click_button('Card transactions')
         if text.startswith('Review payments for ') and not self.visible(locator,'xpath'):
             self.client_section('Review & reconciliation');self.click_button('Recurring payments')
         if text.startswith('Reverify prior classification for ') and not self.visible(locator,'xpath'):
@@ -255,7 +257,7 @@ class WebDriver:
         local_areas={
             'Session notes':'Session notes','History & records':'Session notes',
             'Profile':'Profile & intake','Intake & follow-ups':'Profile & intake',
-            'Review queue':'Review & reconciliation','Verified figures':'Review & reconciliation',
+            'Card transactions':'Review & reconciliation','Review queue':'Review & reconciliation','Verified figures':'Review & reconciliation',
             'Running balances':'Review & reconciliation','Recurring payments':'Review & reconciliation',
             'Transfer matching':'Review & reconciliation','Source checks':'Review & reconciliation',
             'Classification assistance':'Review & reconciliation','Category rules':'Review & reconciliation',
@@ -322,6 +324,7 @@ class WebDriver:
           (('.combined-scenarios','#scenario-','.saved-scenario'),'Scenario comparisons',None),
           (('#csv-','#statement-format','.pdf-line-selection'),'Import statements',None),
           (('.financial-dashboard','#assessment-from','#assessment-through','.assessment-totals','.assessment-basis','.assessment-review','.classified-totals','.verified-balance-totals','.verified-ratios','.verified-fact-metrics'),'Financial dashboard',None),
+          (('#card-row-','.card-transaction-review','.card-review-history'),'Review & reconciliation','Card transactions'),
           (('.financial-facts','#facts-','#fact-','.facts-classifications'),'Review & reconciliation','Verified figures'),
           (('.statement-balance','#balance-','.balance-'),'Review & reconciliation','Running balances'),
           (('.recurring-','#recurring-'),'Review & reconciliation','Recurring payments'),
@@ -667,10 +670,11 @@ def check_pdf_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> No
     driver.wait_text(".imports-panel [role=alert]", "could not be extracted safely", "damaged PDF rejected without an import")
     driver.fill("#csv-path", str(path))
     driver.click_button("Inspect PDF")
-    driver.wait_text(".pdf-line-selection", "Fictional payroll 1000.01", "real PDF parser process returns selectable source text")
-    driver.wait_text(".pdf-line-selection", "Selected PDF lines: 0 / 500", "no automatic PDF line selection")
-    for date in ["2026-10-01", "2026-10-02"]:
-        driver.click(f"//label[contains(@class,'pdf-source-line')][contains(.,'{date}')]/input", "xpath")
+    driver.wait_text(".pdf-line-selection", "Fictional payroll", "real PDF parser process returns selectable source text")
+    driver.wait_text(".pdf-selected-summary", "Selected transactions: 2 / 500", "clear transaction candidates start selected")
+    for line in [2,3]:
+        box=driver.find(f"input[aria-label='Select PDF page 1 line {line}']")
+        if driver.command("GET",f"/element/{box}/property/checked") is not True:raise SmokeFailure("Clear PDF transaction was not prechecked")
     driver.fill("#csv-account-label", "Synthetic PDF checking")
     driver.fill("#csv-openingBalance", "0")
     driver.fill("#csv-closingBalance", "974.90")
@@ -2013,8 +2017,87 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_category_rules(driver, artifacts, data_root, password, binary, restart_driver)
     check_client_history(driver, artifacts, data_root, password, binary, restart_driver)
     check_spending_analysis(driver, artifacts, data_root, password, binary, restart_driver)
+    check_statement_extraction(driver, artifacts, data_root, password, binary, restart_driver)
     check_inactivity_policy(driver, artifacts, data_root, password, binary, restart_driver)
     check_password_change(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_statement_extraction(driver: WebDriver, artifacts: Path, data_root: Path,
+                               password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """Actual PDF worker, visible selection/review, exact source-bound purposes and recovery."""
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click_button('Add client');driver.fill('#first-name','Morgan');driver.fill('#last-name','Extraction');driver.click_button('Create client')
+    driver.wait_text('.client-workspace-header','Morgan Extraction','separate statement extraction client')
+    path=data_root/'transaction-focused.pdf'
+    path.write_bytes(build_pdf([
+      ['Fictional institution welcome','Questions? Please contact us','Your purchases may be subject to a fee of $25.00'],
+      ['Statement period 2026-09-01 to 2026-09-30','Date Description Amount Balance','Opening balance 0.00',
+       '2026-09-01 Fictional payroll 1000.01 1000.01','2026-09-02 Fictional groceries -25.11 974.90','2026-09-03 Fictional coffee -3.02 971.88','Ending balance 971.88'],
+      ['Member FDIC','Questions? Please contact us','Total withdrawals 28.13']]))
+    driver.client_section('Import statements');driver.select('#statement-format','Selectable-text PDF');driver.fill('#csv-path',str(path));driver.click_button('Inspect PDF')
+    driver.wait_text('.pdf-selected-summary','Selected transactions: 3 / 500','only actual transaction rows start checked')
+    driver.wait_text('.pdf-transaction-inspection','across 1 of 3 source pages','nonfinancial pages excluded from checklist')
+    if driver.observe_script("return document.querySelectorAll('.pdf-candidates tbody tr').length")!=3:raise SmokeFailure('Fine print became a transaction candidate')
+    if 'Questions?' in driver.text('.pdf-candidates'):raise SmokeFailure('Institution fine print entered transaction checklist')
+    driver.wait_text('.pdf-selected-summary','Withdrawals / debits$28.13','running balances excluded from exact selected spending')
+    toggle="input[aria-label='Select PDF page 2 line 6']"
+    if driver.command('GET',f'/element/{driver.find(toggle)}/property/checked') is not True:raise SmokeFailure('Clear coffee transaction was not checked')
+    driver.click(toggle);driver.wait_text('.pdf-selected-summary','Selected transactions: 2 / 500','manual uncheck changes selection count')
+    driver.wait_text('.pdf-selected-summary','Withdrawals / debits$25.11','manual uncheck changes exact debit total')
+    driver.wait_text('.pdf-selected-summary','Net selected movement$974.90','manual uncheck updates net')
+    driver.fill('#csv-account-label','Fictional extracted savings');driver.select('#csv-account-kind','Savings')
+    driver.fill('#csv-openingBalance','0');driver.fill('#csv-closingBalance','971.88')
+    driver.click("//label[contains(.,'Authorize retaining the complete original PDF')]/input",'xpath')
+    driver.click_button('Import into review queue');driver.wait_text('.imports-panel > .success-message','Every PDF record needs individual verification.','PDF capture remains separate from approval')
+    driver.client_section('Review & reconciliation');driver.wait_text('.imports-progress','Needs Clarification 2','only checked transactions imported')
+    if driver.observe_script("return document.querySelectorAll('.imports-table tbody tr').length")!=2:raise SmokeFailure('Unchecked transaction imported')
+    def bank_decide(number:int,kind:str,category:str,purpose:str,reason:str)->None:
+        driver.click_button(f'Review {path.name} record {number}');driver.select('#review-kind',kind);driver.fill('#review-category',category);driver.select('#review-status','Approved')
+        if purpose:driver.select('#review-spending-role',purpose)
+        driver.fill('#review-reason',reason);driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','source and purpose committed')
+    bank_decide(1,'Income','Wages','','Verified original fictional payroll; not a spending purchase')
+    bank_decide(2,'Expense','Food','Necessary spending','Discussed necessary groceries with fictional client')
+    driver.wait_text('.imports-totals','Net spending$25.11','approved-only source totals update')
+    def analysis()->None:
+        driver.client_section('Spending Analysis');driver.interactive('#spending-search');driver.fill('#spending-from','2026-09');driver.fill('#spending-through','2026-09');driver.click_button('Update analysis');driver.interactive('#spending-search')
+    analysis();driver.wait_text('.sa-metrics','$25.11','review purpose automatically appears in Spending Analysis')
+    driver.wait_value("select[aria-label='Type for Fictional groceries on 2026-09-02']",'necessary','necessary purpose source binding')
+    driver.client_section('Review & reconciliation');bank_decide(2,'Expense','Food','Discretionary spending','Client discussed discretionary purpose amendment; preserve original import')
+    analysis();driver.wait_value("select[aria-label='Type for Fictional groceries on 2026-09-02']",'discretionary','review amendment automatically recalculates analysis')
+    driver.wait_text('.sa-metrics','100.00%','exact discretionary percentage updated')
+    card=data_root/'extracted-card.pdf';card.write_bytes(build_pdf([
+      ['Billing period 09/01/2026 to 09/30/2026','Purchases','09/05 Fictional card grocery 40.02','Payments and credits','09/06 Fictional card payment 20.01 CR','Minimum payment due 10.00'],
+      ['Questions? Please contact us','Total purchases 40.02','Member FDIC']]))
+    driver.client_section('Import statements');driver.click_button('Credit-card statements');driver.click('.card-import > summary');driver.select('#card-source-format','Selectable-text PDF');driver.fill('#card-csv-path',str(card));driver.click_button('Inspect card PDF')
+    driver.wait_text('.pdf-selected-summary','Selected transactions: 2 / 200','card transactions preselected without fine print')
+    driver.wait_text('.pdf-selected-summary','Charges / debt increases$40.02','purchase signs recognized')
+    driver.wait_text('.pdf-selected-summary','Payments / debt reductions$20.01','credit marker reduces card debt')
+    for selector,value in [('#card-account','Fictional extracted card'),('#card-period-start','2026-09-01'),('#card-period-end','2026-09-30'),('#card-opening','100'),('#card-closing','120.01')]:driver.fill(selector,value)
+    driver.click('#card-retain');driver.interactive("//button[normalize-space(.)='Save card statement for individual review']",'xpath');driver.click_button('Save card statement for individual review')
+    driver.wait_text('.card-progress','Needs Clarification 2','card PDF does not approve records')
+    if driver.visible("//button[normalize-space(.)='Review card row 1']",'xpath'):raise SmokeFailure('Review decisions leaked into statement import page')
+    driver.client_section('Review & reconciliation');driver.click_button('Card transactions')
+    if driver.visible('.card-import'):raise SmokeFailure('Import controls leaked into card review page')
+    def card_decide(row:int,kind:str,category:str,purpose:str)->None:
+        driver.click_button(f'Review card row {row}');driver.select('#card-row-kind',kind);driver.fill('#card-row-category',category);driver.select('#card-row-status','Approved')
+        if purpose:
+            driver.select('#card-row-purpose',purpose);driver.interactive('#card-row-reason')
+        driver.fill('#card-row-reason','Discussed fictional card source, spending purpose and payment treatment with client');driver.click('#card-row-ack');driver.click_button('Save card transaction decision');driver.wait_text('.card-statements > .success-message','Card transaction decision saved','card decision and purpose saved')
+    card_decide(1,'purchase','Food','Necessary spending');card_decide(2,'payment','Card payment','')
+    driver.wait_text('.card-totals','Net card spendingUSD 40.02','card payment excluded from spending')
+    driver.wait_text('.card-reconciliation','Available statement arithmetic reconciles','selected card source and approved movement reconcile')
+    analysis();driver.wait_text('.sa-metrics','$65.13','bank and card approved spending combined exactly')
+    driver.wait_value("select[aria-label='Type for Fictional card grocery on 2026-09-05']",'necessary','card purpose automatically available in analysis')
+    driver.click("button[aria-label='Classification history for Fictional groceries on 2026-09-02']");driver.wait_text('.sa-history','Discussed necessary groceries','original review-purpose history retained');driver.wait_text('.sa-history','discretionary purpose amendment','amended review-purpose history retained');driver.click_button('Close classification history')
+    driver.scroll_to('.sa-heading','start');driver.screenshot(artifacts/'native-extracted-spending.png')
+    folder=data_root/'extraction-backups';folder.mkdir();firm=driver.text('.workspace-label strong')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','selected evidence and classifications backed up');backup=driver.text('.backup-file-path')
+    driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','extraction workspace locked');restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Morgan Extraction');analysis();driver.wait_text('.sa-metrics','$65.13','automatic classifications persist across process restart')
+    driver.click('.lock-button');driver.wait_text('.auth-card','Welcome back','lock before extraction recovery');driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review',firm,'extraction backup validated');driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','extraction recovery complete');driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Morgan Extraction');analysis();driver.wait_text('.sa-metrics','$65.13','exact bank/card classifications recovered')
+    driver.open_client('Robin Synthetic');driver.client_section('Spending Analysis');driver.interactive('#spending-search')
+    if 'Fictional card grocery' in driver.text('.spending-analysis'):raise SmokeFailure('Extracted financial source crossed client boundary')
+    driver.open_client('Alex Fictional');driver.client_section('Profile & intake')
+    status('transaction-focused bank/card PDFs: excluded fine print/pages/balances, editable preselection and exact draft totals, only selected imports, explicit atomic necessary/discretionary review, automatic combined analysis, unchanged source/history, separate pages, restart, encrypted recovery and client isolation')
 
 
 def check_spending_analysis(driver: WebDriver, artifacts: Path, data_root: Path,
@@ -2795,7 +2878,7 @@ def check_integrated_card_review(driver: WebDriver, artifacts: Path, data_root: 
     def card_page() -> None:
         driver.click("nav[aria-label='Main navigation'] button[aria-label='Documents']")
         driver.select('#workspace-client','Jamie Complete')
-        driver.click_button('Credit-card statements')
+        driver.client_section('Review & reconciliation');driver.click_button('Card transactions')
         driver.interactive("//button[normalize-space(.)='Review card row 2']",'xpath')
     def review_page() -> None:
         driver.click("nav[aria-label='Main navigation'] button[aria-label='Financial Review']")

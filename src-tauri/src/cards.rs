@@ -34,6 +34,8 @@ pub struct Input {
     pub opening_owed: String,
     pub closing_owed: String,
     pub retain_source: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pdf: Option<crate::statement_pdf::Evidence>,
     pub mapping: Mapping,
 }
 #[derive(Deserialize)]
@@ -286,4 +288,13 @@ pub fn summary(s: &Source, rows: &[Row]) -> Result<Summary, String> {
         approved_difference: approved_difference.map(money),
         reconciled: source_difference == Some(0) && approved_difference == Some(0),
     })
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Disposition {
+    pub decision: ReviewInput,
+    pub spending_role: Option<crate::card_facts::Role>,
+    pub expected_facts_revision: Option<i64>,
+    pub expected_profile_updated_at: Option<String>,
 }

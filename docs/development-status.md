@@ -1,6 +1,28 @@
 # Development status
 
-## Current stage — client Spending Analysis (0.47.0, schema 29 unchanged)
+## Current stage — transaction-focused statement extraction and review (0.48.0, schema 30)
+
+Implemented offline transaction candidate detection for checking/savings and card
+PDF statements, filtered fine print/pages/balances, editable confident preselection,
+exact server-side draft totals and minimal immutable replayable evidence. Source
+and purpose decisions can save atomically as Necessary or Discretionary through
+Review & reconciliation. Current spending figures consume the existing bank/card
+facts stores. [Workflow, downstream behavior, formats and limits](pdf-import-review.md).
+Card import and card review now have separate client sections/subtabs.
+
+Source checks passed: production frontend build, all 288 UI tests (39 files),
+261 Rust library tests plus both PDF-worker tests, and Clippy all targets with
+warnings denied. After final date/period/filter refinements, all 6 detector,
+4 extraction-storage and 2 disposition tests passed, including the two added
+edge-case tests beyond the full-suite count. The final desktop debug build embeds
+frontend assets and used `--no-bundle`. Desktop workflow validation is in progress;
+its outcome and artifacts will be recorded below.
+
+The user explicitly prohibited creating/providing another installer until asked.
+No packaging or installer workflow is part of this stage.
+
+
+## Previous stage — client Spending Analysis (0.47.0, schema 29 unchanged)
 
 Implemented the user-requested approved/categorized spending workspace with exact
 Rust totals, category charts, evidence-based opportunities, source-bound purpose

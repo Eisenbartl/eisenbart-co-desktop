@@ -39,6 +39,7 @@ mod report_viewer;
 mod saved_scenarios;
 mod savings;
 mod scenarios;
+mod statement_pdf;
 mod storage;
 
 use models::{Client, ClientInput, ClientNote, SetupStatus, SetupWorkspaceInput, WorkspaceInfo};
@@ -115,6 +116,19 @@ async fn choose_client_pdf(
     })
     .await
     .map_err(|_| "PDF selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn inspect_pdf_transactions(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: statement_pdf::Input,
+) -> Result<statement_pdf::Inspection, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.inspect_pdf_transactions(&client_id, input))
+    })
+    .await
+    .map_err(|_| "PDF transaction inspection could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn inspect_client_pdf(
@@ -433,6 +447,34 @@ async fn stage_card_statement(
     })
     .await
     .map_err(|_| "Card operation could not finish. Refresh before another attempt.".to_owned())?
+}
+#[tauri::command]
+async fn review_transaction_disposition(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: imports::Disposition,
+) -> Result<imports::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.review_transaction_disposition(&client_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "The source review task did not complete.".to_owned())?
+}
+#[tauri::command]
+async fn review_card_disposition(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: cards::Disposition,
+) -> Result<cards::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.review_card_disposition(&client_id, input))
+    })
+    .await
+    .map_err(|_| "The card review task did not complete.".to_owned())?
 }
 #[tauri::command]
 async fn review_card_transaction(
@@ -1390,6 +1432,7 @@ pub fn run() {
             choose_client_csv,
             choose_client_pdf,
             inspect_client_pdf,
+            inspect_pdf_transactions,
             inspect_client_csv,
             cancel_client_csv,
             get_client_imports,
@@ -1422,6 +1465,8 @@ pub fn run() {
             get_card_statements,
             stage_card_statement,
             review_card_transaction,
+            review_transaction_disposition,
+            review_card_disposition,
             save_assessment_record,
             choose_assessment_pdf,
             review_final_report,

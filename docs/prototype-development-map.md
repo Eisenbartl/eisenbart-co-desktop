@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.47.0 source
+# Prototype structure and development map — 0.48.0 source
 
 The user requested the [client workspace redesign](client-workspace-redesign.md)
 using a supplied layout reference. The global sidebar now contains Dashboard,
@@ -13,7 +13,7 @@ Review & reconciliation, Spending Analysis, Financial dashboard and Assessments 
 `client-workspace.css` compose the redesign. Existing client editors and financial
 components remain the implementation entry points. `ImportsEditor.tsx` now also
 exposes separately mounted review subtabs. `client_workspace.rs` supplies a
-read-only summary from the existing saved-plan engines. Schema remains 29.
+read-only summary from the existing saved-plan engines. Schema 30 adds a compatibility gate for versioned PDF transaction evidence; original report formats remain unchanged.
 
 Only the selected section is mounted. Tabs retain per-client section metadata,
 require explicit draft discard and close to the most recently used remaining tab.
@@ -21,6 +21,17 @@ Locking clears all client tabs and private UI. Directory counts/statuses/profile
 update dates come from real saved records. Future sections below retain their
 existing working/planned boundaries; their former global-page names now refer to
 local sections and subtabs. See the [complete mapping and limits](client-workspace-redesign.md).
+
+## Statement extraction and review dispositions — working in 0.48.0
+
+Checking/savings and card PDF inspection uses `statement_pdf.rs` and shared
+`PdfTransactionInspection.tsx`: transaction candidates, editable confident
+preselection, exact draft totals, minimal replayable evidence and immutable
+source locators. Card imports remain in Import statements; **Card transactions**
+in Review & reconciliation owns decisions. Bank/card source approvals can save an
+explicit necessary/discretionary purpose atomically into existing facts histories.
+Current analysis recalculates; saved plans/reports keep their documented basis.
+[Usage, supported layouts and limits](pdf-import-review.md). No installer requested.
 
 ## CRUD coverage and retained history
 

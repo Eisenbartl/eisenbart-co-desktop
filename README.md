@@ -1,5 +1,8 @@
 # Eisenbart & Co. Financial Counseling Suite
 
+Version **0.48.0 source** adds [transaction-focused statement extraction](docs/pdf-import-review.md) for checking/savings and credit-card PDFs: fine-print exclusion, editable confident preselection, exact draft totals, and source-bound Necessary/Discretionary dispositions in Review & reconciliation. Current spending analysis updates automatically; original sources and decision history remain intact. **No new installer will be created or provided unless requested.**
+
+
 Version **0.47.0 source** adds [client Spending Analysis](docs/spending-analysis.md): approved/categorized spending cards, category donut and discretionary bars, filters, supported opportunities and discussed Necessary/Discretionary Type changes. Saved changes refresh all affected results while preserving original imports and classification history. Import/review remains separate in the thirteen-section workspace. The [verified 0.47.0 Windows development installer](docs/windows.md) passed automated installation, launch and uninstall; its downloaded checksum and source/version instructions were verified.
 
 Version **0.46.0 source** introduced the [client workspace redesign](docs/client-workspace-redesign.md): a directory-only Clients page, stable-ID client tabs, twelve focused sections, separate review subtabs and saved-plan summaries. Existing financial engines and security were retained. Discard choices use an explicit in-app dialog, including asynchronous native-confirm safeguards. These tools remain available in 0.47.0.

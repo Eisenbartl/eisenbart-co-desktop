@@ -15,6 +15,11 @@ Opportunity Areas and spending insights. Table search, category/type filters,
 opportunity selection and pagination narrow the table without changing the
 snapshot. Date/account scope affects the entire analysis. All values are USD.
 
+Purpose can also be saved with a source approval in **Review & reconciliation**
+(bank Review queue or Card transactions). The combined save is atomic, appends to
+the same existing histories and automatically supplies the current analysis.
+[Statement extraction and downstream rules](pdf-import-review.md).
+
 ## Eligible evidence and totals
 
 Only current **Approved** rows with a nonblank reviewed category enter the page.

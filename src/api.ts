@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  inspectPdfTransactions:(clientId:string,input:{token:string;config:import('./pdfTypes').PdfConfig;choices:import('./pdfTypes').PdfChoice[]})=>command<import('./pdfTypes').PdfInspection>('inspect_pdf_transactions',{clientId,input}),
   getSpendingAnalysis:(clientId:string,input:import('./spendingTypes').SpendingQuery)=>command<import('./spendingTypes').SpendingResult>('get_spending_analysis',{clientId,input}),
   changeSpendingClassification:(clientId:string,input:import('./spendingTypes').SpendingChange)=>command<void>('change_spending_classification',{clientId,input}),
   getSpendingClassificationHistory:(clientId:string,rowId:string)=>command<import('./spendingTypes').SpendingHistory>('get_spending_classification_history',{clientId,rowId}),
@@ -97,6 +98,8 @@ export const api = {
   getClientImports: (clientId:string) => command<ClientImports>('get_client_imports',{clientId}),
   stageClientCsv: (clientId:string,input:CsvStageInput) => command<ClientImports>('stage_client_csv',{clientId,input}),
   reviewTransaction: (clientId:string,input:TransactionReviewInput) => command<ClientImports>('review_transaction',{clientId,input}),
+  reviewTransactionDisposition: (clientId:string,input:{decision:TransactionReviewInput;selection:import('./types').CategoryRuleSelection|null;spendingRole:'necessary'|'discretionary'}) => command<ClientImports>('review_transaction_disposition',{clientId,input}),
+  reviewCardDisposition: (clientId:string,input:{decision:{expectedRevision:number;statementId:string;row:number;fields:import('./types').CardFields;status:import('./types').ReviewStatus;reason:string;acknowledge:boolean};spendingRole:'necessary'|'discretionary';expectedFactsRevision:number;expectedProfileUpdatedAt:string}) => command<import('./types').CardSnapshot>('review_card_disposition',{clientId,input}),
   bulkApproveTransactions: (clientId:string,input:TransactionBulkInput) => command<ClientImports>('bulk_approve_transactions',{clientId,input}),
   pairTransferTransactions: (clientId:string,input:TransactionPairInput) => command<ClientImports>('pair_transfer_transactions',{clientId,input}),
   chooseBackupFolder: () => command<string | null>('choose_backup_folder'),

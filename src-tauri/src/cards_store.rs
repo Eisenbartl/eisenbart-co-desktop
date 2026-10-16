@@ -73,7 +73,9 @@ pub(super) fn read_at(
         if source.import_revision > revision {
             continue;
         }
-        if source.format != 1
+        let pdf_source = source.format == 2;
+        if !matches!(source.format, 1 | 2)
+            || pdf_source != source.input.pdf.is_some()
             || source.id != id
             || source.client_id != client
             || Uuid::parse_str(&id).is_err()
@@ -84,7 +86,12 @@ pub(super) fn read_at(
             || source.import_revision < 1
             || source.import_revision > revision
             || source.byte_count == 0
-            || source.byte_count > cards::MAX_BYTES
+            || source.byte_count
+                > if pdf_source {
+                    crate::imports::MAX_BYTES
+                } else {
+                    cards::MAX_BYTES
+                }
             || source.rows.is_empty()
             || source.rows.len() > cards::MAX_ROWS
             || source.file_name.is_empty()
@@ -99,10 +106,16 @@ pub(super) fn read_at(
             if bytes.len() != source.byte_count || hash(&bytes) != source.sha256 {
                 return Err(STORAGE_ERROR.into());
             }
-            let csv = crate::imports::read_csv(&bytes)?;
-            let raw = crate::imports::extract(&csv, &source.input.mapping)?;
-            if json(&raw)? != json(&source.rows)? {
-                return Err(STORAGE_ERROR.into());
+            if pdf_source {
+                if !bytes.starts_with(b"%PDF-") {
+                    return Err(STORAGE_ERROR.into());
+                }
+            } else {
+                let csv = crate::imports::read_csv(&bytes)?;
+                let raw = crate::imports::extract(&csv, &source.input.mapping)?;
+                if json(&raw)? != json(&source.rows)? {
+                    return Err(STORAGE_ERROR.into());
+                }
             }
         }
         let mut rows = source
@@ -114,58 +127,72 @@ pub(super) fn read_at(
                     row,
                     raw: decode(&json(raw)?)?,
                     fields: cards::initial(raw),
-                    status: crate::imports::Status::Pending,
+                    status: if pdf_source {
+                        crate::imports::Status::NeedsClarification
+                    } else {
+                        crate::imports::Status::Pending
+                    },
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        // Even without retained bytes, validate the declared mapping and captured raw cells.
-        let mut columns = vec![
-            source.input.mapping.date,
-            source.input.mapping.description,
-            source.input.mapping.amount.ok_or(STORAGE_ERROR)?,
-        ];
-        if let Some(n) = source.input.mapping.category {
-            columns.push(n)
-        }
-        let width = columns.into_iter().max().ok_or(STORAGE_ERROR)? + 1;
-        if width > 64 {
-            return Err(STORAGE_ERROR.into());
-        }
-        let mut reconstructed = crate::imports::CsvData {
-            headers: vec![String::new(); width],
-            rows: vec![],
-        };
-        let mut line = 1;
-        for raw in &source.rows {
-            if raw.line <= line {
-                return Err(STORAGE_ERROR.into());
-            }
-            line = raw.line;
-            let mut cells = vec![String::new(); width];
-            cells[source.input.mapping.date] = raw.reported_date.clone();
-            cells[source.input.mapping.description] = raw.reported_description.clone();
-            cells[source.input.mapping.amount.ok_or(STORAGE_ERROR)?] =
-                raw.reported_amount.clone().ok_or(STORAGE_ERROR)?;
-            if let Some(n) = source.input.mapping.category {
-                cells[n] = raw.reported_category.clone().ok_or(STORAGE_ERROR)?;
-            }
-            reconstructed.rows.push((raw.line, cells));
-        }
-        if json(&crate::imports::extract(
-            &reconstructed,
-            &source.input.mapping,
-        )?)? != json(&source.rows)?
-        {
-            return Err(STORAGE_ERROR.into());
-        }
-
-        crate::imports::validate_mapping(&source.input.mapping, width)?;
-        for (n, raw) in source.rows.iter().enumerate() {
-            if raw.record_number != n as u32 + 2
-                || raw.extraction_method != "csv-utf8-v1"
-                || raw.page.is_some()
+        if let Some(e) = &source.input.pdf {
+            if e.config.account != crate::statement_pdf::Account::Card
+                || e.config.period_start.as_ref() != Some(&source.input.period_start)
+                || e.config.period_end.as_ref() != Some(&source.input.period_end)
+                || json(&crate::statement_pdf::replay(e)?)? != json(&source.rows)?
             {
                 return Err(STORAGE_ERROR.into());
+            }
+        } else {
+            // Even without retained bytes, validate the declared mapping and captured raw cells.
+            let mut columns = vec![
+                source.input.mapping.date,
+                source.input.mapping.description,
+                source.input.mapping.amount.ok_or(STORAGE_ERROR)?,
+            ];
+            if let Some(n) = source.input.mapping.category {
+                columns.push(n)
+            }
+            let width = columns.into_iter().max().ok_or(STORAGE_ERROR)? + 1;
+            if width > 64 {
+                return Err(STORAGE_ERROR.into());
+            }
+            let mut reconstructed = crate::imports::CsvData {
+                headers: vec![String::new(); width],
+                rows: vec![],
+            };
+            let mut line = 1;
+            for raw in &source.rows {
+                if raw.line <= line {
+                    return Err(STORAGE_ERROR.into());
+                }
+                line = raw.line;
+                let mut cells = vec![String::new(); width];
+                cells[source.input.mapping.date] = raw.reported_date.clone();
+                cells[source.input.mapping.description] = raw.reported_description.clone();
+                cells[source.input.mapping.amount.ok_or(STORAGE_ERROR)?] =
+                    raw.reported_amount.clone().ok_or(STORAGE_ERROR)?;
+                if let Some(n) = source.input.mapping.category {
+                    cells[n] = raw.reported_category.clone().ok_or(STORAGE_ERROR)?;
+                }
+                reconstructed.rows.push((raw.line, cells));
+            }
+            if json(&crate::imports::extract(
+                &reconstructed,
+                &source.input.mapping,
+            )?)? != json(&source.rows)?
+            {
+                return Err(STORAGE_ERROR.into());
+            }
+
+            crate::imports::validate_mapping(&source.input.mapping, width)?;
+            for (n, raw) in source.rows.iter().enumerate() {
+                if raw.record_number != n as u32 + 2
+                    || raw.extraction_method != "csv-utf8-v1"
+                    || raw.page.is_some()
+                {
+                    return Err(STORAGE_ERROR.into());
+                }
             }
         }
         let saved=c.prepare("SELECT id,row_index,fields_json,status,reason,reviewed_at,counselor_name,revision FROM card_decisions WHERE statement_id=?1 AND client_id=?2 AND organization_id=?3 AND counselor_id=?4 ORDER BY rowid LIMIT 4001").map_err(storage_error)?.query_map(params![id,client,w.organization_id,w.counselor_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,u32>(1)? as usize,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,r.get::<_,String>(6)?,r.get::<_,i64>(7)?))).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
@@ -274,24 +301,47 @@ impl Workspace {
         let p = self
             .pending_csv
             .as_ref()
-            .filter(|p| {
-                p.client_id == client
-                    && p.token == input.token
-                    && !p.expired()
-                    && p.pdf_pages.is_none()
-            })
+            .filter(|p| p.client_id == client && p.token == input.token && !p.expired())
             .ok_or("Inspect this client's CSV again; the card preview is missing or expired.")?;
-        if p.bytes.len() > cards::MAX_BYTES {
-            return Err("Use a card CSV of at most 256 KiB.".into());
+        let pdf_source = p.pdf_pages.is_some();
+        if p.bytes.len()
+            > if pdf_source {
+                crate::imports::MAX_BYTES
+            } else {
+                cards::MAX_BYTES
+            }
+        {
+            return Err(
+                "Use a card CSV up to 256 KiB or a selectable-text PDF up to 2 MiB.".into(),
+            );
         }
-        let settings = cards::canonical(input.input)?;
-        let csv = crate::imports::read_csv(&p.bytes)?;
-        let rows = crate::imports::extract(&csv, &settings.mapping)?;
+        let mut settings = cards::canonical(input.input)?;
+        let rows = if let Some(pages) = &p.pdf_pages {
+            let proposed = settings
+                .pdf
+                .take()
+                .ok_or("Select transactions from the inspected card PDF first.")?;
+            if proposed.config.account != crate::statement_pdf::Account::Card {
+                return Err("Use card liability extraction for a card statement.".into());
+            }
+            let mut config = proposed.config;
+            config.period_start = Some(settings.period_start.clone());
+            config.period_end = Some(settings.period_end.clone());
+            let (evidence, rows) = crate::statement_pdf::capture(pages, config, proposed.selected)?;
+            settings.pdf = Some(evidence);
+            rows
+        } else {
+            if settings.pdf.is_some() {
+                return Err("A CSV preview cannot supply PDF evidence.".into());
+            }
+            let csv = crate::imports::read_csv(&p.bytes)?;
+            crate::imports::extract(&csv, &settings.mapping)?
+        };
         if rows.is_empty() || rows.len() > cards::MAX_ROWS {
             return Err("Use 1–200 card transaction rows per statement in this stage.".into());
         }
         let source = Source {
-            format: 1,
+            format: if pdf_source { 2 } else { 1 },
             id: Uuid::new_v4().to_string(),
             client_id: client.into(),
             imported_at: timestamp(),
@@ -326,7 +376,7 @@ impl Workspace {
             .iter()
             .any(|s| s.source.sha256 == source.sha256)
         {
-            return Err("This card CSV is already recorded for this client.".into());
+            return Err("This exact card source is already recorded for this client.".into());
         }
         tx.execute("INSERT INTO card_statements(id,client_id,organization_id,counselor_id,payload_json,digest,source_hash,source_blob) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![source.id,client,s.info.organization_id,s.info.counselor_id,body,hash(body.as_bytes()),source.sha256,bytes.as_ref().map(|b|b.as_slice())]).map_err(storage_error)?;
         audit(&tx, &s.info, "card_statement_imported", Some(&source.id))?;
@@ -340,12 +390,44 @@ impl Workspace {
         client: &str,
         input: cards::ReviewInput,
     ) -> Result<Snapshot, String> {
+        self.review_card_disposition(
+            client,
+            cards::Disposition {
+                decision: input,
+                spending_role: None,
+                expected_facts_revision: None,
+                expected_profile_updated_at: None,
+            },
+        )
+    }
+    pub fn review_card_disposition(
+        &mut self,
+        client: &str,
+        disposition: cards::Disposition,
+    ) -> Result<Snapshot, String> {
+        let cards::Disposition {
+            decision: input,
+            spending_role,
+            expected_facts_revision,
+            expected_profile_updated_at,
+        } = disposition;
         let s = self.session()?;
         let tx = s
             .connection
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(storage_error)?;
         scoped_client(&tx, &s.info, client)?;
+        let purpose_context = if spending_role.is_some() {
+            let context = super::card_facts_store::read(&tx, &s.info, client)?;
+            if Some(context.latest_revision) != expected_facts_revision
+                || Some(&context.current_profile_updated_at) != expected_profile_updated_at.as_ref()
+            {
+                return Err("Card classifications or client context changed. Reload the card purpose before saving.".into());
+            }
+            Some(context)
+        } else {
+            None
+        };
         imports_store::bump(&tx, &s.info, client, input.expected_revision)?;
         let current = read(&tx, &s.info, client)?;
         let statement = current
@@ -365,6 +447,43 @@ impl Workspace {
         )?;
         let id = Uuid::new_v4().to_string();
         tx.execute("INSERT INTO card_decisions(id,statement_id,client_id,organization_id,counselor_id,row_index,fields_json,status,reason,reviewed_at,counselor_name,revision) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",params![id,input.statement_id,client,s.info.organization_id,s.info.counselor_id,input.row as i64,json(&fields)?,status(&input.status),reason,timestamp(),s.info.counselor_name,input.expected_revision+1]).map_err(storage_error)?;
+        if let Some(role) = spending_role {
+            if input.status != crate::imports::Status::Approved
+                || !matches!(
+                    fields.kind,
+                    cards::Kind::Purchase | cards::Kind::Fee | cards::Kind::Interest
+                )
+                || reason.is_empty()
+                || !input.acknowledge
+            {
+                return Err("A spending purpose requires an approved purchase, fee or interest charge and individual confirmation.".into());
+            }
+            let before = purpose_context.ok_or(STORAGE_ERROR)?;
+            let current = super::card_facts_store::read(&tx, &s.info, client)?;
+            let from = &statement.source.input.period_start[..7];
+            let through = &statement.source.input.period_end[..7];
+            let data = super::card_facts_store::purpose_data(
+                &current,
+                input.statement_id.clone(),
+                input.row,
+                id.clone(),
+                role,
+                &reason,
+                (from, through),
+            );
+            super::card_facts_store::save_in_transaction(
+                &tx,
+                &s.info,
+                client,
+                crate::card_facts::Input {
+                    expected_revision: before.latest_revision,
+                    expected_source_revision: input.expected_revision + 1,
+                    expected_profile_updated_at: before.current_profile_updated_at,
+                    data,
+                    acknowledge: true,
+                },
+            )?;
+        }
         audit(&tx, &s.info, "card_transaction_reviewed", Some(&id))?;
         let result = read(&tx, &s.info, client)?;
         tx.commit().map_err(storage_error)?;
@@ -381,6 +500,7 @@ pub(crate) mod tests {
     const CSV:&str="Date,Description,Amount,Category\n2026-09-01,Fictional groceries,100.01,Food\n2026-09-02,Fictional refund,-20.02,Food\n2026-09-03,Fictional card payment,-50.03,Card payment\n2026-09-04,Fictional fee,5.04,Fees\n2026-09-05,Fictional interest,2.05,Interest\n";
     pub(crate) fn input() -> cards::Input {
         cards::Input {
+            pdf: None,
             account_label: "Fictional card".into(),
             period_start: "2026-09-01".into(),
             period_end: "2026-09-30".into(),

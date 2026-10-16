@@ -72,7 +72,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 29;
+const SCHEMA_VERSION: i32 = 30;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -1234,6 +1234,14 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
     if version == 28 {
         transaction
             .execute_batch(include_str!("security-policy-schema.sql"))
+            .map_err(storage_error)?;
+        version = 29;
+    }
+    if version == 29 {
+        // Compatibility gate: older apps must not write versioned PDF statement evidence.
+        // No existing sources, report payloads or historical bytes are rewritten.
+        transaction
+            .execute_batch("PRAGMA user_version=30;")
             .map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;

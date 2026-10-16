@@ -337,6 +337,7 @@ mod tests {
                     document: DocumentInput {
                         balance_order: None,
                         pdf_selection: None,
+                        pdf: None,
                         account_id: None,
                         account_label: label.into(),
                         account_kind: "checking".into(),

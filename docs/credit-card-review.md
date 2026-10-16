@@ -1,24 +1,24 @@
-# Credit-card CSV review — 0.34.0, schema 23
+# Credit-card statement review — 0.48.0, schema 30
 
-Documents → Credit-card statements now records signed USD card CSV evidence,
+Import statements → Credit-card statements records signed USD CSV or selectable-text PDF evidence,
 individual counselor decisions and statement arithmetic in encrypted storage.
 This is a working liability review, separate from the existing bank cash engine.
 
 ## Use the page
 
-1. Select the client and open Import a card CSV statement. Choose/inspect a UTF-8
+1. Select the client and open Import statements → Credit-card statements → Import a card statement. Choose/inspect a UTF-8
    CSV, then explicitly map date, description, signed amount and optional category.
-   Choose the source date format. No column meanings are guessed.
+   Choose the source date format. For PDFs use the [transaction-focused inspection](pdf-import-review.md) with editable preselection and exact draft totals.
 2. Enter the card name, statement dates and opening/closing balances owed. Positive
    balances mean debt; negative balances mean a credit held on the card. If the
    source uses negative charges and positive payments, explicitly invert its signs.
    Optional authorization retains the complete CSV inside workspace encryption.
-3. Save the statement. Every row starts pending and unclassified. Original source
+3. Save the statement. CSV rows start Pending; PDF rows start Needs Clarification. All remain unclassified. Original source
    cells, line/record references, hash, mapping and balances remain immutable.
-4. Open each row. Inspect the original evidence and choose purchase, refund,
+4. Open Review & reconciliation → Card transactions, then each row. Inspect the original evidence and choose purchase, refund,
    payment, fee, interest or other adjustment; verify date, signed amount,
    description and category. Choose its review state, give a reason, confirm
-   original-source/duplicate review and save. Nothing approves rows automatically.
+   original-source/duplicate review and save. For purchases, fees and interest choose a discussed necessary/discretionary spending purpose; it saves atomically with approval and updates Spending Analysis/card review. Card completeness needs renewed confirmation. Nothing approves rows automatically.
 5. Inspect the separate original and approved closing comparisons. Corrections
    append decisions, retain original amounts and can reveal a difference.
    Rejecting an earlier approval withdraws it from current totals while preserving

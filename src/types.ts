@@ -231,7 +231,7 @@ export type ReviewStatus='Pending'|'Needs Clarification'|'Approved'|'Rejected';
 export interface CsvMapping {date:number;description:number;amountMode:'signed'|'debitCredit';amount:number|null;debit:number|null;credit:number|null;signedIsDebit:boolean;dateFormat:'iso'|'mdy'|'dmy';merchant:number|null;category:number|null;kind:number|null;reference:number|null;balance:number|null}
 export interface TransactionFields {date:string|null;amount:string|null;description:string;merchant:string;category:string;kind:TransactionKind}
 export interface RawCsvRecord {page?:number|null;reportedLine?:string|null;extractionMethod:string;recordNumber:number;line:number;reportedDate:string;reportedAmount:string|null;reportedDebit:string|null;reportedCredit:string|null;reportedDescription:string;reportedMerchant:string|null;reportedCategory:string|null;reportedKind:string|null;reportedReference:string|null;reportedBalance:string|null;extracted:TransactionFields;reference:string|null;balance:string|null;issues:string[]}
-export interface CsvDocumentInput {balanceOrder?:BalanceOrder|null;pdfSelection?:PdfLocator[]|null;accountId:string|null;accountLabel:string;accountKind:string;periodStart:string|null;periodEnd:string|null;openingBalance:string|null;closingBalance:string|null;retainSource:boolean;mapping:CsvMapping}
+export interface CsvDocumentInput {pdf?:import('./pdfTypes').PdfEvidence|null;balanceOrder?:BalanceOrder|null;pdfSelection?:PdfLocator[]|null;accountId:string|null;accountLabel:string;accountKind:string;periodStart:string|null;periodEnd:string|null;openingBalance:string|null;closingBalance:string|null;retainSource:boolean;mapping:CsvMapping}
 export interface CsvPreview {pdfPages?:PdfPage[]|null;clientId:string;token:string;fileName:string;sha256:string;byteCount:number;headers:string[];sampleRows:string[][];rowCount:number}
 export interface StatementAccount {id:string;label:string;kind:string}
 export interface CsvDocument {balanceHistory:StatementBalanceHistory[];balanceReconciliation:StatementBalanceReport|null;id:string;accountId:string;fileName:string;sha256:string;byteCount:number;importedAt:string;sourceRetained:boolean;input:CsvDocumentInput;rowCount:number;sourceExpectedClosing:string|null;sourceDifference:string|null;approvedDifference:string|null;warnings:string[]}
@@ -385,7 +385,7 @@ export interface FinalReportRecord {clientId:string;digest:string;assessment:Sav
 
 export type CardKind='unclassified'|'purchase'|'refund'|'payment'|'fee'|'interest'|'adjustment';
 export interface CardFields {date:string|null;amount:string|null;description:string;category:string;kind:CardKind}
-export interface CardInput {accountLabel:string;periodStart:string;periodEnd:string;openingOwed:string;closingOwed:string;retainSource:boolean;mapping:CsvMapping}
+export interface CardInput {pdf?:import('./pdfTypes').PdfEvidence|null;accountLabel:string;periodStart:string;periodEnd:string;openingOwed:string;closingOwed:string;retainSource:boolean;mapping:CsvMapping}
 export interface CardSource {format:number;id:string;clientId:string;importedAt:string;importRevision:number;fileName:string;sha256:string;byteCount:number;input:CardInput;rows:RawCsvRecord[]}
 export interface CardRow {row:number;raw:RawCsvRecord;fields:CardFields;status:ReviewStatus}
 export interface CardReview {id:string;row:number;fields:CardFields;status:ReviewStatus;reason:string;reviewedAt:string;counselorName:string;revision:number}

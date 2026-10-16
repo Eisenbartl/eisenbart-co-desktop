@@ -4,6 +4,68 @@ use crate::budget::money;
 use crate::imports::*;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
+fn append_fact_review(
+    tx: &Transaction<'_>,
+    info: &WorkspaceInfo,
+    client: &str,
+    data: crate::financial_facts::Data,
+    note: &str,
+) -> Result<(), String> {
+    use crate::financial_facts;
+    let current = read_imports(tx, info, client)?;
+    let data = financial_facts::normalize(data)?;
+    if data
+        .as_of
+        .as_deref()
+        .map(iso_date)
+        .transpose()?
+        .is_some_and(|d| d > chrono::Utc::now().date_naive())
+    {
+        return Err("Balance facts cannot have a future as-of date.".into());
+    }
+    let ids = current.documents.iter().map(|d| d.id.as_str()).collect();
+    financial_facts::validate_bindings(&data, &current.records, &current.history, &ids)?;
+    for c in &data.classifications {
+        let unchanged = current
+            .financial_facts
+            .data
+            .as_ref()
+            .is_some_and(|old| old.classifications.contains(c));
+        if !unchanged
+            && !current
+                .records
+                .iter()
+                .any(|r| r.id == c.record_id && financial_facts::active(c, r, &current.history))
+        {
+            return Err("A new or changed classification requires the current approved source decision. Reverify the transaction first.".into());
+        }
+    }
+    let json = serde_json::to_string(&data).map_err(|_| STORAGE_ERROR.to_owned())?;
+    if current.financial_facts.history.len() >= 100
+        || current
+            .financial_facts
+            .history
+            .iter()
+            .map(|r| {
+                serde_json::to_vec(&r.data)
+                    .map(|v| v.len())
+                    .unwrap_or(financial_facts::MAX_JSON)
+            })
+            .sum::<usize>()
+            + json.len()
+            > 8 * 1024 * 1024
+    {
+        return Err(
+            "Financial fact history reached its local safety limit; nothing was saved.".into(),
+        );
+    }
+    let reason = required_text(note, "Facts review reason", 500)?;
+    let id = Uuid::new_v4().to_string();
+    tx.execute("INSERT INTO financial_fact_reviews(id,client_id,organization_id,counselor_id,data_json,reason,reviewed_at,counselor_name) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![id,client,info.organization_id,info.counselor_id,json,reason,timestamp(),info.counselor_name]).map_err(storage_error)?;
+    audit(tx, info, "financial_facts_reviewed", Some(&id))?;
+    Ok(())
+}
+
 const MAX_RECORDS: usize = 5000;
 const MAX_HISTORY: usize = 10000;
 pub(super) struct PendingCsv {
@@ -257,7 +319,12 @@ pub(super) fn read_imports(
             .ok_or(STORAGE_ERROR)?;
         let raw: Raw = decode(&raw)?;
         if let Some(selected) = &d.input.pdf_selection {
-            if raw.extraction_method != "pdf-text-lines-v1"
+            if raw.extraction_method
+                != if d.input.pdf.is_some() {
+                    "pdf-statement-rows-v2"
+                } else {
+                    "pdf-text-lines-v1"
+                }
                 || !selected
                     .iter()
                     .any(|v| Some(v.page) == raw.page && u64::from(v.line) == raw.line)
@@ -290,6 +357,24 @@ pub(super) fn read_imports(
         return Err(STORAGE_ERROR.into());
     }
     for d in &mut documents {
+        if let Some(e) = &d.input.pdf {
+            if e.config.account != crate::statement_pdf::Account::Bank
+                || e.config.period_start != d.input.period_start
+                || e.config.period_end != d.input.period_end
+                || d.input.pdf_selection.as_ref() != Some(&e.selected)
+            {
+                return Err(STORAGE_ERROR.into());
+            }
+            let expected = crate::statement_pdf::replay(e)?;
+            let actual = records
+                .iter()
+                .filter(|r| r.document_id == d.id)
+                .map(|r| &r.raw)
+                .collect::<Vec<_>>();
+            if json(&expected)? != json(&actual)? {
+                return Err(STORAGE_ERROR.into());
+            }
+        }
         if d.input.pdf_selection.is_some() {
             d.warnings.push("PDF statement checks include only the explicitly selected lines. Verify the original statement for completeness; headers and unselected lines were not imported.".into());
         }
@@ -677,6 +762,26 @@ impl Workspace {
         });
         Ok(result)
     }
+    pub fn inspect_pdf_transactions(
+        &mut self,
+        client: &str,
+        input: crate::statement_pdf::Input,
+    ) -> Result<crate::statement_pdf::Inspection, String> {
+        let s = self.session()?;
+        scoped_client(&s.connection, &s.info, client)?;
+        let pending=self.pending_csv.as_ref().filter(|p|p.client_id==client&&p.token==input.token&&!p.expired()).ok_or("Inspect this client's PDF again; the preview expired or belongs to another client.")?;
+        let pages = pending
+            .pdf_pages
+            .as_ref()
+            .ok_or("Inspect a selectable-text PDF before selecting transactions.")?;
+        crate::statement_pdf::inspect(
+            client.into(),
+            input.token,
+            pages,
+            input.config,
+            input.choices,
+        )
+    }
     pub fn cancel_client_csv(&mut self, token: &str) {
         if self.pending_csv.as_ref().is_some_and(|p| p.token == token) {
             self.pending_csv = None;
@@ -707,14 +812,28 @@ impl Workspace {
                 .pdf_selection
                 .as_ref()
                 .ok_or("Select the PDF transaction lines explicitly.")?;
-            crate::pdf::records(
-                pages,
-                selection,
-                &document.mapping.date_format,
-                document.mapping.signed_is_debit,
-            )?
+            if let Some(settings) = document.pdf.take() {
+                if settings.config.account != crate::statement_pdf::Account::Bank {
+                    return Err("Choose bank extraction for checking/savings; card statements use the separate card liability import.".into());
+                }
+                let mut config = settings.config;
+                // Declared source metadata is authoritative, including edits made after inspection.
+                config.period_start = document.period_start.clone();
+                config.period_end = document.period_end.clone();
+                let (evidence, rows) =
+                    crate::statement_pdf::capture(pages, config, selection.clone())?;
+                document.pdf = Some(evidence);
+                rows
+            } else {
+                crate::pdf::records(
+                    pages,
+                    selection,
+                    &document.mapping.date_format,
+                    document.mapping.signed_is_debit,
+                )?
+            }
         } else {
-            if document.pdf_selection.is_some() {
+            if document.pdf_selection.is_some() || document.pdf.is_some() {
                 return Err("A CSV preview cannot be staged as a PDF.".into());
             }
             let csv = read_csv(&pending.bytes)?;
@@ -820,20 +939,33 @@ impl Workspace {
         client: &str,
         input: ReviewInput,
     ) -> Result<Snapshot, String> {
-        self.review_transaction_with_rule(client, input, None)
+        self.review_transaction_with_rule(client, input, None, None)
     }
     pub fn review_rule_category(
         &mut self,
         client: &str,
         input: crate::category_rules::Decision,
     ) -> Result<Snapshot, String> {
-        self.review_transaction_with_rule(client, input.decision, Some(input.selection))
+        self.review_transaction_with_rule(client, input.decision, Some(input.selection), None)
+    }
+    pub fn review_transaction_disposition(
+        &mut self,
+        client: &str,
+        input: crate::imports::Disposition,
+    ) -> Result<Snapshot, String> {
+        self.review_transaction_with_rule(
+            client,
+            input.decision,
+            input.selection,
+            input.spending_role,
+        )
     }
     fn review_transaction_with_rule(
         &mut self,
         client: &str,
         input: ReviewInput,
         selection: Option<crate::category_rules::Selection>,
+        spending_role: Option<crate::financial_facts::Role>,
     ) -> Result<Snapshot, String> {
         let s = self.session()?;
         scoped_client(&s.connection, &s.info, client)?;
@@ -938,6 +1070,31 @@ impl Workspace {
         if let Some(selection) = &selection {
             category_rules_store::capture(&tx, &s.info, client, &decision_id, &r.id, selection)?;
         }
+        if let Some(role) = spending_role {
+            use crate::financial_facts as ff;
+            if !matches!(role, ff::Role::Necessary | ff::Role::Discretionary)
+                || input.status != Status::Approved
+                || !matches!(fields.kind, Kind::Expense | Kind::Fee | Kind::Interest)
+                || fields
+                    .amount
+                    .as_deref()
+                    .map(crate::imports::signed_money)
+                    .transpose()?
+                    .is_none_or(|v| v >= 0)
+                || !input.acknowledge_warnings
+                || note.is_empty()
+            {
+                return Err("A spending purpose requires an approved withdrawal, a discussion reason and individual confirmation.".into());
+            }
+            let mut data = snapshot.financial_facts.data.clone().unwrap_or_default();
+            data.classifications.retain(|c| c.record_id != r.id);
+            data.classifications.push(ff::Classification {
+                record_id: r.id.clone(),
+                approval_id: decision_id.clone(),
+                role,
+            });
+            append_fact_review(&tx, &s.info, client, data, &note)?;
+        }
         audit(&tx, &s.info, "transaction_reviewed", Some(&r.id))?;
         invalidate_recurring_changes(&tx, &s.info, client)?;
         let result = read_imports(&tx, &s.info, client)?;
@@ -949,7 +1106,6 @@ impl Workspace {
         client: &str,
         input: crate::financial_facts::Input,
     ) -> Result<Snapshot, String> {
-        use crate::financial_facts;
         let s = self.session()?;
         scoped_client(&s.connection, &s.info, client)?;
         if !input.acknowledge {
@@ -959,58 +1115,8 @@ impl Workspace {
             .connection
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
             .map_err(storage_error)?;
-        let current = read_imports(&tx, &s.info, client)?;
-        let data = financial_facts::normalize(input.data)?;
-        if data
-            .as_of
-            .as_deref()
-            .map(iso_date)
-            .transpose()?
-            .is_some_and(|d| d > chrono::Utc::now().date_naive())
-        {
-            return Err("Balance facts cannot have a future as-of date.".into());
-        }
-        let ids = current.documents.iter().map(|d| d.id.as_str()).collect();
-        financial_facts::validate_bindings(&data, &current.records, &current.history, &ids)?;
-        for c in &data.classifications {
-            let unchanged = current
-                .financial_facts
-                .data
-                .as_ref()
-                .is_some_and(|old| old.classifications.contains(c));
-            if !unchanged
-                && !current
-                    .records
-                    .iter()
-                    .any(|r| r.id == c.record_id && financial_facts::active(c, r, &current.history))
-            {
-                return Err("A new or changed classification requires the current approved source decision. Reverify the transaction first.".into());
-            }
-        }
-        let json = serde_json::to_string(&data).map_err(|_| STORAGE_ERROR.to_owned())?;
-        if current.financial_facts.history.len() >= 100
-            || current
-                .financial_facts
-                .history
-                .iter()
-                .map(|r| {
-                    serde_json::to_vec(&r.data)
-                        .map(|v| v.len())
-                        .unwrap_or(financial_facts::MAX_JSON)
-                })
-                .sum::<usize>()
-                + json.len()
-                > 8 * 1024 * 1024
-        {
-            return Err(
-                "Financial fact history reached its local safety limit; nothing was saved.".into(),
-            );
-        }
-        let reason = required_text(&input.reason, "Facts review reason", 500)?;
         bump(&tx, &s.info, client, input.expected_revision)?;
-        let id = Uuid::new_v4().to_string();
-        tx.execute("INSERT INTO financial_fact_reviews(id,client_id,organization_id,counselor_id,data_json,reason,reviewed_at,counselor_name) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![id,client,s.info.organization_id,s.info.counselor_id,json,reason,timestamp(),s.info.counselor_name]).map_err(storage_error)?;
-        audit(&tx, &s.info, "financial_facts_reviewed", Some(&id))?;
+        append_fact_review(&tx, &s.info, client, input.data, &input.reason)?;
         let result = read_imports(&tx, &s.info, client)?;
         tx.commit().map_err(storage_error)?;
         Ok(result)
@@ -1268,6 +1374,7 @@ pub(crate) mod tests {
         DocumentInput {
             balance_order: None,
             pdf_selection: None,
+            pdf: None,
             account_id: None,
             account_label: label.into(),
             account_kind: "checking".into(),
@@ -5280,6 +5387,7 @@ pub(crate) mod tests {
                 expected_revision: revision,
                 token: preview.token,
                 input: crate::cards::Input {
+                    pdf: None,
                     account_label: "Known fictional card".into(),
                     period_start: "2026-09-01".into(),
                     period_end: "2026-09-30".into(),
@@ -5334,5 +5442,560 @@ pub(crate) mod tests {
             .records
             .iter()
             .all(|r| r.needs_review));
+    }
+}
+
+#[cfg(test)]
+mod statement_extraction_tests {
+    use super::*;
+    use crate::{
+        pdf, statement_pdf as extraction,
+        storage::{
+            cards_store::tests as cards,
+            imports_store::tests as bank,
+            tests::{client_input, configured, PASSWORD},
+        },
+    };
+    use tempfile::tempdir;
+    fn inspect(w: &mut Workspace, id: &str, lines: &[&str]) -> Preview {
+        let bytes = crate::pdf_fixture::bytes(crate::pdf_fixture::document(&[lines]));
+        let pages = pdf::extract_pages(&bytes).unwrap();
+        w.capture_pdf(
+            id.into(),
+            Path::new("fictional-statement.pdf"),
+            Zeroizing::new(bytes),
+            pages,
+        )
+        .unwrap()
+    }
+    fn analysis(
+        w: &mut Workspace,
+        id: &str,
+        p: &Preview,
+        config: extraction::Config,
+        choices: Vec<extraction::Choice>,
+    ) -> extraction::Inspection {
+        w.inspect_pdf_transactions(
+            id,
+            extraction::Input {
+                token: p.token.clone(),
+                config,
+                choices,
+            },
+        )
+        .unwrap()
+    }
+    fn evidence(config: extraction::Config, selected: Vec<pdf::Locator>) -> extraction::Evidence {
+        extraction::Evidence {
+            version: 2,
+            config,
+            selected,
+            pages: vec![],
+        }
+    }
+    #[test]
+    fn bank_yearless_dates_capture_the_current_declared_period_not_stale_preview_settings() {
+        let (_root, mut w, _) = configured();
+        let c = w.save_client(client_input()).unwrap();
+        let p = inspect(
+            &mut w,
+            &c.id,
+            &["Withdrawals", "09/02 Fictional groceries 25.11"],
+        );
+        let config = extraction::Config {
+            period_start: Some("2026-09-01".into()),
+            period_end: Some("2026-09-30".into()),
+            ..extraction::Config::default()
+        };
+        let preview = analysis(&mut w, &c.id, &p, config, vec![]);
+        assert_eq!(preview.selected.len(), 1);
+        let mut doc = bank::doc("Savings");
+        doc.account_kind = "savings".into();
+        doc.pdf_selection = Some(preview.selected.clone());
+        doc.pdf = Some(evidence(extraction::Config::default(), preview.selected));
+        let s = w
+            .stage_client_csv(
+                &c.id,
+                StageInput {
+                    expected_revision: 0,
+                    token: p.token,
+                    document: doc,
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            s.records[0].raw.extracted.date.as_deref(),
+            Some("2026-09-02")
+        );
+        assert_eq!(s.records[0].raw.extracted.amount.as_deref(), Some("-25.11"));
+        let e = s.documents[0].input.pdf.as_ref().unwrap();
+        assert_eq!(e.config.period_start, s.documents[0].input.period_start);
+        assert_eq!(
+            extraction::replay(e).unwrap(),
+            vec![s.records[0].raw.clone()]
+        );
+    }
+
+    #[test]
+    fn inspection_is_scoped_read_only_and_selected_bank_evidence_survives_atomic_import_restart_and_recovery(
+    ) {
+        let (root, mut w, _) = configured();
+        let directory = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let p = inspect(
+            &mut w,
+            &c.id,
+            &[
+                "Fictional checking statement",
+                "Questions? Please contact us",
+                "Statement period 2026-09-01 to 2026-09-30",
+                "2026-09-01 Fictional payroll 1000.01",
+                "2026-09-02 Fictional groceries -25.11",
+                "Closing balance 974.90",
+            ],
+        );
+        let before = w.get_client_imports(&c.id).unwrap();
+        let count: i64 = w
+            .session
+            .as_ref()
+            .unwrap()
+            .connection
+            .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
+            .unwrap();
+        let a = analysis(&mut w, &c.id, &p, extraction::Config::default(), vec![]);
+        assert_eq!(a.selected.len(), 2);
+        assert_eq!(a.summary.net, "974.90");
+        let b = analysis(
+            &mut w,
+            &c.id,
+            &p,
+            extraction::Config::default(),
+            vec![extraction::Choice {
+                locator: a.selected[0].clone(),
+                checked: false,
+            }],
+        );
+        assert_eq!(b.summary.outflows, "25.11");
+        assert_eq!(b.summary.inflows, "0.00");
+        assert_eq!(
+            w.get_client_imports(&c.id).unwrap().revision,
+            before.revision
+        );
+        assert_eq!(
+            w.session
+                .as_ref()
+                .unwrap()
+                .connection
+                .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            count
+        );
+        assert!(w
+            .inspect_pdf_transactions(
+                &other.id,
+                extraction::Input {
+                    token: p.token.clone(),
+                    config: extraction::Config::default(),
+                    choices: vec![]
+                }
+            )
+            .is_err());
+        let mut doc = bank::doc("Fictional PDF checking");
+        doc.retain_source = true;
+        doc.pdf_selection = Some(a.selected.clone());
+        doc.pdf = Some(evidence(extraction::Config::default(), a.selected));
+        w.session.as_ref().unwrap().connection.execute_batch("CREATE TRIGGER fail_new_pdf_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='pdf_imported' BEGIN SELECT RAISE(ABORT,'synthetic audit failure'); END;").unwrap();
+        assert!(w
+            .stage_client_csv(
+                &c.id,
+                StageInput {
+                    expected_revision: 0,
+                    token: p.token.clone(),
+                    document: doc.clone()
+                }
+            )
+            .is_err());
+        assert!(w.get_client_imports(&c.id).unwrap().records.is_empty());
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TRIGGER fail_new_pdf_audit;")
+            .unwrap();
+        let saved = w
+            .stage_client_csv(
+                &c.id,
+                StageInput {
+                    expected_revision: 0,
+                    token: p.token,
+                    document: doc,
+                },
+            )
+            .unwrap();
+        assert_eq!(saved.records.len(), 2);
+        assert_eq!(saved.summary.needs_clarification, 2);
+        assert_eq!(saved.summary.income, "0.00");
+        assert_eq!(saved.summary.spending, "0.00");
+        assert!(saved
+            .records
+            .iter()
+            .all(|r| !r.bulk_eligible && r.raw.extraction_method == "pdf-statement-rows-v2"));
+        assert!(!json(&saved.records).unwrap().contains("Please contact"));
+        let source = json(&saved.documents).unwrap();
+        let raw = json(&saved.records).unwrap();
+        let backup = w
+            .create_backup(directory.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        assert!(w.get_client_imports(&c.id).is_err());
+        drop(w);
+        let mut w = Workspace::new(root.path().into());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            json(&w.get_client_imports(&c.id).unwrap().records).unwrap(),
+            raw
+        );
+        w.lock_workspace();
+        let restore = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(restore.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let restored = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(json(&restored.documents).unwrap(), source);
+        assert_eq!(json(&restored.records).unwrap(), raw);
+    }
+    #[test]
+    fn card_pdf_liability_signs_and_versioned_evidence_preserve_csv_sources_and_backups() {
+        let (root, mut w, _) = configured();
+        let directory = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let old = cards::stage(&mut w, &c.id, directory.path());
+        let old_source = json(&old.statements[0].source).unwrap();
+        assert!(!old_source.contains("\"pdf\""));
+        let p = inspect(
+            &mut w,
+            &c.id,
+            &[
+                "Fictional card statement",
+                "Statement period 2026-09-01 to 2026-09-30",
+                "Purchases",
+                "09/02 Fictional purchase 25.15",
+                "Payments and credits",
+                "09/03 AUTOMATIC PAYMENT 50.00CR",
+                "Minimum payment due 5.00",
+                "Questions? Please contact us",
+            ],
+        );
+        let config = extraction::Config {
+            account: extraction::Account::Card,
+            ..Default::default()
+        };
+        let a = analysis(&mut w, &c.id, &p, config.clone(), vec![]);
+        assert_eq!(a.selected.len(), 2);
+        assert_eq!(a.summary.net, "-24.85");
+        let mut input = cards::input();
+        input.account_label = "Different fictional card".into();
+        input.opening_owed = "100.00".into();
+        input.closing_owed = "75.15".into();
+        input.pdf = Some(evidence(config, a.selected));
+        let saved = w
+            .stage_card_statement(
+                &c.id,
+                crate::cards::Stage {
+                    expected_revision: old.revision,
+                    token: p.token,
+                    input,
+                },
+            )
+            .unwrap();
+        let statement = &saved.statements[1];
+        assert_eq!(statement.source.format, 2);
+        assert_eq!(statement.rows.len(), 2);
+        assert!(statement
+            .rows
+            .iter()
+            .all(|r| r.status == Status::NeedsClarification));
+        assert_eq!(statement.summary.source_closing.as_deref(), Some("75.15"));
+        assert_eq!(statement.summary.purchases, "0.00");
+        assert_eq!(statement.summary.payments, "0.00");
+        assert_eq!(json(&saved.statements[0].source).unwrap(), old_source);
+        let original = json(&saved).unwrap();
+        let backup = w
+            .create_backup(directory.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        drop(w);
+        let mut w = Workspace::new(root.path().into());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            json(&w.get_card_statements(&c.id).unwrap()).unwrap(),
+            original
+        );
+        w.lock_workspace();
+        let r = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(r.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            json(&w.get_card_statements(&c.id).unwrap()).unwrap(),
+            original
+        );
+    }
+    #[test]
+    fn schema_29_migration_preserves_original_source_and_legacy_payload_bytes() {
+        let (root, mut w, _) = configured();
+        let directory = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let old = cards::stage(&mut w, &c.id, directory.path());
+        let original = json(&old).unwrap();
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .pragma_update(None, "user_version", 29)
+            .unwrap();
+        w.lock_workspace();
+        drop(w);
+        let mut w = Workspace::new(root.path().into());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            w.session
+                .as_ref()
+                .unwrap()
+                .connection
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            30
+        );
+        assert_eq!(
+            json(&w.get_card_statements(&c.id).unwrap()).unwrap(),
+            original
+        );
+    }
+}
+
+#[cfg(test)]
+mod disposition_tests {
+    use super::*;
+    use crate::storage::spending_analysis as sa;
+    use crate::storage::{
+        cards_store::tests as card,
+        imports_store::tests as bank,
+        tests::{client_input, configured, PASSWORD},
+    };
+    use crate::{card_facts as cf, financial_facts as ff};
+    use tempfile::tempdir;
+    fn query() -> sa::Input {
+        sa::Input {
+            from_month: "2026-09".into(),
+            through_month: "2026-09".into(),
+            account_id: None,
+            search: String::new(),
+            category: None,
+            role: None,
+            page: 1,
+            page_size: 25,
+            compare_previous: false,
+            opportunity: None,
+        }
+    }
+    fn decision(s: &Snapshot, role: ff::Role) -> crate::imports::Disposition {
+        crate::imports::Disposition {
+            selection: None,
+            spending_role: Some(role),
+            decision: ReviewInput {
+                expected_revision: s.revision,
+                record_id: s.records[0].id.clone(),
+                fields: s.records[0].fields.clone(),
+                status: Status::Approved,
+                reason: "Discussed fictional food spending and verified original evidence".into(),
+                acknowledge_warnings: true,
+            },
+        }
+    }
+    #[test]
+    fn bank_disposition_is_atomic_source_bound_recalculates_and_recovers() {
+        let (root, mut w, _) = configured();
+        let d = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let s=bank::stage(&mut w,&c.id,d.path(),"purpose.csv","Date,Description,Amount,Category,Type\n2026-09-01,Fictional dining,-25.11,Food,expense\n",bank::doc("Checking"));
+        let raw = s.records[0].raw.clone();
+        let doc = serde_json::to_vec(&s.documents[0].input).unwrap();
+        assert!(w
+            .review_transaction_disposition(&other.id, decision(&s, ff::Role::Necessary))
+            .is_err());
+        assert!(w
+            .review_transaction_disposition(&c.id, decision(&s, ff::Role::TakeHomePay))
+            .is_err());
+        let mut bad = decision(&s, ff::Role::Necessary);
+        bad.decision.status = Status::Rejected;
+        assert!(w.review_transaction_disposition(&c.id, bad).is_err());
+        let mut bad = decision(&s, ff::Role::Necessary);
+        bad.decision.acknowledge_warnings = false;
+        assert!(w.review_transaction_disposition(&c.id, bad).is_err());
+        w.session.as_ref().unwrap().connection.execute_batch("CREATE TRIGGER fail_purpose BEFORE INSERT ON financial_fact_reviews BEGIN SELECT RAISE(ABORT,'Synthetic classification failure'); END;").unwrap();
+        assert!(w
+            .review_transaction_disposition(&c.id, decision(&s, ff::Role::Necessary))
+            .is_err());
+        let unchanged = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(unchanged.revision, s.revision);
+        assert!(unchanged.history.is_empty());
+        assert!(unchanged.financial_facts.history.is_empty());
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TRIGGER fail_purpose;")
+            .unwrap();
+        let s = w
+            .review_transaction_disposition(&c.id, decision(&s, ff::Role::Necessary))
+            .unwrap();
+        assert_eq!(s.revision, 2);
+        assert_eq!(s.financial_facts.history.len(), 1);
+        assert_eq!(
+            s.financial_facts.data.as_ref().unwrap().classifications[0].approval_id,
+            s.history[0].id
+        );
+        let a = w.get_spending_analysis(&c.id, query()).unwrap();
+        assert_eq!(a.totals.spending, "25.11");
+        assert_eq!(a.totals.necessary, "25.11");
+        assert_eq!(a.totals.discretionary, "0.00");
+        let old = s.financial_facts.history[0].clone();
+        assert!(w
+            .review_transaction_disposition(&c.id, decision(&unchanged, ff::Role::Discretionary))
+            .is_err());
+        let s = w
+            .review_transaction_disposition(&c.id, decision(&s, ff::Role::Discretionary))
+            .unwrap();
+        let a = w.get_spending_analysis(&c.id, query()).unwrap();
+        assert_eq!(a.totals.necessary, "0.00");
+        assert_eq!(a.totals.discretionary, "25.11");
+        assert_eq!(a.totals.discretionary_share.as_deref(), Some("100.00%"));
+        assert_eq!(s.financial_facts.history[0], old);
+        assert_eq!(s.records[0].raw, raw);
+        assert_eq!(serde_json::to_vec(&s.documents[0].input).unwrap(), doc);
+        let backup = w
+            .create_backup(d.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        let mut w = Workspace::new(root.path().into());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        let now = w.get_spending_analysis(&c.id, query()).unwrap();
+        assert_eq!(now.totals.discretionary, "25.11");
+        w.lock_workspace();
+        let restore = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(restore.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            w.get_client_imports(&c.id)
+                .unwrap()
+                .financial_facts
+                .history
+                .len(),
+            2
+        );
+        let mut undo = decision(&s, ff::Role::Necessary).decision;
+        undo.status = Status::Rejected;
+        let s = w.review_transaction(&c.id, undo).unwrap();
+        let a = w.get_spending_analysis(&c.id, query()).unwrap();
+        assert_eq!(a.totals.spending, "0.00");
+        assert_eq!(a.totals.discretionary, "0.00");
+        assert_eq!(s.financial_facts.history.len(), 2);
+        assert_eq!(s.history.len(), 3);
+    }
+    fn card_decision(
+        s: &crate::cards::Snapshot,
+        f: &cf::Record,
+        row: usize,
+        role: cf::Role,
+    ) -> crate::cards::Disposition {
+        crate::cards::Disposition {
+            decision: card::decision(s, row, crate::cards::Kind::Purchase, Status::Approved),
+            spending_role: Some(role),
+            expected_facts_revision: Some(f.latest_revision),
+            expected_profile_updated_at: Some(f.current_profile_updated_at.clone()),
+        }
+    }
+    #[test]
+    fn card_disposition_saves_source_and_purpose_together_rejects_stale_context_and_payments() {
+        let (root, mut w, _) = configured();
+        let d = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = card::stage(&mut w, &c.id, d.path());
+        let f = w.get_card_facts(&c.id).unwrap();
+        let raw = s.statements[0].source.clone();
+        w.session.as_ref().unwrap().connection.execute_batch("CREATE TRIGGER fail_card_purpose BEFORE INSERT ON audit_events WHEN NEW.event_type='card_facts_saved' BEGIN SELECT RAISE(ABORT,'Synthetic classification audit failure'); END;").unwrap();
+        assert!(w
+            .review_card_disposition(&c.id, card_decision(&s, &f, 0, cf::Role::Necessary))
+            .is_err());
+        let now = w.get_card_statements(&c.id).unwrap();
+        assert_eq!(now.revision, s.revision);
+        assert!(now.statements[0].history.is_empty());
+        assert_eq!(w.get_card_facts(&c.id).unwrap().latest_revision, 0);
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .execute_batch("DROP TRIGGER fail_card_purpose;")
+            .unwrap();
+        let s = w
+            .review_card_disposition(&c.id, card_decision(&s, &f, 0, cf::Role::Necessary))
+            .unwrap();
+        let f = w.get_card_facts(&c.id).unwrap();
+        assert_eq!(f.latest_revision, 1);
+        assert_eq!(
+            f.snapshot.as_ref().unwrap().data.classifications[0].approval_id,
+            s.statements[0].history[0].id
+        );
+        assert!(!f.snapshot.as_ref().unwrap().data.inventory_reviewed);
+        let a = w.get_spending_analysis(&c.id, query()).unwrap();
+        assert_eq!(a.totals.necessary, "100.01");
+        assert_eq!(a.totals.discretionary, "0.00");
+        let mut stale = card_decision(&s, &f, 0, cf::Role::Discretionary);
+        stale.expected_facts_revision = Some(0);
+        assert!(w.review_card_disposition(&c.id, stale).is_err());
+        let mut payment = card_decision(&s, &f, 2, cf::Role::Necessary);
+        payment.decision.fields.kind = crate::cards::Kind::Payment;
+        assert!(w.review_card_disposition(&c.id, payment).is_err());
+        let s = w
+            .review_card_disposition(&c.id, card_decision(&s, &f, 0, cf::Role::Discretionary))
+            .unwrap();
+        let a = w.get_spending_analysis(&c.id, query()).unwrap();
+        assert_eq!(a.totals.necessary, "0.00");
+        assert_eq!(a.totals.discretionary, "100.01");
+        assert_eq!(
+            serde_json::to_vec(&s.statements[0].source).unwrap(),
+            serde_json::to_vec(&raw).unwrap()
+        );
+        assert_eq!(w.get_card_facts(&c.id).unwrap().history[0], f.history[0]);
+        let backup = w
+            .create_backup(d.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        let mut w = Workspace::new(root.path().into());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            w.get_spending_analysis(&c.id, query())
+                .unwrap()
+                .totals
+                .discretionary,
+            "100.01"
+        );
+        w.lock_workspace();
+        let restore = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(restore.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(w.get_card_facts(&c.id).unwrap().history.len(), 2);
+        let undo = card::decision(&s, 0, crate::cards::Kind::Purchase, Status::Rejected);
+        w.review_card_transaction(&c.id, undo).unwrap();
+        assert_eq!(
+            w.get_spending_analysis(&c.id, query())
+                .unwrap()
+                .totals
+                .spending,
+            "0.00"
+        );
+        assert_eq!(w.get_card_facts(&c.id).unwrap().history.len(), 2);
     }
 }

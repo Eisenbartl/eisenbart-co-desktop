@@ -315,6 +315,7 @@ mod tests {
         let doc = DocumentInput {
             balance_order: None,
             pdf_selection: None,
+            pdf: None,
             account_id: None,
             account_label: "Original checking".into(),
             account_kind: "checking".into(),
