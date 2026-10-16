@@ -349,4 +349,6 @@ recovered synthetic records. It checks stable forward/backward pages, original
 and corrected card evidence, date/source/status filters, both bank transfer legs,
 exact repayment approval navigation, renamed archived account identity, empty
 results, client isolation, lock privacy and another complete process restart.
-All activity-page actions are read-only searches through visible controls.
+The fixture first imports 31 pending fictional rows through Documents so a second
+page is guaranteed, then verifies paging leaves review counts unchanged. All
+activity-page actions are read-only searches through visible controls.

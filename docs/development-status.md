@@ -8,7 +8,7 @@ decision timeline, account/source/date/status and literal text filters, stable
 and explicit current/obsolete relationship labels. Existing source review and
 financial calculations remain unchanged. See [usage and limits](transaction-activity-history.md).
 
-Validation on 2026-10-15 (America/Chicago), current progress:
+Validation on 2026-10-15 (America/Chicago):
 
 | Check | Result |
 |---|---|
@@ -18,7 +18,7 @@ Validation on 2026-10-15 (America/Chicago), current progress:
 | Focused history fixtures | Passed all three mixed-history, scope/recovery and relationship/error fixtures |
 | Formatting / Clippy | Passed; all targets with warnings denied |
 | Standalone native build | Passed debug/no bundles |
-| Complete native workflow | Rerun in progress; see fixture correction below |
+| Complete native workflow | Passed, exit 0: all earlier workflows plus stable forward/backward pages, unchanged review counts, original/corrected card evidence, source/date/status filters, reciprocal transfer history, exact repayment decisions, archived account identity, empty results, client isolation, lock and full process restart over recovered records |
 | Windows source validation | Passed: 211 UI + 216 library + 2 PDF-worker tests; all five installer/checksum/upload steps skipped |
 | Installer | Not created, per user instruction |
 
@@ -33,8 +33,27 @@ The disabled Next button correctly prevented paging. Test-only commit `0cb9651`
 imports 31 pending fictional rows through the existing Documents UI, verifies
 page navigation does not change review counts, and uses the original fixture's
 actual incoming-transfer description. All earlier assertions and application
-source remain unchanged. A complete rerun is required before this stage is
-marked finished. First-attempt diagnostics are retained separately.
+source remain unchanged. The complete rerun passed with native exit 0.
+First-attempt diagnostics are retained separately. An existing approval UI test
+also now waits for the loaded report selector and flushes readiness before
+editing, retaining its original privacy/navigation assertions.
+
+Native artifacts: `/workspace/shared/desktop-smoke-activity`; validation logs use
+`/workspace/shared/activity-`. The history filters and expanded one-cent-correction
+screens were visually inspected. Windows result metadata and raw logs were
+checked for the exact feature SHA, actual test counts and five skipped installer
+steps. No dependency, schema migration or installer was added.
+
+Clean source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-transaction-activity-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-transaction-activity-source.bundle`, verified
+against the final clean commit and remote main. Follow-up commits contain only
+native fixtures and development/validation notes; application source remains the
+exact feature commit validated on Windows.
+
+Installed Windows/offline printing and full commercial acceptance remain open.
+The last downloadable preview remains 0.23.0. This stage completes transaction
+history within the documented bounds, not the whole product specification.
 
 Next priority: Reports → Print & presentation, placing client/period and financial
 summary first, with approval audit detail in an appendix and separate Windows
