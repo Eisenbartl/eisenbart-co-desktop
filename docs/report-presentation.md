@@ -1,4 +1,4 @@
-# Counselor report presentation — 0.39.0
+# Counselor report presentation — 0.40.0
 
 Open **Reports → Print & presentation**, select a client and a saved assessment,
 then select its internal assessment or an existing final counselor approval.
@@ -54,8 +54,11 @@ navigation is held while a destination/export operation is running.
 
 Exported PDFs contain readable confidential information outside workspace
 encryption. Print an exported PDF with your Windows PDF viewer's **Print** command.
-Direct printing from inside this app is still planned and is not claimed as
-verified by Linux native smoke or Windows source tests. No installer was requested.
+After exporting, the Windows build offers an explicit, consented **Open saved PDF
+to print** action for that exact file. See [file lifetime, failure behavior and
+acceptance limits](windows-pdf-print-workflow.md). The app does not submit a print
+job or confirm printing. Installed viewer/printer acceptance remains unverified
+by Linux native smoke or Windows source tests. No installer was requested.
 
 ## Verification
 

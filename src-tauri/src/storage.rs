@@ -80,6 +80,7 @@ struct Session {
     connection: Connection,
     info: WorkspaceInfo,
     last_activity: Instant,
+    report_pdf: Option<crate::report_viewer::Pending>,
 }
 
 pub struct Workspace {
@@ -224,6 +225,7 @@ impl Workspace {
                     connection,
                     info: info.clone(),
                     last_activity: Instant::now(),
+                    report_pdf: None,
                 });
                 Ok(info)
             }
@@ -281,6 +283,7 @@ impl Workspace {
             connection,
             info: info.clone(),
             last_activity: Instant::now(),
+            report_pdf: None,
         });
         Ok(info)
     }

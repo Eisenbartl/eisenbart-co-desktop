@@ -64,6 +64,14 @@ Cloud tasks already use an isolated environment: reuse the checkout under `/work
 
 ## Windows packaging
 
+`report_viewer.rs` provides a narrow Windows PDF association handoff over the
+existing presentation export. A single expiring in-memory request belongs to
+the unlocked Rust session and binds client, source context, exact file path and
+SHA-256. Scoped reauthorization, unchanged-file verification and dispatch occur
+under the existing workspace mutex. No temporary PDF, schema migration, shell
+plugin, financial write or print-success claim is introduced. See
+[workflow and Windows acceptance](windows-pdf-print-workflow.md).
+
 The Windows workflow builds an NSIS installer with Tauri's `offlineInstaller` WebView2 mode. This is intended to include the WebView2 runtime installer so the resulting package can install without fetching that component during installation. Building it requires network access to obtain dependencies and the runtime redistributable.
 
 The packaging configuration must be exercised on Windows. Merely committing the workflow does not produce an executable, verify the NSIS installer, demonstrate offline installation, or provide a signing certificate. Follow [windows.md](windows.md) for the build and release checks.

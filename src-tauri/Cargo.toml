@@ -1,6 +1,6 @@
 [package]
 name = "eisenbart-counseling-suite"
-version = "0.39.0"
+version = "0.40.0"
 description = "Offline financial counseling desktop foundation"
 edition = "2021"
 rust-version = "1.90"
@@ -47,4 +47,4 @@ debug = 0
 libc = "0.2"
 
 [target."cfg(windows)".dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Foundation", "Win32_Security"] }
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_Foundation", "Win32_Security", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_Com", "Win32_System_Registry"] }

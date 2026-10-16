@@ -1,6 +1,51 @@
 # Development status
 
-## Current stage — counselor report presentation (0.39.0, schema 25 unchanged)
+## Current stage — Windows saved-PDF print workflow (0.40.0, schema 25 unchanged)
+
+Reports → Print & presentation now offers **Open saved PDF to print** after an
+explicit export, with a separate confidentiality acknowledgement. The Windows
+adapter requests the installed `.pdf` viewer using one literal Unicode filename
+and a fixed open verb, without a command interpreter or generic shell permission.
+The counselor chooses Print in that viewer. Windows acceptance of opening is
+never presented as successful printing or even confirmed viewer display.
+
+The Rust session retains one ten-minute request bound to the client, source
+context, actual saved filename and exact exported bytes. Dispatch reauthorizes
+scope/context, rejects changed/missing/oversized/link files and holds the workspace
+mutex through verification/dispatch. Windows denies file writes/deletion during
+that interval. Lock/restart/restore discard the request; no readable temporary
+copy or financial/database write is introduced. The explicit export and external
+viewer copies remain readable after lock, as disclosed. Other platforms show
+manual local-viewer instructions. See [usage, failures and acceptance](windows-pdf-print-workflow.md).
+
+Validation in progress on 2026-10-15 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / UI suite | Passed versioned-source production build and 223 tests |
+| Focused handoff fixture | Passed final scope/receipt/file/expiry/lock/restart/external-restore fixture |
+| Full Linux backend | Passed 223 library + 2 PDF-worker tests; final expanded handoff fixture also passed separately |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build / complete native workflow | Build starting; complete smoke pending |
+| Windows source suite | Starting on feature push; no installer requested |
+| Installed Windows viewer/printer acceptance | Not run in this Linux cloud environment |
+| Installer | Not created, per user instruction |
+
+No schema migration or new package was added. Existing `windows-sys` enables the
+Shell/COM/Registry/window API features required by the narrow native adapter.
+Direct in-app printer selection, job submission and spooler tracking are not
+implemented. The last downloadable installer remains 0.23.0.
+
+Next implementation priority: **bounded local transaction classification
+assistance**, beginning with reviewable bank-transaction suggestions and explicit
+counselor application using existing immutable review decisions. Do not duplicate
+merchant grouping, recurring review, source correction or financial calculators.
+See [next-stage notes](classification-assistance-next-stage.md). Installed Windows
+viewer/printer and broader offline/commercial acceptance remain open release
+checks, independently of this source stage.
+
+## Counselor report presentation (0.39.0, schema 25 unchanged)
 
 Reports → Print & presentation offers a summary-first PDF with original firm,
 client, period, review status and exact figures, followed by a full evidence

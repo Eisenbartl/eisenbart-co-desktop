@@ -360,3 +360,12 @@ full appendix, exact combined cents/debt once, no-overwrite, lock privacy, full
 process restart, original identity and encrypted recovery/client isolation. PDF
 page text and rendered images are inspected separately. It does not submit jobs
 to a Windows printer or create an installer.
+
+The 0.40.0 extension retains every earlier native assertion. Each presentation
+export checks the actual saved path, readable-file lifetime notice and truthful
+non-Windows fallback. Changing layout/client must clear the saved-file shortcut.
+It captures `native-saved-pdf-print-workflow.png`. Rust/UI fixtures separately
+exercise request scope/expiry/bytes/context/session/restore and mocked Windows
+acceptance, cancellation and launch errors. Linux smoke and Windows source tests
+do not verify an installed viewer, physical printer or print spooler; see
+[Windows acceptance steps](windows-pdf-print-workflow.md).

@@ -1832,6 +1832,10 @@ def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Pat
         driver.wait_text('.report-presentation > .success-message',str(target),'reviewed presentation PDF exported')
         driver.wait(lambda:target.is_file(),'presentation PDF file exists')
         driver.interactive('#presentation-layout')
+        driver.wait_text('.saved-pdf-viewer .saved-pdf-path',str(target),'opening workflow bound to the actual exported file')
+        driver.wait_text('.saved-pdf-viewer','remains in your chosen folder after lock','readable export lifetime is explicit')
+        driver.wait_text('.saved-pdf-viewer','Opening from this app is available on Windows only','Linux does not pretend to launch a Windows viewer or print')
+        if driver.observe_script("return document.querySelector('#presentation-viewer-consent')!==null"):raise SmokeFailure('Windows opening consent appeared on unsupported Linux host')
         return target
     def check_pdf(path: Path,card: bool=True) -> None:
         first=subprocess.run(['pdftotext','-f','1','-l','1','-layout',str(path),'-'],check=True,capture_output=True,text=True).stdout
@@ -1851,7 +1855,9 @@ def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Pat
     if not identity:raise SmokeFailure('Original report integrity reference missing')
     driver.scroll_to('.presentation-summary','start');driver.screenshot(artifacts / 'native-report-presentation.png')
     summary=export('summary-card.pdf');check_pdf(summary);original=summary.read_bytes()
+    driver.scroll_to('.saved-pdf-viewer','start');driver.screenshot(artifacts / 'native-saved-pdf-print-workflow.png')
     driver.select('#presentation-layout','Original detailed layout')
+    if driver.observe_script("return document.querySelector('.saved-pdf-viewer')!==null"):raise SmokeFailure('Changing layout retained a stale PDF opening reference')
     driver.fill_pdf_destination('#presentation-pdf-path',summary);driver.click_button('Export presentation PDF')
     driver.wait_text('.report-presentation > [role=alert]','already exists','existing summary PDF cannot be overwritten')
     if summary.read_bytes()!=original:raise SmokeFailure('Detailed export overwrote an existing summary PDF')
@@ -1890,6 +1896,7 @@ def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Pat
     if card_title in driver.text('#presentation-assessment') or bank_title in driver.text('#presentation-assessment'):raise SmokeFailure('Another client received the original report choices')
     driver.select('#workspace-client','Robin Synthetic');driver.interactive('#workspace-client');driver.interactive('#presentation-assessment')
     driver.wait_text('.report-presentation','No saved assessments for this client','report presentation empty state is scoped')
+    if driver.observe_script("return document.querySelector('.saved-pdf-viewer')!==null"):raise SmokeFailure('Saved PDF path crossed client context')
     status('summary-first PDF with full original appendix, v1/v2 exact financial basis and debt counted once, internal/final separation, original detailed layout, no overwrite, identity, privacy, restart and encrypted recovery')
 
 

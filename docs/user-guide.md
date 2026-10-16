@@ -389,3 +389,13 @@ Resolve blocked checks with original evidence. Never omit a known loan or missin
 card to obtain approval. Unsupported cases remain blocked. Later changes preserve
 the original approval with review flags. See the
 [complete supported workflow](card-inclusive-final-approval.md).
+
+## Opening a report for printing (0.40.0 source)
+
+In Reports → Print & presentation, review the selected report and export a PDF
+to a new private filename. On Windows, read the file-lifetime notice, select the
+opening acknowledgement and click **Open saved PDF to print**. Choose Print and
+your printer in the PDF viewer. This app only reports whether Windows accepted
+the opening request; it cannot confirm printing. Exported files remain readable
+after locking the workspace. See [printing steps and limits](windows-pdf-print-workflow.md).
+This source feature is not included in the older 0.23.0 downloadable preview.

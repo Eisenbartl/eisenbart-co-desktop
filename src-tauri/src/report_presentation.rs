@@ -2,6 +2,14 @@
 use crate::{assessments, final_reports};
 use serde::{Deserialize, Serialize};
 pub const VERSION: &str = "counselor-summary-v1";
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Export {
+    #[serde(flatten)]
+    pub pdf: crate::assessment_pdf::Export,
+    pub viewer_ticket: String,
+    pub viewer_supported: bool,
+}
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Kind {

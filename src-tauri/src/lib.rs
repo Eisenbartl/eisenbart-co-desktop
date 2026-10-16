@@ -32,6 +32,7 @@ mod recurring;
 mod report_evidence;
 mod report_intake;
 mod report_presentation;
+mod report_viewer;
 mod saved_scenarios;
 mod savings;
 mod scenarios;
@@ -460,7 +461,7 @@ async fn export_report_presentation(
     state: State<'_, DesktopState>,
     client_id: String,
     input: report_presentation::ExportInput,
-) -> Result<assessment_pdf::Export, String> {
+) -> Result<report_presentation::Export, String> {
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         access(&state, |w| w.export_report_presentation(&client_id, input))
@@ -470,6 +471,16 @@ async fn export_report_presentation(
         "Report PDF export could not finish. Check the destination before another attempt."
             .to_owned()
     })?
+}
+#[tauri::command]
+async fn open_report_pdf(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    ticket: String,
+) -> Result<report_viewer::Handoff, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || access(&state, |w| w.open_report_pdf(&client_id, &ticket)))
+        .await.map_err(|_| "The PDF opening request could not finish. Check your viewer before trying again; no printing was confirmed.".to_owned())?
 }
 #[tauri::command]
 async fn choose_report_presentation_pdf(
@@ -1225,6 +1236,7 @@ pub fn run() {
             get_report_presentation,
             choose_report_presentation_pdf,
             export_report_presentation,
+            open_report_pdf,
             export_assessment_pdf,
             stage_client_csv,
             review_transaction,

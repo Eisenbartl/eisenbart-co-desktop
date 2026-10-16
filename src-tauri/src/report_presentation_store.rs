@@ -54,8 +54,11 @@ impl Workspace {
         &mut self,
         client: &str,
         input: presentation::ExportInput,
-    ) -> Result<assessment_pdf::Export, String> {
+    ) -> Result<presentation::Export, String> {
         let s = self.session()?;
+        // One recent export per unlocked session; a new attempt revokes the old
+        // handoff even if its destination later fails. Files themselves remain.
+        s.report_pdf = None;
         let tx = s.connection.transaction().map_err(storage_error)?;
         let (context, a, f) = read(&tx, &s.info, client, &input.assessment_id)?;
         if context.receipt != input.expected_receipt {
@@ -82,7 +85,59 @@ impl Workspace {
         };
         let record_id = selected.record_id.clone();
         tx.commit().map_err(storage_error)?;
-        assessment_pdf::save_bytes(&record_id, bytes, pages, &input.path, &self.data_dir)
+        let digest = Sha256::digest(&bytes).into();
+        let pdf =
+            assessment_pdf::save_bytes(&record_id, bytes, pages, &input.path, &self.data_dir)?;
+        let token = Uuid::new_v4().to_string();
+        self.session()?.report_pdf = Some(crate::report_viewer::Pending {
+            token: token.clone(),
+            client_id: client.into(),
+            assessment_id: input.assessment_id,
+            receipt: context.receipt,
+            path: PathBuf::from(&pdf.path),
+            digest,
+            created: Instant::now(),
+        });
+        Ok(presentation::Export {
+            pdf,
+            viewer_ticket: token,
+            viewer_supported: cfg!(windows),
+        })
+    }
+    pub fn open_report_pdf(
+        &mut self,
+        client: &str,
+        token: &str,
+    ) -> Result<crate::report_viewer::Handoff, String> {
+        self.open_report_pdf_with(client, token, crate::report_viewer::open_pdf)
+    }
+    fn open_report_pdf_with(
+        &mut self,
+        client: &str,
+        token: &str,
+        launch: impl FnOnce(&Path) -> Result<crate::report_viewer::Status, String>,
+    ) -> Result<crate::report_viewer::Handoff, String> {
+        use crate::report_viewer::{self, Status};
+        let s = self.session()?;
+        let p = s.report_pdf.as_ref().ok_or(report_viewer::EXPIRED)?;
+        if token.len() != 36 || p.token != token || p.client_id != client || p.expired() {
+            return Err(report_viewer::EXPIRED.into());
+        }
+        let tx = s.connection.transaction().map_err(storage_error)?;
+        let (current, _, _) = read(&tx, &s.info, client, &p.assessment_id)?;
+        if current.receipt != p.receipt {
+            return Err("Report context changed since this PDF was exported. Refresh the preview and export a new PDF before opening from this app. The previous file is unchanged.".into());
+        }
+        tx.commit().map_err(storage_error)?;
+        let _verified = p.verified_file()?;
+        let path = p.path.to_string_lossy().into_owned();
+        // Managed Workspace mutex remains held through the native dispatch.
+        // Lock/restore cannot interleave a validated request on this instance.
+        let status = launch(&p.path)?;
+        if status == Status::Requested {
+            s.report_pdf = None;
+        }
+        Ok(report_viewer::Handoff { status, path })
     }
 }
 
@@ -136,6 +191,154 @@ mod tests {
         assert!(p[1].contains("Evidence appendix / original detailed report"));
     }
     #[test]
+    fn viewer_handoff_is_scoped_unchanged_expiring_session_bound_and_readonly() {
+        use crate::report_viewer::{Status, EXPIRED};
+        use std::cell::Cell;
+        let (root, mut w, _) = configured();
+        let c = w.save_client(client_input()).unwrap();
+        let other = w.save_client(client_input()).unwrap();
+        let a = bank::final_candidate(&mut w, &c, root.path());
+        let outputs = tempfile::tempdir().unwrap();
+        let context = w.get_report_presentation(&c.id, &a.payload.id).unwrap();
+        let original = json(&a.payload);
+        let changes = w.session().unwrap().connection.total_changes();
+        let export = |w: &mut Workspace, name: &str| {
+            w.export_report_presentation(
+                &c.id,
+                request(
+                    &context,
+                    Kind::Internal,
+                    Layout::SummaryAppendix,
+                    &outputs.path().join(name),
+                ),
+            )
+            .unwrap()
+        };
+        let e = export(&mut w, "Private résumé & literal $(echo).pdf");
+        assert_eq!(e.viewer_supported, cfg!(windows));
+        let path = PathBuf::from(&e.pdf.path);
+        let bytes = fs::read(&path).unwrap();
+        let calls = Cell::new(0);
+        let launched = |p: &Path| {
+            calls.set(calls.get() + 1);
+            assert_eq!(p, path);
+            Ok(Status::Requested)
+        };
+        assert!(w
+            .open_report_pdf_with(&other.id, &e.viewer_ticket, launched)
+            .is_err());
+        assert!(w
+            .open_report_pdf_with(&c.id, "C:\\arbitrary.exe", launched)
+            .is_err());
+        assert_eq!(calls.get(), 0);
+        let cancelled = w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, |_| Ok(Status::Cancelled))
+            .unwrap();
+        assert_eq!(cancelled.status, Status::Cancelled);
+        assert_eq!(cancelled.path, e.pdf.path);
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, |_| Err(
+                "Synthetic missing PDF viewer".into()
+            ))
+            .unwrap_err()
+            .contains("missing PDF viewer"));
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        w.open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .unwrap();
+        assert_eq!(calls.get(), 1);
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .unwrap_err()
+            .contains(EXPIRED));
+        let e = export(&mut w, "changed.pdf");
+        let path = PathBuf::from(&e.pdf.path);
+        let bytes2 = fs::read(&path).unwrap();
+        fs::write(&path, b"%PDF-Synthetic changed bytes").unwrap();
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .unwrap_err()
+            .contains("changed or unavailable"));
+        fs::remove_file(&path).unwrap();
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .is_err());
+        fs::write(&path, &bytes2).unwrap();
+        w.session().unwrap().report_pdf.as_mut().unwrap().created =
+            Instant::now() - Duration::from_secs(601);
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .unwrap_err()
+            .contains(EXPIRED));
+        let old = e;
+        let e = export(&mut w, "latest.pdf");
+        assert!(w
+            .open_report_pdf_with(&c.id, &old.viewer_ticket, launched)
+            .is_err());
+        #[cfg(not(windows))]
+        assert!(w
+            .open_report_pdf(&c.id, &e.viewer_ticket)
+            .unwrap_err()
+            .contains("Windows only"));
+        assert_eq!(calls.get(), 1);
+        assert_eq!(w.session().unwrap().connection.total_changes(), changes);
+        assert_eq!(
+            json(
+                &w.get_assessment_record(&c.id, &a.payload.id)
+                    .unwrap()
+                    .payload
+            ),
+            original
+        );
+        w.lock_workspace();
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .unwrap_err()
+            .contains("locked"));
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .is_err());
+        let e = export(&mut w, "before-external-restore.pdf");
+        let backups = tempfile::tempdir().unwrap();
+        let backup = w
+            .create_backup(backups.path().to_str().unwrap().into(), PASSWORD.into())
+            .unwrap();
+        let mut another = Workspace::new(root.path().into());
+        let candidate = another
+            .prepare_restore(backup.path, PASSWORD.into())
+            .unwrap();
+        another
+            .confirm_restore(candidate.token, "RESTORE".into())
+            .unwrap();
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .unwrap_err()
+            .contains("locked"));
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .is_err());
+        let e = export(&mut w, "before-profile-change.pdf");
+        let mut changed = client_input();
+        changed.id = Some(c.id.clone());
+        changed.first_name = "Later fictional identity".into();
+        w.save_client(changed).unwrap();
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .unwrap_err()
+            .contains("context changed"));
+        assert_eq!(calls.get(), 1);
+        drop(w);
+        let mut w = Workspace::new(root.path().into());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert!(w
+            .open_report_pdf_with(&c.id, &e.viewer_ticket, launched)
+            .is_err());
+        assert!(outputs.path().join("latest.pdf").is_file());
+        assert_eq!(outputs.path().read_dir().unwrap().count(), 5);
+        assert_eq!(calls.get(), 1);
+    }
+    #[test]
     fn presentation_exports_v1_scope_receipts_readonly_originals_and_recovery() {
         let (root, mut w, _) = configured();
         let c = w.save_client(client_input()).unwrap();
@@ -183,7 +386,7 @@ mod tests {
                 .export_report_presentation(&c.id, request(&context, kind, layout, &path))
                 .unwrap();
             let bytes = fs::read(&path).unwrap();
-            assert!(export.pages > 1);
+            assert!(export.pdf.pages > 1);
             if layout == Layout::SummaryAppendix {
                 first_page(
                     &bytes,

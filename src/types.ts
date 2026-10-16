@@ -416,6 +416,7 @@ export interface ActivityEvent {id:string;sourceId:string;recordId:string;row:nu
 export interface ActivityPage {clientId:string;snapshot:string;query:ActivityQuery;total:number;pageSize:number;sources:ActivitySource[];events:ActivityEvent[]}
 
 export type ReportPresentationKind='internal'|'final';
+export interface ReportPresentationExport {path:string;pages:number;recordId:string;viewerTicket:string;viewerSupported:boolean}
 export type ReportPresentationLayout='summaryAppendix'|'detailed';
 export interface ReportPresentationSummary {kind:ReportPresentationKind;recordId:string;digest:string;title:string;firmName:string;clientName:string;periodStart:string;periodEnd:string;reportDate:string;balanceAsOf:string|null;basis:string;status:string;needsReview:boolean;reviewReasons:string[];figures:{label:string;value:string|null}[];disclosure:string}
 export interface ReportPresentationContext {clientId:string;assessmentId:string;presentation:string;receipt:string;internal:ReportPresentationSummary;finalReport:ReportPresentationSummary|null}

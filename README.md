@@ -1,5 +1,9 @@
 # Eisenbart & Co. Financial Counseling Suite
 
+Version **0.40.0 source** adds [Open saved PDF to print](docs/windows-pdf-print-workflow.md): an explicit, consented request to open an unchanged counselor report export in the Windows PDF viewer. Choose Print in that viewer; the app does not submit jobs or confirm printing. Export lifetime and failures are explicit. No installer was created.
+
+Version **0.39.0 source** adds [summary-first counselor PDFs](docs/report-presentation.md) with a complete evidence appendix and the original detailed option. Version **0.38.0 source** adds [searchable bank/card transaction history](docs/transaction-activity-history.md).
+
 Version **0.37.0 source** adds [card-inclusive final approval](docs/card-inclusive-final-approval.md): complete supported bank/card evidence, explicit counselor review, exact combined spending versus bank cash movement, and immutable approvals/PDFs. Existing debt is counted once and older approvals retain their original policy. No installer was created.
 
 Version **0.33.0 source** adds [final counselor report approval](docs/final-report-approval.md): required evidence gates, explicit professional decisions, immutable audited approvals and offline final PDFs. Later context changes preserve the original approval and flag it for review. No installer was created.

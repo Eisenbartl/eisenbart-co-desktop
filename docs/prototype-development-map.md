@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.39.0 source
+# Prototype structure and development map — 0.40.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -83,7 +83,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Cash-Flow Calendar → Transfer settlement | Extend per-account `cashflow.rs` events and persisted assumptions | Outgoing/incoming dates, both account shortfalls, reserves, same-day order, no premature combined liquidity or invented settlement dates |
 | Financial Scenarios → New goals & funding sources | `scenarios.rs` / `scenarios_store` and control components | Explicit new goal/funding/account IDs, baseline remains unchanged, exact affordability/milestones, immutable linked report/recovery validation |
 | Reports → Final report checklist — approval working | `final_reports.rs`, `final_reports_store.rs`, `FinalReportApproval.tsx`, report PDF | Schema-22 scoped immutable counselor approval, current evidence gates, account/scenario decisions, exact parent binding, atomic audit, final PDF and restart/recovery. [Policy limits and future work](final-report-approval.md) |
-| Reports → Print & presentation — PDF layouts working in 0.39.0 | `ReportPresentation.tsx`, `report_presentation.rs`, `report_presentation_store.rs`, `assessment_pdf.rs`; schema 25 unchanged | Summary-first page, complete evidence appendix, original detailed option, distinct internal/v1/v2 bases, exact figures/unknowns, stale/scoped/no-overwrite export, restart/recovery. Direct in-app printing and installed Windows print acceptance remain planned. [Usage](report-presentation.md) |
+| Reports → Print & presentation — PDF layouts / Windows viewer handoff working in 0.40.0 | `ReportPresentation.tsx`, `report_presentation.rs`, `report_presentation_store.rs`, `assessment_pdf.rs`; schema 25 unchanged | Summary-first page, complete evidence appendix, original detailed option, distinct internal/v1/v2 bases, exact figures/unknowns, stale/scoped/no-overwrite export, restart/recovery. Explicit unchanged-file Windows viewer handoff with consent/expiry/session checks; choose Print in that viewer. In-app job submission and installed Windows viewer/printer acceptance remain open. [Usage](windows-pdf-print-workflow.md) |
 | Clients → History & records | Add bounded cross-module timeline and reviewed note amendments beside note storage | Authorship, original notes retained, reason/audit, scope/pagination, stale edits, restart and encrypted recovery |
 | Documents → Statement accounts (working) | `StatementAccounts.tsx`, `statement_accounts_store`, schema 19 | Scoped standalone create/rename/archive/reactivate, revision/audit/recovery checks; original source/report associations preserved; no destructive deletion |
 | Settings → Branding — working in 0.30.0 | `FirmBranding.tsx`, `branding.rs`, `branding_store.rs`, schema 20, format-6 assessments | Implemented bounded normalized local PNG/contact/disclosure, guarded revision/audit saves, exact immutable capture, old payload/digest preservation and recovery; see [limits and future work](firm-report-branding.md) |
@@ -101,11 +101,15 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **bounded native Windows printing** over the existing report exports.
-Define explicit user action, generated-file lifecycle, cancellation/failure and
-installed Windows acceptance first. Summary and original detailed PDF layouts
-already work; do not redo rendering or approvals. See
-[next-stage implementation notes](native-printing-next-stage.md).
+Implement **bounded local transaction classification assistance**, starting with
+reviewable suggestions for bank records and explicit counselor application through
+the existing immutable decision workflow. Reuse merchant normalization and source
+history; no automatic approval or silent financial change. See
+[next-stage notes](classification-assistance-next-stage.md).
+
+The bounded Windows saved-PDF handoff is implemented in 0.40.0. Printing is chosen
+in the external viewer; direct job submission and actual installed Windows
+viewer/printer acceptance remain separate. Do not redo report layouts or approvals.
 
 Card account CRUD, assignments, repayments, completeness/roles/debt mappings and
 bounded versioned final approval are implemented through 0.37.0 below. Build on
@@ -197,3 +201,14 @@ approval figures. The new first page preserves full identity, period and review
 status; complete original evidence and firm disclosures follow in an appendix.
 No schema, calculator, policy or immutable payload changes are introduced. Direct
 in-app printing is still planned. See [usage and limits](report-presentation.md).
+
+### 0.40.0 — explicit Windows saved-PDF print workflow
+
+A successful presentation export can be opened in the Windows PDF viewer only by
+explicit user action and confidentiality acknowledgement. Rust checks a scoped,
+expiring session request, unchanged source receipt and exact file bytes; lock,
+restart and recovery invalidate it. The export remains user-managed/readable.
+No shell interpreter, temporary PDF or financial write is introduced. Windows
+request acceptance is not print success. Unsupported hosts show manual guidance.
+Source/native verification and installed Windows acceptance are recorded separately
+in [development status](development-status.md). No installer is created.

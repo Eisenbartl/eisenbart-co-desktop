@@ -1,7 +1,10 @@
 # Next stage: bounded native printing
 
-This is a future implementation note; direct printing is not implemented by
-0.39.0. Printable PDF layouts and manual Windows PDF-viewer printing already work.
+This is retained design context. The first bounded action is implemented in
+0.40.0: [open an explicit saved PDF in the Windows viewer](windows-pdf-print-workflow.md).
+Direct print submission, an in-app printer dialog and installed Windows printer
+acceptance are not implemented or claimed. Printable PDF layouts and manual
+Windows PDF-viewer printing already work.
 Do not repeat the report renderer, branding, approval policy or financial logic.
 
 Use existing validated report-presentation selection and the no-overwrite PDF
