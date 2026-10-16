@@ -9,7 +9,7 @@ bank-only final and v2 combined final bases remain distinct. Scoped read-only
 preview receipts, stale-export checks and the existing no-overwrite writer protect
 the workflow. See [usage and limits](report-presentation.md).
 
-Validation on 2026-10-15 (America/Chicago), current progress:
+Validation on 2026-10-15 (America/Chicago):
 
 | Check | Result |
 |---|---|
@@ -21,12 +21,16 @@ Validation on 2026-10-15 (America/Chicago), current progress:
 | Standalone native build | Passed debug/no bundles on corrected source |
 | Complete native workflow | Passed, exit 0: all earlier workflows plus internal/v1/v2 first-page figures, full appendix, original detailed option, no-overwrite, identity, lock/client isolation, restart and encrypted recovery |
 | Visual inspection | Passed corrected internal/v1/v2 summary pages, appendix and report preview |
-| Windows source validation | Final run in progress; no completion claim yet |
+| Windows source validation | Passed: 218 UI + 220 library + 2 PDF-worker tests; all five installer/checksum/upload steps skipped |
 | Installer | Not created, per user instruction |
 
 Feature commit: `2a4fb123576c531a17eec973175cbbae3f9cf56c`.
 Logo-spacing correction: `caf1db529b33c8edb5751b76ac05278dcb1cda18`.
-Application source is unchanged by subsequent UI-fixture commits.
+Application source is unchanged by subsequent UI-fixture commits. Final Windows
+source validation passed for `70721230a6fb6eddca64f529c9768725f20507a7` in
+[run 38840593917](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38840593917).
+Its Rust library suite completed in 742.53 seconds. Raw result metadata/logs were
+checked for that exact source, actual test counts and five skipped installer steps.
 
 The long-identity fixture initially exposed a first-page overflow. Compact full
 identities, a compact logo, fixed summary rows and moving the full title and firm
@@ -46,8 +50,9 @@ completed; test-only commit `4383666` waits for that callback. A subsequent run
 exposed the older v1 approval fixture clicking readiness before the selected
 report's child initialization completed; test-only commit `7072123` flushes that
 saved-report initialization before clicking. Every original assertion remains.
-The complete 218-test UI suite passes locally and on the latest Windows run;
-Windows backend results are still pending.
+The complete 218-test UI suite and all Windows backend tests now pass on the
+latest run. The two failed-attempt logs are retained; no assertion was weakened
+and no financial, authentication or persistence behavior changed for those fixes.
 
 
 Native artifacts: `/workspace/shared/desktop-smoke-presentation`; validation logs
@@ -56,6 +61,12 @@ First-pass PDFs/screens/logs are preserved separately under `before-spacing`.
 No dependency, schema migration or installer was added. Direct Windows printing,
 installed Windows acceptance and commercial readiness remain open; the last
 installer preview is still 0.23.0.
+
+Clean source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-report-presentation-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-report-presentation-source.bundle`, verified
+against the final clean commit and remote main. Only validation/development notes
+follow the exact source tested on Windows.
 
 Next priority: bounded native Windows printing, with explicit file lifecycle,
 user action, cancellation/failure handling and Windows acceptance. Direct in-app

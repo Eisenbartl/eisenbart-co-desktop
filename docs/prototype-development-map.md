@@ -29,7 +29,7 @@ Rust-backed data. Do not add another persistence layer or copy the calculators.
 | Savings Planner | Saved reserves, emergency targets, sinking-fund goals and contribution comparisons (`SavingsEditor.tsx`) |
 | Cash-Flow Calendar | Saved account balances, dated schedules/transfers, calendar/ledger and non-writing previews (`CashflowEditor.tsx`) |
 | Financial Scenarios | Temporary comparisons, explicitly saved scenarios and historical review (`ScenarioComparisons.tsx`) |
-| Reports | Immutable internal assessments, selected intake/evidence/scenarios, client action plans, PDF exports, captured-source final-report checklists and audited counselor approval (`AssessmentRecords.tsx`, `ClientActionPlans.tsx`, `CompletenessReview.tsx`) |
+| Reports | Immutable internal assessments, selected intake/evidence/scenarios, client action plans, summary-first/detailed PDF exports, captured-source final-report checklists and audited counselor approval (`AssessmentRecords.tsx`, `ClientActionPlans.tsx`, `CompletenessReview.tsx`, `ReportPresentation.tsx`) |
 | Settings and Administration | Workspace identity, security/lock, encrypted backup, lock-to-restore route, help; working firm/report branding and named future roles/data/licensing pages (`AdministrationPages.tsx`) |
 
 Client pages require a selected client and display that context. Switching a
