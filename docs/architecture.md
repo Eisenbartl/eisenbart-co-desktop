@@ -91,15 +91,20 @@ preserves formats 1–4 bytes/digests; schema 17 is unchanged. Internal PDF expo
 prints counselor context separately from financial facts. The client-plan PDF
 renderer excludes it. See [report-intake-context.md](report-intake-context.md).
 
-`workspaceNavigation.ts` defines the twelve specification sections. `App` retains
-an authenticated in-memory client context across focused pages, ignores late
-selection responses and guards persistent drafts/busy operations. Page/area
-changes focus the heading. `ClientEditor` remounts the relevant existing workflow;
-`ImportsEditor` presents document/transaction/review/report views over the same
-scoped Rust data. Complete record remains available. `AdministrationPages` and
-`PlannedWorkspaceAreas` distinguish working tools from named future sections;
-[prototype-development-map.md](prototype-development-map.md) records implementation
-entry points and acceptance criteria. Schema 17 and report formats are unchanged.
+`workspaceNavigation.ts` defines three global pages and twelve client-local
+sections. `App` retains stable-ID client tabs and per-client section/subtab metadata
+only while unlocked. The selected section mounts its existing scoped editor;
+late responses are ignored and dirty/busy guards precede navigation or tab closing.
+`ConfirmationDialog` waits for explicit in-app choices and cancels on lock.
+`ImportsEditor` mounts only the selected import/review/dashboard/report workflow.
+The old all-forms Complete record view has been removed. `ClientOverview` renders
+exact saved-plan results from the authenticated read-only `client_workspace` command;
+unknown amounts remain unknown and planning figures stay distinct from approved
+statement activity. `AdministrationPages` and `PlannedWorkspaceAreas` identify
+working and planned features. See [redesign details](client-workspace-redesign.md)
+and [prototype-development-map.md](prototype-development-map.md) for entry points
+and acceptance criteria. This presentation stage leaves schema 29 and existing
+financial/report formats unchanged.
 
 `document_collection.rs` validates workflow-only request metadata, status, dates
 and bounds; `storage::document_collection_store` assigns IDs and captures scoped

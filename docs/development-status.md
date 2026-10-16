@@ -18,8 +18,8 @@ Validation in progress on 2026-10-16 (America/Chicago):
 | New read-only overview | Exact independent synthetic figures, mismatch/reconciliation, unknown versus explicit zero, scoped reads and no audit writes passed |
 | Standalone native build | Passed debug build with embedded assets, no bundles |
 | Focused redesign / visual | Passed exit 0 and final completion marker: twelve sections, exact amounts/mismatch, ID deduplication, cancel/discard, isolation, MRU close, 800px layout, privacy and full restart; desktop/narrow images visually inspected |
-| Complete native regression | Pending; original financial/source/report/privacy assertions retained with real UI routes to focused sections |
-| Windows installer | Explicitly requested; packaging and validation pending |
+| Complete native regression | Passed exit 0, durable zero status and final completion marker: all original planning, statements, report/history, bank/card, approval, lock/restart, recovery, real idle timeout and password-change checks through actual focused pages |
+| Windows installer | Initial application-source run `38945011333` passed 271 UI + 247 Windows library + 2 worker tests and actual install/responsive x64 launch/uninstall; final run `38950497634` on packaging-instructions-only follow-up `cc29e77` is building the package with its corrected README |
 
 Native testing exposed an existing compatibility error: tauri-plugin-dialog 2.8.2
 replaces `window.confirm` with an async function. Synchronous guards treated its
@@ -29,13 +29,31 @@ focus containment, no duplicate request replay and cancellation on lock. Unit an
 native tests verify that cancellation preserves the draft and acceptance discards
 it only for the intended navigation. All existing UI regressions remain active.
 
-Initial native attempts are not passes: the focused driver expected a WebDriver
-JavaScript alert for the asynchronous native-plugin dialog; the complete driver
-also needed to route the original source-inventory assertion to the separate
-Source checks subtab. A diagnostic prompt-policy attempt confirmed that the old
-alert assumption was unsuitable. Logs/screenshots are retained separately. The
-final focused run uses actual in-app buttons and passed. The complete rerun is
-still in progress; no source/financial/privacy assertion was removed.
+Initial native attempts are not passes. The focused driver expected a WebDriver
+JavaScript alert for the asynchronous native-plugin dialog. Complete-driver
+attempts exposed assumptions from the old all-in-one record: source inventory,
+review rows, intake/focus, report selection, period controls and identity headings
+now have focused pages. The driver uses actual rail/subtab controls, reselects
+its intended saved report IDs and periods through native dropdowns, and checks
+saved plans after finishing temporary scenario assertions, since previews reset
+on leaving. Native selects are centered before clicking to avoid sticky headers.
+Read-only visibility/privacy observations never navigate, and unexpected discard
+prompts fail instead of being auto-accepted. All original financial/source/report/
+privacy assertions remain. Deliberately interrupted integration attempts and
+failed attempts retain separate logs/screenshots and are not counted as passes,
+even if the outer D-Bus wrapper returned zero after an interrupt. A final marker
+and durable zero exit status are both required. Both the final focused run and final complete rerun passed.
+
+Application source is committed/pushed as `3cba5da`. Both final native runs use
+that standalone embedded-assets binary; `cc29e77` changes only the Windows bundled
+README generator. No Cargo command ran while native tests were active. The full
+run stopped its processes, removed its temporary synthetic workspace and closed
+its driver ports. Focused desktop/800px screenshots and complete-run budget/security
+screens were visually inspected. Evidence, original failed/interrupted attempts,
+logs and durable exit files are retained under `/workspace/shared/redesign-validation`;
+final full artifacts use
+`/workspace/shared/desktop-smoke-redesign-final-complete-workflow` and focused
+artifacts use `/workspace/shared/desktop-smoke-redesign-final-focused`.
 
 No release or commercial-readiness claim is made. The original prototype's sample
 records were not imported into production workspaces. Essential operation remains
