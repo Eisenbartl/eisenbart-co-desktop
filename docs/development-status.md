@@ -16,13 +16,56 @@ review for reports that captured note evidence. Schema 27 migration/recovery
 validates scoped linear chains without changing old note/report formats. See
 [usage and limits](client-history.md).
 
-Validation in progress on 2026-10-16 (America/Chicago): locked setup, production
-build and all 248 UI tests passed. The complete Linux backend passed 230 library
-and 2 PDF-worker tests; all three focused history fixtures passed. The final
-migration fixture additionally retains a populated saved rule and passed in the
-final focused rerun. Formatting and all-target Clippy with warnings denied passed.
-Native workflow and Windows source validation will be recorded after completion.
-No installer is being created.
+Validation on 2026-10-16 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing reusable environment configuration |
+| Production frontend / UI | Passed build and all 248 tests |
+| Focused backend | Passed all three fixtures, including a final migration rerun preserving a populated category rule |
+| Complete Linux backend | Passed 230 library + 2 PDF-worker tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug build, no bundles |
+| Focused native workflow | Passed all new note/history assertions through visible controls, including original/current versions, report selection, paging, restart and encrypted recovery |
+| Complete native workflow | Passed, exit 0 and final completion marker: all prior financial/source/report/recovery assertions plus reviewed note correction, original reason/history, current report selection, 32-event paging/search/source navigation, lock, restart, encrypted recovery and client isolation |
+| Native visual inspection | Passed focused and full-run original/correction history and searchable timeline screens; readable wrapped text with no horizontal overflow |
+| Windows source validation | Passed 248 UI + 231 library + 2 PDF-worker tests; all five installer/checksum/upload steps skipped |
+| Installer | Not created, per user instruction |
+
+Feature/application source: `fabca12fa16315c593cc3b580d453a8d0fe86bc5`.
+[Windows run 38903104613](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38903104613)
+passed for that source. Raw metadata/logs were checked for the exact SHA, actual
+counts and five skipped installer steps; the library suite took 914.71 seconds.
+Windows source tests do not establish installed Windows offline acceptance.
+Validation logs and verified Windows evidence use `/workspace/shared/client-history-`.
+
+Two incomplete native attempts are retained separately and are not counted as
+passes: WebKit lost focus after clearing an existing employer field, then a
+report selector was read before its directory refresh finished. The test driver
+now uses a native click/keyboard replacement with a fresh readiness check for
+the employer changes, and waits for the enabled populated report selector before
+reading IDs. No uncertain write is replayed and no assertion is removed. The
+application source is unchanged by these driver fixes. No Cargo checks ran after
+the standalone build or during native runs.
+
+Complete-run native artifacts are in `/workspace/shared/desktop-smoke-client-history`;
+the independent focused new-feature run is in
+`/workspace/shared/desktop-smoke-client-history-focused`. Both have the specific
+reviewed-note/timeline PASS and final completion marker; the complete run also has
+exit `0` and retains every earlier assertion. Full-run images
+`native-note-correction-history.png` and `native-client-history-timeline.png` were
+visually inspected for exact original/corrected text, authorship/reason, readable
+search results and source navigation. Interrupted attempts remain under
+`/workspace/shared/desktop-smoke-client-history-interrupted` with failure logs
+retained separately; neither is reported as passing.
+
+Clean source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-client-history-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-client-history-source.bundle`.
+The helper verifies every tracked file against final clean HEAD and actual remote
+main. Only native-driver readiness guards and the final validation documentation
+follow the exact application source tested on Windows. No installer was created;
+clean installed Windows offline acceptance and commercial readiness remain open.
 
 Next priority: **local workspace password change with durable recovery safeguards**,
 including interrupted-change rollback and clear original-backup password semantics.
@@ -94,7 +137,7 @@ advanced models, multiple-counselor/security/commercial work and clean installed
 Windows offline acceptance remain open original requirements. The last
 downloadable installer remains 0.23.0.
 
-## Current stage — local category suggestions (0.41.0, schema 25 unchanged)
+## Local category suggestions (0.41.0, schema 25 unchanged)
 
 Transactions → Classification assistance lists missing-category bank expenses
 and fees in stable 25-record pages, with literal search and exact current approval

@@ -245,6 +245,19 @@ class WebDriver:
         except DriverFailure as error:
             raise SmokeFailure(f"Native field {selector}: {error}") from error
 
+    def replace_text(self, selector: str, value: str) -> None:
+        # Replace an existing controlled value with actual keyboard events.
+        # WebKit's clear endpoint can lose focus between clearing and typing.
+        # Focus first, clear once, recheck effective enabled state, then type once.
+        # No uncertain mutation is retried and no application data is scripted.
+        self.click(selector)
+        element = self.interactive(selector)
+        self.command("POST", f"/element/{element}/value", {"text": "\ue009a\ue000\ue003"})
+        self.wait_value(selector, "", "keyboard-cleared controlled field")
+        element = self.interactive(selector)
+        self.command("POST", f"/element/{element}/value", {"text": value})
+        self.wait_value(selector, value, "complete controlled-field replacement")
+
     def fill_pdf_destination(self, selector: str, destination: Path) -> None:
         # Use real keyboard events so React observes replacement of a retained
         # controlled text field, rather than relying on the clear endpoint.
@@ -1215,12 +1228,12 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.click(".client-care > summary")
     save_client_action_plan(driver, artifacts)
     driver.click(".client-care > summary")
-    driver.fill("#intake-employer", "Alex changed employer")
+    driver.replace_text("#intake-employer", "Alex changed employer")
     driver.wait_value("#intake-employer", "Alex changed employer", "selected employer replacement")
     driver.click_button("Save intake and follow-ups")
     driver.wait_text(".saved-assessment-status", "Needs review", "selected intake change flags report")
     driver.interactive("#intake-employer")
-    driver.fill("#intake-employer", "Alex fictional employer")
+    driver.replace_text("#intake-employer", "Alex fictional employer")
     driver.wait_value("#intake-employer", "Alex fictional employer", "selected employer restored")
     driver.click_button("Save intake and follow-ups")
     driver.interactive("#record-title")
@@ -2920,7 +2933,8 @@ def check_saved_coverage_reviews(driver: WebDriver, artifacts: Path, data_root: 
     driver.click_button('Save assessment record')
     driver.wait_text('.saved-assessments','Assessment record saved with its supporting evidence.','completeness version attached to immutable report')
     driver.wait_text('.saved-assessment-view .captured-coverage-review','Saved completeness review version 1','original review retained in recorded report')
-    record_id=driver.observe_script("return document.querySelector('#saved-assessment').value")
+    driver.interactive('#saved-assessment')
+    record_id=driver.wait(lambda:driver.observe_script("return document.querySelector('#saved-assessment').value"), 'saved report directory contains the selected record after refresh')
     totals=driver.text('.saved-assessment-view .assessment-totals')
     review_page()
     driver.fill('#coverage-missing-information',changed)
@@ -3065,7 +3079,8 @@ def check_firm_branding(driver: WebDriver, artifacts: Path, data_root: Path, pas
     driver.click_button('Save assessment record')
     driver.wait_text('.saved-assessments','Assessment record saved with its supporting evidence.','branded assessment captured')
     driver.wait_text("section[aria-label='Captured firm branding']",'555-0100','captured original contact')
-    record_id=driver.observe_script("return document.querySelector('#saved-assessment').value")
+    driver.interactive('#saved-assessment')
+    record_id=driver.wait(lambda:driver.observe_script("return document.querySelector('#saved-assessment').value"), 'saved report directory contains the selected record after refresh')
     if not record_id:
         raise SmokeFailure('The branded assessment ID was not shown in the saved-record selector')
     # The linked client plan inherits the same captured branding; its established

@@ -393,3 +393,10 @@ and opens the existing note section. New report evidence offers the corrected
 head and omits the superseded original. Full lock/restart/encrypted recovery and
 a second client's empty search validate persistence and isolation. Screenshots:
 `native-note-correction-history.png` and `native-client-history-timeline.png`.
+
+Native driver readiness notes: existing employer replacements use an actual
+click and select-all/delete/type sequence, checking the effective enabled state
+before typing. Saved-report IDs are read only after their directory refresh
+finishes and the selector contains the new selection. These are observation/focus
+guards; they do not replay uncertain writes, script application data or remove
+any workflow assertions.
