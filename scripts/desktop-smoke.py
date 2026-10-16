@@ -1845,7 +1845,7 @@ def check_inactivity_policy(driver: WebDriver, artifacts: Path, data_root: Path,
     driver.screenshot(artifacts/'native-inactivity-policy.png')
     if driver.observe_script('return document.documentElement.scrollWidth > document.documentElement.clientWidth'):
         raise SmokeFailure('Security policy screen overflows horizontally')
-    driver.open_client('Alex Fictional')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note')
     driver.wait_text('.notes-history','Synthetic private note for Alex only.','private client visible before inactivity')
     started=time.monotonic()
     # Read-only WebDriver DOM observations neither invoke app commands nor send
@@ -1875,7 +1875,7 @@ def check_inactivity_policy(driver: WebDriver, artifacts: Path, data_root: Path,
     driver.fill('#password',password);driver.click_button('Unlock workspace')
     security();driver.wait_value('#inactivity-minutes','1','backup retains original policy rather than later fifteen-minute setting')
     save('15')
-    driver.open_client('Alex Fictional');driver.wait_text('.notes-history','Synthetic private note for Alex only.','policy restore preserves original notes')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note');driver.wait_text('.notes-history','Synthetic private note for Alex only.','policy restore preserves original notes')
     status('configurable inactivity policy, default and version history, real one-minute Rust timer lock and private UI clearing, full restart, encrypted policy recovery and unchanged client notes')
 
 
@@ -1925,11 +1925,11 @@ def check_password_change(driver: WebDriver, artifacts: Path, data_root: Path,
     driver.fill('#password', password); driver.click_button('Unlock workspace')
     driver.wait_text('.auth-card [role=alert]', 'password is incorrect', 'old password rejected by active generation')
     driver.fill('#password', new_password); driver.click_button('Unlock workspace')
-    driver.open_client('Alex Fictional')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note')
     driver.wait_text('.notes-history', 'Synthetic private note for Alex only.', 'original notes survive rotation')
     restart_driver(); driver.open(binary)
     driver.fill('#password', new_password); driver.click_button('Unlock workspace')
-    driver.open_client('Alex Fictional')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note')
     driver.wait_text('.notes-history', 'Synthetic private note for Alex only.', 'new password and notes survive complete restart')
     new_backup = backup(new_password)
     for path, secret, wrong in [(old_backup, password, new_password), (new_backup, new_password, password)]:
@@ -1942,7 +1942,7 @@ def check_password_change(driver: WebDriver, artifacts: Path, data_root: Path,
         driver.fill('#restore-confirmation', 'RESTORE'); driver.click_button('Restore verified workspace')
         driver.wait_text('.auth-card', 'Workspace restored.', 'original-password backup activated')
         driver.fill('#password', secret); driver.click_button('Unlock workspace')
-        driver.open_client('Alex Fictional')
+        driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note')
         driver.wait_text('.notes-history', 'Synthetic private note for Alex only.', 'records retained through password-generation backup recovery')
     if old_backup.read_bytes() != old_bytes:
         raise SmokeFailure('Password change or restore rewrote the older encrypted backup')

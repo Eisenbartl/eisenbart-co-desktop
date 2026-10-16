@@ -28,3 +28,8 @@ it('offers retry after a read error and ignores late policy reads after unmount'
  mocks.getSecurityPolicy.mockRejectedValueOnce('Synthetic policy read error');const v=view();expect(await screen.findByRole('alert')).toHaveTextContent('Synthetic policy read error');fireEvent.click(screen.getByRole('button',{name:'Reload security policy'}));await screen.findByLabelText('Inactivity timeout (minutes)');expect(mocks.getSecurityPolicy).toHaveBeenCalledTimes(2);v.unmount();
  let resolve!:(value:SecurityPolicy)=>void;mocks.getSecurityPolicy.mockReturnValueOnce(new Promise(r=>{resolve=r;}));const second=view();second.unmount();await act(async()=>resolve(saved));expect(screen.queryByLabelText('Inactivity timeout (minutes)')).not.toBeInTheDocument();
 });
+it('releases the parent busy guard when a fast reload completes within one render batch',async()=>{
+ const v=view();await screen.findByLabelText('Inactivity timeout (minutes)');v.onBusy.mockClear();
+ await act(async()=>{screen.getByRole('button',{name:'Reload security policy'}).click();await Promise.resolve();});
+ expect(v.onBusy).toHaveBeenCalledWith(true);expect(v.onBusy).toHaveBeenLastCalledWith(false);
+});

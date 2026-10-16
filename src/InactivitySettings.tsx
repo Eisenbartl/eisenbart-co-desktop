@@ -14,7 +14,7 @@ export default function InactivitySettings({onBusy,onDirty}:{onBusy:(value:boole
   pending.current=true;setBusy(true);onBusy(true);setError('');setNotice('');
   try{const value=await api.getSecurityPolicy();if(mounted.current){setPolicy(value);setMinutes(String(value.idleMinutes));setNeedsReload(false);}}
   catch(e){if(mounted.current){setError(message(e));setNeedsReload(true);}}
-  finally{pending.current=false;if(mounted.current)setBusy(false);}
+  finally{pending.current=false;if(mounted.current){setBusy(false);onBusy(false);}}
  }
  useEffect(()=>{mounted.current=true;void load();return()=>{mounted.current=false;};},[]);
  async function save(event:FormEvent){
@@ -22,7 +22,7 @@ export default function InactivitySettings({onBusy,onDirty}:{onBusy:(value:boole
   pending.current=true;setBusy(true);onBusy(true);setError('');setNotice('');
   try{const value=await api.saveSecurityPolicy({expectedRevision:policy.revision,idleMinutes:minutes});if(mounted.current){setPolicy(value);setMinutes(String(value.idleMinutes));setNotice('Inactivity timeout saved. The policy applies to all instances of this workspace.');}}
   catch(e){if(mounted.current){setError(message(e));setNeedsReload(true);}}
-  finally{pending.current=false;if(mounted.current)setBusy(false);}
+  finally{pending.current=false;if(mounted.current){setBusy(false);onBusy(false);}}
  }
  return <section className="panel settings-panel inactivity-settings">
   <h2>Inactivity locking</h2>

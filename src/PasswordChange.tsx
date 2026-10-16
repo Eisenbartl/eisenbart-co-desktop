@@ -25,7 +25,7 @@ export default function PasswordChange({onChanged,onBusy,onDirty}:{onChanged:(re
     submitting.current=true;clear();setBusy(true);onBusy(true);onDirty(false);
     try{const result=await api.changeWorkspacePassword(input);if(mounted.current)onChanged(result);}
     catch(caught){if(mounted.current)setError(caught instanceof Error?caught.message:String(caught));}
-    finally{submitting.current=false;if(mounted.current)setBusy(false);}
+    finally{submitting.current=false;if(mounted.current){setBusy(false);onBusy(false);}}
   }
   return <section className="panel settings-panel password-change">
     <h2>Change workspace password</h2>

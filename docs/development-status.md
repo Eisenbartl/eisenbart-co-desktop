@@ -22,13 +22,13 @@ Validation in progress on 2026-10-16 (America/Chicago):
 | Check | Result |
 |---|---|
 | Locked cloud setup | Reused tested repository setup; dependency versions unchanged |
-| Production frontend / UI | Passed build and all 259 tests in 34 files |
+| Production frontend / UI | Passed final follow-up build and all 260 tests in 34 files |
 | Focused backend | Passed seven security fixtures, including authenticated corrupt-backup rejection |
 | Complete Linux backend | Passed 244 library + 2 PDF-worker tests, exit 0 |
 | Formatting / Clippy | Passed formatting and all-target Clippy with warnings denied |
 | Standalone native build | Passed debug build with embedded assets, no bundles |
 | Focused native workflow / visual inspection | Passed exit 0 and final completion marker: actual one-minute idle lock, private UI clearing, restart, encrypted policy recovery and unchanged notes; Security screen readable without horizontal overflow |
-| Complete native workflow | In progress |
+| Complete native workflow | Rerun in progress against core application source `ab29591` with explicit driver subtab selection |
 | Windows source validation | Not run: proxy still rejects api.github.com with HTTP 403 |
 | Installer | Not created, per user instruction |
 
@@ -40,9 +40,43 @@ normal access locks when the security policy is missing. No production behavior
 or data-preservation assertion was weakened. Its focused rerun and the
 complete backend rerun passed.
 
+The first complete native attempt passed all existing workflows through client
+history, then stopped because the new inactivity check opened a client while its
+History & records subtab remained selected. It expected `.notes-history` without
+selecting Session notes. The driver now explicitly selects that section before
+checking original notes, including the later password workflow. Application code
+and note/privacy assertions are unchanged. The incomplete run is retained in
+`/workspace/shared/desktop-smoke-inactivity-interrupted` and is not counted as a
+pass. A subsequent rerun was deliberately stopped after the command service
+lost its process handle during a transport outage; its result could no longer be
+captured reliably. That attempt is also not counted as a pass and is retained in
+`/workspace/shared/desktop-smoke-inactivity-transport-interrupted`. The final
+complete rerun writes a durable exit-status file and uses the original artifacts
+path.
+
+An additional focused run starting from History & records timed out waiting for
+enabled inactivity controls. Its screenshot/log remain under
+`/workspace/shared/desktop-smoke-inactivity-password-focused`; it is not a pass.
+A diagnostic retry on the same application binary completed both inactivity and
+password workflows with exit 0 and the final marker, including all original
+assertions (`/workspace/shared/desktop-smoke-inactivity-diagnostic`). The timeout
+was not reproduced by the fast-read unit fixture. Final UI review nevertheless
+explicitly pairs synchronous parent busy assertions with completion releases in
+both security forms, covering fast promise settlement within a render batch.
+All 260 UI tests and the production build pass for that follow-up. Final native
+verification of the follow-up is pending; the complete run uses the unchanged
+core binary. No storage, key, timeout or financial implementation changed.
+
 A narrow environment network draft adding only `api.github.com` was saved for
 review; it does not apply until reviewed/saved and published in environment
 settings. Existing package-manager access and setup configuration were preserved.
+
+Feature source is committed as `ab29591`. All Cargo checks finished before the
+standalone build; no Cargo commands run during native verification. Focused native
+artifacts use `/workspace/shared/desktop-smoke-inactivity-focused`; complete-run
+artifacts use `/workspace/shared/desktop-smoke-inactivity`. Logs and the independent
+focused helper are preserved under `/workspace/shared/inactivity-validation`.
+Only fictional data and generated test passwords were used.
 
 No source has been pushed. Installed Windows offline recovery, physical
 power-loss/full-disk/removable-drive drills, independent security review and
