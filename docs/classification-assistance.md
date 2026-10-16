@@ -1,4 +1,6 @@
-# Local category suggestions — 0.41.0
+# Local category suggestions — introduced in 0.41.0
+
+The original approved-evidence policy below remains available. Version 0.42.0 adds [explicit reusable category rules](local-category-rules.md), combined bank/rule snapshot checks and original-version application history in schema 26. A rule can supply an explicitly entered category with fewer than two approvals; conflicting or unsafe evidence still blocks it.
 
 Open **Transactions → Classification assistance** for the selected client.
 The page lists unreviewed bank expenses and fees with a missing category, in
@@ -70,9 +72,6 @@ two approvals, 31 candidates, real paging, an unsaved category draft, unapproved
 save with unchanged approved totals, history and restart/recovery/client isolation.
 Actual executed checks are recorded in [development status](development-status.md).
 
-Reusable counselor rules, larger paged evidence, cross-account matching,
-card/other transaction roles and bulk workflows are not implemented here. The
-next stage should add bounded saved category-rule CRUD with explicit review;
-[implementation notes](classification-rules-next-stage.md) preserve the boundaries.
+Reusable counselor rules are implemented in 0.42.0; see [rule usage and limits](local-category-rules.md). Larger paged evidence, cross-account matching, card/other transaction roles and bulk workflows remain open. The policy description above records the original 0.41.0 behavior; schema 26 now persists rules and original applications.
 No installer is created unless the user asks for one. Installed Windows offline
 acceptance and commercial/security work remain separate release requirements.

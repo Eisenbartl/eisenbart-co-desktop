@@ -1807,6 +1807,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_transaction_history(driver, artifacts, data_root, password, binary, restart_driver)
     check_report_presentation(driver, artifacts, data_root, password, binary, restart_driver)
     check_category_assistance(driver, artifacts, data_root, password, binary, restart_driver)
+    check_category_rules(driver, artifacts, data_root, password, binary, restart_driver)
 
 
 def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Path,
@@ -1969,6 +1970,67 @@ def check_category_assistance(driver: WebDriver, artifacts: Path, data_root: Pat
     if name in driver.text('.classification-assistance') or merchant in driver.text('.classification-results'):raise SmokeFailure('Classification evidence crossed client scope')
     driver.select('#workspace-client','Robin Synthetic');driver.interactive('#classification-search');driver.wait_text('.classification-assistance','No missing-category expenses or fees','classification empty state is client scoped')
     status('local category suggestions reuse exact approved merchant evidence, stable bounded pages, unsaved draft/discard, explicit unapproved save, unchanged financial totals, immutable reason, lock, restart, encrypted recovery and client isolation')
+
+
+
+def check_category_rules(driver: WebDriver, artifacts: Path, data_root: Path,
+                         password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    label='Fictional reusable category rule'
+    pattern='Fictional unmatched category row 00'
+    def ready() -> None:
+        driver.interactive('#classification-search')
+    def save_rule(reason: str) -> None:
+        driver.fill('#rule-reason',reason);driver.click_button('Save category rule')
+        driver.wait_text('.category-rules > .success-message','Category rule saved.','rule saved explicitly without financial changes');ready()
+    def applications() -> None:
+        if not driver.observe_script("return document.querySelector('.rule-applications')?.open===true"):driver.click('.rule-applications > summary')
+    def edit() -> None:
+        driver.click_button(f'Edit rule {label}');driver.interactive('#rule-category')
+    driver.select('#workspace-client','Alex Fictional');ready()
+    driver.click_button('Working tools');driver.interactive('.imports-table tbody button');baseline=driver.text('.imports-totals')
+    driver.click_button('Classification assistance');ready()
+    driver.click_button('Create category rule');driver.interactive('#rule-label')
+    driver.fill('#rule-label',label);driver.select('#rule-account','Fictional classification checking')
+    driver.select('#rule-mode','Description (only when merchant is blank)');driver.fill('#rule-pattern',pattern);driver.fill('#rule-category','Food')
+    save_rule('Fictional exact category rule reviewed by counselor')
+    driver.wait_text('.category-rule-list','Active · Version 1','new rule version visible')
+    edit();driver.fill('#rule-category','');driver.fill('#rule-category','Groceries');save_rule('Fictional category rule amended with a reason')
+    driver.wait_text('.category-rule-list','Active · Version 2','edit appends a version')
+    driver.fill('#classification-search',pattern);driver.click_button('Search category suggestions');ready()
+    driver.wait_text('.classification-results','Suggested category: Groceries','rule proposes a category with no invented approval')
+    driver.wait_text('.matched-category-rule','Version 2','exact applied rule version displayed')
+    driver.click_button('Use suggested category in unsaved review');driver.interactive('#review-status')
+    initial_status=driver.observe_script("return document.querySelector('#review-status').value")
+    if initial_status not in ['Pending','Needs Clarification']:raise SmokeFailure('Rule application automatically selected approval')
+    if driver.observe_script("return [document.querySelector('#review-category').value,document.querySelector('#review-category').readOnly,document.querySelector('#review-amount').readOnly]")!=['Groceries',True,True]:raise SmokeFailure('Rule draft lost category or captured-source protection')
+    driver.fill('#review-reason','Fictional rule and original source checked; transaction remains unapproved')
+    driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','rule-bound decision saved explicitly');ready()
+    applications();driver.wait_text('.rule-applications','Original version 2','immutable original rule reference retained')
+    driver.wait_text('.rule-applications','Category Groceries','original applied category retained')
+    edit();driver.click('#rule-archived');save_rule('Fictional category rule archived without deleting history')
+    driver.wait_text('.category-rule-list','Archived · Version 3','rule archived with retained versions')
+    edit();driver.click('#rule-archived');save_rule('Fictional category rule reactivated explicitly')
+    driver.wait_text('.category-rule-list','Active · Version 4','rule reactivated with a new version')
+    driver.click('.category-rule-list details > summary');driver.wait_text('.category-rule-list','Fictional category rule amended with a reason','prior rule reasons remain available')
+    applications();driver.wait_text('.rule-applications','Original version 2','later edits do not relabel a saved application')
+    driver.scroll_to('.category-rule-list','start');driver.screenshot(artifacts / 'native-category-rule-history.png')
+    driver.click_button('Working tools');driver.interactive('.imports-table tbody button')
+    if driver.text('.imports-totals')!=baseline:raise SmokeFailure('Rule CRUD or an unapproved application changed approved financial totals')
+    folder=data_root / 'rule-backups';folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery')
+    driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','rule histories and original application backed up')
+    backup=driver.text('.backup-file-path');driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','rule workspace locked')
+    if driver.observe_script("return document.querySelector('.category-rules')!==null"):raise SmokeFailure('Rule page remained visible after lock')
+    restart_driver();driver.open(binary);driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review','Fictional Oak Counseling','rule history and application verified after process restart')
+    driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','rule recovery activated');driver.fill('#password',password);driver.click_button('Unlock workspace')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Transactions']");driver.select('#workspace-client','Alex Fictional');driver.interactive('.imports-table tbody button');driver.click_button('Classification assistance');ready()
+    driver.wait_text('.category-rule-list','Active · Version 4','rule lifecycle restored exactly')
+    applications();driver.wait_text('.rule-applications','Original version 2','restored rule application retains original version')
+    driver.wait_text('.rule-applications','Category Groceries','restored application retains original category')
+    driver.select('#workspace-client','Jamie Complete');ready()
+    if label in driver.text('.category-rules') or pattern in driver.text('.category-rules'):raise SmokeFailure('Rules or application history crossed client scope')
+    driver.select('#workspace-client','Robin Synthetic');ready();driver.wait_text('.category-rules','No category rules saved for this client.','rule empty state remains scoped')
+    status('category-rule create/edit/archive/reactivate, current matched version, protected unsaved draft, explicit unapproved save, immutable original application, unchanged financial totals, history, lock, restart, encrypted recovery and client isolation')
 
 
 def check_transaction_history(driver: WebDriver, artifacts: Path, data_root: Path, password: str,

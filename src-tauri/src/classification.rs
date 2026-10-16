@@ -21,6 +21,8 @@ pub struct Query {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Candidate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule: Option<crate::category_rules::Version>,
     pub record_id: String,
     pub document_id: String,
     pub account_label: String,
@@ -56,6 +58,8 @@ pub struct DraftInput {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Draft {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule: Option<crate::category_rules::Selection>,
     pub client_id: String,
     pub revision: i64,
     pub record_id: String,
@@ -92,6 +96,7 @@ fn candidate(s: &Snapshot, r: &imports::Record) -> Result<Candidate, String> {
         .map(|g| g.evidence.iter().take(5).cloned().collect())
         .unwrap_or_default();
     let mut result = Candidate {
+        rule: None,
         record_id: r.id.clone(),
         document_id: r.document_id.clone(),
         account_label: s
@@ -138,7 +143,61 @@ fn candidate(s: &Snapshot, r: &imports::Record) -> Result<Candidate, String> {
     }.into();
     Ok(result)
 }
-pub fn query(s: &Snapshot, mut q: Query) -> Result<Page, String> {
+#[cfg(test)]
+pub fn query(s: &Snapshot, q: Query) -> Result<Page, String> {
+    query_rules(s, q, &[], "")
+}
+pub fn context_fingerprint(s: &Snapshot, rules_fingerprint: &str) -> Result<String, String> {
+    let base = fingerprint(s)?;
+    if rules_fingerprint.is_empty() {
+        return Ok(base);
+    }
+    Ok(format!(
+        "{:x}",
+        Sha256::digest(format!("{base}:{rules_fingerprint}"))
+    ))
+}
+fn candidate_rules(
+    s: &Snapshot,
+    r: &imports::Record,
+    rules: &[crate::category_rules::Version],
+) -> Result<Candidate, String> {
+    let mut c = candidate(s, r)?;
+    let matching = rules
+        .iter()
+        .filter_map(
+            |v| match crate::category_rules::matches(&v.data, &r.account_id, &r.fields) {
+                Ok(true) => Some(Ok(v)),
+                Ok(false) => None,
+                Err(e) => Some(Err(e)),
+            },
+        )
+        .collect::<Result<Vec<_>, String>>()?;
+    if matching.len() > 1 {
+        c.category = None;
+        c.reason = "Conflicting active rules; review manually.".into();
+        return Ok(c);
+    }
+    if let Some(v) = matching.first() {
+        c.rule = Some((*v).clone());
+        c.category = None;
+        let group = s
+            .merchant_groups
+            .iter()
+            .find(|g| crate::category_rules::key(&v.data).ok().as_ref() == Some(&g.id));
+        c.reason=if r.fields.date.is_none()||r.fields.description.is_empty()||r.fields.amount.as_ref().and_then(|a|imports::signed_money(a).ok()).is_none_or(|a|a>=0)||!r.duplicate_ids.is_empty(){"Verify unknown source facts or possible duplicates before using this rule."}
+   else if group.is_some_and(|g|g.evidence.len()>5||g.evidence.iter().any(|e|!e.duplicate_ids.is_empty())){"The matching evidence exceeds this bounded workflow or contains possible duplicates; review manually."}
+   else if group.is_some_and(|g|g.evidence.iter().any(|e|e.fields.category!=v.data.category)){"The rule conflicts with current approved categories. Resolve the evidence or rule explicitly; no category is chosen."}
+   else {c.category=Some(v.data.category.clone());"Explicit counselor rule, with no conflicting current approved category. This fills an unsaved review only."}.into();
+    }
+    Ok(c)
+}
+pub fn query_rules(
+    s: &Snapshot,
+    mut q: Query,
+    rules: &[crate::category_rules::Version],
+    rules_fingerprint: &str,
+) -> Result<Page, String> {
     q.text = q.text.trim().into();
     if q.text.chars().count() > 100
         || q.text.chars().any(char::is_control)
@@ -148,7 +207,7 @@ pub fn query(s: &Snapshot, mut q: Query) -> Result<Page, String> {
             "Use a literal search of up to 100 characters and a valid classification page.".into(),
         );
     }
-    let snapshot = fingerprint(s)?;
+    let snapshot = context_fingerprint(s, rules_fingerprint)?;
     if q.expected_snapshot.as_ref().is_some_and(|v| v != &snapshot)
         || (q.offset > 0 && q.expected_snapshot.is_none())
     {
@@ -174,7 +233,7 @@ pub fn query(s: &Snapshot, mut q: Query) -> Result<Page, String> {
         .iter()
         .skip(q.offset)
         .take(PAGE_SIZE)
-        .map(|r| candidate(s, r))
+        .map(|r| candidate_rules(s, r, rules))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Page {
         client_id: s.client_id.clone(),
@@ -187,8 +246,19 @@ pub fn query(s: &Snapshot, mut q: Query) -> Result<Page, String> {
         candidates,
     })
 }
+#[cfg(test)]
 pub fn prepare(s: &Snapshot, input: DraftInput) -> Result<Draft, String> {
-    if input.expected_revision != s.revision || input.expected_snapshot != fingerprint(s)? {
+    prepare_rules(s, input, &[], "")
+}
+pub fn prepare_rules(
+    s: &Snapshot,
+    input: DraftInput,
+    rules: &[crate::category_rules::Version],
+    rules_fingerprint: &str,
+) -> Result<Draft, String> {
+    if input.expected_revision != s.revision
+        || input.expected_snapshot != context_fingerprint(s, rules_fingerprint)?
+    {
         return Err(STALE.into());
     }
     let r = s
@@ -196,8 +266,13 @@ pub fn prepare(s: &Snapshot, input: DraftInput) -> Result<Draft, String> {
         .iter()
         .find(|r| r.id == input.record_id && eligible(r))
         .ok_or("This record is not eligible for a category suggestion.")?;
-    let c = candidate(s, r)?;
+    let c = candidate_rules(s, r, rules)?;
     Ok(Draft {
+        rule: c.rule.map(|v| crate::category_rules::Selection {
+            rule_id: v.id,
+            revision: v.revision,
+            expected_snapshot: input.expected_snapshot,
+        }),
         client_id: s.client_id.clone(),
         revision: s.revision,
         record_id: r.id.clone(),

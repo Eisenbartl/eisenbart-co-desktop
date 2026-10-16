@@ -408,3 +408,15 @@ only fills the category below; review the original source and choose an explicit
 decision before saving. It never selects Approved automatically. Conflicting or
 insufficient evidence stays unresolved. Use Working tools for manual correction
 or other transaction types. See [steps and limits](classification-assistance.md).
+
+## Reusable category rules (0.42.0 source)
+
+In **Transactions → Classification assistance**, create a rule for this client's
+active bank account, expense/fee type and exact merchant or fallback description.
+Enter a category and reason. Edit appends a version; Archived stops suggestions,
+and clearing it reactivates the rule. History retains all original versions.
+Use a matching suggestion to fill an unsaved review, then check the original
+source, choose status, enter a reason and save explicitly. A rule never approves
+a transaction automatically. Conflicting evidence stays unresolved. Saved rule
+applications show the exact original rule version even after later rule edits.
+See [steps, limits and recovery](local-category-rules.md).

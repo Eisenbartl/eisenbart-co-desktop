@@ -249,4 +249,6 @@ A fingerprint binds source/import revision and exact current decision evidence.
 Draft preparation recomputes the category without writes. `ClassificationAssistance`
 fills only the category in the existing `ImportsEditor` form; final decisions keep
 original revision/audit/history/approval checks. No schema/calculator change or
-saved rule store is introduced. See [policy and limits](classification-assistance.md).
+saved rule store was introduced in 0.41.0. See [policy and limits](classification-assistance.md).
+
+Schema 26 adds `category_rule_versions` and `category_rule_applications`, with immutable triggers, scoped composite references and two audit events. `category_rules_store` validates canonical version JSON/digests, active-account rules, sequential revisions, duplicate keys, original source/decision bindings and bounded history on reads and recovery. Rule CRUD uses immediate transactions, rule-directory fingerprints and optimistic versions without bumping bank import revisions. Classification combines bank/rule fingerprints and reuses exact merchant identity and current approved evidence. `review_rule_category` rechecks the prepared version and category-only source fields inside the original review transaction, then atomically captures the exact immutable version with decision/audit. Legacy decision/report payloads remain unchanged. `CategoryRules` holds scoped dirty/busy state, history and explicit archive/reactivate controls; rule-derived drafts protect source/category inputs. See [usage and limits](local-category-rules.md).

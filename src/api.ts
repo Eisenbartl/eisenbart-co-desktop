@@ -23,6 +23,9 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 
 export const api = {
   getReportPresentation:(clientId:string,assessmentId:string)=>command<import('./types').ReportPresentationContext>('get_report_presentation',{clientId,assessmentId}),
+  getCategoryRules:(clientId:string)=>command<import('./types').CategoryRulesDirectory>('get_category_rules',{clientId}),
+  saveCategoryRule:(clientId:string,input:import('./types').CategoryRuleInput)=>command<import('./types').CategoryRulesDirectory>('save_category_rule',{clientId,input}),
+  reviewRuleCategory:(clientId:string,input:{selection:import('./types').CategoryRuleSelection;decision:{expectedRevision:number;recordId:string;status:import('./types').ReviewStatus;fields:import('./types').TransactionFields;reason:string;acknowledgeWarnings:boolean}}):Promise<ClientImports>=>command<ClientImports>('review_rule_category',{clientId,input}),
   queryCategorySuggestions:(clientId:string,input:import('./types').CategoryQuery)=>command<import('./types').CategoryPage>('query_category_suggestions',{clientId,input}),
   prepareCategoryDraft:(clientId:string,input:{expectedRevision:number;expectedSnapshot:string;recordId:string})=>command<import('./types').CategoryDraft>('prepare_category_draft',{clientId,input}),
   chooseReportPresentationPdf:(clientId:string,assessmentId:string,kind:import('./types').ReportPresentationKind,layout:import('./types').ReportPresentationLayout)=>command<string|null>('choose_report_presentation_pdf',{clientId,assessmentId,kind,layout}),

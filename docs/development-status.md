@@ -1,5 +1,37 @@
 # Development status
 
+## Current stage — reusable local category rules (0.42.0, schema 26)
+
+Transactions → Classification assistance now includes scoped category-rule CRUD:
+create, edit, archive/reactivate, immutable versions and original-decision
+application history. Matching reuses exact merchant identity; conflicting current
+approved evidence, unsafe sources and oversized evidence groups stay unresolved.
+Using a rule fills only an unsaved category review. Explicit save rechecks the
+exact bank/rule snapshot and captures the exact rule version atomically with the
+existing decision/audit. Rule CRUD never changes bank revisions, approvals,
+financial totals or existing reports. See [usage and limits](local-category-rules.md).
+
+Schema 26 atomically adds scoped immutable rule/application tables and audit
+events. Recovery validates retained versions, canonical digests and exact original
+source/decision bindings. Existing transaction and report JSON remains unchanged.
+Legacy test fixtures now remove schema-26 sidecars when constructing genuinely
+older databases; their migration assertions remain intact.
+
+Validation in progress (2026-10-16, America/Chicago): locked setup, production
+frontend and 238 UI tests passed; all three focused rule fixtures passed. The
+complete Linux suite passed 227 library and 2 PDF-worker tests; formatting and
+all-target Clippy with warnings denied passed. Standalone native build/full native
+workflow and Windows source CI will be recorded here once completed. No installer
+is created.
+
+Next priority: **Clients → History & records with reviewed note amendments**.
+Reuse original notes and existing source/history workflows, retain old report
+bytes, and add explicit append-only corrections rather than silent edits. See
+[next-stage notes](client-history-next-stage.md). Other source adapters/OCR,
+advanced models, multiple-counselor/security/commercial work and clean installed
+Windows offline acceptance remain open original requirements. The last
+downloadable installer remains 0.23.0.
+
 ## Current stage — local category suggestions (0.41.0, schema 25 unchanged)
 
 Transactions → Classification assistance lists missing-category bank expenses

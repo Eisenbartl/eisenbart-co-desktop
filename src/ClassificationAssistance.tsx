@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import type {CategoryDraft,CategoryPage,CategoryQuery} from './types';
 const message=(e:unknown)=>e instanceof Error?e.message:String(e);
-export default function ClassificationAssistance({clientId,revision,disabled,onBusy,onDraft}:{clientId:string;revision:number;disabled:boolean;onBusy:(v:boolean)=>void;onDraft:(v:CategoryDraft)=>void}) {
+export default function ClassificationAssistance({clientId,revision,disabled,onBusy,onDraft,ruleEpoch=0}:{ruleEpoch?:number;clientId:string;revision:number;disabled:boolean;onBusy:(v:boolean)=>void;onDraft:(v:CategoryDraft)=>void}) {
  const [page,setPage]=useState<CategoryPage|null>(null),[text,setText]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const generation=useRef(0);
  useEffect(()=>{onBusy(busy);return()=>onBusy(false);},[busy,onBusy]);
@@ -12,7 +12,7 @@ export default function ClassificationAssistance({clientId,revision,disabled,onB
    if(p.clientId!==clientId||p.revision!==revision)throw new Error('Suggestions do not match the loaded client records. Reload imported records.');setPage(p);
   }catch(e){if(g===generation.current)setError(message(e));}finally{if(g===generation.current)setBusy(false);}
  }
- useEffect(()=>{setText('');void load({text:'',offset:0,expectedSnapshot:null});return()=>{generation.current++;};},[clientId,revision]);
+ useEffect(()=>{setText('');void load({text:'',offset:0,expectedSnapshot:null});return()=>{generation.current++;};},[clientId,revision,ruleEpoch]);
  async function draft(recordId:string){
   if(!page||disabled||busy)return;
   const g=generation.current;setBusy(true);setError('');
@@ -35,6 +35,7 @@ export default function ClassificationAssistance({clientId,revision,disabled,onB
     <h4>{c.fields.description||'Unknown description'}</h4><p>{c.fields.date??'Unknown date'} · USD {c.fields.amount??'Unknown'} · {c.fields.kind} · {c.status}</p>
     <p>{c.accountLabel} · {c.fileName} · {c.page?`page ${c.page}, extracted line ${c.line}`:`source line ${c.line}`}</p>
     <p><strong>{c.category===null?'No suggestion':`Suggested category: ${c.category}`}</strong> · {c.reason}</p>
+    {c.rule&&<p className="matched-category-rule">Matched rule: {c.rule.data.label} · Version {c.rule.revision} · Category {c.rule.data.category}</p>}
     <details><summary>Current approved evidence ({c.evidenceCount}; up to five shown)</summary><ul>{c.evidence.map(e=><li key={e.approvalId}>{e.fields.date??'Unknown date'} · USD {e.fields.amount??'Unknown'} · {e.fields.description} · Category {e.fields.category||'Unknown'}<br/>Source {e.documentId} · {e.page?`page ${e.page}, `:''}line {e.line} · Record {e.recordId} · Approval {e.approvalId}</li>)}</ul></details>
     <button type="button" className="button secondary" disabled={disabled||busy||c.category===null} onClick={()=>void draft(c.recordId)}>Use suggested category in unsaved review</button>
    </li>)}</ul>

@@ -582,3 +582,10 @@ textarea { resize: vertical; min-height: 100px; }
 .classification-results { padding-left:1.5rem; }
 .classification-results > li { margin:1.2rem 0; padding-bottom:1rem; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
 .classification-results details { margin:12px 0; }
+
+.category-rules {margin:24px 0;padding:20px;border:1px solid var(--line);border-radius:8px;}
+.category-rule-list > li {margin:18px 0;overflow-wrap:anywhere;}
+.category-rule-form label {margin:12px 0;}
+.category-rules .rule-archive-label {display:flex;align-items:flex-start;gap:10px;}
+.category-rules input[type="checkbox"] {width:16px;height:16px;min-height:16px;padding:0;margin:3px 0 0;flex:0 0 16px;}
+.rule-applications {margin:16px 0;overflow-wrap:anywhere;}

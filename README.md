@@ -1,5 +1,7 @@
 # Eisenbart & Co. Financial Counseling Suite
 
+Version **0.42.0 source** adds [reusable local category rules](docs/local-category-rules.md): create/edit/archive/reactivate with immutable history, conflict checks and explicit transaction review. Saved applications retain the exact original rule version. No installer was created.
+
 Version **0.41.0 source** adds [local category suggestions](docs/classification-assistance.md): current approved merchant evidence, unresolved conflicts, bounded search/pages and category-only unsaved review drafts. Save an explicit decision through the existing review controls; no automatic approval. No installer was created.
 
 Version **0.40.0 source** adds [Open saved PDF to print](docs/windows-pdf-print-workflow.md): an explicit, consented request to open an unchanged counselor report export in the Windows PDF viewer. Choose Print in that viewer; the app does not submit jobs or confirm printing. Export lifetime and failures are explicit. No installer was created.

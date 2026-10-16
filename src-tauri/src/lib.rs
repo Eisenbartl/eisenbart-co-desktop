@@ -9,6 +9,7 @@ mod card_final_policy;
 mod card_review;
 mod cards;
 mod cashflow;
+mod category_rules;
 mod classification;
 mod client_care;
 mod completeness;
@@ -441,6 +442,48 @@ async fn approve_final_report(
     })
     .await
     .map_err(|_| "Final approval could not finish. Reopen readiness to check the stored result before another attempt.".to_owned())?
+}
+#[tauri::command]
+async fn get_category_rules(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<storage::category_rules_store::Directory, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_category_rules(&client_id))
+    })
+    .await
+    .map_err(|_| "Category rules could not load.".to_owned())?
+}
+#[tauri::command]
+async fn save_category_rule(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: category_rules::Input,
+) -> Result<storage::category_rules_store::Directory, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_category_rule(&client_id, input))
+    })
+    .await
+    .map_err(|_| {
+        "The rule save could not finish. Reload rule history before retrying.".to_owned()
+    })?
+}
+#[tauri::command]
+async fn review_rule_category(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: category_rules::Decision,
+) -> Result<imports::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.review_rule_category(&client_id, input))
+    })
+    .await
+    .map_err(|_| {
+        "The rule decision could not finish. Reload decision history before retrying.".to_owned()
+    })?
 }
 #[tauri::command]
 async fn query_category_suggestions(
@@ -1262,6 +1305,9 @@ pub fn run() {
             export_final_report_pdf,
             get_report_presentation,
             query_category_suggestions,
+            get_category_rules,
+            save_category_rule,
+            review_rule_category,
             prepare_category_draft,
             choose_report_presentation_pdf,
             export_report_presentation,

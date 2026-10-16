@@ -640,7 +640,7 @@ pub(crate) mod tests {
         let before: i64 = c
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        c.execute_batch("DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE card_decisions; DROP TABLE card_statements; PRAGMA user_version=22; CREATE TABLE audit_events_v23(collision TEXT);").unwrap();
+        c.execute_batch("DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE card_decisions; DROP TABLE card_statements; PRAGMA user_version=22; CREATE TABLE audit_events_v23(collision TEXT);").unwrap();
         assert!(migrate(c, false).is_err());
         assert_eq!(
             c.pragma_query_value(None, "user_version", |r| r.get::<_, i32>(0))

@@ -4,27 +4,44 @@ impl Workspace {
     fn classification_snapshot(
         &mut self,
         client: &str,
-    ) -> Result<crate::imports::Snapshot, String> {
+    ) -> Result<(crate::imports::Snapshot, category_rules_store::Directory), String> {
         let s = self.session()?;
         let tx = s.connection.transaction().map_err(storage_error)?;
         scoped_client(&tx, &s.info, client)?;
         let snapshot = imports_store::read_imports(&tx, &s.info, client)?;
+        let rules = category_rules_store::read(&tx, &s.info, client)?;
         tx.commit().map_err(storage_error)?;
-        Ok(snapshot)
+        Ok((snapshot, rules))
     }
     pub fn query_category_suggestions(
         &mut self,
         client: &str,
         input: classification::Query,
     ) -> Result<classification::Page, String> {
-        classification::query(&self.classification_snapshot(client)?, input)
+        {
+            let (s, d) = self.classification_snapshot(client)?;
+            classification::query_rules(
+                &s,
+                input,
+                &category_rules_store::active(&d),
+                &d.fingerprint,
+            )
+        }
     }
     pub fn prepare_category_draft(
         &mut self,
         client: &str,
         input: classification::DraftInput,
     ) -> Result<classification::Draft, String> {
-        classification::prepare(&self.classification_snapshot(client)?, input)
+        {
+            let (s, d) = self.classification_snapshot(client)?;
+            classification::prepare_rules(
+                &s,
+                input,
+                &category_rules_store::active(&d),
+                &d.fingerprint,
+            )
+        }
     }
 }
 #[cfg(test)]

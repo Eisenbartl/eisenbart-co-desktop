@@ -417,9 +417,14 @@ export interface ActivityPage {clientId:string;snapshot:string;query:ActivityQue
 
 export type ReportPresentationKind='internal'|'final';
 export interface CategoryQuery {text:string;offset:number;expectedSnapshot:string|null}
-export interface CategoryCandidate {recordId:string;documentId:string;accountLabel:string;fileName:string;page:number|null;line:number;fields:TransactionFields;status:ReviewStatus;category:string|null;reason:string;evidenceCount:number;evidence:{recordId:string;approvalId:string;documentId:string;accountId:string;page:number|null;line:number;fields:TransactionFields;duplicateIds:string[]}[]}
+export interface CategoryCandidate {rule?:CategoryRuleVersion;recordId:string;documentId:string;accountLabel:string;fileName:string;page:number|null;line:number;fields:TransactionFields;status:ReviewStatus;category:string|null;reason:string;evidenceCount:number;evidence:{recordId:string;approvalId:string;documentId:string;accountId:string;page:number|null;line:number;fields:TransactionFields;duplicateIds:string[]}[]}
 export interface CategoryPage {clientId:string;revision:number;snapshot:string;policy:string;query:CategoryQuery;total:number;pageSize:number;candidates:CategoryCandidate[]}
-export interface CategoryDraft {clientId:string;revision:number;recordId:string;category:string}
+export interface CategoryDraft {clientId:string;revision:number;recordId:string;category:string;rule?:CategoryRuleSelection}
+export interface CategoryRuleSelection {ruleId:string;revision:number;expectedSnapshot:string}
+export interface CategoryRuleData {label:string;accountId:string;kind:'expense'|'fee';mode:'merchant'|'description';pattern:string;category:string;archived:boolean}
+export interface CategoryRuleVersion {id:string;revision:number;data:CategoryRuleData;reason:string;updatedAt:string;counselorName:string}
+export interface CategoryRulesDirectory {clientId:string;fingerprint:string;accounts:{id:string;label:string;archived:boolean;revision:number}[];rules:{current:CategoryRuleVersion;history:CategoryRuleVersion[]}[];applicationCount:number;applications:{decisionId:string;recordId:string;rule:CategoryRuleVersion;category:string;status:string;reviewedAt:string;sourceSnapshot:string}[]}
+export interface CategoryRuleInput {id:string|null;expectedRevision:number;expectedFingerprint:string;data:CategoryRuleData;reason:string}
 export interface ReportPresentationExport {path:string;pages:number;recordId:string;viewerTicket:string;viewerSupported:boolean}
 export type ReportPresentationLayout='summaryAppendix'|'detailed';
 export interface ReportPresentationSummary {kind:ReportPresentationKind;recordId:string;digest:string;title:string;firmName:string;clientName:string;periodStart:string;periodEnd:string;reportDate:string;balanceAsOf:string|null;basis:string;status:string;needsReview:boolean;reviewReasons:string[];figures:{label:string;value:string|null}[];disclosure:string}

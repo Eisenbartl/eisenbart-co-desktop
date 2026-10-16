@@ -1,4 +1,6 @@
-# Next stage: reusable local category-rule CRUD
+# Reusable local category-rule CRUD — implementation reference
+
+Implemented in 0.42.0/schema 26. See [usage, persistence and limits](local-category-rules.md) and [executed validation](development-status.md). The original stage boundaries below are retained for context. The next priority is [client history and reviewed note amendments](client-history-next-stage.md).
 
 0.41.0 implements read-only bank category suggestions and unsaved review drafts.
 Reuse `classification.rs`, the existing merchant identity and audited transaction

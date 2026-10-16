@@ -377,3 +377,11 @@ draft. It explicitly saves the category while retaining its unapproved status,
 checks unchanged approved financial totals, original history/reason, lock, full
 process restart, encrypted recovery and client isolation. Screenshot:
 `native-category-suggestions.png`. No installer is created.
+
+The 0.42.0 extension retains all prior assertions. It creates a scoped expense
+rule, edits its category to version 2, prepares a protected unsaved draft and
+explicitly saves it unapproved. It checks exact original-version application
+history, archive/reactivation through versions 3/4, unchanged approved totals,
+lock, full restart, encrypted backup recovery and client isolation. Screenshot:
+`native-category-rule-history.png`. All mutations use visible native controls
+and fictional fixtures. No installer is created.
