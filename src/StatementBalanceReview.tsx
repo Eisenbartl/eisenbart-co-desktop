@@ -1,3 +1,4 @@
+import {confirmDiscard} from './ConfirmationDialog';
 import {useEffect,useState} from 'react';
 import {usd} from './BudgetEditor';
 import type {BalanceOrder,BalanceComparison,ClientImports,StatementBalanceInput} from './types';
@@ -10,7 +11,7 @@ export default function StatementBalanceReview({saved,disabled,onDirty,onReview,
  useEffect(()=>{setSelected('');setReason('');setEdited(false);},[saved.clientId]);
  useEffect(()=>{onDirty(edited);return()=>onDirty(false);},[edited,onDirty]);
  const doc=saved.documents.find(d=>d.id===selected),report=doc?.balanceReconciliation;
- function choose(id:string){if(edited&&!window.confirm('Discard unsaved statement balance review edits?'))return;const d=saved.documents.find(d=>d.id===id);setSelected(id);setOrder(d?.balanceReconciliation?.order??null);setReason('');setEdited(false);}
+ function choose(id:string){const apply=()=>{const d=saved.documents.find(d=>d.id===id);setSelected(id);setOrder(d?.balanceReconciliation?.order??null);setReason('');setEdited(false);};if(edited)confirmDiscard('Discard unsaved statement balance review edits?',apply);else apply();}
  return <div className="statement-balance-review"><h3 className="savings-section-title">Statement running-balance checks</h3><p className="field-help">Compare reported after-transaction checking/savings balances with original movements and approved amounts. Source checks include every imported row regardless of approval. Approved cumulative checks use only approved amounts, exclude rejected rows, and remain unknown after an undecided row. Dates are never silently sorted and missing balances are never treated as zero.</p>
   {!saved.documents.length?<p className="empty-note">No source statements to reconcile yet.</p>:<label htmlFor="balance-document">Statement to check<select id="balance-document" value={selected} disabled={disabled} onChange={e=>choose(e.target.value)}><option value="">Choose a source statement</option>{saved.documents.map(d=><option key={d.id} value={d.id}>{d.fileName} — {saved.accounts.find(a=>a.id===d.accountId)?.label}</option>)}</select></label>}
   {doc&&report&&<div className="statement-balance-details"><h4>{doc.fileName}</h4><p className="field-help">Opening {cash(doc.input.openingBalance)} · Closing {cash(doc.input.closingBalance)} · Source ID {doc.id}. Positive differences mean expected exceeds reported. These references do not approve a bank balance or prove statement completeness.</p>

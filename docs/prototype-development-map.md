@@ -1,45 +1,26 @@
-# Prototype structure and development map — 0.45.0 source
+# Prototype structure and development map — 0.46.0 source
 
-The user has prioritized a coherent CRUD application structure before further
-advanced financial features. This checkpoint exposes all twelve main sections
-from specification section 5, using existing persistent workflows. The original
-[product specification](product-specification.md) remains governing scope.
-A page being present does not mean every capability on it is implemented.
+The user requested the [client workspace redesign](client-workspace-redesign.md)
+using a supplied layout reference. The global sidebar now contains Dashboard,
+Clients and Settings. A directory-only Clients page opens stable-ID in-app client
+tabs. Each client workspace exposes twelve focused sections in a local rail:
+Overview, Profile & intake, Session notes, Monthly budget, Debt payoff, Savings &
+sinking funds, Cash-flow calendar, Scenario comparisons, Import statements,
+Review & reconciliation, Financial dashboard and Assessments & reports.
 
-## Navigation and implementation entry points
+`App.tsx` owns scoped active-tab navigation and draft/busy guards;
+`ClientDirectory.tsx`, `ClientWorkspaceLayout.tsx`, `ClientOverview.tsx` and
+`client-workspace.css` compose the redesign. Existing client editors and financial
+components remain the implementation entry points. `ImportsEditor.tsx` now also
+exposes separately mounted review subtabs. `client_workspace.rs` supplies a
+read-only summary from the existing saved-plan engines. Schema remains 29.
 
-`src/workspaceNavigation.ts` defines main sections and client subsections.
-`src/App.tsx` owns unlocked navigation, selected-client context and draft/busy
-checks. `ClientEditor` selects existing components for focused pages; **Complete
-record** retains the integrated workflow. `src/ImportsEditor.tsx` has explicit
-all/documents/transactions/review/reports presentations over the same scoped
-Rust-backed data. Do not add another persistence layer or copy the calculators.
-`src/PlannedWorkspaceAreas.tsx` distinguishes working subpages from named future areas, and
-`src/AdministrationPages.tsx` hosts working/read-only/planned settings pages.
-
-| Main section | Working parts / current entry point |
-|---|---|
-| Dashboard | Scoped practice counts, recent clients, appointments and follow-ups (`FollowUpOverview.tsx`) |
-| Clients | Directory/search/filter, create/edit/status/archive; Profile, Intake & follow-ups, Session notes, History & records, Complete record (`App.tsx`, `ClientCare.tsx`) |
-| Financial Review | Approved-data dashboard, explicit financial facts, running-balance checks, recurring-payment review and live completeness diagnostics and versioned reviews (`ImportsEditor.tsx`, `CompletenessReview.tsx`, `SavedCoverageReviews.tsx`) |
-| Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers; client-wide searchable bank/card history and local category suggestions, reusable rule CRUD/history and unsaved review drafts (`ImportsEditor.tsx`, `TransactionActivity.tsx`, `ClassificationAssistance.tsx`) |
-| Documents | Bank CSV/selectable-text PDF import, separate signed-card CSV review, statement account management, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`, `StatementAccounts.tsx`) |
-| Budget Planner | Saved income/expenses/allocations, remove/edit rows, optional budget method comparisons (`BudgetEditor.tsx`) |
-| Debt Planner | Saved debts, payment changes/extras and monthly snowball/avalanche projections (`DebtEditor.tsx`) |
-| Savings Planner | Saved reserves, emergency targets, sinking-fund goals and contribution comparisons (`SavingsEditor.tsx`) |
-| Cash-Flow Calendar | Saved account balances, dated schedules/transfers, calendar/ledger and non-writing previews (`CashflowEditor.tsx`) |
-| Financial Scenarios | Temporary comparisons, explicitly saved scenarios and historical review (`ScenarioComparisons.tsx`) |
-| Reports | Immutable internal assessments, selected intake/evidence/scenarios, client action plans, summary-first/detailed PDF exports, captured-source final-report checklists and audited counselor approval (`AssessmentRecords.tsx`, `ClientActionPlans.tsx`, `CompletenessReview.tsx`, `ReportPresentation.tsx`) |
-| Settings and Administration | Workspace identity, security/lock, reviewed workspace password change, encrypted backup, lock-to-restore route, help; working firm/report branding and named future roles/data/licensing pages (`AdministrationPages.tsx`) |
-
-Client pages require a selected client and display that context. Switching a
-page/client ignores late responses and checks unsaved persistent-record drafts
-or ongoing writes. Explicitly accepting discard remounts the workflow. Temporary
-scenario previews are intentionally unsaved and reset on leaving; save a reviewed
-scenario to retain it. Lock/unlock clears selected clients and page state.
-Main navigation is keyboard reachable, identifies the current page and focuses
-the heading on page/area changes. Sidebar navigation scrolls in short windows.
-No workspace or confidential data is stored in browser local storage or a URL.
+Only the selected section is mounted. Tabs retain per-client section metadata,
+require explicit draft discard and close to the most recently used remaining tab.
+Locking clears all client tabs and private UI. Directory counts/statuses/profile
+update dates come from real saved records. Future sections below retain their
+existing working/planned boundaries; their former global-page names now refer to
+local sections and subtabs. See the [complete mapping and limits](client-workspace-redesign.md).
 
 ## CRUD coverage and retained history
 
@@ -102,7 +83,12 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-The 0.44.0 source implements **local workspace password change and recovery safeguards** in Settings → Security. Complete independent security and installed Windows interruption/recovery acceptance before real use. Configurable inactivity locking is implemented in 0.45.0; see [policy and limits](inactivity-locking.md). Next bounded implementation priority after outstanding acceptance: explicitly reviewed retained-workspace recovery selection with original-password verification and validation before activation. Destructive pruning and scheduled backups remain separate work. See [password-change usage and design](workspace-password-change.md).
+The current user-directed stage is the 0.46.0 client design/navigation pivot and
+explicitly requested Windows development installer. Complete its visual/native/
+Windows package acceptance before beginning another feature stage. Retained-copy
+recovery selection, destructive pruning, scheduled backups and broader security/
+commercial acceptance remain separate work. Password changes and configurable
+inactivity are implemented through 0.45.0 and preserved by this redesign.
 
 Client history and reviewed note corrections are implemented in 0.43.0; see [usage and limits](client-history.md).
 

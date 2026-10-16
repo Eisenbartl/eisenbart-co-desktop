@@ -1,3 +1,4 @@
+import {confirmDiscard} from './ConfirmationDialog';
 import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import type {NoteThread} from './types';
@@ -17,7 +18,7 @@ export default function NoteCorrection({clientId,noteId,disabled,onBusy,onDirty,
  {busy&&<p role="status">Working on note history…</p>}{error&&<p role="alert" className="alert error">{error}</p>}
  {thread&&thread.clientId===clientId&&<><details className="note-version-history"><summary>Original note and correction history ({thread.amendments.length+1})</summary><article><h4>Original note</h4><p>{thread.original.body}</p><p>{thread.original.createdAt} · {thread.original.counselorName}</p></article>{thread.amendments.map(a=><article key={a.note.id}><h4>Correction {a.revision}</h4><p>{a.note.body}</p><p>Reason: {a.reason}</p><p>{a.note.createdAt} · {a.note.counselorName}</p></article>)}</details>
  <form onSubmit={e=>{e.preventDefault();void save();}}><fieldset disabled={disabled||busy}><label htmlFor="corrected-note">Corrected session note<textarea id="corrected-note" rows={5} maxLength={8000} value={body} onChange={e=>setBody(e.target.value)}/></label><label htmlFor="note-correction-reason">Note correction reason<textarea id="note-correction-reason" rows={2} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label><button className="button primary" type="submit">Save reviewed note correction</button></fieldset></form></>}
- <button className="button secondary" disabled={busy||disabled} onClick={()=>{if(!dirty||window.confirm('Discard unsaved note correction and reload its history?'))void load();}}>Reload note history</button>
- <button className="button secondary" disabled={busy} onClick={()=>{if(!dirty||window.confirm('Discard this unsaved note correction?'))onClose();}}>Close note correction</button>
+ <button className="button secondary" disabled={busy||disabled} onClick={()=>{if(dirty)confirmDiscard('Discard unsaved note correction and reload its history?',()=>void load());else void load();}}>Reload note history</button>
+ <button className="button secondary" disabled={busy} onClick={()=>{if(dirty)confirmDiscard('Discard this unsaved note correction?',onClose);else onClose();}}>Close note correction</button>
  </section>;
 }

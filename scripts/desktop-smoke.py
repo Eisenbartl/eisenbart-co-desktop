@@ -13,6 +13,7 @@ import datetime as dt
 import http.client
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import shutil
@@ -53,6 +54,7 @@ class WebDriver:
         self.transport = transport
         self.session_id: str | None = None
         self.protected_values = protected_values
+        self.last_client_id: str | None = None
 
     def safe(self, value: str) -> str:
         for protected in self.protected_values:
@@ -146,6 +148,7 @@ class WebDriver:
                 time.sleep(0.25)
 
     def scroll_to(self, selector: str, block: str = "center") -> None:
+        if selector=='.page-heading' and not self.visible(selector):selector='.client-workspace-header'
         self.scroll_element(self.element(selector), block)
 
     def find(self, selector: str, using: str = "css selector") -> str:
@@ -187,9 +190,12 @@ class WebDriver:
         raise SmokeFailure(f"Timed out waiting for {description}")
 
     def element(self, selector: str, using: str = "css selector") -> str:
+        if using=="css selector":self.workflow_for(selector)
         return self.wait(lambda: self.visible(selector, using), f"visible {selector}")
 
     def interactive(self, selector: str, using: str = "css selector") -> str:
+        if selector=='#workspace-client':selector='.workspace-app-tab.active [data-client-tab]'
+        if using=='css selector':self.workflow_for(selector)
         def enabled() -> str | None:
             element = self.visible(selector, using)
             if element and self.command("GET", f"/element/{element}/enabled"):
@@ -205,6 +211,15 @@ class WebDriver:
         return self.wait(enabled, f"enabled {selector}")
 
     def click(self, selector: str, using: str = "css selector") -> None:
+        match=re.fullmatch(r"nav\[aria-label='Main navigation'\] button\[aria-label='([^']+)'\]",selector)
+        if match and match.group(1) not in ['Dashboard','Clients','Settings']:
+            self.client_section(match.group(1));return
+        if selector=='.page-heading button' and not self.visible(selector):
+            self.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+        if selector=='.page-heading' and not self.visible(selector):selector='.client-workspace-header'
+        if self.visible('.workspace-app-tab.active [data-client-tab]'):
+            self.last_client_id=str(self.observe_script("return document.querySelector('.workspace-app-tab.active [data-client-tab]')?.dataset.clientTab"))
+        if using=='css selector':self.workflow_for(selector)
         element = self.interactive(selector, using)
         # WebKit's automatic scrolling can leave a partially visible control
         # at the viewport edge and click its old position. Center first; this
@@ -218,14 +233,74 @@ class WebDriver:
             raise SmokeFailure(f"Native click failed for {selector}: {error}") from None
 
     def click_button(self, text: str) -> None:
+        if text=='Working tools':
+            current=self.observe_script("return document.querySelector('nav[aria-label=\"Client workspace sections\"] [aria-current=page]')?.getAttribute('aria-label')")
+            text={'Import statements':'Import & sources','Review & reconciliation':'Review queue','Financial dashboard':'Approved activity','Assessments & reports':'Assessments & action plans'}.get(str(current),text)
+        route={'Add income':'Monthly budget','Add debt':'Debt payoff','Add cash-flow account':'Cash-flow calendar','Add dated activity':'Cash-flow calendar','Add follow-up':'Profile & intake'}
+        if text in route and not self.visible(f"//button[normalize-space(.)={json.dumps(text)}]",'xpath'):self.client_section(route[text])
         self.click(f"//button[normalize-space(.)={json.dumps(text)}]", "xpath")
 
+    def client_section(self, label: str, force: bool = False) -> None:
+        """Navigate through actual client tabs/rail; never invoke application IPC.
+
+        Old regression fixtures describe logical workflows that used to share a
+        single record page. These page-object routes now open their focused view.
+        Read-only visible/text/observe assertions never route or mutate anything.
+        """
+        aliases = {'Documents':'Import statements','Transactions':'Review & reconciliation',
+                   'Financial Review':'Financial dashboard','Budget Planner':'Monthly budget',
+                   'Debt Planner':'Debt payoff','Savings Planner':'Savings & sinking funds',
+                   'Cash-Flow Calendar':'Cash-flow calendar','Financial Scenarios':'Scenario comparisons',
+                   'Reports':'Assessments & reports'}
+        label=aliases.get(label,label)
+        if not self.visible("nav[aria-label='Client workspace sections']"):
+            selector=(f"[role=tab][data-client-tab={json.dumps(self.last_client_id)}]" if self.last_client_id else '.workspace-app-tab:last-child [role=tab]')
+            self.click(selector)
+            self.element("nav[aria-label='Client workspace sections']")
+        button=f"nav[aria-label='Client workspace sections'] button[aria-label={json.dumps(label)}]"
+        element=self.element(button)
+        current=self.command('GET',f'/element/{element}/attribute/aria-current')
+        if force or current!='page':self.click(button)
+        if self.visible('[role=alertdialog]'):raise SmokeFailure('Unsaved changes block routing to '+label+'; the fixture must choose Keep editing or Discard changes explicitly.')
+        self.last_client_id=str(self.observe_script("return document.querySelector('.workspace-app-tab.active [data-client-tab]')?.dataset.clientTab"))
+
+    def workflow_for(self, selector: str) -> None:
+        # An intended action/wait may choose its logical workflow once. Locator
+        # polling and negative/privacy observations remain strictly read-only.
+        if self.visible(selector):return
+        routes=[
+          (('#first-name','#last-name','#email','#phone','#household-size','#client-status','#goals','.editor-panel'),'Profile & intake',None),
+          (('.client-care','#intake-','#follow-','.care-'),'Profile & intake','Intake & follow-ups'),
+          (('#new-note','.notes-history','.notes-panel','.session-note','.note-correction'),'Session notes',None),
+          (('.budget-panel','#budget-','.budget-results'),'Monthly budget',None),
+          (('.debt-panel','#debt-','.debt-results'),'Debt payoff',None),
+          (('.savings-panel','#savings-','.savings-results'),'Savings & sinking funds',None),
+          (('.cashflow-panel','#cashflow-','.cashflow-'),'Cash-flow calendar',None),
+          (('.combined-scenarios','#scenario-','.saved-scenario'),'Scenario comparisons',None),
+          (('#csv-','.pdf-line-selection'),'Import statements',None),
+          (('.financial-dashboard','#assessment-from','#assessment-through'),'Financial dashboard',None),
+          (('.financial-facts','#facts-'),'Review & reconciliation','Verified figures'),
+          (('.statement-balance','#balance-','.balance-'),'Review & reconciliation','Running balances'),
+          (('.recurring-','#recurring-'),'Review & reconciliation','Recurring payments'),
+          (('.transfer-review','#transfer-'),'Review & reconciliation','Transfer matching'),
+          (('.imports-sources',),'Review & reconciliation','Source checks'),
+          (('.imports-table','.imports-totals','.imports-progress'),'Review & reconciliation','Review queue'),
+          (('.saved-assessments','#record-','.client-action','#action-'),'Assessments & reports',None),
+        ]
+        for prefixes,label,area in routes:
+            if selector.startswith(prefixes):
+                self.client_section(label,force=label in ['Profile & intake','Session notes'])
+                if area:self.click_button(area)
+                return
+
     def open_client(self, name: str) -> None:
-        self.click("nav[aria-label='Main navigation'] button:nth-child(2)")
-        self.click("//button[contains(concat(' ', normalize-space(@class), ' '), ' client-row ')]"
-                   f"[.//strong[normalize-space(.)={json.dumps(name)}]]", "xpath")
+        self.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+        self.click(f"//button[@aria-label={json.dumps('Open workspace for '+name)}]",'xpath')
+        self.wait_text('.client-workspace-header h1',name,'scoped client workspace opened')
+        self.last_client_id=str(self.observe_script("return document.querySelector('.workspace-app-tab.active [data-client-tab]')?.dataset.clientTab"))
 
     def fill(self, selector: str, value: str) -> None:
+        self.workflow_for(selector)
         element = self.interactive(selector)
         # Native clear/focus can fail at a viewport edge after review panels
         # refresh. Move only the viewport, then recheck enabled state. Neither
@@ -282,6 +357,14 @@ class WebDriver:
         self.wait_value(selector, iso, "complete native date before saving")
 
     def select(self, selector: str, value: str, using: str = "css selector") -> None:
+        if selector=='#workspace-client':
+            label=self.observe_script("return document.querySelector('nav[aria-label=\"Client workspace sections\"] [aria-current=page]')?.getAttribute('aria-label')")
+            area=self.observe_script("return document.querySelector('.client-workspace-content .section-navigation [aria-current=page]')?.textContent")
+            self.open_client(value)
+            if label:self.client_section(str(label))
+            if area and self.visible(f"//button[normalize-space(.)={json.dumps(str(area))}]",'xpath'):self.click_button(str(area))
+            return
+        if using=='css selector':self.workflow_for(selector)
         # WebDriver clicks the HTML option rather than calling application code.
         select = self.interactive(selector, using)
         try:
@@ -300,6 +383,7 @@ class WebDriver:
         return str(self.command("GET", f"/element/{element}/property/value"))
 
     def wait_value(self, selector: str, value: str, description: str) -> None:
+        self.workflow_for(selector)
         self.wait(lambda: self.field_value(selector) == value, description)
 
     def text(self, selector: str = "body") -> str:
@@ -307,6 +391,8 @@ class WebDriver:
         return str(self.command("GET", f"/element/{element}/text"))
 
     def wait_text(self, selector: str, value: str, description: str) -> None:
+        if selector=='.imports-panel' and value=='No imported transactions yet':self.client_section('Review & reconciliation')
+        self.workflow_for(selector)
         self.wait(lambda: value in self.text(selector), description)
 
     def wait_content(self, selector: str, value: str, description: str) -> None:
@@ -1389,7 +1475,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
         driver.fill("#household-size", "2")
         driver.fill("#goals", goal)
         driver.click_button("Create client")
-        driver.wait_text(".editor-panel h2", f"{given} {family}", "saved client profile")
+        driver.wait_text(".client-workspace-header h1", f"{given} {family}", "saved client profile")
 
     create_client(first_name, first_last, first_goal)
     driver.fill("#new-note", note)
@@ -2844,7 +2930,7 @@ def check_final_report_approval(driver: WebDriver, artifacts: Path, data_root: P
     driver.fill('#household-size','1')
     driver.fill('#goals','Fictional historical completed-period assessment only; no scenario recommendation requested.')
     driver.click_button('Create client')
-    driver.wait_text('.editor-panel h2','Jamie Complete','separate fictional final-report client')
+    driver.wait_text('.client-workspace-header h1','Jamie Complete','separate fictional final-report client')
     source=data_root / 'complete-final.csv'
     source.write_text(f'Date,Description,Amount,Category,Type\n{period_start},Complete fictional wages,2000.01,Wages,income\n{period_start+dt.timedelta(days=1)},Complete fictional rent,-1200.02,Housing,expense\n',encoding='utf-8')
     driver.fill('#csv-path',str(source))
@@ -3382,12 +3468,12 @@ def check_statement_accounts(driver: WebDriver, artifacts: Path, label: str, ini
 
 def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:
     count = driver.observe_script("return document.querySelectorAll('nav[aria-label=\"Main navigation\"] button').length")
-    if count != 12:
-        raise SmokeFailure("The original twelve workspace sections are not all reachable")
-    for page, heading in [("Financial Review", "Client financial review"), ("Transactions", "Transaction review queue"), ("Documents", "Documents and statement accounts")]:
+    if count != 3:
+        raise SmokeFailure("Expected Dashboard, Clients and Settings at the application level")
+    for page, heading in [("Financial Review", "Approved financial activity"), ("Transactions", "Transaction review queue"), ("Documents", "Documents and statement accounts")]:
         driver.click(f"nav[aria-label='Main navigation'] button[aria-label='{page}']")
         driver.wait_text("#imports-title", heading, f"focused {page} page")
-        driver.element(".imports-totals" if page != "Documents" else "#csv-path")
+        driver.element(".financial-dashboard" if page=="Financial Review" else ".imports-totals" if page=="Transactions" else "#csv-path")
         if page != "Documents" and driver.visible("#csv-path"):
             raise SmokeFailure(f"Document import controls leaked into {page}")
     driver.click(".imports-sources > summary")
@@ -3423,7 +3509,7 @@ def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:
     driver.wait_text(".firm-branding", "No branding changes yet", "branding page is a working saved form")
     driver.open_client("Alex Fictional")
     driver.interactive("#first-name")
-    status("all twelve main pages, saved planner data, isolated client context, future areas and report/admin separation")
+    status("three main pages and twelve client sections, saved planner data, isolated client context, future areas and report/admin separation")
 
 
 def check_client_care(driver: WebDriver, artifacts: Path, label: str, initial: bool = False) -> None:

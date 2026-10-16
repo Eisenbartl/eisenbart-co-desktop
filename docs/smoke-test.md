@@ -427,3 +427,18 @@ captured one-minute policy after a later change, and original client notes. It
 returns the policy to 15 minutes for the remaining workflow. Screenshot:
 `native-inactivity-policy.png`. The focused wrapper uses a separate synthetic
 workspace and the same visible-control check function.
+
+## Client workspace redesign — 0.46.0
+
+The global navigation now has Dashboard, Clients and Settings; all twelve client
+sections live inside stable-ID in-app tabs. The native page object routes legacy
+financial fixture intents through these actual UI controls and separate review
+subtabs. It never invokes app IPC or scripts financial writes. Negative/locked
+DOM observations remain read-only, and source/report/math assertions are retained.
+
+The focused redesign workflow creates real synthetic records through the app,
+checks the directory and all twelve sections, saves independently expected budget
+and debt inputs, checks the $200/$0 mismatch and unknown balances, cancels and
+accepts the actual in-app discard dialog, verifies isolation/tab deduplication/MRU
+close, inspects an 800px window and tests locking plus a full offline restart.
+Keep WebKit sandboxing enabled. See development status for actual run outcomes.

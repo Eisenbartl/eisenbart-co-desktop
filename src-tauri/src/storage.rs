@@ -24,6 +24,8 @@ pub mod classification_store;
 pub mod client_care_store;
 #[path = "client_history_store.rs"]
 pub mod client_history_store;
+#[path = "client_workspace.rs"]
+pub mod client_workspace;
 #[path = "coverage_review_store.rs"]
 pub mod coverage_review_store;
 #[path = "document_collection_store.rs"]

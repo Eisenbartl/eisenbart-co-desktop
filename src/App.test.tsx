@@ -4,7 +4,7 @@ import App from './App';
 import type { Client, ClientNote, WorkspaceInfo } from './types';
 
 const mocks = vi.hoisted(() => ({
-  getSecurityPolicy:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
+  getClientWorkspaceOverview:vi.fn(),getSecurityPolicy:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
   getReportPresentation:vi.fn(),chooseReportPresentationPdf:vi.fn(),exportReportPresentation:vi.fn(),
   getCategoryRules:vi.fn(),saveCategoryRule:vi.fn(),reviewRuleCategory:vi.fn(),queryCategorySuggestions:vi.fn(),prepareCategoryDraft:vi.fn(),queryTransactionActivity:vi.fn(),
   desktop: true,
@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   getClientSavingsPlan: vi.fn(), saveClientSavingsPlan: vi.fn(),
   getCardFacts:vi.fn(),getCardReview:vi.fn(),getCardStatements:vi.fn(),getCoverageReview:vi.fn(),getFinancialCompleteness:vi.fn(),getDocumentCollection:vi.fn(),saveDocumentCollection:vi.fn(),getClientCare:vi.fn(),saveClientCare:vi.fn(),getFollowUpOverview:vi.fn(),
 }));
+
+vi.mock('./ConfirmationDialog',async importOriginal=>{const original=await importOriginal<typeof import('./ConfirmationDialog')>();return {...original,confirmDiscard:(message:string,action:()=>void)=>{if(window.confirm(message))action();}};});
 
 vi.mock('./api', () => ({
   desktopAvailable: () => mocks.desktop,
@@ -44,7 +46,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-beforeEach(() => {mocks.getSecurityPolicy.mockResolvedValue({revision:0,idleMinutes:15,totalChanges:0,history:[]});mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
+beforeEach(() => {mocks.getClientWorkspaceOverview.mockImplementation(async(clientId:string)=>({clientId,monthlyIncome:null,necessaryExpenses:null,unallocated:null,enteredDebt:null,debtMonthlyPayment:null,budgetDebtPayment:null,emergencyTarget:null,accessibleSavings:null,restrictedSavings:null,payoffMonth:null,warnings:[]}));mocks.getSecurityPolicy.mockResolvedValue({revision:0,idleMinutes:15,totalChanges:0,history:[]});mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
   mocks.getStatementAccounts.mockImplementation(async(clientId:string)=>({clientId,importRevision:0,accounts:[]}));
   vi.clearAllMocks();
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
@@ -84,10 +86,19 @@ async function unlock() {
   await waitFor(() => expect(mocks.listClients).toHaveBeenCalled());
 }
 
-async function selectClient(name: string) {
-  fireEvent.click(screen.getByRole('button', { name: /^Clients/ }));
-  fireEvent.click(screen.getByText(name).closest('button')!);
-  await screen.findByRole('heading', { name });
+function go(label:string){fireEvent.click(within(screen.getByRole('navigation',{name:'Client workspace sections'})).getByRole('button',{name:label}));}
+async function selectClient(name:string,section='Profile & intake'){
+ fireEvent.click(screen.getByRole('button',{name:'Clients'}));
+ fireEvent.click(screen.getByRole('button',{name:`Open workspace for ${name}`}));
+ await screen.findByRole('heading',{name});
+ if(section)go(section);
+}
+async function switchClient(name:string){
+ const active=screen.queryByRole('navigation',{name:'Client workspace sections'})?.querySelector('[aria-current=page]')?.getAttribute('aria-label')??'Profile & intake';
+ fireEvent.click(screen.getByRole('tab',{name:'All clients'}));
+ const open=screen.queryByRole('button',{name:`Open workspace for ${name}`});
+ if(!open)return;
+ fireEvent.click(open);await screen.findByRole('heading',{name});go(active);
 }
 
 describe('desktop workspace', () => {
@@ -118,13 +129,12 @@ describe('desktop workspace', () => {
   });
   it('guards an intake draft when changing clients and clears private employment details on lock',async()=>{
     render(<App/>);await unlock();await selectClient('Alice Able');
-    await screen.findByText('No saved budget yet');
-    fireEvent.click(screen.getByText('Intake and follow-ups'));
+    go('Profile & intake');fireEvent.click(screen.getByRole('button',{name:'Intake & follow-ups'}));fireEvent.click(screen.getByText('Intake and follow-ups'));
     await screen.findByLabelText('Employer');
     await waitFor(()=>expect(screen.getByLabelText('Employer')).toBeEnabled());
     fireEvent.change(screen.getByLabelText('Employer'),{target:{value:'Alice private fictional employer'}});
     vi.mocked(window.confirm).mockReturnValueOnce(false);
-    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    await switchClient('Bob Baker');
     expect(window.confirm).toHaveBeenCalled();
     expect(screen.getByLabelText('Employer')).toHaveValue('Alice private fictional employer');
     await act(async()=>mocks.lockHandler?.());
@@ -132,30 +142,27 @@ describe('desktop workspace', () => {
     expect(screen.queryByText('Intake and follow-ups')).not.toBeInTheDocument();
     expect(mocks.saveClientCare).not.toHaveBeenCalled();
   });
-  it('blocks writes during scenario baseline loading and clears temporary proposals and late replies on lock',async()=>{
+  it('blocks navigation during scenario baseline loading and clears late private proposals on lock',async()=>{
     const pending=deferred<unknown>();mocks.getAssessmentPlanning.mockReturnValueOnce(pending.promise);
-    render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No saved budget yet');await screen.findByText('No imported transactions yet');
-    fireEvent.click(screen.getByText('Compare combined financial scenarios'));
-    fireEvent.click(screen.getByRole('button',{name:'Reload saved scenario baseline'}));
-    await waitFor(()=>expect(screen.getByRole('button',{name:'Add income'})).toBeDisabled());
-    expect(screen.getByRole('button',{name:'Save changes'})).toBeDisabled();
-    await act(async()=>mocks.lockHandler?.());
-    await act(async()=>pending.resolve({clientId:'client-a',privateAssumption:'Alice private scenario'}));
-    expect(document.documentElement.outerHTML).not.toContain('Alice private scenario');
-    expect(screen.queryByText('Compare combined financial scenarios')).not.toBeInTheDocument();
-    expect(mocks.compareFinancialScenarios).not.toHaveBeenCalled();
+    render(<App/>);await unlock();await selectClient('Alice Able');go('Scenario comparisons');
+    fireEvent.click(screen.getByText('Compare combined financial scenarios'));fireEvent.click(screen.getByRole('button',{name:'Reload saved scenario baseline'}));
+    fireEvent.click(screen.getByRole('button',{name:'Dashboard'}));expect(screen.getByRole('heading',{name:'Scenario comparisons'})).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:'Add income'})).not.toBeInTheDocument();expect(mocks.saveClientBudget).not.toHaveBeenCalled();
+    await act(async()=>mocks.lockHandler?.());await act(async()=>pending.resolve({clientId:'client-a',privateAssumption:'Alice private scenario'}));
+    expect(document.documentElement.outerHTML).not.toContain('Alice private scenario');expect(screen.queryByText('Compare combined financial scenarios')).not.toBeInTheDocument();expect(mocks.compareFinancialScenarios).not.toHaveBeenCalled();
+
   });
 
   it('guards standalone account drafts across client/page changes and clears private labels on lock',async()=>{
-    render(<App/>);await unlock();
-    fireEvent.click(screen.getByRole('button',{name:'Documents'}));
-    fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});
+    render(<App/>);await unlock();await selectClient('Alice Able');
+    go('Import statements');
+
     fireEvent.click(screen.getByRole('button',{name:'Statement accounts'}));
     fireEvent.click(await screen.findByRole('button',{name:'Add statement account'}));
     fireEvent.change(screen.getByLabelText('Current account name'),{target:{value:'Private Alice account'}});
     vi.mocked(window.confirm).mockReturnValueOnce(false);
-    fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:bob.id}});
-    expect(screen.getByLabelText('Client for Documents')).toHaveValue(alice.id);
+    await switchClient('Bob Baker');
+    expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');
     expect(screen.getByLabelText('Current account name')).toHaveValue('Private Alice account');
     vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByRole('button',{name:'Collection checklist'}));
     expect(screen.getByLabelText('Current account name')).toHaveValue('Private Alice account');
@@ -167,9 +174,9 @@ describe('desktop workspace', () => {
   });
 
   it('guards unsaved CSV selection and clears private source paths on lock',async()=>{
-    render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No imported transactions yet');
-    fireEvent.change(screen.getByLabelText('Local CSV file'),{target:{value:'D:\\Synthetic\\alice-private.csv'}});
-    vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByText('Bob Baker').closest('button')!);expect(window.confirm).toHaveBeenCalled();expect(screen.getByLabelText('Local CSV file')).toHaveValue('D:\\Synthetic\\alice-private.csv');
+    render(<App/>);await unlock();await selectClient('Alice Able');go('Review & reconciliation');await screen.findByText('No imported transactions yet');
+    go('Import statements');await screen.findByLabelText('Local CSV file');fireEvent.change(screen.getByLabelText('Local CSV file'),{target:{value:'D:\\Synthetic\\alice-private.csv'}});
+    vi.mocked(window.confirm).mockReturnValueOnce(false);await switchClient('Bob Baker');expect(window.confirm).toHaveBeenCalled();expect(screen.getByLabelText('Local CSV file')).toHaveValue('D:\\Synthetic\\alice-private.csv');
     await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('alice-private.csv');expect(mocks.stageClientCsv).not.toHaveBeenCalled();
   });
 
@@ -186,29 +193,29 @@ describe('desktop workspace', () => {
   });
 
   it('guards cash-flow edits and removes private account data on lock',async()=>{
-    render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No saved cash-flow plan yet');
+    render(<App/>);await unlock();await selectClient('Alice Able');go('Cash-flow calendar');await screen.findByText('No saved cash-flow plan yet');
     fireEvent.click(screen.getByRole('button',{name:'Add cash-flow account'}));
     fireEvent.change(screen.getByLabelText('Account name'),{target:{value:'Alice private checking'}});
-    vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    vi.mocked(window.confirm).mockReturnValueOnce(false);await switchClient('Bob Baker');
     expect(window.confirm).toHaveBeenCalled();expect(screen.getByLabelText('Account name')).toHaveValue('Alice private checking');
     await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Alice private checking');expect(mocks.saveClientCashflowPlan).not.toHaveBeenCalled();
   });
 
   it('guards unsaved savings edits and clears private reserves on lock',async()=>{
-    render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No saved savings plan yet');
+    render(<App/>);await unlock();await selectClient('Alice Able');go('Savings & sinking funds');await screen.findByText('No saved savings plan yet');
     fireEvent.change(screen.getByLabelText('Funding priorities and notes'),{target:{value:'Alice private savings priority'}});
-    vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    vi.mocked(window.confirm).mockReturnValueOnce(false);await switchClient('Bob Baker');
     expect(window.confirm).toHaveBeenCalled();expect(screen.getByLabelText('Funding priorities and notes')).toHaveValue('Alice private savings priority');
     await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Alice private savings priority');expect(mocks.saveClientSavingsPlan).not.toHaveBeenCalled();
   });
 
   it('guards unsaved debt edits and clears them when the workspace locks', async () => {
     render(<App />); await unlock(); await selectClient('Alice Able');
-    await screen.findByText('No saved debt plan yet');
+    go('Debt payoff');await screen.findByText('No saved debt plan yet');
     fireEvent.click(screen.getByRole('button', {name:'Add debt'}));
     fireEvent.change(screen.getByLabelText('Debt name'), {target:{value:'Private Alice loan'}});
     vi.mocked(window.confirm).mockReturnValueOnce(false);
-    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    await switchClient('Bob Baker');
     expect(window.confirm).toHaveBeenCalled();
     expect(screen.getByLabelText('Debt name')).toHaveValue('Private Alice loan');
     await act(async () => mocks.lockHandler?.());
@@ -218,11 +225,11 @@ describe('desktop workspace', () => {
 
   it('guards unsaved budget edits when changing clients and clears them on a lock event', async () => {
     render(<App />); await unlock(); await selectClient('Alice Able');
-    await screen.findByText('No saved budget yet');
+    go('Monthly budget');await screen.findByText('No saved budget yet');
     fireEvent.click(screen.getByRole('button', { name: 'Add income' }));
     fireEvent.change(screen.getByLabelText('Category or source'), { target: { value: 'Alice private wage estimate' } });
     vi.mocked(window.confirm).mockReturnValueOnce(false);
-    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    await switchClient('Bob Baker');
     expect(window.confirm).toHaveBeenCalled();
     expect(screen.getByRole('heading', { name: 'Alice Able' })).toBeInTheDocument();
     expect(screen.getByLabelText('Category or source')).toHaveValue('Alice private wage estimate');
@@ -234,10 +241,10 @@ describe('desktop workspace', () => {
   it('does not display a delayed budget response in another client record', async () => {
     const delayed = deferred<Awaited<ReturnType<typeof mocks.getClientBudget>>>();
     mocks.getClientBudget.mockImplementationOnce(() => delayed.promise);
-    render(<App />); await unlock(); await selectClient('Alice Able');
-    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    render(<App />); await unlock(); await selectClient('Alice Able');go('Monthly budget');
+    await switchClient('Bob Baker');
     await screen.findByRole('heading', { name: 'Bob Baker' });
-    await screen.findByText('No saved budget yet');
+    go('Monthly budget');await screen.findByText('No saved budget yet');
     await act(async () => delayed.resolve({ clientId: alice.id, lines: [{ label: 'Alice hidden financial detail' }] }));
     expect(screen.queryByDisplayValue('Alice hidden financial detail')).not.toBeInTheDocument();
     expect(document.documentElement.outerHTML).not.toContain('Alice hidden financial detail');
@@ -303,7 +310,7 @@ describe('desktop workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create client' }));
     await screen.findByRole('heading', { name: 'Fictional Client' });
     expect(mocks.saveClient).toHaveBeenCalledWith(expect.objectContaining({ firstName: 'Fictional', lastName: 'Client', email: 'client@example.test', status: 'New Intake', householdSize: 1, goals: 'Build a fictional savings plan' }));
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+    go('Profile & intake');expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
   });
 
   it('updates the selected client identity and counseling status without changing client ownership', async () => {
@@ -324,24 +331,24 @@ describe('desktop workspace', () => {
     mocks.listClientNotes.mockImplementation((id: string) => id === alice.id ? previousNotes.promise : Promise.resolve([]));
     render(<App />);
     await unlock();
-    await selectClient('Alice Able');
-    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    await selectClient('Alice Able');go('Session notes');
+    await switchClient('Bob Baker');
     await screen.findByRole('heading', { name: 'Bob Baker' });
     await waitFor(() => expect(screen.getByLabelText('New session note')).toBeEnabled());
     await act(async () => { previousNotes.resolve([aliceNote]); });
     expect(screen.queryByText(aliceNote.body)).not.toBeInTheDocument();
     expect(screen.getByLabelText('New session note')).toHaveValue('');
-    expect(screen.getByLabelText('Counseling goals')).toHaveValue(bob.goals);
+    go('Profile & intake');expect(screen.getByLabelText('Counseling goals')).toHaveValue(bob.goals);
   });
 
   it('clears an unsaved note when switching clients and saves the new note to the current client only', async () => {
     render(<App />);
     await unlock();
-    await selectClient('Alice Able');
+    await selectClient('Alice Able');go('Session notes');
     await waitFor(() => expect(screen.getByLabelText('New session note')).toBeEnabled());
     fireEvent.change(screen.getByLabelText('New session note'), { target: { value: 'Unsaved private Alice draft' } });
     await waitFor(() => expect(window.confirm).not.toHaveBeenCalled());
-    fireEvent.click(screen.getByText('Bob Baker').closest('button')!);
+    await switchClient('Bob Baker');
     await screen.findByRole('heading', { name: 'Bob Baker' });
     await waitFor(() => expect(screen.getByLabelText('New session note')).toBeEnabled());
     expect(window.confirm).toHaveBeenCalled();
@@ -358,7 +365,7 @@ describe('desktop workspace', () => {
     mocks.listClientNotes.mockResolvedValue([aliceNote]);
     render(<App />);
     await unlock();
-    await selectClient('Alice Able');
+    await selectClient('Alice Able');go('Session notes');
     await screen.findByText(aliceNote.body);
     fireEvent.change(screen.getByLabelText('New session note'), { target: { value: 'Sensitive unsaved draft' } });
     await act(async () => { mocks.lockHandler?.(); });
@@ -387,36 +394,34 @@ describe('desktop workspace', () => {
 });
 
 
-it('opens all twelve sections and retains the selected client across focused working pages',async()=>{
- render(<App/>);await unlock();const nav=screen.getByRole('navigation',{name:'Main navigation'});expect(within(nav).getAllByRole('button')).toHaveLength(12);
- fireEvent.click(within(nav).getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Select a client to open Documents'})).toBeInTheDocument();
- fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});await screen.findByText('No source documents yet. Inspect a local statement above to begin.');expect(mocks.getClientImports).toHaveBeenLastCalledWith(alice.id);expect(screen.queryByText('Client review queue')).not.toBeInTheDocument();expect(screen.queryByText('Saved counselor assessments')).not.toBeInTheDocument();
- for(const page of ['Financial Review','Transactions','Budget Planner','Debt Planner','Savings Planner','Cash-Flow Calendar','Financial Scenarios','Reports']){
-  fireEvent.click(within(nav).getByRole('button',{name:page}));await waitFor(()=>expect(screen.getByLabelText(`Client for ${page}`)).toHaveValue(alice.id));expect(within(nav).getByRole('button',{name:page})).toHaveAttribute('aria-current','page');
-  await waitFor(()=>expect(screen.queryByText('Loading imported records…')).not.toBeInTheDocument());
+it('opens all twelve client sections lazily with only three application-level pages',async()=>{
+ render(<App/>);await unlock();const nav=screen.getByRole('navigation',{name:'Main navigation'});expect(within(nav).getAllByRole('button')).toHaveLength(3);
+ fireEvent.click(within(nav).getByRole('button',{name:'Clients'}));expect(screen.queryByLabelText('New session note')).not.toBeInTheDocument();expect(mocks.getClientImports).not.toHaveBeenCalled();expect(mocks.getClientBudget).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Open workspace for Alice Able'}));await screen.findByRole('heading',{name:'Alice Able'});await screen.findByRole('heading',{name:'Overview'});expect(within(screen.getByRole('navigation',{name:'Client workspace sections'})).getAllByRole('button')).toHaveLength(12);
+ for(const page of ['Monthly budget','Debt payoff','Savings & sinking funds','Cash-flow calendar','Scenario comparisons','Import statements','Review & reconciliation','Financial dashboard','Assessments & reports']){
+  go(page);expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');await waitFor(()=>expect(screen.queryByText('Loading imported records…')).not.toBeInTheDocument());
  }
  expect(screen.getByText('Saved counselor assessments')).toBeInTheDocument();expect(screen.queryByLabelText('Local CSV file')).not.toBeInTheDocument();expect(screen.queryByText('Client review queue')).not.toBeInTheDocument();
  fireEvent.click(within(nav).getByRole('button',{name:'Settings'}));expect(screen.getByRole('heading',{name:'Organization & counselor'})).toBeInTheDocument();
- fireEvent.click(within(nav).getByRole('button',{name:'Clients'}));await screen.findByRole('heading',{name:'Alice Able'});
- fireEvent.click(screen.getByRole('button',{name:'Profile'}));expect(screen.getByLabelText(/First name/)).toHaveValue('Alice');expect(screen.queryByText('No saved budget yet')).not.toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:'History & records'}));expect(screen.getByRole('heading',{name:'Client history and records'})).toBeInTheDocument();await waitFor(()=>expect(screen.getByRole('button',{name:'Open report and action-plan history'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Open report and action-plan history'}));await screen.findByText('Saved counselor assessments');
+ fireEvent.click(screen.getByRole('tab',{name:'Alice Able'}));await screen.findByRole('heading',{name:'Alice Able'});go('Profile & intake');expect(screen.getByLabelText(/First name/)).toHaveValue('Alice');expect(screen.queryByText('No saved budget yet')).not.toBeInTheDocument();
+ go('Session notes');fireEvent.click(screen.getByRole('button',{name:'History & records'}));expect(screen.getByRole('heading',{name:'Client history and records'})).toBeInTheDocument();await waitFor(()=>expect(screen.getByRole('button',{name:'Open report and action-plan history'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Open report and action-plan history'}));await screen.findByText('Saved counselor assessments');
 });
 it('guards page, future-area and client changes, then discards explicitly without saving private drafts',async()=>{
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Budget Planner'}));fireEvent.change(screen.getByLabelText('Client for Budget Planner'),{target:{value:alice.id}});await screen.findByText('No saved budget yet');fireEvent.click(screen.getByRole('button',{name:'Add income'}));fireEvent.change(screen.getByLabelText('Category or source'),{target:{value:'Private prototype draft'}});
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Monthly budget');go('Monthly budget');await screen.findByText('No saved budget yet');fireEvent.click(screen.getByRole('button',{name:'Add income'}));fireEvent.change(screen.getByLabelText('Category or source'),{target:{value:'Private prototype draft'}});
  vi.mocked(window.confirm).mockReturnValue(false);
- fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByLabelText('Category or source')).toHaveValue('Private prototype draft');
+ go('Import statements');expect(screen.getByLabelText('Category or source')).toHaveValue('Private prototype draft');
  fireEvent.click(screen.getByRole('button',{name:/Paycheck allocation/}));expect(screen.getByLabelText('Category or source')).toHaveValue('Private prototype draft');
- fireEvent.change(screen.getByLabelText('Client for Budget Planner'),{target:{value:bob.id}});expect(screen.getByLabelText('Client for Budget Planner')).toHaveValue(alice.id);expect(mocks.getClient).toHaveBeenCalledTimes(1);
+ await switchClient('Bob Baker');expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');expect(mocks.getClient).toHaveBeenCalledTimes(1);
  vi.mocked(window.confirm).mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:/Paycheck allocation/}));expect(screen.getByRole('region',{name:'Paycheck allocation planned feature'})).toHaveTextContent('does not create records');expect(screen.queryByDisplayValue('Private prototype draft')).not.toBeInTheDocument();expect(mocks.saveClientBudget).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole('button',{name:'Working tools'}));await screen.findByText('No saved budget yet');expect(screen.queryByDisplayValue('Private prototype draft')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Working tools'}));go('Monthly budget');await screen.findByText('No saved budget yet');expect(screen.queryByDisplayValue('Private prototype draft')).not.toBeInTheDocument();
  await act(async()=>mocks.lockHandler?.());expect(screen.queryByLabelText('Client for Budget Planner')).not.toBeInTheDocument();expect(document.documentElement.outerHTML).not.toContain('Private prototype draft');
 });
-it('ignores a delayed client selection after leaving a module page and permits retry after a read error',async()=>{
- const pending=deferred<Client>();mocks.getClient.mockReturnValueOnce(pending.promise);render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});expect(screen.getByRole('status')).toHaveTextContent('Opening client record');fireEvent.click(screen.getByRole('button',{name:'Reports'}));await act(async()=>pending.resolve(alice));expect(screen.getByLabelText('Client for Reports')).toHaveValue('');expect(screen.queryByText('Saved counselor assessments')).not.toBeInTheDocument();
- mocks.getClient.mockRejectedValueOnce(new Error('Synthetic selection failure'));fireEvent.change(screen.getByLabelText('Client for Reports'),{target:{value:alice.id}});expect(await screen.findByRole('alert')).toHaveTextContent('Synthetic selection failure');fireEvent.change(screen.getByLabelText('Client for Reports'),{target:{value:bob.id}});await screen.findByText('Saved counselor assessments');expect(screen.getByLabelText('Client for Reports')).toHaveValue(bob.id);
+it('ignores delayed client selections after leaving and permits retry after a read error',async()=>{
+ const pending=deferred<Client>();mocks.getClient.mockReturnValueOnce(pending.promise);render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Clients'}));fireEvent.click(screen.getByRole('button',{name:'Open workspace for Alice Able'}));expect(screen.getByRole('status')).toHaveTextContent('Opening client record');fireEvent.click(screen.getByRole('button',{name:'Settings'}));await act(async()=>pending.resolve(alice));expect(screen.getByRole('heading',{name:'Organization & counselor'})).toBeInTheDocument();expect(screen.queryByRole('tab',{name:'Alice Able'})).not.toBeInTheDocument();expect(mocks.getClientImports).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('tab',{name:'All clients'}));mocks.getClient.mockRejectedValueOnce(new Error('Synthetic selection failure'));fireEvent.click(screen.getByRole('button',{name:'Open workspace for Alice Able'}));expect(await screen.findByRole('alert')).toHaveTextContent('Synthetic selection failure');fireEvent.click(screen.getByRole('button',{name:'Return to all clients'}));fireEvent.click(screen.getByRole('button',{name:'Open workspace for Bob Baker'}));await screen.findByRole('heading',{name:'Bob Baker'});expect(screen.getByRole('tab',{name:'Bob Baker'})).toHaveAttribute('aria-selected','true');
 });
 it('exposes labeled future areas and every administration page without fake save controls',async()=>{
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.click(screen.getByRole('button',{name:/Scanned documents \/ OCR/}));expect(screen.getByRole('region',{name:'Scanned documents / OCR planned feature'})).toHaveTextContent('mandatory verification');expect(screen.queryByRole('button',{name:/Save OCR/})).not.toBeInTheDocument();
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Import statements');fireEvent.click(screen.getByRole('button',{name:/Scanned documents \/ OCR/}));expect(screen.getByRole('region',{name:'Scanned documents / OCR planned feature'})).toHaveTextContent('mandatory verification');expect(screen.queryByRole('button',{name:/Save OCR/})).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'Settings'}));
  for(const tab of ['Branding','Counselors & roles','Data management','Licensing','Help & about','Security','Backup & recovery']){
   await waitFor(()=>expect(screen.getByRole('button',{name:tab})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:tab}));expect(screen.getByRole('button',{name:tab})).toHaveAttribute('aria-current','page');if(tab==='Branding')await screen.findByLabelText('Firm display name');
@@ -426,76 +431,76 @@ it('exposes labeled future areas and every administration page without fake save
 
 it('creates, reloads and removes a saved budget row through its dedicated page',async()=>{
  let budget=await mocks.getClientBudget(alice.id);mocks.getClientBudget.mockImplementation(async()=>budget);mocks.saveClientBudget.mockImplementation(async(clientId,input)=>{budget={...budget,clientId,revision:budget.revision+1,lines:input.lines,summary:{...budget.summary,monthlyAmounts:input.lines.length?['2500.00']:[],monthlyIncome:input.lines.length?'2500.00':'0.00',surplusBeforeAllocations:input.lines.length?'2500.00':'0.00',availableForDebt:input.lines.length?'2500.00':'0.00',unallocated:input.lines.length?'2500.00':'0.00'}};return budget;});
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Budget Planner'}));fireEvent.change(screen.getByLabelText('Client for Budget Planner'),{target:{value:alice.id}});await screen.findByText('No saved budget yet');fireEvent.click(screen.getByRole('button',{name:'Add income'}));fireEvent.change(screen.getByLabelText('Category or source'),{target:{value:'Fictional prototype wages'}});fireEvent.change(screen.getByLabelText('Amount (USD)'),{target:{value:'2500.00'}});fireEvent.click(screen.getByRole('button',{name:'Save budget and calculate'}));await screen.findByText('Budget saved and calculated.');expect(mocks.saveClientBudget).toHaveBeenLastCalledWith(alice.id,{expectedRevision:0,lines:[{label:'Fictional prototype wages',kind:'income',amount:'2500.00',frequency:'monthly',estimated:false}]});
- await waitFor(()=>expect(screen.getByRole('button',{name:'Documents'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Documents'}));await screen.findByText('No source documents yet. Inspect a local statement above to begin.');fireEvent.click(screen.getByRole('button',{name:'Budget Planner'}));await screen.findByDisplayValue('Fictional prototype wages');fireEvent.click(screen.getByRole('button',{name:'Remove line 1'}));fireEvent.click(screen.getByRole('button',{name:'Save budget and calculate'}));await screen.findByText('Budget saved and calculated.');expect(mocks.saveClientBudget).toHaveBeenLastCalledWith(alice.id,{expectedRevision:1,lines:[]});
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Monthly budget');go('Monthly budget');await screen.findByText('No saved budget yet');fireEvent.click(screen.getByRole('button',{name:'Add income'}));fireEvent.change(screen.getByLabelText('Category or source'),{target:{value:'Fictional prototype wages'}});fireEvent.change(screen.getByLabelText('Amount (USD)'),{target:{value:'2500.00'}});fireEvent.click(screen.getByRole('button',{name:'Save budget and calculate'}));await screen.findByText('Budget saved and calculated.');expect(mocks.saveClientBudget).toHaveBeenLastCalledWith(alice.id,{expectedRevision:0,lines:[{label:'Fictional prototype wages',kind:'income',amount:'2500.00',frequency:'monthly',estimated:false}]});
+ await waitFor(()=>expect(within(screen.getByRole('navigation',{name:'Client workspace sections'})).getByRole('button',{name:'Import statements'})).toBeEnabled());go('Import statements');await screen.findByText('No source documents yet. Inspect a local statement above to begin.');go('Monthly budget');await screen.findByDisplayValue('Fictional prototype wages');fireEvent.click(screen.getByRole('button',{name:'Remove line 1'}));fireEvent.click(screen.getByRole('button',{name:'Save budget and calculate'}));await screen.findByText('Budget saved and calculated.');expect(mocks.saveClientBudget).toHaveBeenLastCalledWith(alice.id,{expectedRevision:1,lines:[]});
 });
 
 it('keeps backup operations on their page until completion and clears the password immediately',async()=>{
- const pending=deferred<{path:string;createdAt:string;auditRecorded:boolean;durabilityWarning:boolean}>();mocks.createWorkspaceBackup.mockReturnValueOnce(pending.promise);render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Backup & recovery'}));fireEvent.change(screen.getByLabelText('Backup folder'),{target:{value:'/fictional/backups'}});fireEvent.change(screen.getByLabelText('Current workspace password'),{target:{value:'Fictional-test-password-123'}});fireEvent.click(screen.getByRole('button',{name:'Create encrypted backup'}));expect(screen.getByLabelText('Current workspace password')).toHaveValue('');expect(screen.getByRole('button',{name:'Branding'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Encrypted workspace backup'})).toBeInTheDocument();await act(async()=>pending.resolve({path:'/fictional/backups/test.ebcbackup',createdAt:'2026-10-15T00:00:00Z',auditRecorded:true,durabilityWarning:false}));expect(await screen.findByText('Encrypted backup saved.')).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Select a client to open Documents'})).toBeInTheDocument();
+ const pending=deferred<{path:string;createdAt:string;auditRecorded:boolean;durabilityWarning:boolean}>();mocks.createWorkspaceBackup.mockReturnValueOnce(pending.promise);render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Backup & recovery'}));fireEvent.change(screen.getByLabelText('Backup folder'),{target:{value:'/fictional/backups'}});fireEvent.change(screen.getByLabelText('Current workspace password'),{target:{value:'Fictional-test-password-123'}});fireEvent.click(screen.getByRole('button',{name:'Create encrypted backup'}));expect(screen.getByLabelText('Current workspace password')).toHaveValue('');expect(screen.getByRole('button',{name:'Branding'})).toBeDisabled();fireEvent.click(screen.getByRole('tab',{name:'All clients'}));expect(screen.getByRole('heading',{name:'Encrypted workspace backup'})).toBeInTheDocument();await act(async()=>pending.resolve({path:'/fictional/backups/test.ebcbackup',createdAt:'2026-10-15T00:00:00Z',auditRecorded:true,durabilityWarning:false}));expect(await screen.findByText('Encrypted backup saved.')).toBeInTheDocument();fireEvent.click(screen.getByRole('tab',{name:'All clients'}));expect(screen.getByRole('region',{name:'Client directory'})).toBeInTheDocument();
 });
 
 it('keeps the collection area when selecting a client and guards checklist drafts on navigation and lock',async()=>{
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.click(screen.getByRole('button',{name:'Collection checklist'}));fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});await screen.findByText('No document requests yet. Add a request to begin.');fireEvent.click(screen.getByRole('button',{name:'Add document request'}));fireEvent.change(screen.getByLabelText('Request title'),{target:{value:'Private fictional collection draft'}});vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Reports'}));expect(screen.getByLabelText('Request title')).toHaveValue('Private fictional collection draft');fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:bob.id}});expect(screen.getByLabelText('Client for Documents')).toHaveValue(alice.id);await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional collection draft');expect(mocks.saveDocumentCollection).not.toHaveBeenCalled();
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Import statements');fireEvent.click(screen.getByRole('button',{name:'Collection checklist'}));await screen.findByText('No document requests yet. Add a request to begin.');fireEvent.click(screen.getByRole('button',{name:'Add document request'}));fireEvent.change(screen.getByLabelText('Request title'),{target:{value:'Private fictional collection draft'}});vi.mocked(window.confirm).mockReturnValue(false);go('Assessments & reports');expect(screen.getByLabelText('Request title')).toHaveValue('Private fictional collection draft');await switchClient('Bob Baker');expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional collection draft');expect(mocks.saveDocumentCollection).not.toHaveBeenCalled();
 });
 
 it('opens working completeness and report checklist areas for the selected client without planned badges',async()=>{
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Financial Review'}));
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Financial dashboard');
  const coverage=screen.getByRole('button',{name:'Completeness & final validation'});expect(coverage).not.toHaveTextContent('Planned');fireEvent.click(coverage);
- expect(screen.getByRole('heading',{name:'Select a client to open Financial Review'})).toBeInTheDocument();
- fireEvent.change(screen.getByLabelText('Client for Financial Review'),{target:{value:alice.id}});await screen.findByRole('region',{name:'Financial completeness review'});
+ expect(screen.getByRole('heading',{name:'Alice Able'})).toBeInTheDocument();
+ await screen.findByRole('region',{name:'Financial completeness review'});
  expect(mocks.getFinancialCompleteness).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole('button',{name:'Reports'}));fireEvent.click(screen.getByRole('button',{name:'Final report checklist'}));
+ go('Assessments & reports');fireEvent.click(screen.getByRole('button',{name:'Final report checklist'}));
  await screen.findByLabelText('Saved assessment for validation');expect(mocks.listAssessmentRecords).toHaveBeenCalledWith(alice.id);
  await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('region',{name:'Saved report checklist'})).not.toBeInTheDocument();
 });
 
 it('guards persistent completeness drafts across navigation and clears them on workspace lock',async()=>{
  mocks.getCoverageReview.mockResolvedValue({clientId:alice.id,latestRevision:0,snapshot:null,history:[],choices:{accounts:[],sources:[]},currentSourceRevision:0,currentProfileUpdatedAt:alice.updatedAt,needsReview:false,reviewReasons:[],unresolved:[]});
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Financial Review'}));fireEvent.click(screen.getByRole('button',{name:'Completeness & final validation'}));fireEvent.change(screen.getByLabelText('Client for Financial Review'),{target:{value:alice.id}});await screen.findByText('Saved completeness reviews');fireEvent.click(screen.getByText('Saved completeness reviews'));await screen.findByLabelText('Missing information');fireEvent.change(screen.getByLabelText('Missing information'),{target:{value:'Private fictional completeness draft'}});vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByLabelText('Missing information')).toHaveValue('Private fictional completeness draft');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional completeness draft');
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Financial dashboard');fireEvent.click(screen.getByRole('button',{name:'Completeness & final validation'}));await screen.findByText('Saved completeness reviews');fireEvent.click(screen.getByText('Saved completeness reviews'));await screen.findByLabelText('Missing information');fireEvent.change(screen.getByLabelText('Missing information'),{target:{value:'Private fictional completeness draft'}});vi.mocked(window.confirm).mockReturnValue(false);go('Import statements');expect(screen.getByLabelText('Missing information')).toHaveValue('Private fictional completeness draft');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional completeness draft');
 });
 
 it.each(['v1','v2'])('guards %s final approval drafts across navigation and clears private approvals on lock',async(policy)=>{
  mocks.listAssessmentRecords.mockResolvedValue({clientId:alice.id,records:[{id:'assessment',title:'Fictional reviewed assessment',periodStart:'2026-09-01',periodEnd:'2026-09-30',needsReview:false}]});
  mocks.getAssessmentRecord.mockResolvedValue({clientId:alice.id,digest:'digest',payload:{id:'assessment',title:'Fictional reviewed assessment',client:alice},reviewReasons:[],validation:{version:'coverage-review-v1',checks:[],coverage:{periodStart:'2026-09-01',periodEnd:'2026-09-30',revision:1,approved:2,rejected:0,pending:0,clarification:0,undated:0,outOfPeriod:0,assignmentIssues:0,blockingReasons:[],accounts:[],sources:[]}}});
  mocks.reviewFinalReport.mockResolvedValue({receipt:'receipt',approvalId:null,readiness:{policy:`counselor-final-report-${policy}`,clientId:alice.id,assessmentId:'assessment',assessmentDigest:'digest',reviewedOn:'2026-10-15',ready:true,gates:[],accounts:[],planning:'notApplicable',disclosures:[]}});
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Reports'}));fireEvent.click(screen.getByRole('button',{name:'Final report checklist'}));fireEvent.change(screen.getByLabelText('Client for Reports'),{target:{value:alice.id}});await screen.findByLabelText('Saved assessment for validation');await waitFor(()=>expect(screen.getByLabelText('Saved assessment for validation')).toBeEnabled());await act(async()=>{fireEvent.change(screen.getByLabelText('Saved assessment for validation'),{target:{value:'assessment'}});});await screen.findByRole('button',{name:'Review final-report readiness'});await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Review final-report readiness'})));await screen.findByLabelText('Professional approval notes');fireEvent.change(screen.getByLabelText('Professional approval notes'),{target:{value:'Private fictional approval draft'}});
- if(policy==='v2')fireEvent.change(screen.getByLabelText('Card evidence and repayment review'),{target:{value:'Private fictional card approval decision'}});expect(screen.getByLabelText('Saved assessment for validation')).toBeDisabled();expect(screen.getByRole('button',{name:'Refresh report checklist'})).toBeDisabled();vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByLabelText('Professional approval notes')).toHaveValue('Private fictional approval draft');fireEvent.change(screen.getByLabelText('Client for Reports'),{target:{value:bob.id}});expect(screen.getByLabelText('Client for Reports')).toHaveValue(alice.id);await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional approval draft');expect(document.documentElement.outerHTML).not.toContain('Private fictional card approval decision');expect(mocks.approveFinalReport).not.toHaveBeenCalled();
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Assessments & reports');fireEvent.click(screen.getByRole('button',{name:'Final report checklist'}));await screen.findByLabelText('Saved assessment for validation');await waitFor(()=>expect(screen.getByLabelText('Saved assessment for validation')).toBeEnabled());await act(async()=>{fireEvent.change(screen.getByLabelText('Saved assessment for validation'),{target:{value:'assessment'}});});await screen.findByRole('button',{name:'Review final-report readiness'});await act(async()=>fireEvent.click(screen.getByRole('button',{name:'Review final-report readiness'})));await screen.findByLabelText('Professional approval notes');fireEvent.change(screen.getByLabelText('Professional approval notes'),{target:{value:'Private fictional approval draft'}});
+ if(policy==='v2')fireEvent.change(screen.getByLabelText('Card evidence and repayment review'),{target:{value:'Private fictional card approval decision'}});expect(screen.getByLabelText('Saved assessment for validation')).toBeDisabled();expect(screen.getByRole('button',{name:'Refresh report checklist'})).toBeDisabled();vi.mocked(window.confirm).mockReturnValue(false);go('Import statements');expect(screen.getByLabelText('Professional approval notes')).toHaveValue('Private fictional approval draft');await switchClient('Bob Baker');expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional approval draft');expect(document.documentElement.outerHTML).not.toContain('Private fictional card approval decision');expect(mocks.approveFinalReport).not.toHaveBeenCalled();
 });
 
 it('opens credit-card review, guards its private source draft and clears it on lock',async()=>{
- mocks.getCardStatements.mockImplementation(async(clientId:string)=>({clientId,revision:0,statements:[]}));render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Documents'}));fireEvent.click(screen.getByRole('button',{name:'Credit-card statements'}));fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:alice.id}});await screen.findByText('No card statements recorded for this client.');fireEvent.click(screen.getByText('Import a card CSV statement'));fireEvent.change(screen.getByLabelText('Card CSV file'),{target:{value:'/private/fictional-card.csv'}});vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Reports'}));expect(screen.getByLabelText('Card CSV file')).toHaveValue('/private/fictional-card.csv');fireEvent.change(screen.getByLabelText('Client for Documents'),{target:{value:bob.id}});expect(screen.getByLabelText('Client for Documents')).toHaveValue(alice.id);await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('/private/fictional-card.csv');
+ mocks.getCardStatements.mockImplementation(async(clientId:string)=>({clientId,revision:0,statements:[]}));render(<App/>);await unlock();await selectClient('Alice Able');go('Import statements');fireEvent.click(screen.getByRole('button',{name:'Credit-card statements'}));await screen.findByText('No card statements recorded for this client.');fireEvent.click(screen.getByText('Import a card CSV statement'));fireEvent.change(screen.getByLabelText('Card CSV file'),{target:{value:'/private/fictional-card.csv'}});vi.mocked(window.confirm).mockReturnValue(false);go('Assessments & reports');expect(screen.getByLabelText('Card CSV file')).toHaveValue('/private/fictional-card.csv');await switchClient('Bob Baker');expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('/private/fictional-card.csv');
 });
 
 it('guards card account drafts across pages and clears them on locking',async()=>{
  mocks.getCardReview.mockResolvedValue({clientId:alice.id,sourceRevision:0,snapshot:null,history:[],cards:{clientId:alice.id,revision:0,statements:[]},bank:{clientId:alice.id,revision:0,accounts:[],documents:[],records:[],history:[],merchantGroups:[],recurringHistory:[],summary:{}},staleRepayments:[]});
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Financial Review'}));fireEvent.change(screen.getByLabelText('Client for Financial Review'),{target:{value:alice.id}});await screen.findByRole('heading',{name:'Client financial review'});fireEvent.click(screen.getByRole('button',{name:'Bank & card activity'}));await screen.findByText('No durable card accounts recorded.');fireEvent.change(screen.getByLabelText('Reviewed card account name'),{target:{value:'Private fictional card identity'}});await waitFor(()=>expect(screen.getByRole('button',{name:'Reports'})).toBeEnabled());vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Reports'}));expect(screen.getByLabelText('Reviewed card account name')).toHaveValue('Private fictional card identity');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional card identity');
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Financial dashboard');await screen.findByRole('heading',{name:'Approved financial activity'});fireEvent.click(screen.getByRole('button',{name:'Bank & card activity'}));await screen.findByText('No durable card accounts recorded.');fireEvent.change(screen.getByLabelText('Reviewed card account name'),{target:{value:'Private fictional card identity'}});await waitFor(()=>expect(within(screen.getByRole('navigation',{name:'Client workspace sections'})).getByRole('button',{name:'Assessments & reports'})).toBeEnabled());vi.mocked(window.confirm).mockReturnValue(false);go('Assessments & reports');expect(screen.getByLabelText('Reviewed card account name')).toHaveValue('Private fictional card identity');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional card identity');
 });
 
 it('guards private card completeness drafts across navigation and clears them on lock',async()=>{
  mocks.getCardFacts.mockResolvedValue({clientId:alice.id,currentSourceRevision:0,currentProfileUpdatedAt:alice.updatedAt,latestRevision:0,snapshot:null,history:[],choices:{linkRevision:0,accounts:[],sources:[],facts:null},needsReview:false,reviewReasons:[]});
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Financial Review'}));fireEvent.change(screen.getByLabelText('Client for Financial Review'),{target:{value:alice.id}});await screen.findByRole('heading',{name:'Client financial review'});fireEvent.click(screen.getByRole('button',{name:'Card completeness'}));await screen.findByLabelText('Reviewed card inventory notes');await waitFor(()=>expect(screen.getByLabelText('Reviewed card inventory notes')).toBeEnabled());fireEvent.change(screen.getByLabelText('Reviewed card inventory notes'),{target:{value:'Private fictional inventory review'}});vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Reports'}));expect(screen.getByLabelText('Reviewed card inventory notes')).toHaveValue('Private fictional inventory review');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional inventory review');
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Financial dashboard');await screen.findByRole('heading',{name:'Approved financial activity'});fireEvent.click(screen.getByRole('button',{name:'Card completeness'}));await screen.findByLabelText('Reviewed card inventory notes');await waitFor(()=>expect(screen.getByLabelText('Reviewed card inventory notes')).toBeEnabled());fireEvent.change(screen.getByLabelText('Reviewed card inventory notes'),{target:{value:'Private fictional inventory review'}});vi.mocked(window.confirm).mockReturnValue(false);go('Assessments & reports');expect(screen.getByLabelText('Reviewed card inventory notes')).toHaveValue('Private fictional inventory review');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional inventory review');
 });
 
 it('opens working client activity history and clears its private results on lock',async()=>{
  mocks.queryTransactionActivity.mockResolvedValue({clientId:alice.id,snapshot:'a'.repeat(64),query:{offset:0,text:'',sourceKind:null,status:null,from:null,through:null},total:0,pageSize:25,sources:[],events:[]});
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Transactions'}));const tab=screen.getByRole('button',{name:'Activity history'});expect(tab).not.toHaveTextContent('Planned');fireEvent.click(tab);fireEvent.change(screen.getByLabelText('Client for Transactions'),{target:{value:alice.id}});await screen.findByText('No activity matches these filters.');expect(mocks.queryTransactionActivity).toHaveBeenCalledWith(alice.id,expect.objectContaining({offset:0}));await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('region',{name:'Transaction activity history'})).not.toBeInTheDocument();
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Review & reconciliation');const tab=screen.getByRole('button',{name:'Activity history'});expect(tab).not.toHaveTextContent('Planned');fireEvent.click(tab);await screen.findByText('No activity matches these filters.');expect(mocks.queryTransactionActivity).toHaveBeenCalledWith(alice.id,expect.objectContaining({offset:0}));await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('region',{name:'Transaction activity history'})).not.toBeInTheDocument();
 });
 
 it('opens report presentation, holds navigation during PDF export and clears the private preview on lock',async()=>{
  const pending=deferred<{path:string;pages:number;recordId:string}>();mocks.exportReportPresentation.mockReturnValueOnce(pending.promise);
  mocks.listAssessmentRecords.mockResolvedValue({clientId:alice.id,records:[{id:'assessment',title:'Fictional report',periodStart:'2026-09-01',periodEnd:'2026-09-30',needsReview:false}]});
  mocks.getReportPresentation.mockResolvedValue({clientId:alice.id,assessmentId:'assessment',receipt:'receipt',presentation:'counselor-summary-v1',internal:{recordId:'assessment',kind:'internal',title:'Private fictional report',firmName:'Fictional firm',clientName:'Alice Able',periodStart:'2026-09-01',periodEnd:'2026-09-30',reportDate:'2026-10-15',status:'Internal assessment',basis:'Bank-only',figures:[],balanceAsOf:null,needsReview:false,reviewReasons:[],digest:'digest',disclosure:'Original figures'},finalReport:null});
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Reports'}));const tab=screen.getByRole('button',{name:'Print & presentation'});expect(tab).not.toHaveTextContent('Planned');fireEvent.click(tab);fireEvent.change(screen.getByLabelText('Client for Reports'),{target:{value:alice.id}});await screen.findByLabelText('Saved assessment for presentation');await waitFor(()=>expect(screen.getByLabelText('Saved assessment for presentation')).toBeEnabled());fireEvent.change(screen.getByLabelText('Saved assessment for presentation'),{target:{value:'assessment'}});await screen.findByText('Private fictional report');await waitFor(()=>expect(screen.getByLabelText('Presentation PDF destination')).toBeEnabled());fireEvent.change(screen.getByLabelText('Presentation PDF destination'),{target:{value:'/fictional/new.pdf'}});fireEvent.click(screen.getByRole('button',{name:'Export presentation PDF'}));fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByLabelText('Presentation PDF destination')).toHaveValue('/fictional/new.pdf');await act(async()=>mocks.lockHandler?.());await act(async()=>pending.resolve({path:'/fictional/new.pdf',pages:2,recordId:'assessment'}));expect(document.documentElement.outerHTML).not.toContain('Private fictional report');expect(document.documentElement.outerHTML).not.toContain('/fictional/new.pdf');
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Assessments & reports');const tab=screen.getByRole('button',{name:'Print & presentation'});expect(tab).not.toHaveTextContent('Planned');fireEvent.click(tab);await screen.findByLabelText('Saved assessment for presentation');await waitFor(()=>expect(screen.getByLabelText('Saved assessment for presentation')).toBeEnabled());fireEvent.change(screen.getByLabelText('Saved assessment for presentation'),{target:{value:'assessment'}});await screen.findByText('Private fictional report');await waitFor(()=>expect(screen.getByLabelText('Presentation PDF destination')).toBeEnabled());fireEvent.change(screen.getByLabelText('Presentation PDF destination'),{target:{value:'/fictional/new.pdf'}});fireEvent.click(screen.getByRole('button',{name:'Export presentation PDF'}));go('Import statements');expect(screen.getByLabelText('Presentation PDF destination')).toHaveValue('/fictional/new.pdf');await act(async()=>mocks.lockHandler?.());await act(async()=>pending.resolve({path:'/fictional/new.pdf',pages:2,recordId:'assessment'}));expect(document.documentElement.outerHTML).not.toContain('Private fictional report');expect(document.documentElement.outerHTML).not.toContain('/fictional/new.pdf');
 });
 
 it('opens working classification assistance with current client scope and clears it on lock',async()=>{
  mocks.queryCategorySuggestions.mockResolvedValue({clientId:alice.id,revision:0,snapshot:'proof',policy:'approved-merchant-category-v1',query:{text:'',offset:0,expectedSnapshot:null},total:0,pageSize:25,candidates:[]});
- render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Transactions'}));const tab=screen.getByRole('button',{name:'Classification assistance'});expect(tab).not.toHaveTextContent('Planned');fireEvent.click(tab);fireEvent.change(screen.getByLabelText('Client for Transactions'),{target:{value:alice.id}});await screen.findByText(/No missing-category expenses or fees/);expect(mocks.queryCategorySuggestions).toHaveBeenCalledWith(alice.id,{text:'',offset:0,expectedSnapshot:null});expect(mocks.prepareCategoryDraft).not.toHaveBeenCalled();await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('region',{name:'Local category suggestions'})).not.toBeInTheDocument();
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Review & reconciliation');const tab=screen.getByRole('button',{name:'Classification assistance'});expect(tab).not.toHaveTextContent('Planned');fireEvent.click(tab);await screen.findByText(/No missing-category expenses or fees/);expect(mocks.queryCategorySuggestions).toHaveBeenCalledWith(alice.id,{text:'',offset:0,expectedSnapshot:null});expect(mocks.prepareCategoryDraft).not.toHaveBeenCalled();await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('region',{name:'Local category suggestions'})).not.toBeInTheDocument();
 });
 it('guards reviewed note corrections across pages and clients and clears private drafts on lock',async()=>{
  mocks.listClientNotes.mockResolvedValue([aliceNote]);mocks.getNoteHistory.mockResolvedValue({clientId:alice.id,fingerprint:'note-context',original:aliceNote,amendments:[]});
- render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No imported transactions yet');fireEvent.click(screen.getByRole('button',{name:'Session notes'}));await screen.findByText(aliceNote.body);fireEvent.click(screen.getByRole('button',{name:/Review correction for note/}));await screen.findByDisplayValue(aliceNote.body);await waitFor(()=>expect(screen.getByLabelText('Corrected session note')).toBeEnabled());fireEvent.change(screen.getByLabelText('Corrected session note'),{target:{value:'Private fictional correction draft'}});fireEvent.change(screen.getByLabelText('Note correction reason'),{target:{value:'Private reviewed reason'}});
- vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'History & records'}));expect(screen.getByLabelText('Corrected session note')).toHaveValue('Private fictional correction draft');fireEvent.click(screen.getByText('Bob Baker').closest('button')!);expect(screen.getByText('Alice Able').closest('button')).toHaveAttribute('aria-pressed','true');expect(screen.getByLabelText('Corrected session note')).toHaveValue('Private fictional correction draft');expect(screen.getByRole('button',{name:'Save session note'})).toBeDisabled();await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional correction draft');expect(document.documentElement.outerHTML).not.toContain('Private reviewed reason');expect(mocks.correctClientNote).not.toHaveBeenCalled();
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Review & reconciliation');await screen.findByText('No imported transactions yet');fireEvent.click(screen.getByRole('button',{name:'Session notes'}));await screen.findByText(aliceNote.body);fireEvent.click(screen.getByRole('button',{name:/Review correction for note/}));await screen.findByDisplayValue(aliceNote.body);await waitFor(()=>expect(screen.getByLabelText('Corrected session note')).toBeEnabled());fireEvent.change(screen.getByLabelText('Corrected session note'),{target:{value:'Private fictional correction draft'}});fireEvent.change(screen.getByLabelText('Note correction reason'),{target:{value:'Private reviewed reason'}});
+ vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'History & records'}));expect(screen.getByLabelText('Corrected session note')).toHaveValue('Private fictional correction draft');await switchClient('Bob Baker');expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');expect(screen.getByLabelText('Corrected session note')).toHaveValue('Private fictional correction draft');expect(screen.getByRole('button',{name:'Save session note'})).toBeDisabled();await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional correction draft');expect(document.documentElement.outerHTML).not.toContain('Private reviewed reason');expect(mocks.correctClientNote).not.toHaveBeenCalled();
 });
 
 it('locks and clears workspace state after password change and shows retained-copy semantics',async()=>{
@@ -503,7 +508,7 @@ it('locks and clears workspace state after password change and shows retained-co
  render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Security'}));await screen.findByLabelText('Inactivity timeout (minutes)');
  for(const [label,value] of [['Current password','Synthetic-original-123'],['New password','Synthetic-new-456'],['Confirm new password','Synthetic-new-456']])fireEvent.change(screen.getByLabelText(label),{target:{value}});
  fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'Change password and lock'}));
- expect(screen.getByRole('button',{name:'Branding'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Change workspace password'})).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Branding'})).toBeDisabled();fireEvent.click(screen.getByRole('tab',{name:'All clients'}));expect(screen.getByRole('heading',{name:'Change workspace password'})).toBeInTheDocument();
  await act(async()=>pending.resolve({durabilityWarning:true}));expect(await screen.findByRole('button',{name:'Unlock workspace'})).toBeInTheDocument();
  expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('original passwords');expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('Keep both passwords');
  expect(screen.queryByLabelText('New password')).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Settings'})).not.toBeInTheDocument();
@@ -523,7 +528,39 @@ it('preserves inactivity drafts when a sibling password form clears and guards o
  render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Security'}));
  const minutes=await screen.findByLabelText('Inactivity timeout (minutes)');fireEvent.change(minutes,{target:{value:'5'}});fireEvent.change(screen.getByLabelText('New password'),{target:{value:'Synthetic-private-password-draft'}});fireEvent.click(screen.getByRole('button',{name:'Clear password fields'}));
  vi.mocked(window.confirm).mockReturnValueOnce(false);fireEvent.click(screen.getByRole('button',{name:'Branding'}));expect(screen.getByLabelText('Inactivity timeout (minutes)')).toHaveValue(5);
- fireEvent.click(screen.getByRole('button',{name:'Save inactivity timeout'}));expect(screen.getByRole('button',{name:'Change password and lock'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Inactivity locking'})).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Save inactivity timeout'}));expect(screen.getByRole('button',{name:'Change password and lock'})).toBeDisabled();fireEvent.click(screen.getByRole('tab',{name:'All clients'}));expect(screen.getByRole('heading',{name:'Inactivity locking'})).toBeInTheDocument();
  await act(async()=>pending.resolve({revision:1,idleMinutes:5,totalChanges:1,history:[{revision:1,idleMinutes:5,savedAt:'2026-10-16T13:00:00Z'}]}));expect(screen.getByRole('status')).toHaveTextContent('Inactivity timeout saved');
  act(()=>mocks.lockHandler?.());expect(screen.queryByLabelText('Inactivity timeout (minutes)')).not.toBeInTheDocument();expect(document.documentElement.outerHTML).not.toContain('Synthetic-private-password-draft');
+});
+
+it('opens one stable-ID tab per client, remembers each section and closes to the most recently used tab',async()=>{
+ render(<App/>);await unlock();await selectClient('Alice Able','Session notes');await screen.findByLabelText('New session note');
+ await selectClient('Bob Baker','Monthly budget');await screen.findByText('No saved budget yet');
+ expect(screen.getByRole('tabpanel',{name:'Bob Baker'})).toBeInTheDocument();expect(screen.getAllByRole('tab')).toHaveLength(3);expect(screen.queryByLabelText('New session note')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('tab',{name:'Alice Able'}));await screen.findByLabelText('New session note');expect(screen.queryByRole('button',{name:'Add income'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('tab',{name:'All clients'}));fireEvent.click(screen.getByRole('button',{name:'Open workspace for Alice Able'}));await screen.findByLabelText('New session note');expect(screen.getAllByRole('tab')).toHaveLength(3);
+ fireEvent.click(screen.getByRole('button',{name:'Close workspace for Alice Able'}));await screen.findByText('No saved budget yet');await waitFor(()=>expect(screen.getByRole('tab',{name:'Bob Baker'})).toHaveFocus());
+ fireEvent.click(screen.getByRole('button',{name:'Close workspace for Bob Baker'}));expect(screen.getByRole('region',{name:'Client directory'})).toBeInTheDocument();await waitFor(()=>expect(screen.getByRole('tab',{name:'All clients'})).toHaveFocus());expect(screen.getAllByRole('tab')).toHaveLength(1);
+});
+it('guards tab switching and closing dirty records, then discards only after explicit acceptance',async()=>{
+ render(<App/>);await unlock();await selectClient('Bob Baker');await selectClient('Alice Able');fireEvent.change(screen.getByLabelText('Counseling goals'),{target:{value:'Private Alice tab draft'}});
+ vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('tab',{name:'Bob Baker'}));fireEvent.click(screen.getByRole('button',{name:'Close workspace for Alice Able'}));expect(screen.getByLabelText('Counseling goals')).toHaveValue('Private Alice tab draft');expect(mocks.saveClient).not.toHaveBeenCalled();expect(window.confirm).toHaveBeenCalledTimes(2);
+ vi.mocked(window.confirm).mockReturnValue(true);fireEvent.click(screen.getByRole('tab',{name:'Bob Baker'}));await screen.findByRole('heading',{name:'Bob Baker'});expect(screen.getByLabelText('Counseling goals')).toHaveValue(bob.goals);expect(document.documentElement.outerHTML).not.toContain('Private Alice tab draft');
+ fireEvent.click(screen.getByRole('tab',{name:'Alice Able'}));await screen.findByRole('heading',{name:'Alice Able'});expect(screen.getByLabelText('Counseling goals')).toHaveValue(alice.goals);
+ await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('tab')).not.toBeInTheDocument();expect(document.documentElement.outerHTML).not.toContain('Alice Able');
+});
+it('discards late overview replies and never mounts or loads another client’s inactive tools',async()=>{
+ const pending=deferred<unknown>();mocks.getClientWorkspaceOverview.mockReturnValueOnce(pending.promise);
+ render(<App/>);await unlock();await selectClient('Alice Able','');expect(mocks.getClientBudget).not.toHaveBeenCalled();expect(mocks.getClientImports).not.toHaveBeenCalled();
+ await selectClient('Bob Baker','');await screen.findByRole('heading',{name:'Overview'});await act(async()=>pending.resolve({clientId:alice.id,monthlyIncome:'12345.67',warnings:['Private Alice delayed overview']}));expect(document.documentElement.outerHTML).not.toContain('Private Alice delayed overview');expect(screen.queryByText('$12,345.67')).not.toBeInTheDocument();
+ fireEvent.keyDown(screen.getByRole('tab',{name:'Bob Baker'}),{key:'Home'});expect(screen.getByRole('region',{name:'Client directory'})).toBeInTheDocument();await waitFor(()=>expect(screen.getByRole('tab',{name:'All clients'})).toHaveFocus());
+});
+it('rejects a mismatched client response without creating a tab or showing its private fields',async()=>{
+ mocks.getClient.mockResolvedValueOnce(bob);render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Clients'}));fireEvent.click(screen.getByRole('button',{name:'Open workspace for Alice Able'}));expect(await screen.findByRole('alert')).toHaveTextContent('did not match');expect(screen.queryByRole('tab',{name:'Alice Able'})).not.toBeInTheDocument();expect(screen.queryByLabelText('Counseling goals')).not.toBeInTheDocument();expect(mocks.getClientWorkspaceOverview).not.toHaveBeenCalled();
+});
+it('keeps same-name clients in distinct ID-keyed tabs and retains identity after a rename',async()=>{
+ const sameName={...bob,firstName:alice.firstName,lastName:alice.lastName};mocks.listClients.mockResolvedValue([alice,sameName]);mocks.getClient.mockImplementation(async(id:string)=>id===alice.id?alice:sameName);
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Clients'}));fireEvent.click(within(screen.getByText(alice.id).closest('tr')!).getByRole('button'));await screen.findByRole('heading',{name:'Alice Able'});
+ fireEvent.click(screen.getByRole('tab',{name:'All clients'}));fireEvent.click(within(screen.getByText(bob.id).closest('tr')!).getByRole('button'));await screen.findByRole('tab',{name:`Alice Able · ${bob.id}`});expect(screen.getAllByRole('tab')).toHaveLength(3);expect(screen.getByRole('tab',{name:`Alice Able · ${alice.id}`})).toBeInTheDocument();
+ go('Profile & intake');fireEvent.change(screen.getByLabelText(/Last name/),{target:{value:'Renamed'}});fireEvent.click(screen.getByRole('button',{name:'Save changes'}));expect(await screen.findByRole('tab',{name:'Alice Renamed'})).toHaveAttribute('data-client-tab',bob.id);expect(screen.getAllByRole('tab')).toHaveLength(3);
 });

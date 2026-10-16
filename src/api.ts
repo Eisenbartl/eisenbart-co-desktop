@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getClientWorkspaceOverview:(clientId:string)=>command<import('./types').ClientWorkspaceOverview>('get_client_workspace_overview',{clientId}),
   getSecurityPolicy:()=>command<import('./types').SecurityPolicy>('get_security_policy'),
   saveSecurityPolicy:(input:{expectedRevision:number;idleMinutes:string})=>command<import('./types').SecurityPolicy>('save_security_policy',{input}),
   changeWorkspacePassword:(input:import('./types').PasswordChangeInput)=>command<import('./types').PasswordChangeResult>('change_workspace_password',{input}),

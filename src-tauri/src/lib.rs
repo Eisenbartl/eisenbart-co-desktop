@@ -269,6 +269,18 @@ async fn get_assessment_planning(
     .map_err(|_| "Saved planning context could not be loaded.".to_owned())?
 }
 #[tauri::command]
+async fn get_client_workspace_overview(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<storage::client_workspace::Overview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_client_workspace_overview(&client_id))
+    })
+    .await
+    .map_err(|_| "Client planning overview could not be loaded.".to_owned())?
+}
+#[tauri::command]
 async fn list_assessment_records(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -1343,6 +1355,7 @@ pub fn run() {
             review_financial_facts,
             list_assessment_records,
             get_assessment_planning,
+            get_client_workspace_overview,
             get_assessment_evidence,
             get_assessment_intake,
             review_client_action_plan,

@@ -1,5 +1,7 @@
 # Eisenbart & Co. Financial Counseling Suite
 
+Version **0.46.0 source** implements the supplied [client workspace redesign](docs/client-workspace-redesign.md): a directory-only Clients page, stable-ID client tabs, twelve focused local sections, separate review subtabs and real saved-plan summaries. Existing data, calculations, approvals and security remain intact. Discard choices use an explicit in-app dialog, including asynchronous native-confirm safeguards. Windows installer packaging is in progress; see the [Windows guide](docs/windows.md) for verified download evidence.
+
 Version **0.45.0 source** adds [configurable inactivity locking](docs/inactivity-locking.md): a backend-enforced 1–60 minute workspace policy, encrypted history, stale-save protection and policy-preserving recovery. Existing workspaces default to 15 minutes. No installer was created.
 
 Version **0.44.0 source** adds [workspace password changes and recovery safeguards](docs/workspace-password-change.md): current-password verification, a verified new encrypted generation, atomic activation and locking. Older backups and retained copies keep their original passwords. No installer was created.
@@ -32,7 +34,11 @@ A Windows desktop application for offline financial counseling, built in tested 
 
 The source specification is preserved in [docs/product-specification.md](docs/product-specification.md). [Development status](docs/development-status.md) records the checks actually executed and the milestone checkpoint. The Windows development installer was built and passed automated installation, native-window launch, and uninstall checks on Windows Server 2025. Full Windows 11 offline acceptance remains pending.
 
-[Earlier 0.3.0 Windows installer (without savings, cash flow, backup/recovery, or CSV review)](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38485910521/artifacts/11859772481). The current source dashboard milestone has no new downloadable installer, as requested. GitHub sign-in with repository access may be required. Extract the ZIP, read `README.txt`, and run the installer. This build passed 25 frontend and 32 Windows backend tests, installation, native-window launch, uninstall, and isolated cleanup. The download expires October 27, 2026. Follow the [Windows guide](docs/windows.md) and [evaluation guide](docs/user-guide.md). Version 0.3.0 upgrades the database to schema 4; older versions cannot reopen it afterward.
+See the [Windows download guide](docs/windows.md) and [evaluation guide](docs/user-guide.md)
+for the exact version, verified build and installer limitations. Older installer
+links do not validate the current redesign. GitHub sign-in with repository access
+may be required; extract the ZIP and read its README and checksum file before
+running the unsigned development installer.
 
 The original Google Sheets workbook and supporting documents were not available for inspection. No spreadsheet behavior or financial formula is treated as verified. No real client records are included.
 
@@ -44,7 +50,7 @@ The foundation is scoped to:
 - A React interface with working dashboard, client, and settings workflows.
 - Client profiles, lifecycle status, and dated counselor notes.
 - Rust commands that enforce organization ownership and store records in an encrypted SQLCipher database.
-- Manual session locking and locking after 15 minutes of inactivity.
+- Manual session locking and a configurable 1–60 minute inactivity limit (15-minute default).
 - Persistence and isolation checks using fictional data.
 
 One organization and one counselor are supported per local installation initially. The schema retains organization and counselor identifiers to support future accounts and permissions. Shared access to a SQLite file over a network is unsupported.

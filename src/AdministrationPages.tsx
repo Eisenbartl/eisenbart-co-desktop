@@ -1,3 +1,4 @@
+import {confirmDiscard} from './ConfirmationDialog';
 import {useCallback,useRef,useState} from 'react';
 import FirmBranding from './FirmBranding';
 import PasswordChange from './PasswordChange';
@@ -24,7 +25,7 @@ export default function AdministrationPages({workspace,onLock,onBusy,onDirty,onW
  const inactivityBusy=useCallback((value:boolean)=>reportBusy('inactivity',value),[reportBusy]);
  const [tab,setTab]=useState<Tab>('Workspace');const pending=planned[tab];
  return <div className="administration-pages">
-  <nav className="section-navigation" aria-label="Settings sections">{tabs.map(t=><button type="button" disabled={busy} key={t} aria-current={tab===t?'page':undefined} onClick={()=>{if(t!==tab&&(!dirty||window.confirm("Discard unsaved settings edits?")))setTab(t);}}>{t}</button>)}</nav>
+  <nav className="section-navigation" aria-label="Settings sections">{tabs.map(t=><button type="button" disabled={busy} key={t} aria-current={tab===t?'page':undefined} onClick={()=>{if(t!==tab){if(dirty)confirmDiscard("Discard unsaved settings edits?",()=>setTab(t));else setTab(t);}}}>{t}</button>)}</nav>
   <div className="settings-page" key={tab}>
    {tab==='Workspace'&&<section className="panel settings-panel"><p className="eyebrow">WORKSPACE IDENTITY</p><h2>Organization & counselor</h2><dl className="details-list"><div><dt>Organization</dt><dd>{workspace.organizationName}</dd></div><div><dt>Counselor</dt><dd>{workspace.counselorName}</dd></div><div><dt>Workspace type</dt><dd>Single counselor · Local desktop</dd></div></dl><p className="field-help">Change the firm's display name and report presentation in Branding. Counselor editing remains planned.</p></section>}
    {tab==='Branding'&&<FirmBranding organizationId={workspace.organizationId} onDirty={brandingDirty} onBusy={backupBusy} onSaved={onWorkspaceChanged}/>}

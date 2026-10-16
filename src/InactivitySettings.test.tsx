@@ -11,7 +11,7 @@ beforeEach(()=>{vi.clearAllMocks();mocks.getSecurityPolicy.mockResolvedValue(ori
 it('loads legacy default and saves strings with the exact revision and retained history',async()=>{
  const v=view();const field=await screen.findByLabelText('Inactivity timeout (minutes)');expect(field).toHaveValue(15);expect(screen.getByRole('button',{name:'Save inactivity timeout'})).toBeDisabled();
  fireEvent.change(field,{target:{value:'5'}});expect(v.onDirty).toHaveBeenLastCalledWith(true);fireEvent.click(screen.getByRole('button',{name:'Save inactivity timeout'}));
- expect(await screen.findByRole('status')).toHaveTextContent('Inactivity timeout saved.');expect(mocks.saveSecurityPolicy).toHaveBeenCalledWith({expectedRevision:0,idleMinutes:'5'});expect(v.onDirty).toHaveBeenLastCalledWith(false);
+ expect(await screen.findByRole('status')).toHaveTextContent('Inactivity timeout saved.');expect(mocks.saveSecurityPolicy).toHaveBeenCalledWith({expectedRevision:0,idleMinutes:'5'});await waitFor(()=>expect(v.onDirty).toHaveBeenLastCalledWith(false));
  fireEvent.click(screen.getByText('Security setting history'));expect(screen.getByText(/Revision 1: 5 minutes/)).toBeInTheDocument();expect(screen.getByText(/America\/Chicago/)).toBeInTheDocument();
 });
 it('shows authoritative validation and stale errors without replaying an uncertain save',async()=>{

@@ -1,6 +1,48 @@
 # Development status
 
-## Current stage — configurable inactivity locking (0.45.0, schema 29)
+## Current stage — client workspace redesign (0.46.0, schema 29 unchanged)
+
+The user requested a visual pivot to the supplied client directory/workspace
+mockup, followed by an installer. The actual app now has three global pages,
+a directory-only Clients screen, stable-ID in-app client tabs, a twelve-section
+local rail, separate review subtabs and a scoped read-only saved-plan overview.
+Existing forms, financial engines, imports, immutable history and security controls
+are reused. [Design, workflow mapping and boundaries](client-workspace-redesign.md).
+
+Validation in progress on 2026-10-16 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Frontend | Production build and all 271 UI tests passed |
+| Backend | 246 library + 2 PDF-worker tests passed; Clippy all targets with warnings denied |
+| New read-only overview | Exact independent synthetic figures, mismatch/reconciliation, unknown versus explicit zero, scoped reads and no audit writes passed |
+| Standalone native build | Passed debug build with embedded assets, no bundles |
+| Focused redesign / visual | Passed exit 0 and final completion marker: twelve sections, exact amounts/mismatch, ID deduplication, cancel/discard, isolation, MRU close, 800px layout, privacy and full restart; desktop/narrow images visually inspected |
+| Complete native regression | Pending; original financial/source/report/privacy assertions retained with real UI routes to focused sections |
+| Windows installer | Explicitly requested; packaging and validation pending |
+
+Native testing exposed an existing compatibility error: tauri-plugin-dialog 2.8.2
+replaces `window.confirm` with an async function. Synchronous guards treated its
+Promise as approval. The redesign now uses a real in-app confirmation host for
+root and internal discard paths, with explicit asynchronous fallback handling,
+focus containment, no duplicate request replay and cancellation on lock. Unit and
+native tests verify that cancellation preserves the draft and acceptance discards
+it only for the intended navigation. All existing UI regressions remain active.
+
+Initial native attempts are not passes: the focused driver expected a WebDriver
+JavaScript alert for the asynchronous native-plugin dialog; the complete driver
+also needed to route the original source-inventory assertion to the separate
+Source checks subtab. A diagnostic prompt-policy attempt confirmed that the old
+alert assumption was unsuitable. Logs/screenshots are retained separately. The
+final focused run uses actual in-app buttons and passed. The complete rerun is
+still in progress; no source/financial/privacy assertion was removed.
+
+No release or commercial-readiness claim is made. The original prototype's sample
+records were not imported into production workspaces. Essential operation remains
+offline and only synthetic test records are used. GitHub API access now succeeds;
+the previous network block is no longer current for this stage.
+
+## Configurable inactivity locking (0.45.0, schema 29)
 
 Settings → Security now saves an encrypted, versioned inactivity timeout from 1
 through 60 whole minutes. Automatic locking cannot be disabled; existing

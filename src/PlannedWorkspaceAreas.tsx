@@ -1,5 +1,5 @@
 import type {ModuleView} from './workspaceNavigation';
-export const workingAreas:Partial<Record<ModuleView,string[]>>={Transactions:['Activity history','Classification assistance'],'Financial Review':['Completeness & final validation','Bank & card activity','Card completeness'],Reports:['Final report checklist','Print & presentation'],Documents:['Collection checklist','Statement accounts','Credit-card statements']};
+export const workingAreas:Partial<Record<ModuleView,string[]>>={Transactions:['Verified figures','Running balances','Recurring payments','Transfer matching','Source checks','Activity history','Classification assistance','Completeness & final validation','Bank & card activity','Card completeness'],'Financial Review':['Completeness & final validation','Bank & card activity','Card completeness'],Reports:['Final report checklist','Print & presentation'],Documents:['Collection checklist','Statement accounts','Credit-card statements']};
 // Keep implementation entry points and acceptance criteria in docs/prototype-development-map.md.
 export const plannedAreas:Record<ModuleView,{title:string;detail:string}[]>={
  'Financial Review':[{title:'Savings progress',detail:'Dated savings progress charts based on recorded balances, with unknown-data and source labels.'}],

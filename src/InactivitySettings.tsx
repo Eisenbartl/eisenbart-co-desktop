@@ -1,3 +1,4 @@
+import {confirmDiscard} from './ConfirmationDialog';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {api} from './api';
 import type {SecurityPolicy} from './types';
@@ -39,6 +40,6 @@ export default function InactivitySettings({onBusy,onDirty}:{onBusy:(value:boole
   {busy&&!policy&&<p role="status">Loading security policy…</p>}
   {error&&<div className="alert error" role="alert">{error} Reload the saved policy before trying again.</div>}
   {notice&&<p role="status">{notice}</p>}
-  <button className="button secondary" type="button" disabled={busy} onClick={()=>{if(!dirty||window.confirm('Discard unsaved inactivity timeout edits?'))void load();}}>Reload security policy</button>
+  <button className="button secondary" type="button" disabled={busy} onClick={()=>{if(dirty)confirmDiscard('Discard unsaved inactivity timeout edits?',()=>void load());else void load();}}>Reload security policy</button>
  </section>;
 }

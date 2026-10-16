@@ -4,6 +4,10 @@ export interface WorkspaceInfo {
   counselorId: string;
   counselorName: string;
 }
+export interface ClientWorkspaceOverview {
+ clientId:string;monthlyIncome:string|null;necessaryExpenses:string|null;unallocated:string|null;enteredDebt:string|null;
+ debtMonthlyPayment:string|null;budgetDebtPayment:string|null;emergencyTarget:string|null;accessibleSavings:string|null;restrictedSavings:string|null;payoffMonth:string|null;warnings:string[];
+}
 
 export const CLIENT_STATUSES = [
   'New Intake',
