@@ -394,7 +394,7 @@ mod tests {
         let (_dir, mut w, _) = configured();
         let a = w.save_client(client_input()).unwrap();
         let s = w.session().unwrap();
-        s.connection.execute_batch("DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE statement_account_history; DROP TRIGGER statement_accounts_no_update; DROP TRIGGER statement_accounts_no_delete; PRAGMA user_version=18; CREATE TABLE audit_events_v19(collision TEXT);").unwrap();
+        s.connection.execute_batch("DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE statement_account_history; DROP TRIGGER statement_accounts_no_update; DROP TRIGGER statement_accounts_no_delete; PRAGMA user_version=18; CREATE TABLE audit_events_v19(collision TEXT);").unwrap();
         assert!(migrate(&mut s.connection, false).is_err());
         assert_eq!(
             s.connection

@@ -229,11 +229,10 @@ impl Workspace {
         scoped_client(&tx, &s.info, client)?;
         let notes_count = notes_count(&tx, &s.info, client)?;
         let source = imports_store::read_imports(&tx, &s.info, client)?;
-        let ids=tx.prepare("SELECT id FROM client_notes WHERE client_id=?1 AND organization_id=?2 AND counselor_id=?3 ORDER BY created_at DESC,id DESC LIMIT 100").map_err(storage_error)?.query_map(params![client,s.info.organization_id,s.info.counselor_id],|r|r.get::<_,String>(0)).map_err(storage_error)?.collect::<rusqlite::Result<Vec<_>>>().map_err(storage_error)?;
-        let notes = ids
-            .iter()
-            .map(|id| note(&tx, &s.info, client, id))
-            .collect::<Result<Vec<_>, _>>()?;
+        let notes = client_history_store::current_notes(&tx, &s.info, client)?
+            .into_iter()
+            .take(100)
+            .collect();
         let review_count = source
             .recurring_history
             .iter()
@@ -405,6 +404,7 @@ impl Workspace {
             let count=notes_count(&tx,&s.info,client)?;
             if count!=selection.expected_notes_count {return Err("Session notes changed since evidence review. Reload report evidence and review your selection; nothing was saved.".into());}
             if selection.note_ids.len()>crate::report_evidence::MAX_NOTES || selection.note_ids.iter().collect::<std::collections::HashSet<_>>().len()!=selection.note_ids.len() {return Err("Select at most ten distinct session notes.".into());}
+            client_history_store::require_current(&tx,&s.info,client,&selection.note_ids)?;
             let notes=selection.note_ids.iter().map(|id|note(&tx,&s.info,client,id)).collect::<Result<Vec<_>,_>>()?;
             Ok(crate::report_evidence::Snapshot{calculator:"counselor-evidence-v1".into(),notes_count:count,notes})
         }).transpose()?;

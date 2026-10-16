@@ -1808,6 +1808,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_report_presentation(driver, artifacts, data_root, password, binary, restart_driver)
     check_category_assistance(driver, artifacts, data_root, password, binary, restart_driver)
     check_category_rules(driver, artifacts, data_root, password, binary, restart_driver)
+    check_client_history(driver, artifacts, data_root, password, binary, restart_driver)
 
 
 def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Path,
@@ -1971,6 +1972,66 @@ def check_category_assistance(driver: WebDriver, artifacts: Path, data_root: Pat
     driver.select('#workspace-client','Robin Synthetic');driver.interactive('#classification-search');driver.wait_text('.classification-assistance','No missing-category expenses or fees','classification empty state is client scoped')
     status('local category suggestions reuse exact approved merchant evidence, stable bounded pages, unsaved draft/discard, explicit unapproved save, unchanged financial totals, immutable reason, lock, restart, encrypted recovery and client isolation')
 
+
+
+def check_client_history(driver: WebDriver, artifacts: Path, data_root: Path,
+                         password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    prefix='Fictional timeline session'
+    original=f'{prefix} 00: meeting Tuesday.'
+    corrected=f'{prefix} 00: meeting Wednesday, original source checked.'
+    def history() -> None:
+        driver.click_button('History & records');driver.interactive('#client-history-search')
+    def search(text: str) -> None:
+        driver.fill('#client-history-search','');driver.fill('#client-history-search',text)
+        driver.click_button('Search client history');driver.interactive('#client-history-search')
+    def note_review(text: str) -> None:
+        driver.click("//article[contains(@class,'session-note')][p[normalize-space(.)="+json.dumps(text)+"]]//button",'xpath')
+        driver.interactive('#corrected-note')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note')
+    # Enough real saves to exercise stable pages independently of report count.
+    for i in range(31):
+        body=f'{prefix} {i:02}: meeting Tuesday.'
+        driver.fill('#new-note',body);driver.click_button('Save session note');driver.wait_text('.notes-history',body,'timeline note saved explicitly');driver.interactive('#new-note')
+    note_review(original)
+    driver.click('.note-version-history > summary');driver.wait_text('.note-version-history',original,'original remains readable before correction')
+    driver.fill('#corrected-note','');driver.fill('#corrected-note',corrected)
+    driver.fill('#note-correction-reason','Fictional appointment day verified against original counseling record')
+    driver.click_button('Save reviewed note correction');driver.wait_text('.notes-panel > .success-message','Reviewed note correction saved.','new immutable correction saved')
+    driver.interactive('#new-note')
+    if original in driver.text('.notes-history'):raise SmokeFailure('Superseded original was offered as the current note')
+    driver.wait_text('.notes-history',corrected,'current note reflects reviewed correction')
+    note_review(corrected);driver.click('.note-version-history > summary')
+    driver.wait_text('.note-version-history',original,'original retained after amendment')
+    driver.wait_text('.note-version-history',corrected,'corrected version retained with original')
+    driver.wait_text('.note-version-history','Fictional appointment day verified','correction reason retained')
+    driver.scroll_to('.note-correction','start');driver.screenshot(artifacts / 'native-note-correction-history.png')
+    driver.click_button('Close note correction');history();driver.select('#client-history-kind','Session notes');search(prefix)
+    driver.wait_text('.client-history-results','32 matching history records','31 original notes plus immutable correction')
+    driver.click_button('Next client history page');driver.interactive('#client-history-search');driver.wait_text('.client-history-results','26–32','stable second history page')
+    driver.click_button('Previous client history page');driver.interactive('#client-history-search');driver.wait_text('.client-history-results','1–25','stable previous history page')
+    driver.select('#client-history-kind','All record types');search('meeting Wednesday')
+    driver.wait_text('.client-history-results','1 matching history records','literal search isolates reviewed correction')
+    driver.click('.client-history-event > summary');driver.wait_text('.client-history-event','Fictional appointment day verified','timeline amendment reason')
+    driver.scroll_to('.client-history-results','start');driver.screenshot(artifacts / 'native-client-history-timeline.png')
+    driver.click_button('Open Session notes section');driver.interactive('#new-note');driver.wait_text('.notes-history',corrected,'timeline opens existing scoped note workflow')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']");driver.interactive('#workspace-client')
+    driver.click('.saved-assessments > summary');driver.interactive('#record-include-evidence');driver.click('#record-include-evidence');driver.click_button('Review report evidence')
+    driver.wait_text('.report-evidence-selection',corrected,'new reports offer latest corrected note')
+    if original in driver.text('.report-evidence-selection'):raise SmokeFailure('New report selection offered superseded original note')
+    driver.click_button('Discard assessment draft')
+    folder=data_root/'client-history-backups';folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery')
+    driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','note chain and history backed up')
+    backup=driver.text('.backup-file-path');driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','note history locked')
+    if driver.observe_script("return document.querySelector('.client-history,.note-correction')!==null"):raise SmokeFailure('Private client history remained after locking')
+    restart_driver();driver.open(binary);driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review','Fictional Oak Counseling','amended notes verified after full restart')
+    driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','amendment recovery activated');driver.fill('#password',password);driver.click_button('Unlock workspace')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note');driver.wait_text('.notes-history',corrected,'current corrected note restored')
+    note_review(corrected);driver.click('.note-version-history > summary');driver.wait_text('.note-version-history',original,'recovered original remains exact');driver.wait_text('.note-version-history','Fictional appointment day verified','recovered original amendment reason');driver.click_button('Close note correction')
+    history();search(prefix);driver.wait_text('.client-history-results','32 matching history records','timeline rebuilt from recovered originals and correction')
+    driver.open_client('Robin Synthetic');driver.click_button('History & records');driver.interactive('#client-history-search');search(prefix)
+    driver.wait_text('.client-history-results','No matching client history records.','timeline and correction remain isolated by client')
+    status('reviewed note correction, immutable original/reason/history, current report-note selection, timeline literal search/type filters/stable paging/source navigation, lock, full restart, encrypted recovery and client isolation')
 
 
 def check_category_rules(driver: WebDriver, artifacts: Path, data_root: Path,

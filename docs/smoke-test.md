@@ -385,3 +385,11 @@ history, archive/reactivation through versions 3/4, unchanged approved totals,
 lock, full restart, encrypted backup recovery and client isolation. Screenshot:
 `native-category-rule-history.png`. All mutations use visible native controls
 and fictional fixtures. No installer is created.
+
+The 0.43.0 extension retains all earlier assertions. It saves 31 fictional session
+notes through visible controls, explicitly corrects one with a reason, reads its
+unchanged original/history, pages 32 note events, searches a single correction
+and opens the existing note section. New report evidence offers the corrected
+head and omits the superseded original. Full lock/restart/encrypted recovery and
+a second client's empty search validate persistence and isolation. Screenshots:
+`native-note-correction-history.png` and `native-client-history-timeline.png`.

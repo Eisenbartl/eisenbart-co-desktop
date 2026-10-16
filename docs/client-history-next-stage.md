@@ -1,4 +1,6 @@
-# Next stage: client history and reviewed note amendments
+# Client history and reviewed note amendments — implementation reference
+
+Implemented in 0.43.0/schema 27. See [usage and limits](client-history.md) and [executed validation](development-status.md). These original boundaries are retained for context. The next priority is [local workspace password change](workspace-password-next-stage.md).
 
 Complete the existing **Clients → History & records** area with a bounded,
 searchable client timeline and reviewed corrections to session notes. Reuse

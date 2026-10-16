@@ -12,6 +12,7 @@ mod cashflow;
 mod category_rules;
 mod classification;
 mod client_care;
+mod client_history;
 mod completeness;
 mod coverage_review;
 mod dashboard;
@@ -1070,6 +1071,31 @@ fn save_client(state: State<'_, DesktopState>, input: ClientInput) -> Result<Cli
 }
 
 #[tauri::command]
+fn get_note_history(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    note_id: String,
+) -> Result<client_history::Thread, String> {
+    access(&state, |w| w.get_note_history(&client_id, &note_id))
+}
+#[tauri::command]
+fn correct_client_note(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: client_history::Correction,
+) -> Result<client_history::Thread, String> {
+    access(&state, |w| w.correct_client_note(&client_id, input))
+}
+#[tauri::command]
+fn get_client_history(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: client_history::Query,
+) -> Result<client_history::Page, String> {
+    access(&state, |w| w.get_client_history(&client_id, input))
+}
+
+#[tauri::command]
 fn add_client_note(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -1344,6 +1370,9 @@ pub fn run() {
             save_document_collection,
             get_follow_up_overview,
             save_client_care,
+            get_note_history,
+            correct_client_note,
+            get_client_history,
             add_client_note,
             list_client_notes,
             compare_budget_methods,

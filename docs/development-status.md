@@ -1,6 +1,37 @@
 # Development status
 
-## Current stage — reusable local category rules (0.42.0, schema 26)
+## Current stage — client history and reviewed note corrections (0.43.0, schema 27)
+
+Clients → History & records now combines scoped dated notes/corrections, intake
+versions, imported source metadata, scenarios, assessments and client action plans
+with literal/type/Chicago-date filters, stable 25-event pages and guarded source
+section navigation. Original transaction activity remains in its existing page.
+Profile entries clearly show creation and the latest update only.
+
+Session notes now support reviewed append-only corrections with explicit reasons,
+original/version history, optimistic fingerprints and atomic note/link/audit save.
+New report selection uses current note heads; old report bytes, digests and original
+IDs/text remain unchanged. A correction or wording reversion requires fresh context
+review for reports that captured note evidence. Schema 27 migration/recovery
+validates scoped linear chains without changing old note/report formats. See
+[usage and limits](client-history.md).
+
+Validation in progress on 2026-10-16 (America/Chicago): locked setup, production
+build and all 248 UI tests passed. The complete Linux backend passed 230 library
+and 2 PDF-worker tests; all three focused history fixtures passed. The final
+migration fixture additionally retains a populated saved rule and passed in the
+final focused rerun. Formatting and all-target Clippy with warnings denied passed.
+Native workflow and Windows source validation will be recorded after completion.
+No installer is being created.
+
+Next priority: **local workspace password change with durable recovery safeguards**,
+including interrupted-change rollback and clear original-backup password semantics.
+See [next-stage notes](workspace-password-next-stage.md). Broader adapters/OCR,
+advanced financial models, multi-counselor/roles, independent security/commercial
+review and clean installed Windows offline acceptance remain open. The last
+installer remains 0.23.0.
+
+## Reusable local category rules (0.42.0, schema 26)
 
 Transactions → Classification assistance now includes scoped category-rule CRUD:
 create, edit, archive/reactivate, immutable versions and original-decision

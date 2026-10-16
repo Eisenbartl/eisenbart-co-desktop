@@ -420,3 +420,16 @@ source, choose status, enter a reason and save explicitly. A rule never approves
 a transaction automatically. Conflicting evidence stays unresolved. Saved rule
 applications show the exact original rule version even after later rule edits.
 See [steps, limits and recovery](local-category-rules.md).
+
+## Client history and note corrections (0.43.0 source)
+
+Open **Clients → History & records** to search dated notes, intake versions,
+imported documents, saved scenarios, assessments and action plans. Use type/date
+filters, expand an event and open its existing source section. Dates use
+America/Chicago; individual transaction decisions stay in Activity history.
+
+In **Session notes**, choose **Review correction for note…**, read the original
+and correction history, enter corrected text and a reason, then explicitly save.
+The original remains unchanged. Earlier reports retain their exact selected text
+and require renewed context review; new reports offer current note versions.
+See [instructions, limits and recovery](client-history.md).

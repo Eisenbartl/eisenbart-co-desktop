@@ -1,5 +1,7 @@
 # Eisenbart & Co. Financial Counseling Suite
 
+Version **0.43.0 source** adds [client history and reviewed note corrections](docs/client-history.md): searchable dated records, explicit corrections with original versions retained, and current-note selection for new reports while old reports keep their exact evidence. No installer was created.
+
 Version **0.42.0 source** adds [reusable local category rules](docs/local-category-rules.md): create/edit/archive/reactivate with immutable history, conflict checks and explicit transaction review. Saved applications retain the exact original rule version. No installer was created.
 
 Version **0.41.0 source** adds [local category suggestions](docs/classification-assistance.md): current approved merchant evidence, unresolved conflicts, bounded search/pages and category-only unsaved review drafts. Save an explicit decision through the existing review controls; no automatic approval. No installer was created.

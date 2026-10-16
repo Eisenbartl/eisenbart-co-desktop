@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.42.0 source
+# Prototype structure and development map — 0.43.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -47,7 +47,7 @@ No workspace or confidential data is stored in browser local storage or a URL.
 |---|---|---|
 | Clients | Create, directory/search/open, edit profile and lifecycle status | Archive via status; reactivate via another status. Permanent deletion not implemented |
 | Intake and follow-ups | Save/edit optional intake and task/appointment versions; complete/cancel outcomes | Remove unsaved tasks only; saved tasks stay in history and can be cancelled |
-| Session notes | Append authored dated notes and read history | Silent edit/delete not offered; reviewed amendments and a combined activity view remain future work |
+| Session notes | Append authored dated notes; explicitly correct current versions with a reason and read original/correction history | Immutable original and correction versions; no silent edit/delete. Existing reports retain original evidence; new selections use current heads |
 | Budget/debt/savings/cash-flow inputs | Save/reload/edit and remove current plan rows or goals | Removal changes the current saved plan; previously recorded report/scenario snapshots remain historical |
 | Statement accounts | Standalone creation, current-name edits, archive/reactivate and change history; immutable original source identity | Other account types/institution metadata and planning-account mappings remain future work |
 | Documents / collection | Inspect/import sources and read provenance; create/edit requests, mark receipt and view versions | Cancel unsaved previews/requests; archive/reactivate saved requests. Saved source replacement/deletion is not implemented |
@@ -85,7 +85,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Financial Scenarios → New goals & funding sources | `scenarios.rs` / `scenarios_store` and control components | Explicit new goal/funding/account IDs, baseline remains unchanged, exact affordability/milestones, immutable linked report/recovery validation |
 | Reports → Final report checklist — approval working | `final_reports.rs`, `final_reports_store.rs`, `FinalReportApproval.tsx`, report PDF | Schema-22 scoped immutable counselor approval, current evidence gates, account/scenario decisions, exact parent binding, atomic audit, final PDF and restart/recovery. [Policy limits and future work](final-report-approval.md) |
 | Reports → Print & presentation — PDF layouts / Windows viewer handoff working in 0.40.0 | `ReportPresentation.tsx`, `report_presentation.rs`, `report_presentation_store.rs`, `assessment_pdf.rs`; schema 25 unchanged | Summary-first page, complete evidence appendix, original detailed option, distinct internal/v1/v2 bases, exact figures/unknowns, stale/scoped/no-overwrite export, restart/recovery. Explicit unchanged-file Windows viewer handoff with consent/expiry/session checks; choose Print in that viewer. In-app job submission and installed Windows viewer/printer acceptance remain open. [Usage](windows-pdf-print-workflow.md) |
-| Clients → History & records | Add bounded cross-module timeline and reviewed note amendments beside note storage | Authorship, original notes retained, reason/audit, scope/pagination, stale edits, restart and encrypted recovery |
+| Clients → History & records — working in 0.43.0 | `ClientHistory.tsx`, `NoteCorrection.tsx`, `client_history_store.rs`, schema 27; original note/report formats unchanged | Scoped 25-event pages, literal/type/Chicago-date filters, source-section navigation, explicit correction reasons/history, stale/audit/recovery controls, original report bytes retained and current-head report selection. [Usage and limits](client-history.md) |
 | Documents → Statement accounts (working) | `StatementAccounts.tsx`, `statement_accounts_store`, schema 19 | Scoped standalone create/rename/archive/reactivate, revision/audit/recovery checks; original source/report associations preserved; no destructive deletion |
 | Settings → Branding — working in 0.30.0 | `FirmBranding.tsx`, `branding.rs`, `branding_store.rs`, schema 20, format-6 assessments | Implemented bounded normalized local PNG/contact/disclosure, guarded revision/audit saves, exact immutable capture, old payload/digest preservation and recovery; see [limits and future work](firm-report-branding.md) |
 | Settings → Counselors & roles | Auth/session/storage ownership and role model before UI CRUD | Explicit account lifecycle and permissions for reads/writes/approvals/reports/admin, fail-closed access, isolation and recovery drills |
@@ -102,7 +102,9 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **Clients → History & records with reviewed note amendments**: bounded scoped history, explicit append-only corrections and original report evidence retained. Reuse working notes and existing history/source workflows. See [next-stage notes](client-history-next-stage.md).
+Implement **local workspace password change and recovery safeguards** in Settings → Security, reusing existing authentication/encrypted storage and durable recovery activation. Preserve source/report bytes, handle interrupted rekey safely, and retain old-backup password semantics. See [next-stage notes](workspace-password-next-stage.md).
+
+Client history and reviewed note corrections are implemented in 0.43.0; see [usage and limits](client-history.md).
 
 Reusable local category-rule CRUD is implemented in 0.42.0, including archive/reactivation and exact original-version application history; do not rebuild it.
 
@@ -229,3 +231,12 @@ Classification reuses exact merchant identity and current evidence; final rule
 application rechecks both source and rule context atomically through the existing
 transaction review. No automatic approval or financial writes occur on rule save.
 See [usage and limits](local-category-rules.md) and [executed checks](development-status.md).
+
+### 0.43.0 — client history and reviewed note corrections
+
+The Clients history page now combines bounded source metadata and note/correction
+content, with literal/type/date filters, stable pages and source-section links.
+Session notes support explicit append-only corrections, optimistic fingerprints
+and retained original/reason history. New reports select current note heads; old
+report bytes and IDs remain original and changed context requires renewed review.
+See [usage](client-history.md) and [executed checks](development-status.md).

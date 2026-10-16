@@ -115,6 +115,9 @@ export const api = {
   listClients: () => command<Client[]>('list_clients'),
   getClient: (id: string) => command<Client>('get_client', { id }),
   saveClient: (input: ClientInput) => command<Client>('save_client', { input }),
+  getNoteHistory:(clientId:string,noteId:string)=>command<import('./types').NoteThread>('get_note_history',{clientId,noteId}),
+  correctClientNote:(clientId:string,input:import('./types').NoteCorrectionInput)=>command<import('./types').NoteThread>('correct_client_note',{clientId,input}),
+  getClientHistory:(clientId:string,input:import('./types').ClientHistoryQuery)=>command<import('./types').ClientHistoryPage>('get_client_history',{clientId,input}),
   addClientNote: (clientId: string, body: string) => command<ClientNote>('add_client_note', { clientId, body }),
   listClientNotes: (clientId: string) => command<ClientNote[]>('list_client_notes', { clientId }),
 };

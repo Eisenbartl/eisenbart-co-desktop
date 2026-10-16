@@ -1,3 +1,5 @@
+import ClientHistory from './ClientHistory';
+import NoteCorrection from './NoteCorrection';
 import ReportPresentation from './ReportPresentation';
 import TransactionActivity from './TransactionActivity';
 import CardCompleteness from './CardCompleteness';
@@ -151,8 +153,8 @@ function clientInput(client: Client): ClientInput {
   return { id: client.id, firstName: client.firstName, lastName: client.lastName, email: client.email, phone: client.phone, householdSize: client.householdSize, status: client.status, goals: client.goals };
 }
 
-function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy, followUpId, section='record', onNavigate }: {
-  client: Client | null; workspace: WorkspaceInfo; followUpId?:string; section?:ClientSection; onNavigate:(view:View)=>void;
+function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy, followUpId, section='record', onNavigate, onClientSection }: {
+  client: Client | null; workspace: WorkspaceInfo; followUpId?:string; section?:ClientSection; onNavigate:(view:View)=>void; onClientSection?:(section:ClientSection)=>void;
   onSaved: (client: Client) => void; onCancel: () => void;
   onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void;
 }) {
@@ -243,12 +245,13 @@ function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy, f
     {client && shows('Cash-Flow Calendar') && <CashflowEditor key={client.id} client={client} onDirty={setCashflowDirty} onBusy={setCashflowSaving} otherSaving={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || importsBusy || scenarioBusy || careBusy} />}
     {client && shows('Financial Scenarios') && <ScenarioComparisons key={client.id} clientId={client.id} disabled={dirty || saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || careBusy} onBusy={setScenarioBusy} />}
     {client && shows('Documents','Transactions','Financial Review','Reports') && <ImportsEditor key={client.id} page={section==='Documents'?'documents':section==='Transactions'?'transactions':section==='Financial Review'?'review':section==='Reports'?'reports':'all'} client={client} onDirty={setImportsDirty} onBusy={setImportsBusy} otherSaving={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || scenarioBusy || careBusy} />}
-    {client&&section==='history'&&<section className="panel settings-panel"><h2>Client history and records</h2><dl className="details-list"><div><dt>Created</dt><dd>{dateLabel(client.createdAt,true)}</dd></div><div><dt>Profile last updated</dt><dd>{dateLabel(client.updatedAt,true)}</dd></div><div><dt>Current stage</dt><dd>{client.status}</dd></div></dl><p className="muted small">Session notes, review decisions, scenarios and reports retain their own dated history.</p><div className="page-shortcuts"><button className="button secondary" onClick={()=>onNavigate('Transactions')}>Open transaction decisions</button><button className="button secondary" onClick={()=>onNavigate('Financial Scenarios')}>Open saved scenarios</button><button className="button secondary" onClick={()=>onNavigate('Reports')}>Open report and action-plan history</button></div><p className="field-help">A combined client activity timeline is planned. Archive or reactivate this client through Counseling status in Profile; permanent deletion is not available.</p></section>}
+    {client&&section==='history'&&<ClientHistory clientId={client.id} disabled={dirty||saving||noteSaving||careBusy||importsBusy||scenarioBusy} onBusy={setScenarioBusy} onOpen={kind=>{if(kind==='profile'||kind==='note'||kind==='intake')onClientSection?.(kind==='note'?'notes':kind==='intake'?'intake':'profile');else onNavigate(kind==='document'?'Documents':kind==='scenario'?'Financial Scenarios':'Reports');}}/>}
   </div>;
 }
 
 function ClientNotes({ client, workspace, onBusy, onDirty, clientSaving }: { client: Client; workspace: WorkspaceInfo; onBusy: (busy: boolean) => void; onDirty: (dirty: boolean) => void; clientSaving: boolean }) {
   const [notes, setNotes] = useState<ClientNote[]>([]);
+  const [correctionId,setCorrectionId]=useState(''),[correctionBusy,setCorrectionBusy]=useState(false),[correctionDirty,setCorrectionDirty]=useState(false),[notice,setNotice]=useState('');
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -256,11 +259,13 @@ function ClientNotes({ client, workspace, onBusy, onDirty, clientSaving }: { cli
   const [loadError, setLoadError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const mounted = useRef(true);
-  useEffect(() => { onDirty(body.trim().length > 0); }, [body, onDirty]);
+  useEffect(() => { onDirty(body.trim().length > 0||correctionDirty); return()=>onDirty(false); }, [body, correctionDirty, onDirty]);
+  useEffect(()=>{onBusy(saving||correctionBusy);return()=>onBusy(false);},[saving,correctionBusy,onBusy]);
   useEffect(() => {
     mounted.current = true;
     let current = true;
     setNotes([]);
+    setCorrectionId('');
     setBody('');
     setLoading(true);
     setLoadError('');
@@ -277,7 +282,6 @@ function ClientNotes({ client, workspace, onBusy, onDirty, clientSaving }: { cli
     setError('');
     if (!body.trim()) { setError('Write a note before saving.'); return; }
     setSaving(true);
-    onBusy(true);
     try {
       const note = await api.addClientNote(client.id, body.trim());
       if (!mounted.current) return;
@@ -286,21 +290,23 @@ function ClientNotes({ client, workspace, onBusy, onDirty, clientSaving }: { cli
     } catch (caught) {
       if (mounted.current) setError(message(caught));
     } finally {
-      if (mounted.current) { setSaving(false); onBusy(false); }
+      if (mounted.current) { setSaving(false); }
     }
   }
 
   return <section className="panel notes-panel" aria-labelledby="notes-title">
     <div className="panel-heading"><div><p className="eyebrow">COUNSELING HISTORY</p><h2 id="notes-title">Session notes</h2></div><span className="count-badge">{notes.length}</span></div>
-    <p className="muted small">Saved notes retain their author and date. Add a new note to correct or update a previous entry.</p>
+    <p className="muted small">Saved notes retain their author and date. Review an explicit correction to amend a note; its original text and all corrections remain in history. Current versions are shown below.</p>
     <form onSubmit={add} noValidate>
-      <label htmlFor="new-note">New session note<textarea id="new-note" rows={4} maxLength={8000} value={body} onChange={e => setBody(e.target.value)} placeholder="Record the discussion, decisions, and next steps…" disabled={saving || clientSaving || loading || !!loadError} /></label>
+      <label htmlFor="new-note">New session note<textarea id="new-note" rows={4} maxLength={8000} value={body} onChange={e => setBody(e.target.value)} placeholder="Record the discussion, decisions, and next steps…" disabled={saving || clientSaving || correctionBusy || correctionDirty || loading || !!loadError} /></label>
       <div className="field-footer"><span>Author: {workspace.counselorName}</span><span>{body.length.toLocaleString()} / 8,000</span></div>
       <ErrorMessage>{error}</ErrorMessage>
-      <div className="note-actions"><button type="submit" className="button primary" disabled={saving || clientSaving || loading || !!loadError}>{saving ? 'Saving note…' : 'Save session note'}</button></div>
+      <div className="note-actions"><button type="submit" className="button primary" disabled={saving || clientSaving || correctionBusy || correctionDirty || loading || !!loadError}>{saving ? 'Saving note…' : 'Save session note'}</button></div>
     </form>
+    {notice&&<p className="success-message" role="status">{notice}</p>}
+    {correctionId&&<NoteCorrection clientId={client.id} noteId={correctionId} disabled={clientSaving||saving||body.trim().length>0} onDirty={setCorrectionDirty} onBusy={setCorrectionBusy} onClose={()=>setCorrectionId('')} onSaved={()=>{setCorrectionId('');setNotice('Reviewed note correction saved. Original notes and report evidence retained.');setAttempt(v=>v+1);}}/>}
     <div className="notes-history">
-      {loading ? <p className="muted" role="status">Loading session notes…</p> : loadError ? <><ErrorMessage>{loadError}</ErrorMessage><button className="button secondary" onClick={() => setAttempt(previous => previous + 1)}>Retry loading notes</button></> : notes.length === 0 ? <p className="empty-note">No session notes yet. Your first saved note will appear here.</p> : notes.map(note => <article className="session-note" key={note.id}><div className="note-meta"><strong>{note.counselorName}</strong><time dateTime={note.createdAt}>{dateLabel(note.createdAt, true)}</time></div><p>{note.body}</p></article>)}
+      {loading ? <p className="muted" role="status">Loading session notes…</p> : loadError ? <><ErrorMessage>{loadError}</ErrorMessage><button className="button secondary" onClick={() => setAttempt(previous => previous + 1)}>Retry loading notes</button></> : notes.length === 0 ? <p className="empty-note">No session notes yet. Your first saved note will appear here.</p> : notes.map(note => <article className="session-note" key={note.id}><div className="note-meta"><strong>{note.counselorName}</strong><time dateTime={note.createdAt}>{dateLabel(note.createdAt, true)}</time></div><p>{note.body}</p><button className="button secondary" disabled={saving||clientSaving||correctionBusy||correctionDirty||body.trim().length>0||correctionId!==''} onClick={()=>{setNotice('');setCorrectionId(note.id);}}>Review correction for note {dateLabel(note.createdAt,true)}</button></article>)}
     </div>
   </section>;
 }
@@ -550,7 +556,7 @@ export default function App() {
             {clientsLoading ? <div className="empty-state" role="status">Loading clients…</div> : clientsError ? <div className="empty-state">Use Retry loading clients to recover the directory.</div> : visibleClients.length ? <div className="client-list">{visibleClients.map(client => <button className={`client-row ${selected?.id === client.id ? 'selected' : ''}`} key={client.id} onClick={() => openClient(client.id)} aria-pressed={selected?.id === client.id}><Initials client={client} /><div className="client-row-text"><strong>{client.firstName} {client.lastName}</strong><span>{client.email || client.phone || 'No contact details added'}</span><Status status={client.status} /></div><Icon name="arrow" size={15} /></button>)}</div> : <div className="empty-state"><Icon name={clients.length ? 'search' : 'clients'} size={28} /><h3>{clients.length ? 'No matching clients' : 'Your client directory starts here.'}</h3><p>{clients.length ? 'Try a different search or status filter.' : 'Add a fictional client to create your first record.'}</p>{!clients.length && <button className="button secondary" onClick={createClient}>Add client</button>}</div>}
             <div className="directory-footer">{visibleClients.length} {visibleClients.length === 1 ? 'client' : 'clients'}{query || statusFilter !== 'All statuses' ? ` of ${clients.length}` : ''}</div>
           </section>
-          {selectionLoading ? <div className="panel selection-loading" role="status">Opening client record…</div> : editing ? <ClientEditor key={`${selected?.id??'new'}:${clientSection}`} section={selected?clientSection:'profile'} onNavigate={navigate} client={selected} workspace={workspace} followUpId={targetFollowUp} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onCancel={() => { if (canLeave()) clearSelection(); }} /> : clients.length > 0 && <div className="panel client-selection-hint"><Icon name="file" size={34} /><h2>A complete client picture</h2><p className="muted">Select a client to review intake details, update their counseling stage, and add a session note.</p></div>}
+          {selectionLoading ? <div className="panel selection-loading" role="status">Opening client record…</div> : editing ? <ClientEditor key={`${selected?.id??'new'}:${clientSection}`} section={selected?clientSection:'profile'} onClientSection={next=>{if(canLeave()){setClientSection(next);dirty.current=false;}}} onNavigate={navigate} client={selected} workspace={workspace} followUpId={targetFollowUp} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onCancel={() => { if (canLeave()) clearSelection(); }} /> : clients.length > 0 && <div className="panel client-selection-hint"><Icon name="file" size={34} /><h2>A complete client picture</h2><p className="muted">Select a client to review intake details, update their counseling stage, and add a session note.</p></div>}
           {selectionError && <ErrorMessage>{selectionError}</ErrorMessage>}
         </div></>}
         {isModule(view)&&<>

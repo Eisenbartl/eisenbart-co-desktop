@@ -4,6 +4,7 @@ import App from './App';
 import type { Client, ClientNote, WorkspaceInfo } from './types';
 
 const mocks = vi.hoisted(() => ({
+  getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
   getReportPresentation:vi.fn(),chooseReportPresentationPdf:vi.fn(),exportReportPresentation:vi.fn(),
   getCategoryRules:vi.fn(),saveCategoryRule:vi.fn(),reviewRuleCategory:vi.fn(),queryCategorySuggestions:vi.fn(),prepareCategoryDraft:vi.fn(),queryTransactionActivity:vi.fn(),
   desktop: true,
@@ -43,7 +44,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-beforeEach(() => {mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
+beforeEach(() => {mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
   mocks.getStatementAccounts.mockImplementation(async(clientId:string)=>({clientId,importRevision:0,accounts:[]}));
   vi.clearAllMocks();
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
@@ -398,7 +399,7 @@ it('opens all twelve sections and retains the selected client across focused wor
  fireEvent.click(within(nav).getByRole('button',{name:'Settings'}));expect(screen.getByRole('heading',{name:'Organization & counselor'})).toBeInTheDocument();
  fireEvent.click(within(nav).getByRole('button',{name:'Clients'}));await screen.findByRole('heading',{name:'Alice Able'});
  fireEvent.click(screen.getByRole('button',{name:'Profile'}));expect(screen.getByLabelText(/First name/)).toHaveValue('Alice');expect(screen.queryByText('No saved budget yet')).not.toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:'History & records'}));expect(screen.getByRole('heading',{name:'Client history and records'})).toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Open report and action-plan history'}));await screen.findByText('Saved counselor assessments');
+ fireEvent.click(screen.getByRole('button',{name:'History & records'}));expect(screen.getByRole('heading',{name:'Client history and records'})).toBeInTheDocument();await waitFor(()=>expect(screen.getByRole('button',{name:'Open report and action-plan history'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Open report and action-plan history'}));await screen.findByText('Saved counselor assessments');
 });
 it('guards page, future-area and client changes, then discards explicitly without saving private drafts',async()=>{
  render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Budget Planner'}));fireEvent.change(screen.getByLabelText('Client for Budget Planner'),{target:{value:alice.id}});await screen.findByText('No saved budget yet');fireEvent.click(screen.getByRole('button',{name:'Add income'}));fireEvent.change(screen.getByLabelText('Category or source'),{target:{value:'Private prototype draft'}});
@@ -490,4 +491,9 @@ it('opens report presentation, holds navigation during PDF export and clears the
 it('opens working classification assistance with current client scope and clears it on lock',async()=>{
  mocks.queryCategorySuggestions.mockResolvedValue({clientId:alice.id,revision:0,snapshot:'proof',policy:'approved-merchant-category-v1',query:{text:'',offset:0,expectedSnapshot:null},total:0,pageSize:25,candidates:[]});
  render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Transactions'}));const tab=screen.getByRole('button',{name:'Classification assistance'});expect(tab).not.toHaveTextContent('Planned');fireEvent.click(tab);fireEvent.change(screen.getByLabelText('Client for Transactions'),{target:{value:alice.id}});await screen.findByText(/No missing-category expenses or fees/);expect(mocks.queryCategorySuggestions).toHaveBeenCalledWith(alice.id,{text:'',offset:0,expectedSnapshot:null});expect(mocks.prepareCategoryDraft).not.toHaveBeenCalled();await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('region',{name:'Local category suggestions'})).not.toBeInTheDocument();
+});
+it('guards reviewed note corrections across pages and clients and clears private drafts on lock',async()=>{
+ mocks.listClientNotes.mockResolvedValue([aliceNote]);mocks.getNoteHistory.mockResolvedValue({clientId:alice.id,fingerprint:'note-context',original:aliceNote,amendments:[]});
+ render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No imported transactions yet');fireEvent.click(screen.getByRole('button',{name:'Session notes'}));await screen.findByText(aliceNote.body);fireEvent.click(screen.getByRole('button',{name:/Review correction for note/}));await screen.findByDisplayValue(aliceNote.body);await waitFor(()=>expect(screen.getByLabelText('Corrected session note')).toBeEnabled());fireEvent.change(screen.getByLabelText('Corrected session note'),{target:{value:'Private fictional correction draft'}});fireEvent.change(screen.getByLabelText('Note correction reason'),{target:{value:'Private reviewed reason'}});
+ vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'History & records'}));expect(screen.getByLabelText('Corrected session note')).toHaveValue('Private fictional correction draft');fireEvent.click(screen.getByText('Bob Baker').closest('button')!);expect(screen.getByText('Alice Able').closest('button')).toHaveAttribute('aria-pressed','true');expect(screen.getByLabelText('Corrected session note')).toHaveValue('Private fictional correction draft');expect(screen.getByRole('button',{name:'Save session note'})).toBeDisabled();await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional correction draft');expect(document.documentElement.outerHTML).not.toContain('Private reviewed reason');expect(mocks.correctClientNote).not.toHaveBeenCalled();
 });

@@ -252,3 +252,24 @@ original revision/audit/history/approval checks. No schema/calculator change or
 saved rule store was introduced in 0.41.0. See [policy and limits](classification-assistance.md).
 
 Schema 26 adds `category_rule_versions` and `category_rule_applications`, with immutable triggers, scoped composite references and two audit events. `category_rules_store` validates canonical version JSON/digests, active-account rules, sequential revisions, duplicate keys, original source/decision bindings and bounded history on reads and recovery. Rule CRUD uses immediate transactions, rule-directory fingerprints and optimistic versions without bumping bank import revisions. Classification combines bank/rule fingerprints and reuses exact merchant identity and current approved evidence. `review_rule_category` rechecks the prepared version and category-only source fields inside the original review transaction, then atomically captures the exact immutable version with decision/audit. Legacy decision/report payloads remain unchanged. `CategoryRules` holds scoped dirty/busy state, history and explicit archive/reactivate controls; rule-derived drafts protect source/category inputs. See [usage and limits](local-category-rules.md).
+
+## Client timeline and reviewed note corrections (0.43.0)
+
+`client_history_store` validates linear original/previous/current note chains and
+derives current heads without updating the original `client_notes` records.
+Schema 27 adds scoped immutable correction links and `note_amended` audit events.
+Immediate transactions bind correction to the exact thread fingerprint and append
+new note/link/audit atomically. Recovery validates every chain before activation.
+Old assessment formats/digests retain original note IDs and bodies; existing
+retained-count context flags remain permanent after a correction or reversion.
+New report preparation/capture allows current heads only and retains the existing
+note-count stale check. No financial model or approval policy changes.
+
+The read-only client timeline merges scoped note/correction content and bounded
+source metadata in a SQLite snapshot, normalizes timestamps for stable ordering
+and uses offline America/Chicago dates. Literal/type/date filtering and 25-event
+pages use an exact source fingerprint. `ClientHistory` opens existing source
+sections; `NoteCorrection` and `ClientNotes` hold dirty/busy/client/session guards.
+Timeline reads do not append audit or financial records. Profile entries are
+explicitly creation/latest-update metadata, not fabricated past profile versions.
+See [usage and limitations](client-history.md).

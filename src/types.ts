@@ -429,3 +429,10 @@ export interface ReportPresentationExport {path:string;pages:number;recordId:str
 export type ReportPresentationLayout='summaryAppendix'|'detailed';
 export interface ReportPresentationSummary {kind:ReportPresentationKind;recordId:string;digest:string;title:string;firmName:string;clientName:string;periodStart:string;periodEnd:string;reportDate:string;balanceAsOf:string|null;basis:string;status:string;needsReview:boolean;reviewReasons:string[];figures:{label:string;value:string|null}[];disclosure:string}
 export interface ReportPresentationContext {clientId:string;assessmentId:string;presentation:string;receipt:string;internal:ReportPresentationSummary;finalReport:ReportPresentationSummary|null}
+
+export interface NoteThread {clientId:string;fingerprint:string;original:ClientNote;amendments:{revision:number;previousId:string;note:ClientNote;reason:string}[]}
+export interface NoteCorrectionInput {noteId:string;expectedFingerprint:string;body:string;reason:string}
+export type ClientHistoryKind='profile'|'note'|'intake'|'document'|'scenario'|'report'|'actionPlan';
+export interface ClientHistoryQuery {text:string;kind:ClientHistoryKind|null;fromDate:string;throughDate:string;offset:number;expectedSnapshot:string|null}
+export interface ClientHistoryEvent {id:string;sourceId:string;kind:ClientHistoryKind;title:string;detail:string;occurredAt:string;day:string}
+export interface ClientHistoryPage {clientId:string;snapshot:string;offset:number;total:number;events:ClientHistoryEvent[]}
