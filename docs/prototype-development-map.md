@@ -106,6 +106,8 @@ period and a readable financial summary first; move approval audit details into
 an appendix without changing captured figures or original financial claims.
 Preserve existing historical exports, bounded offline rendering and scope checks.
 Direct Windows printing needs explicit acceptance before it is called complete.
+See [next-stage implementation notes](report-presentation-next-stage.md) for the
+existing renderer entry points and preservation checks.
 
 Card account CRUD, assignments, repayments, completeness/roles/debt mappings and
 bounded versioned final approval are implemented through 0.37.0 below. Build on
