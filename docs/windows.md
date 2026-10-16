@@ -1,25 +1,28 @@
-# Windows development installer — 0.46.0
+# Windows development installer — 0.47.0
 
-The current preview includes the redesigned client directory, in-app client tabs,
-twelve focused workspace sections and review subtabs. Existing financial tools,
-imports, immutable report evidence, encrypted backup/recovery, password changes
-and configurable inactivity locking are retained. Schema is 29.
+The current preview adds client **Spending Analysis**: approved/categorized
+spending cards, category charts, transaction filters, discussed Type changes and
+supported opportunity prompts. Original imports and classification history are
+retained; all affected live results refresh after saving. The directory, client
+tabs and thirteen focused sections keep import/review separate. Existing planning,
+reports, encryption and security remain available. Schema is 29.
+[Feature usage and calculation rules](spending-analysis.md).
 
 ## Download and install
 
-[Download the verified 0.46.0 Windows x64 preview](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38950497634/artifacts/12069289452)
+[Download the verified 0.47.0 Windows x64 preview](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38974473672/artifacts/12078199826)
 (about 213.4 MiB). Extract the ZIP to find
-`Eisenbart Counseling Suite_0.46.0_x64-setup.exe`, `README.txt` and `SHA256SUMS.txt`.
+`Eisenbart Counseling Suite_0.47.0_x64-setup.exe`, `README.txt` and `SHA256SUMS.txt`.
 GitHub sign-in with repository access may be required. The artifact expires
-October 30, 2026 at 19:20 (UTC); expired artifacts require another build.
+October 30, 2026 at 22:38 (UTC); expired artifacts require another build.
 
-[Build and Windows validation](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38950497634)
-passed for source `cc29e7764b2a6bfd9ca6cad181438dbfc5deab49`. That commit differs
-from the natively tested application source `3cba5da` only in bundled download
-instructions. SHA-256 was checked again after downloading the package:
+[Build and Windows validation](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38974473672)
+passed for source `25e9dafd6f16523ef4832f424ae8d1ff6f8dbd80`, the same application
+source used by the successful focused and complete native checks. The downloaded
+EXE, source/version instructions and checksum were verified again locally:
 
 ```text
-c398a20641ba396466f7c13473f6c5df7d0b2935a9107c0954fc9f0ac22a922c  Eisenbart Counseling Suite_0.46.0_x64-setup.exe
+e2d28f7a5265bf47f0028c8ddf312abcc42b46ff1a74b88e08d036ddae2d7da4  Eisenbart Counseling Suite_0.47.0_x64-setup.exe
 ```
 
 1. Download the **windows-installer** ZIP and choose **Extract All** in File Explorer.
@@ -55,7 +58,7 @@ Close older app versions before changing passwords or inactivity policy.
 
 ## What validation establishes
 
-The packaging workflow ran locked frontend builds, all 271 UI tests, all 247
+The packaging workflow ran locked frontend builds, all 281 UI tests, all 252
 Windows library tests and both PDF-worker tests on Windows Server 2025 x64.
 It built the NSIS installer, installed it in a private test directory, checked a
 responsive installed x64 native window, stopped its test process, uninstalled,
@@ -64,7 +67,7 @@ client workflow was entered and offline installation was not tested. Download
 metadata and checksums were generated after successful package checks.
 
 Linux validation separately covers the complete native counseling, statement,
-report, privacy, restart and encrypted recovery workflows, plus focused redesign
+report, privacy, restart and encrypted recovery workflows, plus focused Spending Analysis
 checks and desktop/narrow visual inspection. See [executed evidence and source
 scope](development-status.md). Automated Windows launch checks do not establish a
 complete installed counseling workflow, clean Windows 11 offline installation,
@@ -73,7 +76,8 @@ independent security/accessibility review or commercial readiness.
 ## Clean Windows 11 evaluation still needed
 
 Use a disposable fictional workspace to check an offline installation and upgrade,
-setup/wrong passwords, client tabs/isolation, planning and source approvals,
+setup/wrong passwords, client tabs/isolation, Spending Analysis Type edits and
+cancellation, exact recalculation/history, planning and source approvals,
 original report evidence, PDF export/viewer handoff, lock/restart, password changes,
 inactivity policy and encrypted recovery. Test native file/folder dialogs,
 wrong/damaged backups, retained originals, error-screen recovery and uninstall/

@@ -41,7 +41,7 @@ A CRUD-oriented interface does not justify deleting audit evidence or rewriting
 an assessment already given to a client. Destructive lifecycle work needs explicit
 retention policy, source dependency checks, audit and recovery acceptance.
 
-## Spending Analysis — working, focused native acceptance passed
+## Spending Analysis — working, focused and complete native acceptance passed
 
 The client workspace has a thirteenth section, **Spending Analysis**. It reuses
 approved bank/card sources and existing purpose-review histories, with exact
@@ -92,8 +92,9 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-The user-directed 0.46.0 client design/navigation stage and explicitly requested
-Windows development installer are complete: focused desktop/narrow visual checks,
+The user-directed client design/navigation stage and 0.47.0 Spending Analysis,
+with the explicitly requested Windows development installer, are complete:
+focused desktop/narrow visual checks,
 complete native regression and automated Windows packaging/install/launch/uninstall
 passed. See [executed evidence](development-status.md) and the [verified download](windows.md).
 Clean Windows 11 offline installation and full installed workflows, independent

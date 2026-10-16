@@ -32,8 +32,40 @@ also corrected from actual rendered views. Repeated card edits retain only the
 latest annotation in the current conclusion, with all earlier snapshots unchanged.
 Fees/interest are excluded from the frequent-small-purchase count.
 
-Complete native regression and the updated Windows installer are the remaining
-acceptance checks. No new installer is claimed tested until those checks finish.
+The complete native regression also passed with durable exit 0 and its final
+completion marker, including all prior planning, statement/PDF, card, report,
+classification, immutable history, source approval, lock/restart, encrypted/error-
+screen recovery, real idle timeout and password-generation checks. The new
+Spending Analysis workflow passed again inside this complete run. Artifacts:
+`/workspace/shared/desktop-smoke-spending-complete`. Its history screenshot was
+visually inspected; the unchanged embedded binary SHA-256 and closed driver ports
+were verified. No Cargo command ran while either successful native run was active.
+
+Application source is committed/pushed as
+`25e9dafd6f16523ef4832f424ae8d1ff6f8dbd80` on
+`client-workspace-redesign-0.46`. Validation logs and the source/binary manifest
+are retained under `/workspace/shared/spending-validation`.
+
+Windows run [`38974473672`](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38974473672)
+completed successfully for that exact source: production frontend build, all 281
+UI tests, all 252 Windows library + 2 PDF-worker tests, NSIS build, silent install,
+responsive installed x64 native window, uninstall and artifact upload passed.
+The log explicitly limits the installed check to a responsive window; no setup/
+client workflow was entered and offline installation was not tested.
+
+The [verified 0.47.0 Windows x64 download](windows.md) is a 213.4 MiB ZIP containing
+the unsigned installer, current source/version instructions and SHA256SUMS.txt.
+Artifact `12078199826` expires 2026-10-30 22:38 UTC. The downloaded EXE's versioned
+filename, source commit, feature instructions and SHA-256 were reverified:
+`e2d28f7a5265bf47f0028c8ddf312abcc42b46ff1a74b88e08d036ddae2d7da4`.
+The Windows installation log, complete job log, artifact metadata and checksum
+verification are retained under `/workspace/shared/spending-validation`.
+Final documentation changes do not alter the packaged application source.
+
+Next bounded acceptance priority: the installed Windows 11 counselor workflow,
+including actual native Type cancellation/re-editing, source/analysis separation,
+offline installation, upgrade, lock, history and encrypted recovery. Retain the
+existing development-build status and documented financial/source safety bounds.
 
 
 ## Previous stage — client workspace redesign (0.46.0, schema 29 unchanged)
