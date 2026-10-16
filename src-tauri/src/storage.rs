@@ -44,6 +44,8 @@ pub mod report_presentation_store;
 pub mod scenarios_store;
 #[path = "security_policy.rs"]
 pub mod security_policy;
+#[path = "spending_analysis.rs"]
+pub mod spending_analysis;
 #[path = "statement_accounts_store.rs"]
 pub mod statement_accounts_store;
 

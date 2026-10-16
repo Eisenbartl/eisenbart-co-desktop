@@ -22,6 +22,9 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getSpendingAnalysis:(clientId:string,input:import('./spendingTypes').SpendingQuery)=>command<import('./spendingTypes').SpendingResult>('get_spending_analysis',{clientId,input}),
+  changeSpendingClassification:(clientId:string,input:import('./spendingTypes').SpendingChange)=>command<void>('change_spending_classification',{clientId,input}),
+  getSpendingClassificationHistory:(clientId:string,rowId:string)=>command<import('./spendingTypes').SpendingHistory>('get_spending_classification_history',{clientId,rowId}),
   getClientWorkspaceOverview:(clientId:string)=>command<import('./types').ClientWorkspaceOverview>('get_client_workspace_overview',{clientId}),
   getSecurityPolicy:()=>command<import('./types').SecurityPolicy>('get_security_policy'),
   saveSecurityPolicy:(input:{expectedRevision:number;idleMinutes:string})=>command<import('./types').SecurityPolicy>('save_security_policy',{input}),

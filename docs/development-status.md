@@ -1,6 +1,20 @@
 # Development status
 
-## Current stage — client workspace redesign (0.46.0, schema 29 unchanged)
+## Current work — client Spending Analysis
+
+Implemented the user-requested approved/categorized spending workspace with exact
+Rust totals, category charts, evidence-based opportunities, source-bound purpose
+edits, retained original data and existing immutable history. See
+[usage, calculation basis and limits](spending-analysis.md). The client rail now
+has thirteen sections. Schema 29 and historical report formats are unchanged.
+
+Working milestone checks: production frontend build, all 281 UI tests (38 files),
+and five focused Rust analysis tests passed. Complete Rust/Clippy and native
+desktop checks are in progress; this milestone does not yet claim those checks or
+a new tested installer.
+
+
+## Previous stage — client workspace redesign (0.46.0, schema 29 unchanged)
 
 The user requested a visual pivot to the supplied client directory/workspace
 mockup, followed by an installer. The actual app now has three global pages,

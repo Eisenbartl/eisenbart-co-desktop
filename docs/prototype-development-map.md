@@ -41,6 +41,15 @@ A CRUD-oriented interface does not justify deleting audit evidence or rewriting
 an assessment already given to a client. Destructive lifecycle work needs explicit
 retention policy, source dependency checks, audit and recovery acceptance.
 
+## Spending Analysis — working implementation, native acceptance in progress
+
+The client workspace has a thirteenth section, **Spending Analysis**. It reuses
+approved bank/card sources and existing purpose-review histories, with exact
+summary cards, donut/bars, table filtering and discussion-bound Type edits.
+Import and approval stay in their own sections. [Calculation rules, opportunities
+and safeguards](spending-analysis.md). Current validation is recorded in
+[development status](development-status.md).
+
 ## Future feature areas: return here before implementing
 
 Future areas below have a named UI home with a visible **Planned** state. The

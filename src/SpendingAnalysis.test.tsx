@@ -1,0 +1,54 @@
+import {act,fireEvent,render,screen,within,waitFor} from '@testing-library/react';
+import {beforeEach,expect,it,vi} from 'vitest';
+import SpendingAnalysis from './SpendingAnalysis';
+import ConfirmationDialog from './ConfirmationDialog';
+import {spendingFixture,spendingHistoryFixture} from './test-fixtures/spending';
+const mocks=vi.hoisted(()=>({getSpendingAnalysis:vi.fn(),changeSpendingClassification:vi.fn(),getSpendingClassificationHistory:vi.fn()}));
+vi.mock('./api',()=>({api:mocks}));
+const dirty=vi.fn(),busy=vi.fn(),review=vi.fn();
+function page(clientId='client-a'){return <><ConfirmationDialog/><SpendingAnalysis clientId={clientId} onDirty={dirty} onBusy={busy} onOpenReview={review}/></>;}
+function deferred<T>(){let resolve!:(v:T)=>void;const promise=new Promise<T>(r=>{resolve=r;});return{promise,resolve};}
+async function ready(){return screen.findByRole('table',{name:'Approved categorized transactions'});}
+function draft(){fireEvent.change(screen.getByRole('combobox',{name:'Type for Fictional Dining on 2026-09-03'}),{target:{value:'necessary'}});}
+function discussed(){fireEvent.change(screen.getByLabelText('Discussion and reason'),{target:{value:'Discussed: this meal was necessary for the client.'}});fireEvent.click(screen.getByLabelText('I discussed and verified this spending purpose with the client.'));}
+beforeEach(()=>{vi.clearAllMocks();mocks.getSpendingAnalysis.mockResolvedValue(spendingFixture());mocks.changeSpendingClassification.mockResolvedValue(undefined);mocks.getSpendingClassificationHistory.mockResolvedValue(spendingHistoryFixture());});
+it('presents authoritative cents, chart shares and safe read-only source types without import controls',async()=>{
+ render(page());const table=await ready();expect(table).toHaveTextContent('-$200.01');expect(table).toHaveTextContent('Transfer');expect(within(table).getAllByRole('combobox')).toHaveLength(1);
+ expect(screen.getByRole('table',{name:'Spending mix amounts and percentages'})).toHaveTextContent('83.33%');expect(screen.getByRole('img',{name:'Dining: $200.01'})).toBeInTheDocument();expect(document.querySelector('.sa-metrics')).toHaveTextContent('$1,200.01');expect(document.querySelector('.sa-reconciliation')).toHaveTextContent('$1,179.98');expect(document.querySelector('#csv-path')).toBeNull();
+ expect(screen.queryByText(/No comparable/)).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Necessary'}));expect(screen.getByRole('table',{name:'Spending mix amounts and percentages'})).not.toHaveTextContent('Dining');
+ fireEvent.click(screen.getByRole('button',{name:'Open separate review & reconciliation'}));expect(review).toHaveBeenCalledOnce();expect(mocks.changeSpendingClassification).not.toHaveBeenCalled();
+});
+it('requires a discussion and explicit save, then refreshes every displayed result from Rust',async()=>{
+ render(page());await ready();draft();expect(dirty).toHaveBeenLastCalledWith(true);expect(screen.getByRole('button',{name:'Save spending type'})).toBeDisabled();expect(document.querySelector('.sa-metrics')).toHaveTextContent('$200.01');expect(mocks.changeSpendingClassification).not.toHaveBeenCalled();
+ discussed();const refreshed=spendingFixture();refreshed.context='new-receipt';refreshed.totals={...refreshed.totals,necessary:'1200.01',discretionary:'0.00',necessaryShare:'100.00%',discretionaryShare:'0.00%'};refreshed.rows[0].role='necessary';refreshed.discretionaryCategories=[];refreshed.necessaryCategories=refreshed.mix;refreshed.opportunities=[];mocks.getSpendingAnalysis.mockResolvedValue(refreshed);
+ fireEvent.click(screen.getByRole('button',{name:'Save spending type'}));await screen.findByText('No discretionary spending classified in this period.');expect(mocks.changeSpendingClassification).toHaveBeenCalledOnce();expect(mocks.changeSpendingClassification).toHaveBeenCalledWith('client-a',expect.objectContaining({context:'scoped-current-receipt',rowId:'bank:dining',approvalId:'approval-7',role:'necessary',reason:'Discussed: this meal was necessary for the client.',acknowledge:true}));expect(document.querySelector('.sa-metrics')).toHaveTextContent('$0.00');expect(document.querySelector('.sa-insights')).toHaveTextContent('100.00%');expect(screen.queryByRole('button',{name:/Discretionary spending above saved budget/})).not.toBeInTheDocument();expect(dirty).toHaveBeenLastCalledWith(false);expect(screen.getByRole('combobox',{name:'Type for Fictional Dining on 2026-09-03'})).toHaveValue('necessary');
+});
+it('keeps uncertain saves as drafts, never replays a write, and confirms discard before reload',async()=>{
+ mocks.changeSpendingClassification.mockRejectedValue(new Error('Synthetic save not confirmed'));render(page());await ready();draft();discussed();fireEvent.click(screen.getByRole('button',{name:'Save spending type'}));expect(await screen.findByRole('alert')).toHaveTextContent('save was not confirmed');expect(screen.getByLabelText('Discussion and reason')).toHaveValue('Discussed: this meal was necessary for the client.');expect(mocks.changeSpendingClassification).toHaveBeenCalledOnce();
+ fireEvent.click(screen.getByRole('button',{name:'Reload analysis'}));const dialog=await screen.findByRole('alertdialog');fireEvent.click(within(dialog).getByRole('button',{name:'Keep editing'}));expect(screen.getByLabelText('Discussion and reason')).toBeInTheDocument();expect(mocks.getSpendingAnalysis).toHaveBeenCalledOnce();
+ fireEvent.click(screen.getByRole('button',{name:'Cancel type change'}));expect(screen.queryByLabelText('Discussion and reason')).not.toBeInTheDocument();expect(mocks.changeSpendingClassification).toHaveBeenCalledOnce();
+});
+it('hides stale metrics if a committed save cannot be refreshed, and reloads without resaving',async()=>{
+ render(page());await ready();draft();discussed();mocks.getSpendingAnalysis.mockRejectedValueOnce(new Error('Synthetic refresh failure'));fireEvent.click(screen.getByRole('button',{name:'Save spending type'}));expect(await screen.findByRole('alert')).toHaveTextContent('classification was saved');expect(document.querySelector('.sa-metrics')).toBeNull();expect(screen.queryByLabelText('Discussion and reason')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Reload analysis'}));await ready();expect(mocks.changeSpendingClassification).toHaveBeenCalledOnce();
+});
+it('separates table filters from pending date/account edits and uses explicit comparison scope',async()=>{
+ render(page());await ready();const initial=mocks.getSpendingAnalysis.mock.calls[0][1];fireEvent.change(screen.getByLabelText('From month'),{target:{value:'2026-09'}});fireEvent.change(screen.getByLabelText('Through month'),{target:{value:'2026-09'}});fireEvent.change(screen.getByLabelText('Account'),{target:{value:'bank:checking'}});fireEvent.change(screen.getByLabelText('Search transactions'),{target:{value:'Dining'}});fireEvent.click(screen.getByRole('button',{name:'Filter transactions'}));await waitFor(()=>expect(mocks.getSpendingAnalysis).toHaveBeenCalledTimes(2));await ready();expect(mocks.getSpendingAnalysis.mock.calls[1][1]).toMatchObject({fromMonth:initial.fromMonth,accountId:null,search:'Dining'});
+ fireEvent.click(screen.getByLabelText('Compare previous period'));fireEvent.click(screen.getByRole('button',{name:'Update analysis'}));await waitFor(()=>expect(mocks.getSpendingAnalysis).toHaveBeenCalledTimes(3));expect(mocks.getSpendingAnalysis.mock.calls[2][1]).toMatchObject({fromMonth:'2026-09',throughMonth:'2026-09',accountId:'bank:checking',comparePrevious:true,page:0});await ready();
+ fireEvent.click(screen.getByRole('button',{name:/Discretionary spending above saved budget/}));await waitFor(()=>expect(mocks.getSpendingAnalysis).toHaveBeenCalledTimes(4));expect(mocks.getSpendingAnalysis.mock.calls[3][1]).toMatchObject({opportunity:'overspending',search:'',role:null});
+});
+it('shows original source and versioned classifications literally, with no mutation',async()=>{
+ render(page());await ready();fireEvent.click(screen.getByRole('button',{name:'Classification history for Fictional Dining on 2026-09-03'}));await screen.findByRole('heading',{name:'Classification history and original source'});expect(screen.getByText('Original fictional source description')).toBeInTheDocument();expect(document.querySelector('.sa-history')).toHaveTextContent('Verified original purpose.');expect(mocks.getSpendingClassificationHistory).toHaveBeenCalledWith('client-a','bank:dining');expect(mocks.changeSpendingClassification).not.toHaveBeenCalled();
+});
+it('clears private drafts and history on client change and ignores late replies after switches and unmount',async()=>{
+ const view=render(page());await ready();draft();discussed();const old=deferred<ReturnType<typeof spendingHistoryFixture>>();mocks.getSpendingClassificationHistory.mockReturnValueOnce(old.promise);fireEvent.click(screen.getByRole('button',{name:'Classification history for Fictional Dining on 2026-09-03'}));
+ const next=spendingFixture('client-b');next.rows=[];next.matchingRows=0;next.mix=[];mocks.getSpendingAnalysis.mockResolvedValue(next);view.rerender(page('client-b'));await screen.findByText('No approved, categorized transactions match these filters.');expect(screen.queryByLabelText('Discussion and reason')).not.toBeInTheDocument();
+ await act(async()=>old.resolve(spendingHistoryFixture()));expect(screen.queryByText('Original fictional source description')).not.toBeInTheDocument();expect(dirty).toHaveBeenLastCalledWith(false);view.unmount();expect(busy).toHaveBeenLastCalledWith(false);
+});
+it('rejects mismatched client results and never leaves earlier private amounts visible during a reload',async()=>{
+ render(page());await ready();mocks.getSpendingAnalysis.mockResolvedValue(spendingFixture('client-b'));fireEvent.click(screen.getByRole('button',{name:'Reload analysis'}));expect(document.querySelector('.sa-metrics')).toBeNull();expect(await screen.findByRole('alert')).toHaveTextContent('belongs to another client');
+});
+it('displays honest empty states and comparison from a zero base without manufacturing insights',async()=>{
+ const empty=spendingFixture();empty.rows=[];empty.matchingRows=0;empty.mix=[];empty.necessaryCategories=[];empty.discretionaryCategories=[];empty.opportunities=[];empty.totals={spending:'0.00',necessary:'0.00',discretionary:'0.00',unclassified:'0.00',refunds:'0.00',netSpending:'0.00',debtPayments:'0.00',transfers:'0.00',necessaryShare:null,discretionaryShare:null};empty.previous=empty.totals;empty.discretionaryBudget=null;mocks.getSpendingAnalysis.mockResolvedValue(empty);render(page());await ready();expect(screen.getByText(/percentage comparison unavailable from a zero base/)).toBeInTheDocument();expect(screen.getByText(/No supported opportunity flags/)).toBeInTheDocument();expect(document.querySelector('.sa-insights')).toHaveTextContent('unavailable share');
+});

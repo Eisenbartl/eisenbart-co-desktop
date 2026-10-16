@@ -1,6 +1,7 @@
 export const workspacePages = [
   {id:'Dashboard',title:'Dashboard',description:'Your practice overview, recent clients, appointments and follow-ups.',icon:'dashboard'},
   {id:'Clients',title:'Clients',description:'Your client directory. Search, review progress, and open a dedicated workspace for each client.',icon:'clients'},
+  {id:'Spending Analysis',title:'Spending Analysis',description:'Understand approved categorized spending and record reviewed spending purposes without changing source imports.',icon:'spending'},
   {id:'Financial Review',title:'Financial Review',description:'Review approved activity, verified balances, statement checks and recurring payments.',icon:'review'},
   {id:'Transactions',title:'Transactions',description:'Find imported transactions, review original evidence and save approval or correction decisions.',icon:'transactions'},
   {id:'Documents',title:'Documents',description:'Import local statements and review this client’s source documents and account inventory.',icon:'file'},
@@ -23,5 +24,5 @@ export function isModule(view:View):view is ModuleView {return view!=='Dashboard
 export const clientWorkspaceGroups = [
  {title:'Workspace',items:[{view:'Clients',section:'overview',label:'Overview',icon:'dashboard'},{view:'Clients',section:'profile',label:'Profile & intake',icon:'clients'},{view:'Clients',section:'notes',label:'Session notes',icon:'file'}]},
  {title:'Planning tools',items:[{view:'Budget Planner',label:'Monthly budget',icon:'budget'},{view:'Debt Planner',label:'Debt payoff',icon:'debt'},{view:'Savings Planner',label:'Savings & sinking funds',icon:'savings'},{view:'Cash-Flow Calendar',label:'Cash-flow calendar',icon:'calendar'},{view:'Financial Scenarios',label:'Scenario comparisons',icon:'scenarios'}]},
- {title:'Documents & review',items:[{view:'Documents',label:'Import statements',icon:'file'},{view:'Transactions',label:'Review & reconciliation',icon:'review'},{view:'Financial Review',label:'Financial dashboard',icon:'dashboard'},{view:'Reports',label:'Assessments & reports',icon:'file'}]},
+ {title:'Documents & review',items:[{view:'Documents',label:'Import statements',icon:'file'},{view:'Transactions',label:'Review & reconciliation',icon:'review'},{view:'Spending Analysis',label:'Spending Analysis',icon:'spending'},{view:'Financial Review',label:'Financial dashboard',icon:'dashboard'},{view:'Reports',label:'Assessments & reports',icon:'file'}]},
 ] as const;

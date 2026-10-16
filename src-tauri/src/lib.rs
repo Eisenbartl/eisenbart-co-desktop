@@ -269,6 +269,51 @@ async fn get_assessment_planning(
     .map_err(|_| "Saved planning context could not be loaded.".to_owned())?
 }
 #[tauri::command]
+async fn get_spending_analysis(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::spending_analysis::Input,
+) -> Result<storage::spending_analysis::Analysis, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_spending_analysis(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Spending analysis could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn change_spending_classification(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::spending_analysis::Change,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.change_spending_classification(&client_id, input)
+        })
+    })
+    .await
+    .map_err(|_| {
+        "Classification save could not be confirmed. Reload before trying again.".to_owned()
+    })?
+}
+#[tauri::command]
+async fn get_spending_classification_history(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    row_id: String,
+) -> Result<storage::spending_analysis::History, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.get_spending_classification_history(&client_id, &row_id)
+        })
+    })
+    .await
+    .map_err(|_| "Classification history could not finish.".to_owned())?
+}
+#[tauri::command]
 async fn get_client_workspace_overview(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -1356,6 +1401,9 @@ pub fn run() {
             list_assessment_records,
             get_assessment_planning,
             get_client_workspace_overview,
+            get_spending_analysis,
+            change_spending_classification,
+            get_spending_classification_history,
             get_assessment_evidence,
             get_assessment_intake,
             review_client_action_plan,

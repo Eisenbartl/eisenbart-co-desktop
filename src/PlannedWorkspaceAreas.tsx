@@ -2,6 +2,7 @@ import type {ModuleView} from './workspaceNavigation';
 export const workingAreas:Partial<Record<ModuleView,string[]>>={Transactions:['Verified figures','Running balances','Recurring payments','Transfer matching','Source checks','Activity history','Classification assistance','Completeness & final validation','Bank & card activity','Card completeness'],'Financial Review':['Completeness & final validation','Bank & card activity','Card completeness'],Reports:['Final report checklist','Print & presentation'],Documents:['Collection checklist','Statement accounts','Credit-card statements']};
 // Keep implementation entry points and acceptance criteria in docs/prototype-development-map.md.
 export const plannedAreas:Record<ModuleView,{title:string;detail:string}[]>={
+ 'Spending Analysis':[],
  'Financial Review':[{title:'Savings progress',detail:'Dated savings progress charts based on recorded balances, with unknown-data and source labels.'}],
  Transactions:[],
  Documents:[{title:'Scanned documents / OCR',detail:'Bounded local OCR, page evidence and mandatory verification before extracted facts can be approved.'},{title:'Additional document types',detail:'Card PDF, loan, paystub and broader institution parsers, each with validated mappings and source reconciliation. Signed CSV credit-card review is available in Credit-card statements.'}],

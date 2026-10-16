@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import {spendingFixture} from './test-fixtures/spending';
 import type { Client, ClientNote, WorkspaceInfo } from './types';
 
 const mocks = vi.hoisted(() => ({
-  getClientWorkspaceOverview:vi.fn(),getSecurityPolicy:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
+  getSpendingAnalysis:vi.fn(),changeSpendingClassification:vi.fn(),getSpendingClassificationHistory:vi.fn(),getClientWorkspaceOverview:vi.fn(),getSecurityPolicy:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
   getReportPresentation:vi.fn(),chooseReportPresentationPdf:vi.fn(),exportReportPresentation:vi.fn(),
   getCategoryRules:vi.fn(),saveCategoryRule:vi.fn(),reviewRuleCategory:vi.fn(),queryCategorySuggestions:vi.fn(),prepareCategoryDraft:vi.fn(),queryTransactionActivity:vi.fn(),
   desktop: true,
@@ -46,7 +47,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-beforeEach(() => {mocks.getClientWorkspaceOverview.mockImplementation(async(clientId:string)=>({clientId,monthlyIncome:null,necessaryExpenses:null,unallocated:null,enteredDebt:null,debtMonthlyPayment:null,budgetDebtPayment:null,emergencyTarget:null,accessibleSavings:null,restrictedSavings:null,payoffMonth:null,warnings:[]}));mocks.getSecurityPolicy.mockResolvedValue({revision:0,idleMinutes:15,totalChanges:0,history:[]});mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
+beforeEach(() => {mocks.getSpendingAnalysis.mockImplementation(async(clientId:string)=>spendingFixture(clientId));mocks.getClientWorkspaceOverview.mockImplementation(async(clientId:string)=>({clientId,monthlyIncome:null,necessaryExpenses:null,unallocated:null,enteredDebt:null,debtMonthlyPayment:null,budgetDebtPayment:null,emergencyTarget:null,accessibleSavings:null,restrictedSavings:null,payoffMonth:null,warnings:[]}));mocks.getSecurityPolicy.mockResolvedValue({revision:0,idleMinutes:15,totalChanges:0,history:[]});mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
   mocks.getStatementAccounts.mockImplementation(async(clientId:string)=>({clientId,importRevision:0,accounts:[]}));
   vi.clearAllMocks();
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
@@ -394,11 +395,11 @@ describe('desktop workspace', () => {
 });
 
 
-it('opens all twelve client sections lazily with only three application-level pages',async()=>{
+it('opens all thirteen client sections lazily with only three application-level pages',async()=>{
  render(<App/>);await unlock();const nav=screen.getByRole('navigation',{name:'Main navigation'});expect(within(nav).getAllByRole('button')).toHaveLength(3);
  fireEvent.click(within(nav).getByRole('button',{name:'Clients'}));expect(screen.queryByLabelText('New session note')).not.toBeInTheDocument();expect(mocks.getClientImports).not.toHaveBeenCalled();expect(mocks.getClientBudget).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole('button',{name:'Open workspace for Alice Able'}));await screen.findByRole('heading',{name:'Alice Able'});await screen.findByRole('heading',{name:'Overview'});expect(within(screen.getByRole('navigation',{name:'Client workspace sections'})).getAllByRole('button')).toHaveLength(12);
- for(const page of ['Monthly budget','Debt payoff','Savings & sinking funds','Cash-flow calendar','Scenario comparisons','Import statements','Review & reconciliation','Financial dashboard','Assessments & reports']){
+ fireEvent.click(screen.getByRole('button',{name:'Open workspace for Alice Able'}));await screen.findByRole('heading',{name:'Alice Able'});await screen.findByRole('heading',{name:'Overview'});expect(within(screen.getByRole('navigation',{name:'Client workspace sections'})).getAllByRole('button')).toHaveLength(13);
+ for(const page of ['Monthly budget','Debt payoff','Savings & sinking funds','Cash-flow calendar','Scenario comparisons','Import statements','Review & reconciliation','Spending Analysis','Financial dashboard','Assessments & reports']){
   go(page);expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');await waitFor(()=>expect(screen.queryByText('Loading imported records…')).not.toBeInTheDocument());
  }
  expect(screen.getByText('Saved counselor assessments')).toBeInTheDocument();expect(screen.queryByLabelText('Local CSV file')).not.toBeInTheDocument();expect(screen.queryByText('Client review queue')).not.toBeInTheDocument();
@@ -563,4 +564,13 @@ it('keeps same-name clients in distinct ID-keyed tabs and retains identity after
  render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Clients'}));fireEvent.click(within(screen.getByText(alice.id).closest('tr')!).getByRole('button'));await screen.findByRole('heading',{name:'Alice Able'});
  fireEvent.click(screen.getByRole('tab',{name:'All clients'}));fireEvent.click(within(screen.getByText(bob.id).closest('tr')!).getByRole('button'));await screen.findByRole('tab',{name:`Alice Able · ${bob.id}`});expect(screen.getAllByRole('tab')).toHaveLength(3);expect(screen.getByRole('tab',{name:`Alice Able · ${alice.id}`})).toBeInTheDocument();
  go('Profile & intake');fireEvent.change(screen.getByLabelText(/Last name/),{target:{value:'Renamed'}});fireEvent.click(screen.getByRole('button',{name:'Save changes'}));expect(await screen.findByRole('tab',{name:'Alice Renamed'})).toHaveAttribute('data-client-tab',bob.id);expect(screen.getAllByRole('tab')).toHaveLength(3);
+});
+
+it('guards unsaved Spending Analysis changes across client tabs and clears analysis on locking',async()=>{
+ render(<App/>);await unlock();await selectClient('Alice Able','Spending Analysis');await screen.findByRole('table',{name:'Approved categorized transactions'});
+ fireEvent.change(screen.getByRole('combobox',{name:'Type for Fictional Dining on 2026-09-03'}),{target:{value:'necessary'}});fireEvent.change(screen.getByLabelText('Discussion and reason'),{target:{value:'Private unsaved client discussion'}});
+ vi.mocked(window.confirm).mockReturnValueOnce(false);go('Import statements');expect(screen.getByLabelText('Discussion and reason')).toHaveValue('Private unsaved client discussion');expect(screen.queryByLabelText('Local CSV file')).not.toBeInTheDocument();
+ vi.mocked(window.confirm).mockReturnValueOnce(true);go('Import statements');await screen.findByText('Documents and statement accounts');expect(mocks.changeSpendingClassification).not.toHaveBeenCalled();
+ go('Spending Analysis');await screen.findByRole('table',{name:'Approved categorized transactions'});expect(screen.queryByLabelText('Discussion and reason')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Lock workspace'}));await screen.findByRole('heading',{name:'Welcome back'});expect(screen.queryByText('Fictional Dining')).not.toBeInTheDocument();expect(screen.queryByRole('table',{name:'Spending mix amounts and percentages'})).not.toBeInTheDocument();
 });
