@@ -20,6 +20,13 @@ identities, a compact logo, fixed summary rows and moving the full title and fir
 disclosure to the appendix now preserve page-one financial figures even with
 maximal names, a logo and a current-review warning. The focused rerun passed.
 
+The first complete native workflow passed. Subsequent image inspection exposed
+logo/firm-name overlap, which text extraction cannot detect. The new presentation
+now reserves explicit logo clearance on summary/appendix pages; original detailed
+layout geometry is unchanged. A geometry regression test checks glyph bounds and
+the top margin, and the source checks/native workflow are being repeated for the
+corrected source before completion.
+
 Next priority: bounded native Windows printing, with explicit file lifecycle,
 user action, cancellation/failure handling and Windows acceptance. Direct in-app
 printing remains planned; exported PDFs can be printed in a Windows PDF viewer.

@@ -52,6 +52,13 @@ impl Layout {
         })
     }
     fn branding(&mut self, data: &crate::branding::Data) -> Result<(), String> {
+        self.branding_raised(data, 0.0)
+    }
+    fn branding_raised(
+        &mut self,
+        data: &crate::branding::Data,
+        logo_raise: f32,
+    ) -> Result<(), String> {
         if let Some(png) = &data.logo_png {
             let pixels = crate::branding::logo_pixels(png)?;
             let scale = (120.0 / pixels.width as f32).min(48.0 / pixels.height as f32);
@@ -67,7 +74,7 @@ impl Layout {
                         0.into(),
                         height.into(),
                         48.into(),
-                        (self.y - height).into(),
+                        (self.y - height + logo_raise).into(),
                     ],
                 ),
                 Operation::new("Do", vec!["BrandLogo".into()]),
@@ -113,7 +120,7 @@ impl Layout {
                         0.into(),
                         height.into(),
                         48.into(),
-                        (self.y - height).into(),
+                        (self.y - height + 14.0).into(),
                     ],
                 ),
                 Operation::new("Do", vec!["BrandLogo".into()]),
@@ -1089,7 +1096,14 @@ fn render_report(
         l.text("Read this captured evidence together with the preceding summary. Financial capture, approval policy and record integrity are unchanged by the presentation layout.",9.0)?;
     }
     if let Some(brand) = &p.branding {
-        l.branding(&brand.data)?;
+        if presented && brand.data.logo_png.is_some() {
+            // Reserve clear space below the appendix preamble. Only the new
+            // presentation moves the logo; original detailed exports stay exact.
+            l.y -= 14.0;
+            l.branding_raised(&brand.data, 14.0)?;
+        } else {
+            l.branding(&brand.data)?;
+        }
     } else {
         l.text(&p.workspace.organization_name, 18.0)?;
     }
@@ -2171,6 +2185,57 @@ pub fn save_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn presentation_logo_has_clear_space_above_full_firm_identity() {
+        let mut png = vec![];
+        {
+            let mut e = png::Encoder::new(&mut png, 2, 1);
+            e.set_color(png::ColorType::Rgb);
+            e.set_depth(png::BitDepth::Eight);
+            e.write_header()
+                .unwrap()
+                .write_image_data(&[20, 50, 70, 180, 140, 60])
+                .unwrap();
+        }
+        for name in ["Fictional Oak Counseling".to_owned(), "W".repeat(120)] {
+            let mut data = crate::branding::defaults(&name);
+            data.logo_png = Some(crate::branding::inspect_logo(&png).unwrap());
+            for compact in [true, false] {
+                let mut l = Layout::new().unwrap();
+                if compact {
+                    l.compact_branding(&data).unwrap();
+                } else {
+                    l.y -= 14.0;
+                    l.branding_raised(&data, 14.0).unwrap();
+                }
+                let page = &l.pages[0];
+                let image = page.iter().find(|o| o.operator == "cm").unwrap();
+                let bottom = image.operands[5].as_float().unwrap();
+                let top = bottom + image.operands[3].as_float().unwrap();
+                let font = page.iter().find(|o| o.operator == "Tf").unwrap().operands[1]
+                    .as_float()
+                    .unwrap();
+                let baseline = page.iter().find(|o| o.operator == "Tm").unwrap().operands[5]
+                    .as_float()
+                    .unwrap();
+                let glyph_top = name
+                    .chars()
+                    .filter_map(|c| {
+                        l.face
+                            .glyph_index(c)
+                            .and_then(|g| l.face.glyph_bounding_box(g))
+                    })
+                    .map(|b| f32::from(b.y_max) * font / f32::from(l.face.units_per_em()))
+                    .fold(0.0_f32, f32::max);
+                assert!(
+                    bottom >= baseline + glyph_top + 6.0,
+                    "Logo overlaps identity: compact={compact}"
+                );
+                assert!(top <= 744.0, "Logo exceeds the 48-point top margin");
+                assert_eq!(l.pages.len(), 1);
+            }
+        }
+    }
     #[test]
     fn typography_wraps_long_tokens_within_letter_page_margins_and_fails_at_limit() {
         let mut l = Layout::new().unwrap();
