@@ -343,3 +343,10 @@ independent USD 1287.10 spending, 712.91 income less spending, 749.96 bank cash 
 final PDF, then verifies original figures/identity after a later review, restart,
 encrypted recovery and client changes. Earlier v1 approval and full workflows
 remain in the same run. No direct IPC mutations or installer are used.
+
+The 0.38.0 extension opens Transactions → Activity history over the existing
+recovered synthetic records. It checks stable forward/backward pages, original
+and corrected card evidence, date/source/status filters, both bank transfer legs,
+exact repayment approval navigation, renamed archived account identity, empty
+results, client isolation, lock privacy and another complete process restart.
+All activity-page actions are read-only searches through visible controls.

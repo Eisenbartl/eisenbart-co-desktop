@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  queryTransactionActivity:(clientId:string,input:import('./types').ActivityQuery)=>command<import('./types').ActivityPage>('query_transaction_activity',{clientId,input}),
   getCardFacts:(clientId:string)=>command<import('./types').CardCompletenessRecord>('get_card_facts',{clientId}),
   saveCardFacts:(clientId:string,input:{expectedRevision:number;expectedSourceRevision:number;expectedProfileUpdatedAt:string;data:import('./types').CardCompletenessData;acknowledge:boolean})=>command<import('./types').CardCompletenessRecord>('save_card_facts',{clientId,input}),
   getCardReview:(clientId:string)=>command<import('./types').CardReviewDirectory>('get_card_review',{clientId}),

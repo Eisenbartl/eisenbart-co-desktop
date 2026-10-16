@@ -1,6 +1,24 @@
 # Development status
 
-## Current stage — card-inclusive final approval (0.37.0, schema 25 unchanged)
+## Current stage — searchable transaction activity (0.38.0, schema 25 unchanged)
+
+Transactions → Activity history adds a bounded read-only bank/card import and
+decision timeline, account/source/date/status and literal text filters, stable
+25-event pages, original/corrected evidence, exact counterpart decision locators
+and explicit current/obsolete relationship labels. Existing source review and
+financial calculations remain unchanged. See [usage and limits](transaction-activity-history.md).
+
+Locked setup and the three focused backend fixtures passed. Full frontend, backend,
+format/Clippy, standalone native workflow and Windows source verification are
+in progress; do not treat this stage as verified until their actual results are
+recorded here. No installer is requested or being created.
+
+Next priority: Reports → Print & presentation, placing client/period and financial
+summary first, with approval audit detail in an appendix and separate Windows
+printing acceptance. Unsupported loan/card-policy cases remain blocked.
+
+
+## Card-inclusive final approval (0.37.0, schema 25 unchanged)
 
 Reports → Final report checklist now selects policy v2 for matching format-9
 assessments. Current bank/card completeness, exact approval-bound roles, repayment

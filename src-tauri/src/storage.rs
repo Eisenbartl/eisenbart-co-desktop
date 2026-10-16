@@ -2,6 +2,8 @@
 //! using the authenticated organization and counselor, never IDs from the UI.
 #[path = "action_plans_store.rs"]
 pub mod action_plans_store;
+#[path = "activity_store.rs"]
+pub mod activity_store;
 #[path = "assessments_store.rs"]
 pub mod assessments_store;
 #[path = "backup.rs"]

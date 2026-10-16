@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.37.0 source
+# Prototype structure and development map — 0.38.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -22,7 +22,7 @@ Rust-backed data. Do not add another persistence layer or copy the calculators.
 | Dashboard | Scoped practice counts, recent clients, appointments and follow-ups (`FollowUpOverview.tsx`) |
 | Clients | Directory/search/filter, create/edit/status/archive; Profile, Intake & follow-ups, Session notes, History & records, Complete record (`App.tsx`, `ClientCare.tsx`) |
 | Financial Review | Approved-data dashboard, explicit financial facts, running-balance checks, recurring-payment review and live completeness diagnostics and versioned reviews (`ImportsEditor.tsx`, `CompletenessReview.tsx`, `SavedCoverageReviews.tsx`) |
-| Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers (`ImportsEditor.tsx` transactions page) |
+| Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers; client-wide searchable bank/card history (`ImportsEditor.tsx`, `TransactionActivity.tsx`) |
 | Documents | Bank CSV/selectable-text PDF import, separate signed-card CSV review, statement account management, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`, `StatementAccounts.tsx`) |
 | Budget Planner | Saved income/expenses/allocations, remove/edit rows, optional budget method comparisons (`BudgetEditor.tsx`) |
 | Debt Planner | Saved debts, payment changes/extras and monthly snowball/avalanche projections (`DebtEditor.tsx`) |
@@ -74,7 +74,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Documents → Additional document types | `pdf.rs`, `imports.rs`, supervised parser adapters and import UI | Synthetic card/loan/paystub/institution fixtures, bounded parse, original locators, individual review, duplicate/sign/balance controls |
 | Documents → Scanned documents / OCR | Extend supervised `pdf_process.rs`; vetted offline OCR assets/dependencies | Scanned/mixed/rotated/low-quality fixtures, time/memory/page limits, no guessed facts, explicit review, offline/license checks |
 | Transactions → Classification assistance | Pure local suggestions plus scoped decision/rule persistence; `RecurringReview.tsx` conventions | Suggestions never auto-approve; immutable provenance, false-positive correction, undo/reversal and client isolation |
-| Transactions → Activity history | Bounded scoped history query across existing review records | Stable pagination/filtering, corrections and both transfer legs, authorized scope, unreadable history failure and no writes |
+| Transactions → Activity history — working in 0.38.0 | `activity_store.rs`, `TransactionActivity.tsx`; existing schema 25 | Scoped 25-event pages, literal/date/account/source/status filters, original/corrected decision evidence, both transfer legs, exact current/obsolete repayment locators, stale-token rejection, ownership, read-only failure and recovery. [Limits](transaction-activity-history.md) |
 | Financial Review → Completeness & final validation — working review/history | `completeness.rs`, `coverage_review.rs`, `coverage_review_store.rs`, `SavedCoverageReviews.tsx` | Declared coverage plus scoped schema-21 expected inventory, dates, source choices, missing information and exceptions; stale/audit/recovery controls and immutable format-7 capture. [Review history and constraints](saved-completeness-reviews.md) |
 | Financial Review → Savings progress | Dated verified balance facts and `FactMetricsView.tsx` | Real approved/verified sources, explicit period, unknown data, independent expected points and no estimates masquerading as facts |
 | Budget Planner → Paycheck allocation | Reuse `budget.rs` and `cashflow.rs`; define period allocations first | Exact frequency/rounding examples, unknown dates, insufficient funding and no automatic double-counted schedules |
@@ -184,3 +184,5 @@ on navigation/lock. Do not redo review CRUD or silently change financial figures
 Unsupported loan obligations, early closure, credits and split/cross-period
 repayments remain blocked until their own modeled evidence workflows. Broader
 adapters/OCR/printing/advanced models and installed/commercial acceptance remain.
+
+Next priority after 0.38.0: Reports → Print & presentation, with client/period and financial summary first, approval audit details in an appendix, and explicit Windows printing acceptance. Do not rebuild the completed transaction review/history workflows.

@@ -335,6 +335,19 @@ async fn preview_card_review(
     .map_err(|_| "Card review could not finish.".to_owned())?
 }
 #[tauri::command]
+async fn query_transaction_activity(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::activity_store::Query,
+) -> Result<storage::activity_store::Page, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.query_transaction_activity(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Activity search could not finish. Refresh activity.".to_owned())?
+}
+#[tauri::command]
 async fn get_card_statements(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -1121,6 +1134,7 @@ pub fn run() {
             get_card_review,
             save_card_review,
             preview_card_review,
+            query_transaction_activity,
             get_card_statements,
             stage_card_statement,
             review_card_transaction,

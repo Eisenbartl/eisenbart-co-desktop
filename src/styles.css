@@ -560,3 +560,12 @@ textarea { resize: vertical; min-height: 100px; }
 .card-statements .check-label input[type="checkbox"] {width:16px;height:16px;min-height:16px;margin:3px 0 0;flex:0 0 16px;}
 .card-preview,.card-statement-view,.card-transaction-review {margin-top:20px;}
 .card-reconciliation {padding:16px;border:1px solid var(--line);border-radius:8px;margin:16px 0;}
+
+.transaction-activity {padding:24px;}
+.activity-events {padding-left:1.5rem;}
+.activity-events > li {margin:1rem 0;}
+.activity-event {border:1px solid var(--line);border-radius:8px;padding:1rem;overflow-wrap:anywhere;}
+.activity-event summary {cursor:pointer;line-height:1.6;}
+.activity-locators dd {margin:0 0 .6rem;overflow-wrap:anywhere;}
+.activity-locators dt {font-weight:600;}
+.activity-event pre {white-space:pre-wrap;}

@@ -210,3 +210,15 @@ only displays Rust figures. Required separate card notes/confirmation use the
 existing private draft guards, atomic receipt/date/audit and PDF preflight.
 Recovery recomputes original policy figures against the scoped immutable parent.
 See [defined gates and scope](card-inclusive-final-approval.md).
+
+## Read-only transaction timeline (0.38.0)
+
+`storage::activity_store` derives bounded import/decision events from the existing
+bank/card/account/link readers inside one authenticated read transaction. It
+returns 25-event pages and source metadata; financial revision plus account/link
+metadata bind subsequent pages to the same context. No migration, financial
+writes, new calculator or persistent search state is introduced.
+`TransactionActivity.tsx` presents original/corrected evidence and exact scoped
+counterpart/decision searches, labels historical versus current state and ignores
+late replies after a client switch or unmount. See
+[transaction-activity-history.md](transaction-activity-history.md).

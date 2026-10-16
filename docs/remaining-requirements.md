@@ -1,3 +1,9 @@
+> 0.38.0 update: Transactions → Activity history now provides scoped, searchable,
+> paginated bank/card import and decision history with original provenance and
+> current/obsolete counterpart locators. See [usage and limits](transaction-activity-history.md).
+> The future combined client timeline, note amendments and commercial acceptance
+> remain separate work. Next priority: report presentation/printing.
+
 # Remaining original requirements after 0.37.0 source
 
 The [original product specification](product-specification.md) governs the full
