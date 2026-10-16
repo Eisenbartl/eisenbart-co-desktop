@@ -65,7 +65,7 @@ fn access<T>(
     if workspace.expire_if_idle() {
         let _ = state.handle.emit("workspace-locked", ());
     }
-    operation(&mut workspace)
+    workspace.with_operation(operation)
 }
 
 #[tauri::command]
@@ -939,6 +939,22 @@ async fn unlock_workspace(
 }
 
 #[tauri::command]
+async fn change_workspace_password(
+    state: State<'_, DesktopState>,
+    input: storage::password_change::PasswordChangeInput,
+) -> Result<storage::password_change::PasswordChangeResult, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.change_workspace_password(input))
+    })
+    .await
+    .map_err(|_| {
+        "Password change could not finish. Restart and check which password opens the workspace."
+            .to_owned()
+    })?
+}
+
+#[tauri::command]
 fn lock_workspace(state: State<'_, DesktopState>) -> Result<(), String> {
     access(&state, |workspace| {
         workspace.lock_workspace();
@@ -1355,6 +1371,7 @@ pub fn run() {
             setup_workspace,
             unlock_workspace,
             lock_workspace,
+            change_workspace_password,
             workspace_info,
             list_clients,
             get_client,

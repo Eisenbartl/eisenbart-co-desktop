@@ -4,7 +4,7 @@ import App from './App';
 import type { Client, ClientNote, WorkspaceInfo } from './types';
 
 const mocks = vi.hoisted(() => ({
-  getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
+  changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
   getReportPresentation:vi.fn(),chooseReportPresentationPdf:vi.fn(),exportReportPresentation:vi.fn(),
   getCategoryRules:vi.fn(),saveCategoryRule:vi.fn(),reviewRuleCategory:vi.fn(),queryCategorySuggestions:vi.fn(),prepareCategoryDraft:vi.fn(),queryTransactionActivity:vi.fn(),
   desktop: true,
@@ -496,4 +496,15 @@ it('guards reviewed note corrections across pages and clients and clears private
  mocks.listClientNotes.mockResolvedValue([aliceNote]);mocks.getNoteHistory.mockResolvedValue({clientId:alice.id,fingerprint:'note-context',original:aliceNote,amendments:[]});
  render(<App/>);await unlock();await selectClient('Alice Able');await screen.findByText('No imported transactions yet');fireEvent.click(screen.getByRole('button',{name:'Session notes'}));await screen.findByText(aliceNote.body);fireEvent.click(screen.getByRole('button',{name:/Review correction for note/}));await screen.findByDisplayValue(aliceNote.body);await waitFor(()=>expect(screen.getByLabelText('Corrected session note')).toBeEnabled());fireEvent.change(screen.getByLabelText('Corrected session note'),{target:{value:'Private fictional correction draft'}});fireEvent.change(screen.getByLabelText('Note correction reason'),{target:{value:'Private reviewed reason'}});
  vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'History & records'}));expect(screen.getByLabelText('Corrected session note')).toHaveValue('Private fictional correction draft');fireEvent.click(screen.getByText('Bob Baker').closest('button')!);expect(screen.getByText('Alice Able').closest('button')).toHaveAttribute('aria-pressed','true');expect(screen.getByLabelText('Corrected session note')).toHaveValue('Private fictional correction draft');expect(screen.getByRole('button',{name:'Save session note'})).toBeDisabled();await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional correction draft');expect(document.documentElement.outerHTML).not.toContain('Private reviewed reason');expect(mocks.correctClientNote).not.toHaveBeenCalled();
+});
+
+it('locks and clears workspace state after password change and shows retained-copy semantics',async()=>{
+ const pending=deferred<{durabilityWarning:boolean}>();mocks.changeWorkspacePassword.mockReturnValueOnce(pending.promise);
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Settings'}));fireEvent.click(screen.getByRole('button',{name:'Security'}));
+ for(const [label,value] of [['Current password','Synthetic-original-123'],['New password','Synthetic-new-456'],['Confirm new password','Synthetic-new-456']])fireEvent.change(screen.getByLabelText(label),{target:{value}});
+ fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(screen.getByRole('button',{name:'Change password and lock'}));
+ expect(screen.getByRole('button',{name:'Branding'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByRole('heading',{name:'Change workspace password'})).toBeInTheDocument();
+ await act(async()=>pending.resolve({durabilityWarning:true}));expect(await screen.findByRole('button',{name:'Unlock workspace'})).toBeInTheDocument();
+ expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('original passwords');expect(screen.getByText(/Workspace password changed/)).toHaveTextContent('Keep both passwords');
+ expect(screen.queryByLabelText('New password')).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Settings'})).not.toBeInTheDocument();
 });

@@ -1,6 +1,58 @@
 # Development status
 
-## Current stage — client history and reviewed note corrections (0.43.0, schema 27)
+## Current stage — workspace password change and recovery safeguards (0.44.0, schema 28)
+
+Settings → Security now requires the current password, a different confirmed new
+password and explicit acknowledgment of retained-copy passwords. Rust creates a
+new-key/new-salt encrypted generation, verifies its persisted metadata/database,
+adds an immutable audit event and atomically activates it through shared durable
+recovery activation. It never rekeys the active database in place. Success locks
+the workspace and clears private drafts, CSV previews and PDF receipts.
+
+Whole-command OS locking serializes managed IPC across cooperating app instances;
+stale sessions lock before their next command. Original client/source/history/
+report values remain unchanged. Older backups and retained copies keep their
+original passwords, and restoring an older backup restores that password. There
+is no forgotten-password reset. See [design and recovery policy](workspace-password-change.md).
+
+Validation on 2026-10-16 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Reused the tested repository setup from this environment; Node 24 and stable Rust |
+| Production frontend / UI | Passed build and all 253 tests |
+| Focused backend | Passed seven fixtures, including WAL values/source BLOBs/report digests, pending preview clearing, stale instances, old/new backup passwords, schema-27 rollback and actual subprocess exits |
+| Complete Linux backend | Passed 237 library + 2 PDF-worker tests, exit 0 |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug build with embedded assets, no bundles |
+| Focused native / visual inspection | Passed exit 0 with the password-change marker and final completion marker; real controls, restart and both backup passwords. Security screen visually checked for readable disclosure/fields and no horizontal overflow |
+| Complete native workflow | Running; not yet counted as passing |
+| Windows source validation | Not run: network proxy rejects CONNECT to api.github.com with HTTP 403; Git read access works |
+| Installer | Not created, per user instruction |
+
+The first complete backend attempt was not a pass: a concurrent test recompilation
+removed the running test executable before its interruption fixture could spawn
+itself. That attempt passed 235 tests and failed the subprocess launch with ENOENT.
+The final complete suite ran without concurrent Cargo commands and passed all
+237 library tests plus both worker tests. The interruption fixture retains all
+before/after activation assertions; no check was disabled.
+
+Tests inject snapshot/audit/metadata/activation failures and use real process exits.
+Physical full-disk/power-loss/removable-drive drills, independent security review,
+and clean installed Windows offline recovery are still unverified. Windows source
+CI is also pending for this stage; existing 0.43.0 Windows results do not validate
+0.44.0. No branch or source has been pushed to trigger external CI.
+
+Validation logs use `/tmp/password-` in this current machine. No real client data
+or credentials were used. Focused native artifacts are under `/workspace/shared/desktop-smoke-password-focused`; the complete run is under `/workspace/shared/desktop-smoke-password-change`. Complete-run results will be recorded after completion.
+
+Next bounded implementation priority after the outstanding acceptance checks:
+backend-owned configurable inactivity locking with validated limits and preserved
+lock privacy. Retained-copy selection/pruning, scheduled backups, multiple
+counselors, independent security/commercial review and clean installed Windows
+acceptance remain separate work. The last installer remains 0.23.0.
+
+## Client history and reviewed note corrections (0.43.0, schema 27)
 
 Clients → History & records now combines scoped dated notes/corrections, intake
 versions, imported source metadata, scenarios, assessments and client action plans

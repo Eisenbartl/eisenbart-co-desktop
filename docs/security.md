@@ -10,11 +10,11 @@ The application stores its database locally using SQLCipher. A counselor passwor
 
 The first setup creates one organization and counselor on the installation. Choose a long, unique password and retain it securely outside the application. No developer service can unlock the database for you.
 
-**There is no password reset or recovery mechanism in this milestone. Losing the password can permanently prevent access to every record in the database.** Password changes are not available yet. Encrypted backup and verified whole-workspace restore are available; they require the password used when the backup was created. Do not delete local files or reinstall in an attempt to recover a forgotten password.
+**There is no password reset or recovery mechanism in this milestone. Losing the password can permanently prevent access to every record in the database.** Settings → Security now supports a reviewed current-password change using a verified new encrypted generation; see [password changes and retained copies](workspace-password-change.md). Encrypted backup and verified whole-workspace restore are available; they require the password used when the backup was created. Do not delete local files or reinstall in an attempt to recover a forgotten password.
 
-The local data directory contains `workspace.db` (the encrypted database) and `workspace.json` (non-secret version and Argon2 salt metadata needed for unlocking it). Preserve both files if investigating a failure. Check the Windows guide for the expected directory before making any manual copy. A manual copy of a live database can miss journal/WAL data; use the [backup and recovery controls](backup-recovery.md). After restore, `workspace-active.json` selects a complete database/metadata pair inside `recovery-generations`; prior files are retained. Preserve the whole data folder when investigating a failure.
+The local data directory contains `workspace.db` (the encrypted database) and `workspace.json` (non-secret version and Argon2 salt metadata needed for unlocking it). Preserve both files if investigating a failure. Check the Windows guide for the expected directory before making any manual copy. A manual copy of a live database can miss journal/WAL data; use the [backup and recovery controls](backup-recovery.md). After restore or password change, `workspace-active.json` selects a complete database/metadata pair inside `recovery-generations`; prior files are retained. Preserve the whole data folder when investigating a failure.
 
-The initial password must have at least 12 characters and at most 1,024 UTF-8 bytes. This minimum does not guarantee that a password is strong; a long, unique passphrase is preferable.
+The initial password must have at least 12 characters and at most 1,024 characters. This minimum does not guarantee that a password is strong; a long, unique passphrase is preferable.
 
 ## Sessions and access
 
@@ -49,7 +49,7 @@ production requirement.
 ## Release-blocking security work
 
 - Complete clean Windows offline recovery and removable-drive/power-loss drills for the implemented authenticated backups and staged restore.
-- Define a password change/recovery policy without an undocumented bypass or master key.
+- Independently review the implemented generation-based password change and retained-copy/original-backup password policy; no reset bypass or master key exists.
 - Extend validated migration failure handling, corruption detection, and interrupted restore tests to installed Windows and future attachments.
 - Test client and organization isolation throughout future imports, calculations, exports, and reports.
 - Add role enforcement, configurable inactivity settings, safe archival/deletion, and data export.

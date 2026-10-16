@@ -22,6 +22,7 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  changeWorkspacePassword:(input:import('./types').PasswordChangeInput)=>command<import('./types').PasswordChangeResult>('change_workspace_password',{input}),
   getReportPresentation:(clientId:string,assessmentId:string)=>command<import('./types').ReportPresentationContext>('get_report_presentation',{clientId,assessmentId}),
   getCategoryRules:(clientId:string)=>command<import('./types').CategoryRulesDirectory>('get_category_rules',{clientId}),
   saveCategoryRule:(clientId:string,input:import('./types').CategoryRuleInput)=>command<import('./types').CategoryRulesDirectory>('save_category_rule',{clientId,input}),

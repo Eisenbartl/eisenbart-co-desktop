@@ -1,4 +1,4 @@
-# Next stage: local workspace password change and recovery safeguards
+# Stage requirements: local workspace password change and recovery safeguards
 
 Implement the planned **Settings → Security** password-change workflow using
 the existing authentication, SQLCipher and generation-based recovery architecture.
@@ -23,3 +23,5 @@ Use fictional records and independently verify unchanged source/report digests.
 Run full UI/backend/native and Windows source checks, document remaining clean
 Windows/security acceptance, and commit one bounded stage. No installer unless
 the user explicitly requests one.
+
+Implementation is now in the 0.44.0 source. See [design, recovery policy and limits](workspace-password-change.md) and [executed validation](development-status.md). The criteria above remain acceptance requirements; installed Windows and independent security results must be recorded separately.

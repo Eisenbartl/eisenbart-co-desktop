@@ -63,8 +63,11 @@ copy or the previous workspace, never a mixture of their database and credential
 Disk/drive failure can still require restoration from the separate backup.
 
 Losing the encryption password prevents restoring that backup. There is no
-password reset, administrator bypass, or supported password-change feature in
-this stage. Reinstalling cannot decrypt the data. The app has no remote copy.
+forgotten-password reset or administrator bypass. Settings → Security supports
+a [reviewed password change](workspace-password-change.md) requiring the current
+password. Changing the active password does not rewrite or revoke older backups
+or retained generations; those keep their original passwords. Restoring an older
+backup restores that original password as well. Reinstalling cannot decrypt the data. The app has no remote copy.
 
 ## Preserved previous files
 
@@ -80,7 +83,7 @@ if you need support recovering changes from the retained copy.
 On Windows the root is ordinarily
 `%LOCALAPPDATA%\com.eisenbart.counseling\` (see the app identifier in the build
 configuration). On Linux it is under the user data directory. Initially the root
-contains `workspace.db` and `workspace.json`. After restore,
+contains `workspace.db` and `workspace.json`. After restore or password change,
 `workspace-active.json` selects a UUID folder inside `recovery-generations`,
 containing its own database and metadata. The older root or generation remains.
 The `workspace-operation.lock` file is normal; its operating-system lock is
@@ -152,5 +155,5 @@ See [development-status.md](development-status.md) for completed results.
 
 Unrun or future work includes actual removable-drive/power-loss drills, a clean
 installed Windows 11 recovery workflow, independent crypto/security review,
-scheduled backups, retained-copy selection/pruning, password change/recovery,
+scheduled backups, retained-copy selection/pruning, independent password-change security acceptance,
 and inclusion of future document/report file attachments. Authorized original CSVs and PDFs are stored inside SQLCipher, so current backups include their BLOBs, provenance, decisions, and immutable history. There are no separate file attachments yet; the format covers the whole existing database.

@@ -52,9 +52,9 @@ pub struct RestoreResult {
     pub durability_warning: bool,
 }
 
-struct PrivateDirectory {
-    path: PathBuf,
-    keep: bool,
+pub(super) struct PrivateDirectory {
+    pub(super) path: PathBuf,
+    pub(super) keep: bool,
 }
 impl Drop for PrivateDirectory {
     fn drop(&mut self) {
@@ -92,7 +92,7 @@ fn private_directory(path: &Path) -> Result<(), String> {
         Err(_) => Err(RECOVERY_ERROR.into()),
     }
 }
-fn staging(root: &Path) -> Result<PrivateDirectory, String> {
+pub(super) fn staging(root: &Path) -> Result<PrivateDirectory, String> {
     private_directory(root)?;
     let parent = root.join("recovery-generations");
     private_directory(&parent)?;
@@ -183,7 +183,7 @@ pub(super) fn activation_lock(root: &Path) -> Result<File, String> {
     file.try_lock_exclusive().map_err(|_|"Another backup or recovery operation is running. Close other application instances and try again.".to_owned())?;
     Ok(file)
 }
-fn sync_directory(path: &Path) -> Result<(), String> {
+pub(super) fn sync_directory(path: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         File::open(path)
@@ -202,7 +202,7 @@ fn authentication(key: &[u8; 32]) -> Authentication {
     let derived = Zeroizing::new(<[u8; 32]>::from(derive.finalize().into_bytes()));
     Authentication::new_from_slice(&*derived).expect("fixed HMAC key")
 }
-fn info(connection: &Connection) -> Result<WorkspaceInfo, String> {
+pub(super) fn info(connection: &Connection) -> Result<WorkspaceInfo, String> {
     let result=connection.query_row("SELECT o.id,o.name,c.id,c.name FROM workspace_settings w JOIN organizations o ON o.id=w.organization_id JOIN counselors c ON c.id=w.counselor_id AND c.organization_id=o.id WHERE w.singleton=1",[],|r|Ok(WorkspaceInfo{organization_id:r.get(0)?,organization_name:r.get(1)?,counselor_id:r.get(2)?,counselor_name:r.get(3)?})).map_err(|_|VERIFY_ERROR.to_owned())?;
     required_text(&result.organization_name, "Organization name", 120)
         .map_err(|_| VERIFY_ERROR.to_owned())?;
@@ -210,7 +210,7 @@ fn info(connection: &Connection) -> Result<WorkspaceInfo, String> {
         .map_err(|_| VERIFY_ERROR.to_owned())?;
     Ok(result)
 }
-fn verify_database(connection: &Connection) -> Result<(), String> {
+pub(super) fn verify_database(connection: &Connection) -> Result<(), String> {
     let id: i32 = connection
         .query_row("PRAGMA application_id", [], |r| r.get(0))
         .map_err(|_| VERIFY_ERROR.to_owned())?;
@@ -231,7 +231,11 @@ fn verify_database(connection: &Connection) -> Result<(), String> {
     }
     Ok(())
 }
-fn export_snapshot(source: &Connection, path: &Path, key: &[u8; 32]) -> Result<(), String> {
+pub(super) fn export_snapshot(
+    source: &Connection,
+    path: &Path,
+    key: &[u8; 32],
+) -> Result<(), String> {
     drop(create_private_file(path)?);
     let mut encoded = Zeroizing::new(String::from("x'"));
     for b in key {
@@ -449,7 +453,7 @@ impl Workspace {
         password: String,
     ) -> Result<BackupResult, String> {
         self.session()?;
-        let _activation = activation_lock(&self.data_dir)?;
+        let _activation = self.activation_lock()?;
         let password = Zeroizing::new(password);
         validate_password(&password)?;
         let metadata = self.read_metadata()?;
@@ -523,7 +527,7 @@ impl Workspace {
         self.pending_restore = None;
         let password = Zeroizing::new(password);
         validate_password(&password)?;
-        let _activation = activation_lock(&self.data_dir)?;
+        let _activation = self.activation_lock()?;
         let parent_pointer = pointer_bytes(&self.data_dir)?;
         let source_directory =
             resolve_directory(&self.data_dir).unwrap_or_else(|_| self.data_dir.clone());
@@ -621,7 +625,7 @@ impl Workspace {
                     .into(),
             );
         }
-        let _activation = activation_lock(&self.data_dir)?;
+        let _activation = self.activation_lock()?;
         if pointer_bytes(&self.data_dir)? != candidate.parent_pointer
             || file_stamps(&candidate.source_directory) != candidate.parent_files
         {
@@ -643,54 +647,57 @@ impl Workspace {
         transaction.commit().map_err(storage_error)?;
         integrity_check(connection)?;
         candidate.connection.take();
-        OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(candidate.directory.path.join(DATABASE_NAME))
-            .and_then(|f| f.sync_all())
-            .map_err(|_| RECOVERY_ERROR.to_owned())?;
-        sync_directory(&candidate.directory.path)?;
-        sync_directory(
-            candidate
-                .directory
-                .path
-                .parent()
-                .expect("generation parent"),
-        )?;
-        let temporary = self.data_dir.join(format!(".workspace-active-{token}.tmp"));
-        let p = Pointer {
-            version: 1,
-            generation: candidate
-                .directory
-                .path
-                .file_name()
-                .expect("generation name")
-                .to_string_lossy()
-                .into_owned(),
-        };
-        let mut owns_temporary = false;
-        let result = (|| {
-            let mut file = create_private_file(&temporary)?;
-            owns_temporary = true;
-            serde_json::to_writer(&mut file, &p).map_err(|_| RECOVERY_ERROR.to_owned())?;
-            file.sync_all().map_err(|_| RECOVERY_ERROR.to_owned())?;
-            drop(file);
-            sync_directory(&self.data_dir)?;
-            replace_pointer(&temporary, &self.data_dir.join(POINTER))
-        })();
-        if let Err(error) = result {
-            if owns_temporary {
-                let _ = fs::remove_file(&temporary);
-            }
-            return Err(error);
-        }
-        candidate.directory.keep = true;
+        let durability_warning =
+            activate_generation(&self.data_dir, &mut candidate.directory, &token)?;
         self.active_dir = candidate.directory.path.clone();
         Ok(RestoreResult {
             previous_workspace_preserved: candidate.review.current_workspace_present,
-            durability_warning: sync_directory(&self.data_dir).is_err(),
+            durability_warning,
         })
     }
+}
+
+pub(super) fn activate_generation(
+    root: &Path,
+    directory: &mut PrivateDirectory,
+    token: &str,
+) -> Result<bool, String> {
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(directory.path.join(DATABASE_NAME))
+        .and_then(|f| f.sync_all())
+        .map_err(|_| RECOVERY_ERROR.to_owned())?;
+    sync_directory(&directory.path)?;
+    sync_directory(directory.path.parent().expect("generation parent"))?;
+    let temporary = root.join(format!(".workspace-active-{token}.tmp"));
+    let p = Pointer {
+        version: 1,
+        generation: directory
+            .path
+            .file_name()
+            .expect("generation name")
+            .to_string_lossy()
+            .into_owned(),
+    };
+    let mut owns_temporary = false;
+    let result = (|| {
+        let mut file = create_private_file(&temporary)?;
+        owns_temporary = true;
+        serde_json::to_writer(&mut file, &p).map_err(|_| RECOVERY_ERROR.to_owned())?;
+        file.sync_all().map_err(|_| RECOVERY_ERROR.to_owned())?;
+        drop(file);
+        sync_directory(root)?;
+        replace_pointer(&temporary, &root.join(POINTER))
+    })();
+    if let Err(error) = result {
+        if owns_temporary {
+            let _ = fs::remove_file(&temporary);
+        }
+        return Err(error);
+    }
+    directory.keep = true;
+    Ok(sync_directory(root).is_err())
 }
 
 #[cfg(test)]

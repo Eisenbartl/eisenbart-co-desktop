@@ -436,3 +436,6 @@ export type ClientHistoryKind='profile'|'note'|'intake'|'document'|'scenario'|'r
 export interface ClientHistoryQuery {text:string;kind:ClientHistoryKind|null;fromDate:string;throughDate:string;offset:number;expectedSnapshot:string|null}
 export interface ClientHistoryEvent {id:string;sourceId:string;kind:ClientHistoryKind;title:string;detail:string;occurredAt:string;day:string}
 export interface ClientHistoryPage {clientId:string;snapshot:string;offset:number;total:number;events:ClientHistoryEvent[]}
+
+export interface PasswordChangeResult {durabilityWarning:boolean}
+export interface PasswordChangeInput {currentPassword:string;newPassword:string;confirmation:string;acknowledgeRetainedCopies:boolean}

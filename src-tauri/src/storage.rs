@@ -32,6 +32,8 @@ pub mod document_collection_store;
 pub mod final_reports_store;
 #[path = "imports_store.rs"]
 pub mod imports_store;
+#[path = "password_change.rs"]
+pub mod password_change;
 #[path = "report_intake_store.rs"]
 pub mod report_intake_store;
 #[path = "report_presentation_store.rs"]
@@ -64,7 +66,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 27;
+const SCHEMA_VERSION: i32 = 28;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -95,6 +97,7 @@ pub struct Workspace {
     session: Option<Session>,
     pending_restore: Option<backup::Candidate>,
     pending_csv: Option<imports_store::PendingCsv>,
+    operation_guarded: bool,
 }
 
 impl Workspace {
@@ -105,6 +108,29 @@ impl Workspace {
             session: None,
             pending_restore: None,
             pending_csv: None,
+            operation_guarded: false,
+        }
+    }
+
+    /// Serialize complete IPC operations across managed application instances.
+    /// Recheck session generation only after acquiring this lock. Nested backup,
+    /// setup and password operations reuse it rather than locking twice.
+    pub(crate) fn with_operation<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let _guard = backup::activation_lock(&self.data_dir)?;
+        self.operation_guarded = true;
+        let result = operation(self);
+        self.operation_guarded = false;
+        result
+    }
+
+    fn activation_lock(&self) -> Result<Option<File>, String> {
+        if self.operation_guarded {
+            Ok(None)
+        } else {
+            backup::activation_lock(&self.data_dir).map(Some)
         }
     }
 
@@ -159,7 +185,7 @@ impl Workspace {
 
     pub fn setup_workspace(&mut self, input: SetupWorkspaceInput) -> Result<WorkspaceInfo, String> {
         self.pending_restore = None;
-        let _activation = backup::activation_lock(&self.data_dir)?;
+        let _activation = self.activation_lock()?;
         let password = Zeroizing::new(input.password);
         validate_password(&password)?;
         let organization_name = required_text(&input.organization_name, "Organization name", 120)?;
@@ -1184,6 +1210,12 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
     if version == 26 {
         transaction
             .execute_batch(include_str!("client-history-schema.sql"))
+            .map_err(storage_error)?;
+        version = 27;
+    }
+    if version == 27 {
+        transaction
+            .execute_batch(include_str!("password-change-schema.sql"))
             .map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;

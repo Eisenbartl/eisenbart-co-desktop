@@ -273,3 +273,12 @@ sections; `NoteCorrection` and `ClientNotes` hold dirty/busy/client/session guar
 Timeline reads do not append audit or financial records. Profile entries are
 explicitly creation/latest-update metadata, not fabricated past profile versions.
 See [usage and limitations](client-history.md).
+
+`storage::password_change` implements a verified new-key SQLCipher export and
+metadata generation, schema-28 atomic audit, persisted-key reopen and shared
+recovery activation. `lib::access` serializes complete managed IPC commands with
+the OS operation lock before rechecking session generation, preventing stale
+cooperating writes after activation. `PasswordChange` clears submitted secrets,
+requires explicit retained-copy password acknowledgment and returns to locked
+UI after success. No in-place rekey, new KDF, reset service or financial mutation
+is introduced. See [password-change design](workspace-password-change.md).

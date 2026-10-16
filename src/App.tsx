@@ -447,6 +447,11 @@ export default function App() {
     }
   }
 
+  function passwordChanged(result:import('./types').PasswordChangeResult) {
+    clearWorkspace();setAuthError('');setAuthBusy(false);setPhase('locked');
+    setRecoveryNotice(`Workspace password changed. Unlock with the new password. Older backups and retained copies still require their original passwords.${result.durabilityWarning?' The disk did not confirm directory synchronization. Keep both passwords and your backups until restart verifies the active workspace.':''}`);
+  }
+
   function restored(result:RestoreResult) {
     clearWorkspace();setAuthError('');setAuthBusy(false);setPhase('locked');
     setRecoveryNotice(`Workspace restored. Unlock it using the password from this backup.${result.durabilityWarning?' The disk did not confirm directory synchronization; keep your backup available.':''}`);
@@ -566,7 +571,7 @@ export default function App() {
          {selectionError&&<ErrorMessage>{selectionError}</ErrorMessage>}
          {selectionLoading?<p className="panel settings-panel" role="status">Opening client record…</p>:moduleArea!=='Working tools'&&!workingAreas[view]?.includes(moduleArea)?<PlannedWorkspaceArea view={view} title={moduleArea}/>:selected?view==='Reports'&&moduleArea==='Print & presentation'?<ReportPresentation key={selected.id} clientId={selected.id} onBusy={onBusy}/>:view==='Transactions'&&moduleArea==='Classification assistance'?<ImportsEditor key={`${selected.id}:classification`} client={selected} page="classification" onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:view==='Transactions'&&moduleArea==='Activity history'?<TransactionActivity key={selected.id} clientId={selected.id}/>:view==='Financial Review'&&moduleArea==='Card completeness'?<CardCompleteness key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Financial Review'&&moduleArea==='Bank & card activity'?<CardFinancialReview key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Financial Review'&&moduleArea==='Completeness & final validation'?<CompletenessReview key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Reports'&&moduleArea==='Final report checklist'?<SavedReportChecklist key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Credit-card statements'?<CardStatements key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Statement accounts'?<StatementAccounts key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Collection checklist'?<DocumentCollection key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:<ClientEditor key={`${selected.id}:${view}`} section={view} client={selected} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onNavigate={navigate} onCancel={()=>{if(canLeave())clearSelection();}}/>:<section className="panel module-empty"><Icon name={workspacePages.find(p=>p.id===view)?.icon??'file'} size={32}/><h2>Select a client to open {view}</h2><p className="muted">{clientsLoading?'Loading the client directory…':clientsError?'Reload the client directory using the retry above.':clients.length?'Select a client above. Their saved data will load here.':'No clients yet. Add a fictional client to try this workflow.'}</p></section>}
         </>}
-        {view==='Settings'&&<AdministrationPages workspace={workspace} onLock={()=>void lock()} onBusy={onBusy} onDirty={onDirty} onWorkspaceChanged={name=>setWorkspace(w=>w?{...w,organizationName:name}:w)}/>}
+        {view==='Settings'&&<AdministrationPages onPasswordChanged={passwordChanged} workspace={workspace} onLock={()=>void lock()} onBusy={onBusy} onDirty={onDirty} onWorkspaceChanged={name=>setWorkspace(w=>w?{...w,organizationName:name}:w)}/>}
 
       </main>
       <footer className="app-footer"><span>Eisenbart & Co. Financial Counseling Suite</span><span>Financial planning · Development build</span></footer>

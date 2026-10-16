@@ -400,3 +400,19 @@ before typing. Saved-report IDs are read only after their directory refresh
 finishes and the selector contains the new selection. These are observation/focus
 guards; they do not replay uncertain writes, script application data or remove
 any workflow assertions.
+
+## Workspace password changes (0.44.0 source)
+
+The full native workflow ends with wrong-current-password rejection, empty
+submitted fields, reviewed retained-copy disclosures, successful change/lock,
+old-password rejection, new-password unlock and complete restart. It creates
+backups before and after rotation, rejects each other-generation password,
+restores both using their original passwords and checks original notes and
+unchanged older backup bytes. The backend fixture separately compares exact
+source/report values and digests. No password is included in diagnostics.
+Screenshot: `native-workspace-password-safeguards.png`.
+
+After verifying termination of its own private process group, driver restart
+waits up to 75 seconds for closed TCP ports to be released. Initial occupied-port
+checks still fail before creating test data. This addresses observed WebKit
+TIME_WAIT timing; UI writes, clicks and assertions are never replayed.

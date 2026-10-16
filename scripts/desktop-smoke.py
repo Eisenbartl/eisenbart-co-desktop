@@ -1822,6 +1822,77 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_category_assistance(driver, artifacts, data_root, password, binary, restart_driver)
     check_category_rules(driver, artifacts, data_root, password, binary, restart_driver)
     check_client_history(driver, artifacts, data_root, password, binary, restart_driver)
+    check_password_change(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_password_change(driver: WebDriver, artifacts: Path, data_root: Path,
+                          password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    new_password = "Changed-" + secrets.token_urlsafe(24)
+    wrong_password = "Wrong-" + secrets.token_urlsafe(24)
+    driver.protected_values.extend([new_password, wrong_password])
+    folder = data_root / 'password-change-backups'
+    folder.mkdir()
+    def settings(tab: str) -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
+        driver.click_button(tab)
+    def backup(secret: str) -> Path:
+        settings('Backup & recovery')
+        before = set(folder.glob('*.ebcbackup'))
+        driver.fill('#backup-folder', str(folder)); driver.fill('#backup-password', secret)
+        driver.click_button('Create encrypted backup')
+        driver.wait_text('.backup-success', 'Encrypted backup saved.', 'password-stage backup completed')
+        added = set(folder.glob('*.ebcbackup')) - before
+        if len(added) != 1: raise SmokeFailure('Expected one new password-stage encrypted backup')
+        return added.pop()
+    old_backup = backup(password)
+    old_bytes = old_backup.read_bytes()
+    settings('Security')
+    driver.wait_text('.password-change', 'original passwords', 'old-copy password disclosure')
+    driver.scroll_to('.password-change', 'start')
+    driver.screenshot(artifacts / 'native-workspace-password-safeguards.png')
+    if driver.observe_script('return document.documentElement.scrollWidth > document.documentElement.clientWidth'):
+        raise SmokeFailure('Password-change screen overflows horizontally')
+    driver.fill('#password-change-current', wrong_password)
+    driver.fill('#password-change-new', new_password)
+    driver.fill('#password-change-confirmation', new_password)
+    driver.click('#password-change-acknowledge')
+    driver.click_button('Change password and lock')
+    driver.wait_text('.password-change [role=alert]', 'current password is incorrect', 'wrong current password rejected')
+    for field in ['current', 'new', 'confirmation']:
+        driver.wait_value('#password-change-' + field, '', 'submitted password cleared')
+    driver.fill('#password-change-current', password)
+    driver.fill('#password-change-new', new_password)
+    driver.fill('#password-change-confirmation', new_password)
+    driver.click('#password-change-acknowledge')
+    driver.click_button('Change password and lock')
+    driver.wait_text('.auth-card', 'Workspace password changed.', 'successful password change locks and clears workspace')
+    if driver.visible('.app-shell') or driver.visible('.password-change'):
+        raise SmokeFailure('Private workspace remained visible after password change')
+    driver.fill('#password', password); driver.click_button('Unlock workspace')
+    driver.wait_text('.auth-card [role=alert]', 'password is incorrect', 'old password rejected by active generation')
+    driver.fill('#password', new_password); driver.click_button('Unlock workspace')
+    driver.open_client('Alex Fictional')
+    driver.wait_text('.notes-history', 'Synthetic private note for Alex only.', 'original notes survive rotation')
+    restart_driver(); driver.open(binary)
+    driver.fill('#password', new_password); driver.click_button('Unlock workspace')
+    driver.open_client('Alex Fictional')
+    driver.wait_text('.notes-history', 'Synthetic private note for Alex only.', 'new password and notes survive complete restart')
+    new_backup = backup(new_password)
+    for path, secret, wrong in [(old_backup, password, new_password), (new_backup, new_password, password)]:
+        driver.click('.lock-button'); driver.click('.restore-panel > summary')
+        driver.fill('#restore-file', str(path)); driver.fill('#restore-password', wrong)
+        driver.click_button('Verify backup for recovery')
+        driver.wait_text('.restore-panel [role=alert]', 'could not be verified', 'backup rejects other-generation password')
+        driver.fill('#restore-password', secret); driver.click_button('Verify backup for recovery')
+        driver.wait_text('.restore-review', 'Verified backup', 'backup accepts its original password')
+        driver.fill('#restore-confirmation', 'RESTORE'); driver.click_button('Restore verified workspace')
+        driver.wait_text('.auth-card', 'Workspace restored.', 'original-password backup activated')
+        driver.fill('#password', secret); driver.click_button('Unlock workspace')
+        driver.open_client('Alex Fictional')
+        driver.wait_text('.notes-history', 'Synthetic private note for Alex only.', 'records retained through password-generation backup recovery')
+    if old_backup.read_bytes() != old_bytes:
+        raise SmokeFailure('Password change or restore rewrote the older encrypted backup')
+    status('workspace password change, wrong-password rejection, empty submitted secrets, locked private UI, new-password restart, unchanged older backup, and old/new original-password encrypted recovery')
 
 
 def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Path,
@@ -3466,8 +3537,18 @@ def main() -> int:
                         raise SmokeFailure("The native driver exited unexpectedly before the restart checkpoint")
                     stop_driver(process)
                     driver.session_id = None
-                    ensure_available(options.port)
-                    ensure_available(options.native_port)
+                    # stop_driver verified there are no live group members.
+                    # WebKit's closed TCP sockets can still occupy a port in
+                    # TIME_WAIT. Wait only on availability; never replay a UI
+                    # action or weaken the full-process-restart assertion.
+                    def ports_released() -> bool:
+                        try:
+                            ensure_available(options.port)
+                            ensure_available(options.native_port)
+                            return True
+                        except SmokeFailure:
+                            return False
+                    driver.wait(ports_released, "closed native driver ports released", seconds=75)
                     launch_driver()
                     driver.wait(ready, "fresh native WebDriver readiness", seconds=25)
 
