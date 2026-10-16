@@ -9,11 +9,24 @@ bank-only final and v2 combined final bases remain distinct. Scoped read-only
 preview receipts, stale-export checks and the existing no-overwrite writer protect
 the workflow. See [usage and limits](report-presentation.md).
 
-Locked setup, the frontend build, 218 UI tests, 218 Linux library + 2 PDF-worker
-tests, three focused backend fixtures, formatting and Clippy (all targets,
-warnings denied) passed. Standalone native workflow and Windows source validation
-are in progress; this stage is not complete until their actual results are
-recorded here. No installer is being created.
+Validation on 2026-10-15 (America/Chicago), current progress:
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing configuration reused |
+| Production frontend / complete UI suite | Passed build and 218 tests |
+| Complete Linux backend | Passed 219 library + 2 PDF-worker tests on corrected source |
+| Focused PDF checks | Passed four tests, including first-page bounds and explicit logo/glyph clearance |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug/no bundles on corrected source |
+| Complete native workflow | Passed, exit 0: all earlier workflows plus internal/v1/v2 first-page figures, full appendix, original detailed option, no-overwrite, identity, lock/client isolation, restart and encrypted recovery |
+| Visual inspection | Passed corrected internal/v1/v2 summary pages, appendix and report preview |
+| Windows source validation | Final run in progress; no completion claim yet |
+| Installer | Not created, per user instruction |
+
+Feature commit: `2a4fb123576c531a17eec973175cbbae3f9cf56c`.
+Logo-spacing correction: `caf1db529b33c8edb5751b76ac05278dcb1cda18`.
+Application source is unchanged by subsequent UI-fixture commits.
 
 The long-identity fixture initially exposed a first-page overflow. Compact full
 identities, a compact logo, fixed summary rows and moving the full title and firm
@@ -24,8 +37,25 @@ The first complete native workflow passed. Subsequent image inspection exposed
 logo/firm-name overlap, which text extraction cannot detect. The new presentation
 now reserves explicit logo clearance on summary/appendix pages; original detailed
 layout geometry is unchanged. A geometry regression test checks glyph bounds and
-the top margin, and the source checks/native workflow are being repeated for the
-corrected source before completion.
+the top margin. Corrected source passed the complete backend and native workflow;
+rendered summary and appendix images were visually checked for clear spacing.
+
+Windows initially passed the first feature source. The corrected-source rerun
+exposed an older branding fixture observing the dirty callback before its effect
+completed; test-only commit `4383666` waits for that callback. A subsequent run
+exposed the older v1 approval fixture clicking readiness before the selected
+report's child initialization completed; test-only commit `7072123` flushes that
+saved-report initialization before clicking. Every original assertion remains.
+The complete 218-test UI suite passes locally and on the latest Windows run;
+Windows backend results are still pending.
+
+
+Native artifacts: `/workspace/shared/desktop-smoke-presentation`; validation logs
+use `/workspace/shared/presentation-`. The corrected native exit file records `0`.
+First-pass PDFs/screens/logs are preserved separately under `before-spacing`.
+No dependency, schema migration or installer was added. Direct Windows printing,
+installed Windows acceptance and commercial readiness remain open; the last
+installer preview is still 0.23.0.
 
 Next priority: bounded native Windows printing, with explicit file lifecycle,
 user action, cancellation/failure handling and Windows acceptance. Direct in-app
