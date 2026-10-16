@@ -1,79 +1,84 @@
-# Windows development installer — 0.23.0
+# Windows development installer — 0.46.0
 
-Current development source is **0.28.0**, with all twelve main sections and a persistent
-document collection checklist. Schema 18 adds retained request history; report
-format 5 remains supported. No new installer is created until requested.
-The downloadable **0.23.0** preview below predates those changes. Do not open a
-schema-18 workspace or format-5 reports with the older application.
+The current preview includes the redesigned client directory, in-app client tabs,
+twelve focused workspace sections and review subtabs. Existing financial tools,
+imports, immutable report evidence, encrypted backup/recovery, password changes
+and configurable inactivity locking are retained. Schema is 29.
 
 ## Download and install
 
-[Download the verified 0.23.0 Windows x64 preview](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38668750314/artifacts/11943645145)
-(about 213 MiB). The ZIP contains `Eisenbart Counseling Suite_0.23.0_x64-setup.exe`,
-`README.txt` and `SHA256SUMS.txt`. This artifact expires October 29, 2026 (UTC).
-[Build and Windows checks](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38668750314)
-passed for source `bd2d1a88544ea941e69373f6312cf275d3767186`.
+[Download the verified 0.46.0 Windows x64 preview](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38950497634/artifacts/12069289452)
+(about 213.4 MiB). Extract the ZIP to find
+`Eisenbart Counseling Suite_0.46.0_x64-setup.exe`, `README.txt` and `SHA256SUMS.txt`.
+GitHub sign-in with repository access may be required. The artifact expires
+October 30, 2026 at 19:20 (UTC); expired artifacts require another build.
 
-1. Download the **windows-installer** ZIP from the verified build link. Sign in to
-   GitHub with access to the repository if prompted.
-2. Right-click the ZIP and choose **Extract All**. Read the included `README.txt`.
-3. Run the `.exe` in the extracted folder, then open **Eisenbart Counseling Suite**
-   from the Windows Start menu.
-4. Use fictional records and retain the password you choose. See the
-   [evaluation guide](user-guide.md) for the client, scenario, report and backup steps.
+[Build and Windows validation](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38950497634)
+passed for source `cc29e7764b2a6bfd9ca6cad181438dbfc5deab49`. That commit differs
+from the natively tested application source `3cba5da` only in bundled download
+instructions. SHA-256 was checked again after downloading the package:
 
-This is an unsigned development installer; Windows may show an unknown-publisher
-or SmartScreen warning. Confirm the build/version and repository before running
-it. No certificate or signing claim is supplied. The artifact is retained for
-14 days; an expired download requires a new build.
+```text
+c398a20641ba396466f7c13473f6c5df7d0b2935a9107c0954fc9f0ac22a922c  Eisenbart Counseling Suite_0.46.0_x64-setup.exe
+```
 
-The current package includes budgets, debt/savings/cash-flow planning, encrypted
-recovery, reviewed CSV/selectable-text PDF imports, recurring and balance review,
-approved-data charts, saved scenarios and counselor/client-plan PDF export.
-Temporary income periods show funding deficits/recovery and explicitly selected
-paycheck changes. Scanned OCR, advanced terms, broader intake/follow-up and other
-commercial requirements remain open. This is not a production release.
+1. Download the **windows-installer** ZIP and choose **Extract All** in File Explorer.
+2. Read its `README.txt`, then run the extracted `.exe`.
+3. Open **Eisenbart Counseling Suite** from the Windows Start menu.
+4. Use fictional records and retain the password you choose. Follow the
+   [evaluation guide](user-guide.md) for clients, planning, reports and recovery.
+
+This is an unsigned development installer. Windows may show an unknown-publisher
+or SmartScreen warning. No publisher certificate or commercial-readiness claim is
+supplied. Essential operation is offline; the installer is configured to include
+Microsoft's WebView2 offline redistributable.
 
 ## Updating an earlier preview
 
-Close the app before installing. Keep the existing workspace, its password and a
-backup. If the old preview has no backup controls, copy the entire closed-app data
-folder to a safe location first. Do not delete files to make setup appear again.
-Version 0.23.0 uses schema 16 and migrates supported older workspaces; earlier
-applications may not read upgraded or newly extended records. Keep using the new
-version afterward. Reinstalling cannot recover a forgotten encryption password.
+Close all application instances before installing. Preserve the existing
+workspace, its password and a supported encrypted backup. If an old preview has
+no backup controls, copy its entire closed-app data folder to a safe location
+first. Never delete files to force setup to appear. This version migrates
+supported older workspaces to schema 29; older apps may not read upgraded records.
+Continue using the new version afterward.
 
 The normal per-user data directory is `%LOCALAPPDATA%\com.eisenbart.counseling`.
-After recovery, `workspace-active.json` selects records under recovery generations.
-Keep that entire directory intact; do not edit or move individual database,
-metadata, pointer or recovery files. Use supported encrypted backup and restore.
+`workspace-active.json` selects records under recovery generations. Keep the
+entire directory intact; do not edit or move individual databases, metadata,
+pointers or recovery files. Use supported encrypted backup and restore.
+
+Changing the current workspace password creates a verified encrypted generation
+and locks the app. Existing backups and retained originals keep their original
+passwords. Restoring an older backup restores its password and captured settings.
+There is no forgotten-password reset; reinstalling cannot recover a lost password.
+Close older app versions before changing passwords or inactivity policy.
 
 ## What validation establishes
 
-The packaging workflow runs on a disposable Windows Server 2025 x64 runner. It
-installs locked dependencies, builds/tests the frontend, tests Rust persistence
-and PDF workers, builds the actual NSIS installer, installs it into a private
-location, checks a responsive installed x64 native window, uninstalls it and
-cleans only its own data. SHA-256 download metadata is produced after those steps.
-The script refuses existing installations, processes or workspaces.
+The packaging workflow ran locked frontend builds, all 271 UI tests, all 247
+Windows library tests and both PDF-worker tests on Windows Server 2025 x64.
+It built the NSIS installer, installed it in a private test directory, checked a
+responsive installed x64 native window, stopped its test process, uninstalled,
+and removed only its own data. Its log explicitly records that no setup/password/
+client workflow was entered and offline installation was not tested. Download
+metadata and checksums were generated after successful package checks.
 
-This does not establish a complete installed Windows counseling workflow, a clean
-Windows 11 offline installation without preinstalled WebView2, or a security
-review. The installer is configured to carry Microsoft's WebView2 offline
-redistributable. Its inclusion and actual package results are recorded in
-[development status](development-status.md). Linux native workflow checks and
-Windows package checks are separate evidence.
+Linux validation separately covers the complete native counseling, statement,
+report, privacy, restart and encrypted recovery workflows, plus focused redesign
+checks and desktop/narrow visual inspection. See [executed evidence and source
+scope](development-status.md). Automated Windows launch checks do not establish a
+complete installed counseling workflow, clean Windows 11 offline installation,
+independent security/accessibility review or commercial readiness.
 
 ## Clean Windows 11 evaluation still needed
 
-Use a disposable fictional workspace to check setup, wrong passwords, client
-isolation, budgets/debt/savings/cash flow, CSV/PDF approvals and original evidence,
-recurring/balance review, approved dashboards, scenario periods, reports/client
-plans, lock/restart and encrypted recovery. Repeat offline. Test native file/folder
-dialogs, wrong/damaged backups, retained originals, error-screen recovery and an
-upgrade from a copied fictional older workspace. Check uninstall/reinstall data
-behavior separately. Preserve failures and their steps. Signing, accessibility,
-security, realistic data volume and commercial acceptance remain release work.
+Use a disposable fictional workspace to check an offline installation and upgrade,
+setup/wrong passwords, client tabs/isolation, planning and source approvals,
+original report evidence, PDF export/viewer handoff, lock/restart, password changes,
+inactivity policy and encrypted recovery. Test native file/folder dialogs,
+wrong/damaged backups, retained originals, error-screen recovery and uninstall/
+reinstall data behavior. Preserve failures and their steps. Scanned PDF OCR,
+advanced financial terms and other planned requirements remain open.
 
 ## Build instructions for a developer
 

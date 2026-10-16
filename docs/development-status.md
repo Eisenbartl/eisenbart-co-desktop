@@ -9,7 +9,7 @@ local rail, separate review subtabs and a scoped read-only saved-plan overview.
 Existing forms, financial engines, imports, immutable history and security controls
 are reused. [Design, workflow mapping and boundaries](client-workspace-redesign.md).
 
-Validation in progress on 2026-10-16 (America/Chicago):
+Executed validation on 2026-10-16 (America/Chicago):
 
 | Check | Result |
 |---|---|
@@ -19,7 +19,7 @@ Validation in progress on 2026-10-16 (America/Chicago):
 | Standalone native build | Passed debug build with embedded assets, no bundles |
 | Focused redesign / visual | Passed exit 0 and final completion marker: twelve sections, exact amounts/mismatch, ID deduplication, cancel/discard, isolation, MRU close, 800px layout, privacy and full restart; desktop/narrow images visually inspected |
 | Complete native regression | Passed exit 0, durable zero status and final completion marker: all original planning, statements, report/history, bank/card, approval, lock/restart, recovery, real idle timeout and password-change checks through actual focused pages |
-| Windows installer | Initial application-source run `38945011333` passed 271 UI + 247 Windows library + 2 worker tests and actual install/responsive x64 launch/uninstall; final run `38950497634` on packaging-instructions-only follow-up `cc29e77` is building the package with its corrected README |
+| Windows installer | Final run [`38950497634`](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38950497634) passed frontend build, all 271 UI + 247 Windows library + 2 worker tests, NSIS build, actual install/responsive x64 launch/uninstall and upload; downloaded EXE SHA-256 and version/source/README reverified |
 
 Native testing exposed an existing compatibility error: tauri-plugin-dialog 2.8.2
 replaces `window.confirm` with an async function. Synchronous guards treated its
@@ -42,7 +42,8 @@ prompts fail instead of being auto-accepted. All original financial/source/repor
 privacy assertions remain. Deliberately interrupted integration attempts and
 failed attempts retain separate logs/screenshots and are not counted as passes,
 even if the outer D-Bus wrapper returned zero after an interrupt. A final marker
-and durable zero exit status are both required. Both the final focused run and final complete rerun passed.
+and durable zero exit status are both required. Both the final focused run and
+final complete rerun passed.
 
 Application source is committed/pushed as `3cba5da`. Both final native runs use
 that standalone embedded-assets binary; `cc29e77` changes only the Windows bundled
@@ -54,6 +55,19 @@ logs and durable exit files are retained under `/workspace/shared/redesign-valid
 final full artifacts use
 `/workspace/shared/desktop-smoke-redesign-final-complete-workflow` and focused
 artifacts use `/workspace/shared/desktop-smoke-redesign-final-focused`.
+
+The [verified 0.46.0 Windows x64 download](windows.md) is a 213.4 MiB ZIP containing
+the unsigned NSIS installer, corrected current-version instructions and its
+SHA-256 checksum. Artifact `12069289452` expires 2026-10-30 19:20 UTC. Downloaded
+EXE hash: `c398a20641ba396466f7c13473f6c5df7d0b2935a9107c0954fc9f0ac22a922c`.
+Its recorded source is `cc29e7764b2a6bfd9ca6cad181438dbfc5deab49`; subsequent
+`2188428` changes only the native driver and documentation. The first packaging
+run `38945011333` also passed, but its README described an older UI. The final
+run repackaged the same application source with corrected instructions. The
+Windows log explicitly limits its installed check to a responsive x64 window;
+it does not claim an installed counseling workflow or an offline installation.
+Validation logs and final artifact metadata/checksum evidence are preserved under
+`/workspace/shared/redesign-validation`.
 
 No release or commercial-readiness claim is made. The original prototype's sample
 records were not imported into production workspaces. Essential operation remains

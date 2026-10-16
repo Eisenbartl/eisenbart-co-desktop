@@ -83,12 +83,17 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-The current user-directed stage is the 0.46.0 client design/navigation pivot and
-explicitly requested Windows development installer. Complete its visual/native/
-Windows package acceptance before beginning another feature stage. Retained-copy
-recovery selection, destructive pruning, scheduled backups and broader security/
-commercial acceptance remain separate work. Password changes and configurable
-inactivity are implemented through 0.45.0 and preserved by this redesign.
+The user-directed 0.46.0 client design/navigation stage and explicitly requested
+Windows development installer are complete: focused desktop/narrow visual checks,
+complete native regression and automated Windows packaging/install/launch/uninstall
+passed. See [executed evidence](development-status.md) and the [verified download](windows.md).
+Clean Windows 11 offline installation and full installed workflows, independent
+security/accessibility review and commercial acceptance remain separate gates.
+
+The next bounded feature priority remains retained-workspace recovery selection
+with original-password verification. Destructive pruning and scheduled backups
+remain separate work. Password changes and configurable inactivity are implemented
+through 0.45.0 and preserved by this redesign. Do not rebuild those completed tools.
 
 Client history and reviewed note corrections are implemented in 0.43.0; see [usage and limits](client-history.md).
 
