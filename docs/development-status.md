@@ -16,7 +16,7 @@ queries/preparation use source fingerprints; no new persistence layer, schema,
 financial calculator, dependency or automatic approval is added. See
 [usage and limits](classification-assistance.md).
 
-Validation in progress on 2026-10-16 (America/Chicago):
+Validation completed on 2026-10-16 (America/Chicago):
 
 | Check | Result |
 |---|---|
@@ -25,9 +25,35 @@ Validation in progress on 2026-10-16 (America/Chicago):
 | Focused backend | Passed complete classification fixture, including read-only scope, atomic decisions and recovery |
 | Complete Linux backend | Passed 224 library + 2 PDF-worker tests |
 | Formatting / Clippy | Passed; all targets with warnings denied |
-| Standalone native build / complete native workflow | Build starting; full smoke pending |
-| Windows source validation | Starting with feature push; installer steps remain disabled |
+| Standalone native build | Passed debug build, no bundles |
+| Complete native workflow | Passed, exit 0 and final completion marker: all prior workflows plus actual bank import/approvals, 31-candidate paging, draft/discard, explicit unapproved save, unchanged approved totals, history, lock/restart/encrypted recovery and client isolation |
+| Native visual inspection | Passed actual category suggestion/evidence screen |
+| Windows source validation | Passed 231 UI + 225 library + 2 PDF-worker tests on the feature source; all five installer/checksum/upload steps skipped |
 | Installer | Not created, per user instruction |
+
+Feature/source commit: `aed4557acfdcb977854fb6fa1580ace93041f287`.
+[Windows run 38859790975](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38859790975)
+passed for that exact source; its library suite completed in 777.96 seconds. Raw
+metadata/logs were checked for the source SHA, actual counts and skipped installer
+steps. The complete Linux suite passed 224 library + 2 PDF-worker tests; the
+merchant-identity extraction also retained the existing recurring/history/report
+behavior in the full suite and native workflow.
+
+Native artifacts are in `/workspace/shared/desktop-smoke-classification`;
+validation logs and verified Windows metadata use `/workspace/shared/classification-`.
+The native run has both exit `0` and the final complete-workflow marker, including
+the new category assertions. `native-category-suggestions.png` was visually checked
+for readable category/status/source approval evidence and no horizontal overflow.
+No Cargo checks ran after the standalone build or during the native workflow.
+
+Clean source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-category-suggestions-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-category-suggestions-source.bundle`.
+The helper checks every tracked file against final clean HEAD and remote main.
+Only this final validation record follows the exact application source tested
+on Windows. No installer was created; the last downloadable preview remains
+0.23.0. These source/native checks do not establish installed Windows offline
+acceptance or commercial readiness.
 
 Next priority: **reusable local category-rule CRUD**, with explicit scope,
 version/history, conflict handling and archived/reactivated rules. Rules will
