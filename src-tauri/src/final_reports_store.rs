@@ -30,7 +30,12 @@ fn preview(c: &Connection, w: &WorkspaceInfo, client: &str, id: &str) -> Result<
         approval_id,
     })
 }
-fn record(c: &Connection, w: &WorkspaceInfo, client: &str, id: &str) -> Result<Record, String> {
+pub(super) fn record(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    client: &str,
+    id: &str,
+) -> Result<Record, String> {
     limits(c, w, client)?;
     let row:Option<(String,String,String,String)>=c.query_row("SELECT payload_json,digest,assessment_id,approved_at FROM final_report_approvals WHERE id=?1 AND client_id=?2 AND organization_id=?3 AND counselor_id=?4",params![id,client,w.organization_id,w.counselor_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional().map_err(storage_error)?;
     let (json, digest, parent, at) =

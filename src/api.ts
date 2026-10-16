@@ -22,6 +22,9 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getReportPresentation:(clientId:string,assessmentId:string)=>command<import('./types').ReportPresentationContext>('get_report_presentation',{clientId,assessmentId}),
+  chooseReportPresentationPdf:(clientId:string,assessmentId:string,kind:import('./types').ReportPresentationKind,layout:import('./types').ReportPresentationLayout)=>command<string|null>('choose_report_presentation_pdf',{clientId,assessmentId,kind,layout}),
+  exportReportPresentation:(clientId:string,input:{assessmentId:string;kind:import('./types').ReportPresentationKind;layout:import('./types').ReportPresentationLayout;expectedReceipt:string;path:string})=>command<{path:string;pages:number;recordId:string}>('export_report_presentation',{clientId,input}),
   queryTransactionActivity:(clientId:string,input:import('./types').ActivityQuery)=>command<import('./types').ActivityPage>('query_transaction_activity',{clientId,input}),
   getCardFacts:(clientId:string)=>command<import('./types').CardCompletenessRecord>('get_card_facts',{clientId}),
   saveCardFacts:(clientId:string,input:{expectedRevision:number;expectedSourceRevision:number;expectedProfileUpdatedAt:string;data:import('./types').CardCompletenessData;acknowledge:boolean})=>command<import('./types').CardCompletenessRecord>('save_card_facts',{clientId,input}),

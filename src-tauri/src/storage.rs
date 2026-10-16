@@ -28,6 +28,8 @@ pub mod final_reports_store;
 pub mod imports_store;
 #[path = "report_intake_store.rs"]
 pub mod report_intake_store;
+#[path = "report_presentation_store.rs"]
+pub mod report_presentation_store;
 #[path = "scenarios_store.rs"]
 pub mod scenarios_store;
 #[path = "statement_accounts_store.rs"]

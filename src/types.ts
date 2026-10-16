@@ -414,3 +414,8 @@ export interface ActivityFields {date:string|null;amount:string|null;description
 export interface ActivityLink {kind:string;sourceId:string;recordId:string;decisionId:string|null;current:boolean}
 export interface ActivityEvent {id:string;sourceId:string;recordId:string;row:number|null;decisionId:string|null;occurredAt:string;counselorName:string|null;fromStatus:ReviewStatus|null;status:ReviewStatus;currentStatus:ReviewStatus;latest:boolean;fields:ActivityFields;reason:string;raw:RawCsvRecord;links:ActivityLink[]}
 export interface ActivityPage {clientId:string;snapshot:string;query:ActivityQuery;total:number;pageSize:number;sources:ActivitySource[];events:ActivityEvent[]}
+
+export type ReportPresentationKind='internal'|'final';
+export type ReportPresentationLayout='summaryAppendix'|'detailed';
+export interface ReportPresentationSummary {kind:ReportPresentationKind;recordId:string;digest:string;title:string;firmName:string;clientName:string;periodStart:string;periodEnd:string;reportDate:string;balanceAsOf:string|null;basis:string;status:string;needsReview:boolean;reviewReasons:string[];figures:{label:string;value:string|null}[];disclosure:string}
+export interface ReportPresentationContext {clientId:string;assessmentId:string;presentation:string;receipt:string;internal:ReportPresentationSummary;finalReport:ReportPresentationSummary|null}

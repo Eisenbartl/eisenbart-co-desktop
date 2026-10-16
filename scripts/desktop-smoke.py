@@ -1805,6 +1805,92 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_card_completeness(driver, artifacts, data_root, password, binary, restart_driver)
     check_card_final_approval(driver, artifacts, data_root, password, binary, restart_driver)
     check_transaction_history(driver, artifacts, data_root, password, binary, restart_driver)
+    check_report_presentation(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Path,
+                              password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    card_title='Fictional approved bank/card assessment'
+    bank_title='Fictional final-ready completed-period assessment'
+    def open_page(select_client: bool=False) -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Reports']")
+        if not select_client:driver.interactive('.saved-assessments > summary')
+        driver.click_button('Print & presentation')
+        if select_client:driver.select('#workspace-client','Jamie Complete')
+        driver.interactive('#workspace-client');driver.interactive('#presentation-assessment')
+    def choose(title: str,final: bool=True) -> None:
+        driver.interactive('#presentation-assessment')
+        choice=driver.observe_script("return Array.from(document.querySelector('#presentation-assessment').options).find(o=>o.textContent.startsWith(arguments[0]))?.textContent",[title])
+        if not choice:raise SmokeFailure('Original report is missing from presentation directory')
+        driver.select('#presentation-assessment',choice);driver.interactive('#presentation-kind')
+        if final:driver.select('#presentation-kind','Original final counselor approval')
+        driver.interactive('#presentation-layout')
+    def export(name: str) -> Path:
+        target=artifacts / name
+        driver.fill_pdf_destination('#presentation-pdf-path',target)
+        driver.click_button('Export presentation PDF')
+        driver.wait_text('.report-presentation > .success-message',str(target),'reviewed presentation PDF exported')
+        driver.wait(lambda:target.is_file(),'presentation PDF file exists')
+        driver.interactive('#presentation-layout')
+        return target
+    def check_pdf(path: Path,card: bool=True) -> None:
+        first=subprocess.run(['pdftotext','-f','1','-l','1','-layout',str(path),'-'],check=True,capture_output=True,text=True).stdout
+        all_text=subprocess.run(['pdftotext','-layout',str(path),'-'],check=True,capture_output=True,text=True).stdout
+        compact=''.join(first.split())
+        expected=['Jamie Complete','2026-09-01','2026-09-30','Financial summary / USD','counselor-summary-v1','CURRENT CONTEXT NEEDS REVIEW']
+        expected+=['1287.10','712.91','749.96','50.03','1037.05'] if card else ['Bank-only approved activity','799.99','1200.02']
+        for value in expected:
+            if ''.join(value.split()) not in compact:raise SmokeFailure(f'First PDF page omitted {value}')
+        if 'Approval SHA-256' in first or 'Approved check /' in first:raise SmokeFailure('Approval audit detail displaced the financial summary')
+        if 'Evidence appendix / original detailed report' not in all_text:raise SmokeFailure('Summary PDF omitted detailed evidence appendix')
+        if card and compact.count('1037.05')!=1:raise SmokeFailure('Card debt was duplicated on the summary page')
+    open_page();choose(card_title)
+    driver.wait_text('.presentation-summary','Combined recorded spendingUSD 1287.10','reviewed card figures displayed without frontend calculation')
+    driver.wait_text('.presentation-summary','Current context needs review','historical approval status is explicit')
+    identity=driver.observe_script("return Array.from(document.querySelectorAll('.presentation-summary .field-help')).find(e=>e.textContent.startsWith('Original record'))?.textContent")
+    if not identity:raise SmokeFailure('Original report integrity reference missing')
+    driver.scroll_to('.presentation-summary','start');driver.screenshot(artifacts / 'native-report-presentation.png')
+    summary=export('summary-card.pdf');check_pdf(summary);original=summary.read_bytes()
+    driver.select('#presentation-layout','Original detailed layout')
+    driver.fill_pdf_destination('#presentation-pdf-path',summary);driver.click_button('Export presentation PDF')
+    driver.wait_text('.report-presentation > [role=alert]','already exists','existing summary PDF cannot be overwritten')
+    if summary.read_bytes()!=original:raise SmokeFailure('Detailed export overwrote an existing summary PDF')
+    detailed=export('summary-card-original-detailed.pdf')
+    first=subprocess.run(['pdftotext','-f','1','-l','1','-layout',str(detailed),'-'],check=True,capture_output=True,text=True).stdout
+    if 'Final approval ID' not in first or 'counselor-summary-v1' in first:raise SmokeFailure('Original detailed layout changed interpretation')
+    choose(bank_title);driver.select('#presentation-layout','Summary with evidence appendix')
+    bank=export('summary-bank-v1.pdf');check_pdf(bank,False)
+    choose(card_title,False)
+    driver.wait_text('.presentation-summary','Bank-only approved activity','internal report remains bank-only rather than inheriting final combined approval figures')
+    internal=export('summary-internal.pdf')
+    first=subprocess.run(['pdftotext','-f','1','-l','1','-layout',str(internal),'-'],check=True,capture_output=True,text=True).stdout
+    if 'Internal assessment / incomplete information' not in first or 'Combined recorded spending' in first:raise SmokeFailure('Internal summary was presented as a final card approval')
+    choose(card_title)
+    driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','presentation workspace locked')
+    if driver.observe_script("return document.querySelector('.report-presentation')!==null"):raise SmokeFailure('Private report presentation remained on locked page')
+    restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace')
+    open_page(True);choose(card_title)
+    current=driver.observe_script("return Array.from(document.querySelectorAll('.presentation-summary .field-help')).find(e=>e.textContent.startsWith('Original record'))?.textContent")
+    if current!=identity:raise SmokeFailure('Report presentation changed original identity after restart')
+    check_pdf(export('summary-card-restarted.pdf'))
+    backup_folder=data_root / 'presentation-backups';backup_folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery')
+    driver.fill('#backup-folder',str(backup_folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup')
+    driver.wait_text('.backup-success','Encrypted backup saved.','presentation records backed up')
+    backup_path=Path(driver.text('.backup-file-path'));driver.click_button('Lock workspace');driver.click('.restore-panel > summary')
+    driver.fill('#restore-file',str(backup_path));driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery')
+    driver.wait_text('.restore-review','Fictional Oak Counseling','original presentation sources verified for recovery')
+    driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','presentation recovery activated')
+    driver.fill('#password',password);driver.click_button('Unlock workspace');open_page(True);choose(card_title)
+    current=driver.observe_script("return Array.from(document.querySelectorAll('.presentation-summary .field-help')).find(e=>e.textContent.startsWith('Original record'))?.textContent")
+    if current!=identity:raise SmokeFailure('Encrypted recovery changed original presentation identity')
+    check_pdf(export('summary-card-restored.pdf'))
+    if summary.read_bytes()!=original:raise SmokeFailure('Restart or recovery rewrote the original exported summary')
+    driver.select('#workspace-client','Alex Fictional');driver.interactive('#workspace-client');driver.interactive('#presentation-assessment')
+    if card_title in driver.text('#presentation-assessment') or bank_title in driver.text('#presentation-assessment'):raise SmokeFailure('Another client received the original report choices')
+    driver.select('#workspace-client','Robin Synthetic');driver.interactive('#workspace-client');driver.interactive('#presentation-assessment')
+    driver.wait_text('.report-presentation','No saved assessments for this client','report presentation empty state is scoped')
+    status('summary-first PDF with full original appendix, v1/v2 exact financial basis and debt counted once, internal/final separation, original detailed layout, no overwrite, identity, privacy, restart and encrypted recovery')
 
 
 def check_transaction_history(driver: WebDriver, artifacts: Path, data_root: Path, password: str,
@@ -3183,6 +3269,11 @@ def main() -> int:
                     try:
                         if driver.visible(".imports-panel [role=alert]"):
                             print("CSV diagnostic: " + driver.safe(driver.text(".imports-panel [role=alert]")), flush=True)
+                    except SmokeFailure:
+                        pass
+                    try:
+                        if driver.visible(".report-presentation [role=alert]"):
+                            print("Presentation diagnostic: " + driver.safe(driver.text(".report-presentation [role=alert]")), flush=True)
                     except SmokeFailure:
                         pass
                     if driver.session_id:

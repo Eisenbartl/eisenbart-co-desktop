@@ -352,3 +352,11 @@ results, client isolation, lock privacy and another complete process restart.
 The fixture first imports 31 pending fictional rows through Documents so a second
 page is guaranteed, then verifies paging leaves review counts unchanged. All
 activity-page actions are read-only searches through visible controls.
+
+The 0.39.0 extension opens Reports → Print & presentation over existing recovered
+records. It exports real summary-first internal/v1/v2 PDFs, checks first-page
+identity/period/financial figures and review flags, the original detailed option,
+full appendix, exact combined cents/debt once, no-overwrite, lock privacy, full
+process restart, original identity and encrypted recovery/client isolation. PDF
+page text and rendered images are inspected separately. It does not submit jobs
+to a Windows printer or create an installer.

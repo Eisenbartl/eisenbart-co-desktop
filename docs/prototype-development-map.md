@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.38.0 source
+# Prototype structure and development map — 0.39.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -83,7 +83,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Cash-Flow Calendar → Transfer settlement | Extend per-account `cashflow.rs` events and persisted assumptions | Outgoing/incoming dates, both account shortfalls, reserves, same-day order, no premature combined liquidity or invented settlement dates |
 | Financial Scenarios → New goals & funding sources | `scenarios.rs` / `scenarios_store` and control components | Explicit new goal/funding/account IDs, baseline remains unchanged, exact affordability/milestones, immutable linked report/recovery validation |
 | Reports → Final report checklist — approval working | `final_reports.rs`, `final_reports_store.rs`, `FinalReportApproval.tsx`, report PDF | Schema-22 scoped immutable counselor approval, current evidence gates, account/scenario decisions, exact parent binding, atomic audit, final PDF and restart/recovery. [Policy limits and future work](final-report-approval.md) |
-| Reports → Print & presentation | `assessment_pdf.rs`, branding snapshots and native printing | Client/period/financial summary on the first page with approval audit details in an appendix; embedded/offline assets, exact totals, private internal evidence excluded from client plans, page margins and Windows print acceptance |
+| Reports → Print & presentation — PDF layouts working in 0.39.0 | `ReportPresentation.tsx`, `report_presentation.rs`, `report_presentation_store.rs`, `assessment_pdf.rs`; schema 25 unchanged | Summary-first page, complete evidence appendix, original detailed option, distinct internal/v1/v2 bases, exact figures/unknowns, stale/scoped/no-overwrite export, restart/recovery. Direct in-app printing and installed Windows print acceptance remain planned. [Usage](report-presentation.md) |
 | Clients → History & records | Add bounded cross-module timeline and reviewed note amendments beside note storage | Authorship, original notes retained, reason/audit, scope/pagination, stale edits, restart and encrypted recovery |
 | Documents → Statement accounts (working) | `StatementAccounts.tsx`, `statement_accounts_store`, schema 19 | Scoped standalone create/rename/archive/reactivate, revision/audit/recovery checks; original source/report associations preserved; no destructive deletion |
 | Settings → Branding — working in 0.30.0 | `FirmBranding.tsx`, `branding.rs`, `branding_store.rs`, schema 20, format-6 assessments | Implemented bounded normalized local PNG/contact/disclosure, guarded revision/audit saves, exact immutable capture, old payload/digest preservation and recovery; see [limits and future work](firm-report-branding.md) |
@@ -101,13 +101,11 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **Reports → Print & presentation**: put client identity, assessment
-period and a readable financial summary first; move approval audit details into
-an appendix without changing captured figures or original financial claims.
-Preserve existing historical exports, bounded offline rendering and scope checks.
-Direct Windows printing needs explicit acceptance before it is called complete.
-See [next-stage implementation notes](report-presentation-next-stage.md) for the
-existing renderer entry points and preservation checks.
+Implement **bounded native Windows printing** over the existing report exports.
+Define explicit user action, generated-file lifecycle, cancellation/failure and
+installed Windows acceptance first. Summary and original detailed PDF layouts
+already work; do not redo rendering or approvals. See
+[next-stage implementation notes](native-printing-next-stage.md).
 
 Card account CRUD, assignments, repayments, completeness/roles/debt mappings and
 bounded versioned final approval are implemented through 0.37.0 below. Build on
@@ -187,4 +185,15 @@ original/corrected evidence and exact counterpart decision searches. Current
 transfer/repayment context is explicitly separate from historical event state.
 No new storage, review mutations or financial calculator is introduced. See
 [usage and limits](transaction-activity-history.md). Build on this completed page;
-the next priority is report presentation/printing above.
+report presentation/printing follows in 0.39.0 below.
+
+### 0.39.0 — summary-first counselor PDF presentation
+
+`ReportPresentation.tsx` selects existing scoped records and either the new
+`counselor-summary-v1` layout or original detailed export. Rust constructs the
+summary from original validated money strings and checks a context receipt before
+writing. Internal and v1 bank-only summaries stay distinct from v2 combined
+approval figures. The new first page preserves full identity, period and review
+status; complete original evidence and firm disclosures follow in an appendix.
+No schema, calculator, policy or immutable payload changes are introduced. Direct
+in-app printing is still planned. See [usage and limits](report-presentation.md).

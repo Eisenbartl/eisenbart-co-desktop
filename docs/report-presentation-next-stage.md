@@ -1,6 +1,8 @@
 # Next stage: readable report presentation
 
-This is a development note, not implemented functionality. The original
+Implemented PDF presentation in 0.39.0 is documented in [report-presentation.md](report-presentation.md).
+This original planning note is retained as implementation context. Direct printing
+remains planned; see [native printing follow-up](native-printing-next-stage.md). The original
 specification and prototype map remain governing scope.
 
 ## Concrete problem and existing entry points

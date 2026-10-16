@@ -24,7 +24,7 @@ fn change(w: &mut Workspace, id: &str, action: cr::Action) -> cr::Directory {
     )
     .unwrap()
 }
-fn fixture(
+pub(super) fn fixture(
     w: &mut Workspace,
     c: &Client,
     dir: &Path,
@@ -282,7 +282,7 @@ fn fixture(
     input.card_facts = Some(cf::Selection { revision: 1 });
     (w.save_assessment_record(&c.id, input).unwrap(), legacy)
 }
-fn input(p: &fr::Preview) -> fr::Input {
+pub(super) fn input(p: &fr::Preview) -> fr::Input {
     let mut i = bank::final_input(p);
     i.decision.card_review=Some(fr::CardDecision {notes:"Reviewed card originals, each role and repayment, required payments and original household debt without duplication.".into(),confirmed:true});
     i

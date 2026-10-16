@@ -31,6 +31,7 @@ mod reconciliation;
 mod recurring;
 mod report_evidence;
 mod report_intake;
+mod report_presentation;
 mod saved_scenarios;
 mod savings;
 mod scenarios;
@@ -438,6 +439,82 @@ async fn approve_final_report(
     })
     .await
     .map_err(|_| "Final approval could not finish. Reopen readiness to check the stored result before another attempt.".to_owned())?
+}
+#[tauri::command]
+async fn get_report_presentation(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    assessment_id: String,
+) -> Result<report_presentation::Context, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.get_report_presentation(&client_id, &assessment_id)
+        })
+    })
+    .await
+    .map_err(|_| "Report presentation could not load.".to_owned())?
+}
+#[tauri::command]
+async fn export_report_presentation(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: report_presentation::ExportInput,
+) -> Result<assessment_pdf::Export, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.export_report_presentation(&client_id, input))
+    })
+    .await
+    .map_err(|_| {
+        "Report PDF export could not finish. Check the destination before another attempt."
+            .to_owned()
+    })?
+}
+#[tauri::command]
+async fn choose_report_presentation_pdf(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    assessment_id: String,
+    kind: report_presentation::Kind,
+    layout: report_presentation::Layout,
+) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.get_report_presentation(&client_id, &assessment_id)
+        })?
+        .selected(kind)?;
+        let name = match (kind, layout) {
+            (report_presentation::Kind::Internal, report_presentation::Layout::SummaryAppendix) => {
+                "internal-counselor-summary.pdf"
+            }
+            (report_presentation::Kind::Final, report_presentation::Layout::SummaryAppendix) => {
+                "approved-counselor-summary.pdf"
+            }
+            (report_presentation::Kind::Internal, report_presentation::Layout::Detailed) => {
+                "internal-counselor-evidence.pdf"
+            }
+            (report_presentation::Kind::Final, report_presentation::Layout::Detailed) => {
+                "approved-counselor-evidence.pdf"
+            }
+        };
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("Counselor report PDF", &["pdf"])
+            .set_file_name(name)
+            .blocking_save_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local PDF path.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "PDF destination selection could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn export_final_report_pdf(
@@ -1145,6 +1222,9 @@ pub fn run() {
             approve_final_report,
             choose_final_report_pdf,
             export_final_report_pdf,
+            get_report_presentation,
+            choose_report_presentation_pdf,
+            export_report_presentation,
             export_assessment_pdf,
             stage_client_csv,
             review_transaction,

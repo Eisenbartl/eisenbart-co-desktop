@@ -97,6 +97,108 @@ impl Layout {
         }
         Ok(())
     }
+    fn compact_branding(&mut self, data: &crate::branding::Data) -> Result<(), String> {
+        if let Some(png) = &data.logo_png {
+            let pixels = crate::branding::logo_pixels(png)?;
+            let scale = (90.0 / pixels.width as f32).min(32.0 / pixels.height as f32);
+            let width = pixels.width as f32 * scale;
+            let height = pixels.height as f32 * scale;
+            self.pages.last_mut().ok_or(ERROR)?.extend([
+                Operation::new("q", vec![]),
+                Operation::new(
+                    "cm",
+                    vec![
+                        width.into(),
+                        0.into(),
+                        0.into(),
+                        height.into(),
+                        48.into(),
+                        (self.y - height).into(),
+                    ],
+                ),
+                Operation::new("Do", vec!["BrandLogo".into()]),
+                Operation::new("Q", vec![]),
+            ]);
+            self.y -= height + 8.0;
+            self.logo = Some(pixels);
+        }
+        self.text(
+            &data.name,
+            if data.name.chars().count() > 80 {
+                12.0
+            } else {
+                18.0
+            },
+        )
+    }
+    fn next_page(&mut self) -> Result<(), String> {
+        if self.pages.len() >= MAX_PAGES {
+            return Err(
+                "This report exceeds the 1,000-page export limit. Use a smaller assessment record."
+                    .into(),
+            );
+        }
+        self.pages.push(vec![]);
+        self.y = 730.0;
+        Ok(())
+    }
+    fn summary_figure(&mut self, label: &str, value: Option<&str>) -> Result<(), String> {
+        self.room(24.0)?;
+        let value = value.map_or_else(|| "Unknown".to_owned(), |v| format!("USD {v}"));
+        let width = value
+            .chars()
+            .map(|c| self.advance(c, 11.0))
+            .collect::<Result<Vec<_>, _>>()?
+            .iter()
+            .sum::<f32>();
+        let label_width = label
+            .chars()
+            .map(|c| self.advance(c, 10.0))
+            .collect::<Result<Vec<_>, _>>()?
+            .iter()
+            .sum::<f32>();
+        if width > 170.0 || label_width > WIDTH - 185.0 {
+            return Err(ERROR.into());
+        }
+        for (text, x, size) in [
+            (label, 48.0, 10.0),
+            (value.as_str(), 48.0 + WIDTH - width, 11.0),
+        ] {
+            let encoded = self.encode(text)?;
+            self.pages.last_mut().ok_or(ERROR)?.extend([
+                Operation::new("BT", vec![]),
+                Operation::new("rg", vec![0.10.into(), 0.18.into(), 0.24.into()]),
+                Operation::new("Tf", vec!["F1".into(), size.into()]),
+                Operation::new(
+                    "Tm",
+                    vec![
+                        1.into(),
+                        0.into(),
+                        0.into(),
+                        1.into(),
+                        x.into(),
+                        self.y.into(),
+                    ],
+                ),
+                Operation::new(
+                    "Tj",
+                    vec![Object::String(encoded, lopdf::StringFormat::Hexadecimal)],
+                ),
+                Operation::new("ET", vec![]),
+            ]);
+        }
+        self.pages.last_mut().ok_or(ERROR)?.extend([
+            Operation::new("q", vec![]),
+            Operation::new("RG", vec![0.86.into(), 0.89.into(), 0.91.into()]),
+            Operation::new("w", vec![0.5.into()]),
+            Operation::new("m", vec![48.into(), (self.y - 8.0).into()]),
+            Operation::new("l", vec![564.into(), (self.y - 8.0).into()]),
+            Operation::new("S", vec![]),
+            Operation::new("Q", vec![]),
+        ]);
+        self.y -= 24.0;
+        Ok(())
+    }
     fn advance(&self, c: char, size: f32) -> Result<f32, String> {
         // This renderer has no shaping engine. Never silently lose unsupported text.
         if matches!(c,'\u{0300}'..='\u{036f}'|'\u{200b}'..='\u{200f}'|'\u{202a}'..='\u{202e}'|'\u{2066}'..='\u{2069}')
@@ -882,25 +984,110 @@ fn report_evidence_pdf(l: &mut Layout, p: &crate::assessments::Payload) -> Resul
     }
     Ok(())
 }
+fn presentation_summary(
+    l: &mut Layout,
+    r: &Record,
+    approved: Option<&crate::final_reports::Record>,
+    exported_at: &str,
+) -> Result<(), String> {
+    let s = crate::report_presentation::summary(r, approved)?;
+    if let Some(b) = &r.payload.branding {
+        l.compact_branding(&b.data)?;
+    } else {
+        l.text(
+            &s.firm_name,
+            if s.firm_name.chars().count() > 80 {
+                12.0
+            } else {
+                18.0
+            },
+        )?;
+    }
+    l.text("Financial counseling summary", 16.0)?;
+    l.text(&s.status, 10.0)?;
+    l.text(
+        &format!("Client: {}", s.client_name),
+        if s.client_name.chars().count() > 80 {
+            11.0
+        } else {
+            13.0
+        },
+    )?;
+    l.value(
+        "Assessment period",
+        &format!("{} through {}", s.period_start, s.period_end),
+    )?;
+    l.value("Report date (America/Chicago)", &s.report_date)?;
+    if s.needs_review {
+        l.text("CURRENT CONTEXT NEEDS REVIEW. Original figures remain historical; review the appendix before reuse.",9.0)?;
+    }
+    l.section("Financial summary / USD")?;
+    for f in &s.figures {
+        l.summary_figure(&f.label, f.value.as_deref())?;
+    }
+    l.text(&s.basis, 9.0)?;
+    l.value(
+        "Balance facts as of",
+        s.balance_as_of
+            .as_deref()
+            .unwrap_or("Unknown; no complete dated inventory is implied"),
+    )?;
+    l.text(&s.disclosure, 9.0)?;
+    l.text(
+        &format!(
+            "Presentation {} / checked {} (America/Chicago).",
+            crate::report_presentation::VERSION,
+            chicago_time(exported_at)?
+        ),
+        8.0,
+    )?;
+    l.text("Internal counselor information. Full report title, firm disclosures and evidence follow in the appendix.",8.0)?;
+    // The summary is deliberately bounded to one page. Never silently push its
+    // financial rows into the appendix for long but otherwise valid identities.
+    if l.pages.len() != 1 {
+        return Err("The summary cannot fit on one page. Export the original detailed layout instead; the saved report is unchanged.".into());
+    }
+    Ok(())
+}
 pub fn render(r: &Record, exported_at: &str) -> Result<(Vec<u8>, usize), String> {
-    render_report(r, exported_at, None)
+    render_report(r, exported_at, None, false)
 }
 pub fn render_final_report(
     r: &crate::final_reports::Record,
     exported_at: &str,
 ) -> Result<(Vec<u8>, usize), String> {
     crate::final_reports::validate(&r.payload, &r.assessment)?;
-    render_report(&r.assessment, exported_at, Some(r))
+    render_report(&r.assessment, exported_at, Some(r), false)
+}
+pub fn render_presented_assessment(
+    r: &Record,
+    exported_at: &str,
+) -> Result<(Vec<u8>, usize), String> {
+    render_report(r, exported_at, None, true)
+}
+pub fn render_presented_final_report(
+    r: &crate::final_reports::Record,
+    exported_at: &str,
+) -> Result<(Vec<u8>, usize), String> {
+    crate::final_reports::validate(&r.payload, &r.assessment)?;
+    render_report(&r.assessment, exported_at, Some(r), true)
 }
 fn render_report(
     r: &Record,
     exported_at: &str,
     approved: Option<&crate::final_reports::Record>,
+    presented: bool,
 ) -> Result<(Vec<u8>, usize), String> {
     let p = &r.payload;
     crate::assessments::validate(p)?;
     let a = &p.assessment;
     let mut l = Layout::new()?;
+    if presented {
+        presentation_summary(&mut l, r, approved, exported_at)?;
+        l.next_page()?;
+        l.text("Evidence appendix / original detailed report", 16.0)?;
+        l.text("Read this captured evidence together with the preceding summary. Financial capture, approval policy and record integrity are unchanged by the presentation layout.",9.0)?;
+    }
     if let Some(brand) = &p.branding {
         l.branding(&brand.data)?;
     } else {
@@ -1711,7 +1898,16 @@ fn render_report(
     l.value("Captured source revision", &a.revision.to_string())?;
     l.value("Stored record SHA-256", &r.digest)?;
     l.text("This checksum checks the stored record bytes, not this exported file, and is not a digital signature or certification. This local PDF contains readable client information outside workspace encryption. It contains captured evidence references, not attached original statement files. Keep it in an appropriate private location. Review the original sources and assumptions before acting on incomplete information.",10.0)?;
-    if approved.is_some() {
+    if presented {
+        l.finish_labeled(
+            if approved.is_some() {
+                "COUNSELOR APPROVED / SUMMARY + APPENDIX"
+            } else {
+                "INTERNAL / INCOMPLETE / SUMMARY + APPENDIX"
+            },
+            "Counselor report - summary and evidence appendix",
+        )
+    } else if approved.is_some() {
         l.finish_labeled(
             "COUNSELOR APPROVED / PRESERVED EVIDENCE",
             "Final counselor report - counselor approved",

@@ -222,3 +222,15 @@ writes, new calculator or persistent search state is introduced.
 counterpart/decision searches, labels historical versus current state and ignores
 late replies after a client switch or unmount. See
 [transaction-activity-history.md](transaction-activity-history.md).
+
+## Separate report presentation (0.39.0)
+
+`report_presentation.rs` creates compact summaries from validated immutable
+assessment/approval fields without financial calculations. The scoped store reads
+assessment and optional associated final approval in one transaction and hashes
+the preview context. Export rechecks that receipt and invokes either the original
+renderer or its explicit summary-first layout, using the existing atomic,
+no-overwrite writer. `ReportPresentation.tsx` displays Rust figures, holds busy
+navigation and clears client/lock context. Schema 25, old PDF entry points,
+financial versions and stored digests remain unchanged. Direct native printing is
+separate future work. See [report-presentation.md](report-presentation.md).

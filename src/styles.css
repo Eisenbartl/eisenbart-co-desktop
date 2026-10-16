@@ -569,3 +569,9 @@ textarea { resize: vertical; min-height: 100px; }
 .activity-locators dd {margin:0 0 .6rem;overflow-wrap:anywhere;}
 .activity-locators dt {font-weight:600;}
 .activity-event pre {white-space:pre-wrap;}
+
+.report-presentation {padding:24px;}
+.report-presentation > fieldset {margin-top:18px;}
+.presentation-summary {border:1px solid var(--line);border-radius:8px;padding:20px;margin-top:20px;overflow-wrap:anywhere;}
+.presentation-summary h3 {margin-top:8px;}
+.presentation-figures {margin:20px 0;}

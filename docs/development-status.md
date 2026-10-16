@@ -1,6 +1,32 @@
 # Development status
 
-## Current stage — searchable transaction activity (0.38.0, schema 25 unchanged)
+## Current stage — counselor report presentation (0.39.0, schema 25 unchanged)
+
+Reports → Print & presentation offers a summary-first PDF with original firm,
+client, period, review status and exact figures, followed by a full evidence
+appendix. Original detailed exports remain available. Internal bank-only, v1
+bank-only final and v2 combined final bases remain distinct. Scoped read-only
+preview receipts, stale-export checks and the existing no-overwrite writer protect
+the workflow. See [usage and limits](report-presentation.md).
+
+Locked setup, the frontend build, 218 UI tests, 218 Linux library + 2 PDF-worker
+tests, three focused backend fixtures, formatting and Clippy (all targets,
+warnings denied) passed. Standalone native workflow and Windows source validation
+are in progress; this stage is not complete until their actual results are
+recorded here. No installer is being created.
+
+The long-identity fixture initially exposed a first-page overflow. Compact full
+identities, a compact logo, fixed summary rows and moving the full title and firm
+disclosure to the appendix now preserve page-one financial figures even with
+maximal names, a logo and a current-review warning. The focused rerun passed.
+
+Next priority: bounded native Windows printing, with explicit file lifecycle,
+user action, cancellation/failure handling and Windows acceptance. Direct in-app
+printing remains planned; exported PDFs can be printed in a Windows PDF viewer.
+See [next-stage notes](native-printing-next-stage.md).
+
+
+## Searchable transaction activity (0.38.0, schema 25 unchanged)
 
 Transactions → Activity history adds a bounded read-only bank/card import and
 decision timeline, account/source/date/status and literal text filters, stable

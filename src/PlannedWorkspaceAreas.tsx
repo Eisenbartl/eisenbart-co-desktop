@@ -1,5 +1,5 @@
 import type {ModuleView} from './workspaceNavigation';
-export const workingAreas:Partial<Record<ModuleView,string[]>>={Transactions:['Activity history'],'Financial Review':['Completeness & final validation','Bank & card activity','Card completeness'],Reports:['Final report checklist'],Documents:['Collection checklist','Statement accounts','Credit-card statements']};
+export const workingAreas:Partial<Record<ModuleView,string[]>>={Transactions:['Activity history'],'Financial Review':['Completeness & final validation','Bank & card activity','Card completeness'],Reports:['Final report checklist','Print & presentation'],Documents:['Collection checklist','Statement accounts','Credit-card statements']};
 // Keep implementation entry points and acceptance criteria in docs/prototype-development-map.md.
 export const plannedAreas:Record<ModuleView,{title:string;detail:string}[]>={
  'Financial Review':[{title:'Savings progress',detail:'Dated savings progress charts based on recorded balances, with unknown-data and source labels.'}],
@@ -10,7 +10,7 @@ export const plannedAreas:Record<ModuleView,{title:string;detail:string}[]>={
  'Savings Planner':[{title:'Funding & drawdown',detail:'Model funding sources, reserved balances and drawdowns without spending the same savings twice or treating transfers as expenses.'}],
  'Cash-Flow Calendar':[{title:'Transfer settlement',detail:'Separate outgoing and incoming transfer dates, with per-account reserves and explicit settlement assumptions.'}],
  'Financial Scenarios':[{title:'New goals & funding sources',detail:'Proposed new savings goals, account-targeted extra payments and funding/drawdown controls that preserve the saved baseline.'}],
- Reports:[{title:'Print & presentation',detail:'Direct desktop printing and organization-branded report/client-plan presentation, preserving the original recorded identity.'}],
+ Reports:[],
 };
 export default function PlannedWorkspaceArea({view,title}:{view:ModuleView;title:string}) {
  const area=plannedAreas[view].find(a=>a.title===title);

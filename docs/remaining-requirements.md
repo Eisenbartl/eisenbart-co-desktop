@@ -1,4 +1,4 @@
-# Remaining original requirements after 0.38.0 source
+# Remaining original requirements after 0.39.0 source
 
 The [original product specification](product-specification.md) governs the full
 application. This is a tested development checkpoint, not a commercial release.
@@ -26,6 +26,8 @@ still identify functionality that is unavailable.
   figures and preserved original approvals/PDFs within its supported scope.
 - Searchable client-wide bank/card import/decision history with stable pages,
   original/corrected provenance and exact transfer/repayment decision navigation.
+- Summary-first counselor PDF presentation with a full evidence appendix, original
+  detailed option and scoped, stale-checked, no-overwrite exports.
 - Encrypted backup/recovery and bounded integrity validation of historical records.
 
 Do not repeat these foundations. See [development-status.md](development-status.md)
@@ -35,9 +37,11 @@ entry points and acceptance criteria.
 
 ## Next development priority
 
-Improve Reports → Print & presentation: a client/period financial summary first,
-with approval audit details in an appendix and explicit Windows printing
-acceptance. Preserve original financial capture and historical exports.
+Implement bounded native Windows printing over existing exports, with an explicit
+file lifecycle, user action, cancellation/failures and installed Windows
+acceptance. Summary-first and detailed PDF layouts already work. Manual printing
+of exported PDFs through a Windows PDF viewer is available; direct in-app printing
+remains planned.
 
 Card-inclusive final approval now works for the [bounded v2 policy](card-inclusive-final-approval.md).
 Unsupported other loan obligations, bank-refund role treatments, credits, early
