@@ -1,0 +1,29 @@
+import {act,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {beforeEach,it,expect,vi} from 'vitest';
+import ClassificationAssistance from './ClassificationAssistance';
+import type {CategoryPage} from './types';
+const mocks=vi.hoisted(()=>({queryCategorySuggestions:vi.fn(),prepareCategoryDraft:vi.fn()}));vi.mock('./api',()=>({api:mocks}));
+const fields={date:'2026-09-03',amount:'-13.03',description:"<script>Fictional Market % _'",merchant:'',category:'',kind:'expense' as const};
+const page:CategoryPage={clientId:'a',revision:3,snapshot:'fingerprint',policy:'approved-merchant-category-v1',query:{text:'',offset:0,expectedSnapshot:null},total:26,pageSize:25,candidates:[{recordId:'r',documentId:'doc',accountLabel:'Fictional checking',fileName:'fictional.csv',page:1,line:2,fields,status:'Pending',category:'Food',reason:'Current approvals agree.',evidenceCount:2,evidence:[{recordId:'proof',approvalId:'original-approval',documentId:'original-document',accountId:'bank',page:null,line:4,fields:{...fields,category:'Food'},duplicateIds:[]}]}]};
+const onBusy=vi.fn(),onDraft=vi.fn();
+beforeEach(()=>{vi.clearAllMocks();mocks.queryCategorySuggestions.mockResolvedValue(page);mocks.prepareCategoryDraft.mockResolvedValue({clientId:'a',revision:3,recordId:'r',category:'Food'});});
+function open(){return render(<ClassificationAssistance clientId="a" revision={3} disabled={false} onBusy={onBusy} onDraft={onDraft}/>);}
+async function ready(){const b=await screen.findByRole('button',{name:'Use suggested category in unsaved review'});await waitFor(()=>expect(b).toBeEnabled());return b;}
+it('shows exact evidence as literal text and prepares a revision/fingerprint-bound draft only on click',async()=>{
+ open();const b=await ready();expect(mocks.prepareCategoryDraft).not.toHaveBeenCalled();expect(screen.getByText(fields.description)).toBeInTheDocument();expect(document.querySelector('script')).toBeNull();expect(screen.getByText(/original-approval/)).toHaveTextContent('Category Food');fireEvent.click(b);await waitFor(()=>expect(onDraft).toHaveBeenCalledExactlyOnceWith({clientId:'a',revision:3,recordId:'r',category:'Food'}));expect(mocks.prepareCategoryDraft).toHaveBeenCalledWith('a',{expectedRevision:3,expectedSnapshot:'fingerprint',recordId:'r'});await waitFor(()=>expect(onBusy).toHaveBeenLastCalledWith(false));
+});
+it('pages using the original query/fingerprint and searches literal text from the first page',async()=>{
+ open();await ready();mocks.queryCategorySuggestions.mockResolvedValueOnce({...page,query:{...page.query,offset:25,expectedSnapshot:'fingerprint'}});fireEvent.click(screen.getByRole('button',{name:'Next suggestion page'}));await waitFor(()=>expect(mocks.queryCategorySuggestions).toHaveBeenLastCalledWith('a',{text:'',offset:25,expectedSnapshot:'fingerprint'}));await ready();fireEvent.change(screen.getByLabelText('Literal description or merchant search'),{target:{value:"% _'"}});fireEvent.click(screen.getByRole('button',{name:'Search category suggestions'}));await waitFor(()=>expect(mocks.queryCategorySuggestions).toHaveBeenLastCalledWith('a',{text:"% _'",offset:0,expectedSnapshot:null}));
+});
+it('keeps unknown/conflicting evidence unresolved and disables drafts while another review is dirty',async()=>{
+ mocks.queryCategorySuggestions.mockResolvedValue({...page,candidates:[{...page.candidates[0],category:null,reason:'Conflicting approved categories.'}]});open();const b=await screen.findByRole('button',{name:'Use suggested category in unsaved review'});expect(b).toBeDisabled();expect(screen.getByText(/Conflicting approved categories/)).toHaveTextContent('No suggestion');fireEvent.click(b);expect(mocks.prepareCategoryDraft).not.toHaveBeenCalled();
+});
+it('reports stale evidence without applying or retrying a decision and rejects foreign replies',async()=>{
+ mocks.prepareCategoryDraft.mockRejectedValueOnce(new Error('Classification evidence changed.'));open();fireEvent.click(await ready());expect(await screen.findByRole('alert')).toHaveTextContent('changed');expect(onDraft).not.toHaveBeenCalled();expect(mocks.prepareCategoryDraft).toHaveBeenCalledTimes(1);mocks.prepareCategoryDraft.mockResolvedValueOnce({clientId:'b',revision:3,recordId:'r',category:'Private other category'});fireEvent.click(await ready());await waitFor(()=>expect(screen.getByRole('alert')).toHaveTextContent('did not match'));expect(onDraft).not.toHaveBeenCalled();
+});
+it('clears prior client evidence, ignores a late draft, and releases busy state on unmount',async()=>{
+ let resolve!:(v:unknown)=>void;mocks.prepareCategoryDraft.mockReturnValue(new Promise(r=>resolve=r));const v=open();fireEvent.click(await ready());mocks.queryCategorySuggestions.mockResolvedValue({...page,clientId:'b',total:0,candidates:[]});v.rerender(<ClassificationAssistance clientId="b" revision={3} disabled={false} onBusy={onBusy} onDraft={onDraft}/>);await screen.findByText(/No missing-category expenses/);await act(async()=>resolve({clientId:'a',revision:3,recordId:'r',category:'Food'}));expect(onDraft).not.toHaveBeenCalled();expect(document.documentElement.outerHTML).not.toContain('original-approval');v.unmount();expect(onBusy).toHaveBeenLastCalledWith(false);
+});
+it('rejects a mismatched directory revision and honours a disabled parent',async()=>{
+ mocks.queryCategorySuggestions.mockResolvedValueOnce({...page,revision:4});const v=open();expect(await screen.findByRole('alert')).toHaveTextContent('Reload imported records');v.unmount();const x=render(<ClassificationAssistance clientId="a" revision={3} disabled={true} onBusy={onBusy} onDraft={onDraft}/>);const b=await screen.findByRole('button',{name:'Use suggested category in unsaved review'});expect(b).toBeDisabled();fireEvent.click(b);expect(mocks.prepareCategoryDraft).not.toHaveBeenCalled();x.unmount();
+});

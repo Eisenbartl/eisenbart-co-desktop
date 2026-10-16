@@ -242,3 +242,11 @@ no-overwrite writer. `ReportPresentation.tsx` displays Rust figures, holds busy
 navigation and clears client/lock context. Schema 25, old PDF entry points,
 financial versions and stored digests remain unchanged. Direct native printing is
 separate future work. See [report-presentation.md](report-presentation.md).
+
+`classification.rs` derives bounded advisory bank categories from existing approved
+merchant groups; `storage::classification_store` scopes atomic read snapshots.
+A fingerprint binds source/import revision and exact current decision evidence.
+Draft preparation recomputes the category without writes. `ClassificationAssistance`
+fills only the category in the existing `ImportsEditor` form; final decisions keep
+original revision/audit/history/approval checks. No schema/calculator change or
+saved rule store is introduced. See [policy and limits](classification-assistance.md).

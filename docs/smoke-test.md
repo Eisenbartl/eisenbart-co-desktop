@@ -369,3 +369,11 @@ exercise request scope/expiry/bytes/context/session/restore and mocked Windows
 acceptance, cancellation and launch errors. Linux smoke and Windows source tests
 do not verify an installed viewer, physical printer or print spooler; see
 [Windows acceptance steps](windows-pdf-print-workflow.md).
+
+The 0.41.0 extension retains all prior workflows, then imports a fictional bank
+source, explicitly approves two independent expenses, pages 31 missing-category
+records, displays current approval evidence and fills/discards an unsaved Food
+draft. It explicitly saves the category while retaining its unapproved status,
+checks unchanged approved financial totals, original history/reason, lock, full
+process restart, encrypted recovery and client isolation. Screenshot:
+`native-category-suggestions.png`. No installer is created.

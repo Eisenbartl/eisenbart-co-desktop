@@ -399,3 +399,12 @@ your printer in the PDF viewer. This app only reports whether Windows accepted
 the opening request; it cannot confirm printing. Exported files remain readable
 after locking the workspace. See [printing steps and limits](windows-pdf-print-workflow.md).
 This source feature is not included in the older 0.23.0 downloadable preview.
+
+## Missing transaction categories (0.41.0 source)
+
+Open Transactions → Classification assistance for your client. Expand the approved
+evidence before using a suggestion. **Use suggested category in unsaved review**
+only fills the category below; review the original source and choose an explicit
+decision before saving. It never selects Approved automatically. Conflicting or
+insufficient evidence stays unresolved. Use Working tools for manual correction
+or other transaction types. See [steps and limits](classification-assistance.md).

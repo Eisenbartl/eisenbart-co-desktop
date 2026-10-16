@@ -1806,6 +1806,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_card_final_approval(driver, artifacts, data_root, password, binary, restart_driver)
     check_transaction_history(driver, artifacts, data_root, password, binary, restart_driver)
     check_report_presentation(driver, artifacts, data_root, password, binary, restart_driver)
+    check_category_assistance(driver, artifacts, data_root, password, binary, restart_driver)
 
 
 def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Path,
@@ -1898,6 +1899,76 @@ def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Pat
     driver.wait_text('.report-presentation','No saved assessments for this client','report presentation empty state is scoped')
     if driver.observe_script("return document.querySelector('.saved-pdf-viewer')!==null"):raise SmokeFailure('Saved PDF path crossed client context')
     status('summary-first PDF with full original appendix, v1/v2 exact financial basis and debt counted once, internal/final separation, original detailed layout, no overwrite, identity, privacy, restart and encrypted recovery')
+
+
+
+def check_category_assistance(driver: WebDriver, artifacts: Path, data_root: Path,
+                              password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    name='category-fictional.csv'
+    merchant='Fictional classification market'
+    source=data_root / name
+    source.write_text('Date,Description,Amount,Category,Type\n'
+                      f'2026-09-01,{merchant},-11.01,Food,expense\n'
+                      f'2026-09-02,{merchant},-12.02,Food,expense\n'
+                      f'2026-09-03,{merchant},-13.03,,expense\n'+
+                      ''.join(f'2026-09-04,Fictional unmatched category row {i:02d},-{20+i}.00,,expense\n' for i in range(30)),encoding='utf-8')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Documents']")
+    driver.interactive('#csv-path');driver.select('#workspace-client','Alex Fictional');driver.interactive('#csv-path')
+    driver.fill('#csv-path',str(source));driver.click_button('Inspect CSV');driver.wait_text('.csv-preview',name,'fictional category source inspected')
+    driver.fill('#csv-account-label','Fictional classification checking')
+    for key,heading in [('date','1: Date'),('description','2: Description'),('amount','3: Amount'),('category','4: Category'),('kind','5: Type')]:driver.select(f'#csv-map-{key}',heading)
+    driver.click_button('Import into review queue');driver.wait_text('.imports-panel > .success-message','CSV imported into the review queue','category fixture staged without automatic approval');driver.interactive('#csv-path')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Transactions']");driver.interactive('.imports-table tbody button')
+    for number in [2,3]:
+        driver.click_button(f'Review {name} record {number}');driver.interactive('#review-category')
+        driver.select('#review-status','Approved');driver.fill('#review-reason','Fictional original source individually verified as Food')
+        driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','two independent source approvals saved explicitly');driver.interactive('.imports-table tbody button')
+    baseline=driver.text('.imports-totals')
+    driver.click_button('Classification assistance');driver.interactive('#classification-search')
+    driver.wait_text('.classification-count','31 unreviewed records','unreviewed categories counted without adding approved facts')
+    first=driver.observe_script("return Array.from(document.querySelectorAll('.classification-results > li')).map(e=>e.dataset.recordId)")
+    driver.click_button('Next suggestion page');driver.interactive('#classification-search');driver.wait_text('.classification-count','Showing 26–31','bounded second suggestion page')
+    second=driver.observe_script("return Array.from(document.querySelectorAll('.classification-results > li')).map(e=>e.dataset.recordId)")
+    if len(first)!=25 or len(second)!=6 or set(first)&set(second):raise SmokeFailure('Classification paging repeated or omitted candidates')
+    driver.click_button('Previous suggestion page');driver.interactive('#classification-search')
+    if driver.observe_script("return Array.from(document.querySelectorAll('.classification-results > li')).map(e=>e.dataset.recordId)")!=first:raise SmokeFailure('Classification first page was unstable')
+    driver.fill('#classification-search',merchant);driver.click_button('Search category suggestions');driver.interactive('#classification-search')
+    driver.wait_text('.classification-count','1 unreviewed records','exact merchant search narrows the eligible target')
+    driver.wait_text('.classification-results','Suggested category: Food','two current approvals supply a category suggestion')
+    driver.click('.classification-results details > summary');driver.wait_text('.classification-results','Category Food','source category evidence displayed')
+    driver.scroll_to('.classification-assistance','start');driver.screenshot(artifacts / 'native-category-suggestions.png')
+    driver.click_button('Use suggested category in unsaved review');driver.interactive('#review-category')
+    if driver.observe_script("return document.querySelector('#review-category').value")!='Food':raise SmokeFailure('Category suggestion did not fill the unsaved category field')
+    original_status=driver.observe_script("return document.querySelector('#review-status').value")
+    if original_status not in ['Pending','Needs Clarification']:raise SmokeFailure('Category suggestion automatically selected approval')
+    if driver.observe_script("return document.querySelector('#review-amount').value")!='-13.03':raise SmokeFailure('Category suggestion changed the source amount')
+    driver.click_button('Discard category review draft');driver.interactive('.classification-results button')
+    if driver.observe_script("return document.querySelector('#review-category')!==null"):raise SmokeFailure('Discarded category draft remained on screen')
+    driver.click_button('Use suggested category in unsaved review');driver.interactive('#review-category')
+    driver.fill('#review-reason','Fictional category evidence checked; transaction remains unapproved')
+    driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','category saved using the existing explicit unapproved decision');driver.interactive('#classification-search')
+    driver.click_button('Working tools');driver.interactive('.imports-table tbody button')
+    if driver.text('.imports-totals')!=baseline:raise SmokeFailure('Saving an unapproved suggested category changed approved financial totals')
+    driver.click_button(f'Review {name} record 4');driver.interactive('#review-category')
+    if driver.observe_script("return [document.querySelector('#review-category').value,document.querySelector('#review-status').value]")!=['Food',original_status]:raise SmokeFailure('Existing review did not preserve category/status exactly')
+    driver.click('.review-history > summary');driver.wait_text('.review-history','transaction remains unapproved','category reason preserved in immutable decision history')
+    folder=data_root / 'category-backups';folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery')
+    driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','category decision backed up')
+    backup=driver.text('.backup-file-path');driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','classification workspace locked')
+    if driver.observe_script("return document.querySelector('.classification-assistance')!==null||document.querySelector('#review-category')!==null"):raise SmokeFailure('Classification data remained after lock')
+    restart_driver();driver.open(binary);driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review','Fictional Oak Counseling','category history verified after process restart')
+    driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','category recovery activated');driver.fill('#password',password);driver.click_button('Unlock workspace')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Transactions']");driver.select('#workspace-client','Alex Fictional');driver.interactive('.imports-table tbody button')
+    driver.click_button(f'Review {name} record 4');driver.interactive('#review-category')
+    if driver.observe_script("return [document.querySelector('#review-category').value,document.querySelector('#review-status').value]")!=['Food',original_status]:raise SmokeFailure('Restart/recovery changed the saved category decision')
+    driver.click('.review-history > summary');driver.wait_text('.review-history','transaction remains unapproved','restored category history retains the original reason')
+    driver.click_button('Classification assistance');driver.interactive('#classification-search');driver.fill('#classification-search',merchant);driver.click_button('Search category suggestions');driver.interactive('#classification-search')
+    driver.wait_text('.classification-assistance','No missing-category expenses or fees','saved category no longer offered as missing after recovery')
+    driver.select('#workspace-client','Jamie Complete');driver.interactive('#classification-search')
+    if name in driver.text('.classification-assistance') or merchant in driver.text('.classification-results'):raise SmokeFailure('Classification evidence crossed client scope')
+    driver.select('#workspace-client','Robin Synthetic');driver.interactive('#classification-search');driver.wait_text('.classification-assistance','No missing-category expenses or fees','classification empty state is client scoped')
+    status('local category suggestions reuse exact approved merchant evidence, stable bounded pages, unsaved draft/discard, explicit unapproved save, unchanged financial totals, immutable reason, lock, restart, encrypted recovery and client isolation')
 
 
 def check_transaction_history(driver: WebDriver, artifacts: Path, data_root: Path, password: str,

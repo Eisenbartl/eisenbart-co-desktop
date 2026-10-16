@@ -1,5 +1,7 @@
 # Eisenbart & Co. Financial Counseling Suite
 
+Version **0.41.0 source** adds [local category suggestions](docs/classification-assistance.md): current approved merchant evidence, unresolved conflicts, bounded search/pages and category-only unsaved review drafts. Save an explicit decision through the existing review controls; no automatic approval. No installer was created.
+
 Version **0.40.0 source** adds [Open saved PDF to print](docs/windows-pdf-print-workflow.md): an explicit, consented request to open an unchanged counselor report export in the Windows PDF viewer. Choose Print in that viewer; the app does not submit jobs or confirm printing. Export lifetime and failures are explicit. No installer was created.
 
 Version **0.39.0 source** adds [summary-first counselor PDFs](docs/report-presentation.md) with a complete evidence appendix and the original detailed option. Version **0.38.0 source** adds [searchable bank/card transaction history](docs/transaction-activity-history.md).

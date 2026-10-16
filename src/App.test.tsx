@@ -5,7 +5,7 @@ import type { Client, ClientNote, WorkspaceInfo } from './types';
 
 const mocks = vi.hoisted(() => ({
   getReportPresentation:vi.fn(),chooseReportPresentationPdf:vi.fn(),exportReportPresentation:vi.fn(),
-  queryTransactionActivity:vi.fn(),
+  queryCategorySuggestions:vi.fn(),prepareCategoryDraft:vi.fn(),queryTransactionActivity:vi.fn(),
   desktop: true,
   lockHandler: undefined as (() => void) | undefined,
   setupStatus: vi.fn(), setupWorkspace: vi.fn(), unlockWorkspace: vi.fn(),
@@ -485,4 +485,9 @@ it('opens report presentation, holds navigation during PDF export and clears the
  mocks.listAssessmentRecords.mockResolvedValue({clientId:alice.id,records:[{id:'assessment',title:'Fictional report',periodStart:'2026-09-01',periodEnd:'2026-09-30',needsReview:false}]});
  mocks.getReportPresentation.mockResolvedValue({clientId:alice.id,assessmentId:'assessment',receipt:'receipt',presentation:'counselor-summary-v1',internal:{recordId:'assessment',kind:'internal',title:'Private fictional report',firmName:'Fictional firm',clientName:'Alice Able',periodStart:'2026-09-01',periodEnd:'2026-09-30',reportDate:'2026-10-15',status:'Internal assessment',basis:'Bank-only',figures:[],balanceAsOf:null,needsReview:false,reviewReasons:[],digest:'digest',disclosure:'Original figures'},finalReport:null});
  render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Reports'}));const tab=screen.getByRole('button',{name:'Print & presentation'});expect(tab).not.toHaveTextContent('Planned');fireEvent.click(tab);fireEvent.change(screen.getByLabelText('Client for Reports'),{target:{value:alice.id}});await screen.findByLabelText('Saved assessment for presentation');await waitFor(()=>expect(screen.getByLabelText('Saved assessment for presentation')).toBeEnabled());fireEvent.change(screen.getByLabelText('Saved assessment for presentation'),{target:{value:'assessment'}});await screen.findByText('Private fictional report');await waitFor(()=>expect(screen.getByLabelText('Presentation PDF destination')).toBeEnabled());fireEvent.change(screen.getByLabelText('Presentation PDF destination'),{target:{value:'/fictional/new.pdf'}});fireEvent.click(screen.getByRole('button',{name:'Export presentation PDF'}));fireEvent.click(screen.getByRole('button',{name:'Documents'}));expect(screen.getByLabelText('Presentation PDF destination')).toHaveValue('/fictional/new.pdf');await act(async()=>mocks.lockHandler?.());await act(async()=>pending.resolve({path:'/fictional/new.pdf',pages:2,recordId:'assessment'}));expect(document.documentElement.outerHTML).not.toContain('Private fictional report');expect(document.documentElement.outerHTML).not.toContain('/fictional/new.pdf');
+});
+
+it('opens working classification assistance with current client scope and clears it on lock',async()=>{
+ mocks.queryCategorySuggestions.mockResolvedValue({clientId:alice.id,revision:0,snapshot:'proof',policy:'approved-merchant-category-v1',query:{text:'',offset:0,expectedSnapshot:null},total:0,pageSize:25,candidates:[]});
+ render(<App/>);await unlock();fireEvent.click(screen.getByRole('button',{name:'Transactions'}));const tab=screen.getByRole('button',{name:'Classification assistance'});expect(tab).not.toHaveTextContent('Planned');fireEvent.click(tab);fireEvent.change(screen.getByLabelText('Client for Transactions'),{target:{value:alice.id}});await screen.findByText(/No missing-category expenses or fees/);expect(mocks.queryCategorySuggestions).toHaveBeenCalledWith(alice.id,{text:'',offset:0,expectedSnapshot:null});expect(mocks.prepareCategoryDraft).not.toHaveBeenCalled();await act(async()=>mocks.lockHandler?.());expect(screen.queryByRole('region',{name:'Local category suggestions'})).not.toBeInTheDocument();
 });

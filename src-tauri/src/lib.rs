@@ -9,6 +9,7 @@ mod card_final_policy;
 mod card_review;
 mod cards;
 mod cashflow;
+mod classification;
 mod client_care;
 mod completeness;
 mod coverage_review;
@@ -440,6 +441,32 @@ async fn approve_final_report(
     })
     .await
     .map_err(|_| "Final approval could not finish. Reopen readiness to check the stored result before another attempt.".to_owned())?
+}
+#[tauri::command]
+async fn query_category_suggestions(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: classification::Query,
+) -> Result<classification::Page, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.query_category_suggestions(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Category suggestions could not load.".to_owned())?
+}
+#[tauri::command]
+async fn prepare_category_draft(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: classification::DraftInput,
+) -> Result<classification::Draft, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.prepare_category_draft(&client_id, input))
+    })
+    .await
+    .map_err(|_| "The category draft could not be prepared; no decision was saved.".to_owned())?
 }
 #[tauri::command]
 async fn get_report_presentation(
@@ -1234,6 +1261,8 @@ pub fn run() {
             choose_final_report_pdf,
             export_final_report_pdf,
             get_report_presentation,
+            query_category_suggestions,
+            prepare_category_draft,
             choose_report_presentation_pdf,
             export_report_presentation,
             open_report_pdf,

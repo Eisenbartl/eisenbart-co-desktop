@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.40.0 source
+# Prototype structure and development map — 0.41.0 source
 
 The user has prioritized a coherent CRUD application structure before further
 advanced financial features. This checkpoint exposes all twelve main sections
@@ -22,7 +22,7 @@ Rust-backed data. Do not add another persistence layer or copy the calculators.
 | Dashboard | Scoped practice counts, recent clients, appointments and follow-ups (`FollowUpOverview.tsx`) |
 | Clients | Directory/search/filter, create/edit/status/archive; Profile, Intake & follow-ups, Session notes, History & records, Complete record (`App.tsx`, `ClientCare.tsx`) |
 | Financial Review | Approved-data dashboard, explicit financial facts, running-balance checks, recurring-payment review and live completeness diagnostics and versioned reviews (`ImportsEditor.tsx`, `CompletenessReview.tsx`, `SavedCoverageReviews.tsx`) |
-| Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers; client-wide searchable bank/card history (`ImportsEditor.tsx`, `TransactionActivity.tsx`) |
+| Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers; client-wide searchable bank/card history and local category suggestions/unsaved review drafts (`ImportsEditor.tsx`, `TransactionActivity.tsx`, `ClassificationAssistance.tsx`) |
 | Documents | Bank CSV/selectable-text PDF import, separate signed-card CSV review, statement account management, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`, `StatementAccounts.tsx`) |
 | Budget Planner | Saved income/expenses/allocations, remove/edit rows, optional budget method comparisons (`BudgetEditor.tsx`) |
 | Debt Planner | Saved debts, payment changes/extras and monthly snowball/avalanche projections (`DebtEditor.tsx`) |
@@ -73,7 +73,7 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Documents → Credit-card statements — signed CSV review working | `cards.rs`, `cards_store.rs`, `CardStatements.tsx`, schema 23 | Scoped encrypted sources, explicit signed mapping, individual decisions/history, exact liability/spending/payment checks, bank-report guard and restart/recovery. [Limits and integration work](credit-card-review.md) |
 | Documents → Additional document types | `pdf.rs`, `imports.rs`, supervised parser adapters and import UI | Synthetic card/loan/paystub/institution fixtures, bounded parse, original locators, individual review, duplicate/sign/balance controls |
 | Documents → Scanned documents / OCR | Extend supervised `pdf_process.rs`; vetted offline OCR assets/dependencies | Scanned/mixed/rotated/low-quality fixtures, time/memory/page limits, no guessed facts, explicit review, offline/license checks |
-| Transactions → Classification assistance | Pure local suggestions plus scoped decision/rule persistence; `RecurringReview.tsx` conventions | Suggestions never auto-approve; immutable provenance, false-positive correction, undo/reversal and client isolation |
+| Transactions → Classification assistance — suggestions working in 0.41.0 | `classification.rs`, `classification_store.rs`, `ClassificationAssistance.tsx`, existing `ImportsEditor.tsx` review | Scoped 25-record pages, exact current approvals, unresolved conflicts/unknowns, fingerprint-bound unsaved category drafts, explicit audited decisions, reversal, restart/recovery and client isolation. Saved rules remain planned. [Usage](classification-assistance.md) |
 | Transactions → Activity history — working in 0.38.0 | `activity_store.rs`, `TransactionActivity.tsx`; existing schema 25 | Scoped 25-event pages, literal/date/account/source/status filters, original/corrected decision evidence, both transfer legs, exact current/obsolete repayment locators, stale-token rejection, ownership, read-only failure and recovery. [Limits](transaction-activity-history.md) |
 | Financial Review → Completeness & final validation — working review/history | `completeness.rs`, `coverage_review.rs`, `coverage_review_store.rs`, `SavedCoverageReviews.tsx` | Declared coverage plus scoped schema-21 expected inventory, dates, source choices, missing information and exceptions; stale/audit/recovery controls and immutable format-7 capture. [Review history and constraints](saved-completeness-reviews.md) |
 | Financial Review → Savings progress | Dated verified balance facts and `FactMetricsView.tsx` | Real approved/verified sources, explicit period, unknown data, independent expected points and no estimates masquerading as facts |
@@ -101,11 +101,11 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-Implement **bounded local transaction classification assistance**, starting with
-reviewable suggestions for bank records and explicit counselor application through
-the existing immutable decision workflow. Reuse merchant normalization and source
-history; no automatic approval or silent financial change. See
-[next-stage notes](classification-assistance-next-stage.md).
+Implement **reusable local category-rule CRUD** with explicit source/account/type
+scope, optimistic versions, immutable rule history, conflict handling and
+archive/reactivation. Reuse working read-only classification suggestions and the
+existing transaction decision API; rules must not automatically approve or
+rewrite records. See [next-stage notes](classification-rules-next-stage.md).
 
 The bounded Windows saved-PDF handoff is implemented in 0.40.0. Printing is chosen
 in the external viewer; direct job submission and actual installed Windows
@@ -212,3 +212,12 @@ No shell interpreter, temporary PDF or financial write is introduced. Windows
 request acceptance is not print success. Unsupported hosts show manual guidance.
 Source/native verification and installed Windows acceptance are recorded separately
 in [development status](development-status.md). No installer is created.
+
+### 0.41.0 — local bank category suggestions
+
+Working Classification assistance reuses current approved merchant evidence for
+same-account/type missing-category expenses/fees. Bounded pages, conflicts and
+unknowns are explicit; a suggestion only fills an unsaved existing review field.
+All saves retain existing audit/revision/history/financial boundaries. Schema 25
+is unchanged. Saved reusable rules and larger evidence sets remain future work.
+See [usage](classification-assistance.md) and [executed checks](development-status.md).

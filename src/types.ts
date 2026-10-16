@@ -416,6 +416,10 @@ export interface ActivityEvent {id:string;sourceId:string;recordId:string;row:nu
 export interface ActivityPage {clientId:string;snapshot:string;query:ActivityQuery;total:number;pageSize:number;sources:ActivitySource[];events:ActivityEvent[]}
 
 export type ReportPresentationKind='internal'|'final';
+export interface CategoryQuery {text:string;offset:number;expectedSnapshot:string|null}
+export interface CategoryCandidate {recordId:string;documentId:string;accountLabel:string;fileName:string;page:number|null;line:number;fields:TransactionFields;status:ReviewStatus;category:string|null;reason:string;evidenceCount:number;evidence:{recordId:string;approvalId:string;documentId:string;accountId:string;page:number|null;line:number;fields:TransactionFields;duplicateIds:string[]}[]}
+export interface CategoryPage {clientId:string;revision:number;snapshot:string;policy:string;query:CategoryQuery;total:number;pageSize:number;candidates:CategoryCandidate[]}
+export interface CategoryDraft {clientId:string;revision:number;recordId:string;category:string}
 export interface ReportPresentationExport {path:string;pages:number;recordId:string;viewerTicket:string;viewerSupported:boolean}
 export type ReportPresentationLayout='summaryAppendix'|'detailed';
 export interface ReportPresentationSummary {kind:ReportPresentationKind;recordId:string;digest:string;title:string;firmName:string;clientName:string;periodStart:string;periodEnd:string;reportDate:string;balanceAsOf:string|null;basis:string;status:string;needsReview:boolean;reviewReasons:string[];figures:{label:string;value:string|null}[];disclosure:string}

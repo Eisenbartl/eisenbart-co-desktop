@@ -1,6 +1,42 @@
 # Development status
 
-## Current stage — Windows saved-PDF print workflow (0.40.0, schema 25 unchanged)
+## Current stage — local category suggestions (0.41.0, schema 25 unchanged)
+
+Transactions → Classification assistance lists missing-category bank expenses
+and fees in stable 25-record pages, with literal search and exact current approval
+evidence. Two to five matching approvals on distinct dates must agree; conflicts,
+possible duplicates, unknown source facts and larger groups stay unresolved.
+Same-account/type merchant matching reuses the existing case/space normalization.
+No income/transfer/refund/debt/card role is guessed.
+
+Using a suggestion fills only an unsaved category field in the existing review
+form, preserving date, amount, type and unapproved status. Explicit save retains
+all original audit, history, warning/approval and revision checks. Scoped read-only
+queries/preparation use source fingerprints; no new persistence layer, schema,
+financial calculator, dependency or automatic approval is added. See
+[usage and limits](classification-assistance.md).
+
+Validation in progress on 2026-10-16 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Passed; existing environment configuration reused |
+| Production frontend / UI | Passed build and 231 tests |
+| Focused backend | Passed complete classification fixture, including read-only scope, atomic decisions and recovery |
+| Complete Linux backend | Passed 224 library + 2 PDF-worker tests |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build / complete native workflow | Build starting; full smoke pending |
+| Windows source validation | Starting with feature push; installer steps remain disabled |
+| Installer | Not created, per user instruction |
+
+Next priority: **reusable local category-rule CRUD**, with explicit scope,
+version/history, conflict handling and archived/reactivated rules. Rules will
+continue to fill review drafts without automatically approving transactions.
+See [next-stage notes](classification-rules-next-stage.md). Larger evidence groups,
+other bank/card roles, OCR/adapters, advanced models, roles/security/commercial
+work and clean installed Windows offline acceptance remain open requirements.
+
+## Windows saved-PDF print workflow (0.40.0, schema 25 unchanged)
 
 Reports → Print & presentation now offers **Open saved PDF to print** after an
 explicit export, with a separate confidentiality acknowledgement. The Windows

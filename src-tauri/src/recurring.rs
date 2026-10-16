@@ -89,13 +89,19 @@ fn normalized(s: &str) -> String {
         .to_lowercase()
 }
 fn identity(e: &Evidence) -> Result<(String, String, bool), String> {
-    let fallback = e.fields.merchant.trim().is_empty();
+    merchant_identity(&e.account_id, &e.fields)
+}
+pub(crate) fn merchant_identity(
+    account: &str,
+    fields: &Fields,
+) -> Result<(String, String, bool), String> {
+    let fallback = fields.merchant.trim().is_empty();
     let name = if fallback {
-        &e.fields.description
+        &fields.description
     } else {
-        &e.fields.merchant
+        &fields.merchant
     };
-    let key = serde_json::to_vec(&(&e.account_id, &e.fields.kind, fallback, normalized(name)))
+    let key = serde_json::to_vec(&(account, &fields.kind, fallback, normalized(name)))
         .map_err(|_| "Cannot group payments.")?;
     Ok((
         format!("{:x}", Sha256::digest(key)),

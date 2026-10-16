@@ -23,6 +23,8 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 
 export const api = {
   getReportPresentation:(clientId:string,assessmentId:string)=>command<import('./types').ReportPresentationContext>('get_report_presentation',{clientId,assessmentId}),
+  queryCategorySuggestions:(clientId:string,input:import('./types').CategoryQuery)=>command<import('./types').CategoryPage>('query_category_suggestions',{clientId,input}),
+  prepareCategoryDraft:(clientId:string,input:{expectedRevision:number;expectedSnapshot:string;recordId:string})=>command<import('./types').CategoryDraft>('prepare_category_draft',{clientId,input}),
   chooseReportPresentationPdf:(clientId:string,assessmentId:string,kind:import('./types').ReportPresentationKind,layout:import('./types').ReportPresentationLayout)=>command<string|null>('choose_report_presentation_pdf',{clientId,assessmentId,kind,layout}),
   exportReportPresentation:(clientId:string,input:{assessmentId:string;kind:import('./types').ReportPresentationKind;layout:import('./types').ReportPresentationLayout;expectedReceipt:string;path:string})=>command<import('./types').ReportPresentationExport>('export_report_presentation',{clientId,input}),
   openReportPdf:(clientId:string,ticket:string)=>command<{status:'requested'|'cancelled';path:string}>('open_report_pdf',{clientId,ticket}),

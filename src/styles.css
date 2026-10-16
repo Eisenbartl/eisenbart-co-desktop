@@ -578,3 +578,7 @@ textarea { resize: vertical; min-height: 100px; }
 .presentation-summary {border:1px solid var(--line);border-radius:8px;padding:20px;margin-top:20px;overflow-wrap:anywhere;}
 .presentation-summary h3 {margin-top:8px;}
 .presentation-figures {margin:20px 0;}
+
+.classification-results { padding-left:1.5rem; }
+.classification-results > li { margin:1.2rem 0; padding-bottom:1rem; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+.classification-results details { margin:12px 0; }

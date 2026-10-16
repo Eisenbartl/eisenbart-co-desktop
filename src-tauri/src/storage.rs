@@ -16,6 +16,8 @@ pub mod card_facts_store;
 pub mod card_review_store;
 #[path = "cards_store.rs"]
 pub mod cards_store;
+#[path = "classification_store.rs"]
+pub mod classification_store;
 #[path = "client_care_store.rs"]
 pub mod client_care_store;
 #[path = "coverage_review_store.rs"]
