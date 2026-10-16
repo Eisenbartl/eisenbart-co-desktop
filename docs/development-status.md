@@ -18,24 +18,47 @@ copy or financial/database write is introduced. The explicit export and external
 viewer copies remain readable after lock, as disclosed. Other platforms show
 manual local-viewer instructions. See [usage, failures and acceptance](windows-pdf-print-workflow.md).
 
-Validation in progress on 2026-10-15 (America/Chicago):
+Validation completed on 2026-10-15 (America/Chicago):
 
 | Check | Result |
 |---|---|
 | Locked cloud setup | Passed; existing configuration reused |
-| Production frontend / UI suite | Passed versioned-source production build and 223 tests |
+| Production frontend / UI suite | Passed corrected-source production build and 223 tests |
 | Focused handoff fixture | Passed final scope/receipt/file/expiry/lock/restart/external-restore fixture |
 | Full Linux backend | Passed 223 library + 2 PDF-worker tests; final expanded handoff fixture also passed separately |
 | Formatting / Clippy | Passed; all targets with warnings denied |
-| Standalone native build / complete native workflow | Initial build passed; initial smoke deliberately interrupted for consent-checkbox CSS correction; corrected build/full smoke pending |
-| Windows source suite | Initial run superseded for the CSS correction; corrected-source run starting; no installer requested |
+| Standalone native build | Passed corrected-source debug build, no bundles |
+| Complete native workflow | Passed, exit 0 and final completion marker: all earlier financial/source/recovery checks plus saved-PDF path, lifetime notice, truthful non-Windows fallback and clearing on layout/client changes |
+| Native visual inspection | Passed actual saved-PDF workflow screen; Windows consent/printer UI still needs installed acceptance |
+| Windows source suite | Passed: 223 UI + 224 library + 2 PDF-worker tests on corrected source; five installer/checksum/upload steps skipped |
 | Installed Windows viewer/printer acceptance | Not run in this Linux cloud environment |
 | Installer | Not created, per user instruction |
 
 Review found the new Windows consent checkbox inheriting the text-input width.
 Scoped checkbox sizing and wrapping for long saved paths correct that layout.
 The first native/Windows checks were deliberately stopped/superseded; incomplete
-runs are not counted as passes. Corrected-source checks follow below.
+runs are not counted as passes. Corrected-source checks above completed successfully.
+
+Feature commit: `289b4363939b941e4ae308792962dc4f7d0f0ba4`.
+Corrected application source: `add67a48ed898741ce0377fdc1ad6fc5d3470068`.
+[Windows run 38844031485](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38844031485)
+passed on that exact source. Its library tests completed in 842.72 seconds. Raw
+metadata/logs were checked for the exact SHA, actual counts and five skipped
+installer steps. Source tests use a fake launcher for dispatch outcomes; they do
+not prove an installed viewer or printer worked.
+
+Native artifacts: `/workspace/shared/desktop-smoke-printing`. Logs and verified
+Windows evidence use `/workspace/shared/printing-`; the corrected native run has
+both exit `0` and the final complete-workflow marker. The interrupted first native
+run is retained under `before-layout` and explicitly marked incomplete. No Cargo
+checks ran after the standalone build or during the corrected native workflow.
+
+Clean source/history checkpoints are retained at
+`/workspace/shared/checkpoints/eisenbart-windows-pdf-print-source.tar.gz` and
+`/workspace/shared/checkpoints/eisenbart-windows-pdf-print-source.bundle`; the
+checkpoint helper checks every tracked file against final clean HEAD and remote
+main. Only this final validation record follows the application source checked
+on Windows.
 
 No schema migration or new package was added. Existing `windows-sys` enables the
 Shell/COM/Registry/window API features required by the narrow native adapter.
