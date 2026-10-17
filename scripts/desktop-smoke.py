@@ -2070,7 +2070,7 @@ def check_households(driver: WebDriver, artifacts: Path, data_root: Path,
     section('Payments & Settlements');driver.click_button('Record payment')
     driver.select(drawer+' select[data-field="payment-expense"]','Rent');driver.fill(drawer+' input[data-field="amount"]','2400.00');driver.select(drawer+' select[data-field="payment-state"]','Confirmed by counselor / source');driver.click_button('Save payment record');driver.wait(lambda:not driver.visible(drawer),'external payment saved');ready()
     driver.wait_text(active+' .household-content','$900.00','outstanding reimbursement suggestions')
-    section('Overview');driver.wait_text(active+' .household-stats','$2,400.00','fronted payment is not duplicated spending')
+    section('Overview');driver.wait_text(active+' .household-stats','$2,400.00','fronted payment is not duplicated spending');driver.wait_text(active+' .household-stats','Necessary $2,400.00 · Discretionary $0.00','overview necessary/discretionary plan breakdown')
     if '$4,200.00' in driver.text(active):raise SmokeFailure('Household double-counted the external payment and reimbursements')
     driver.scroll_to(active+' .household-page-heading','start');driver.screenshot(artifacts/'native-household-overview.png')
     section('Payments & Settlements');driver.click_button('Record payment')

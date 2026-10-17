@@ -475,3 +475,27 @@ by their actual text and reads their extracted locators, rather than assuming
 printed line positions. Native click failures report read-only geometry and never
 replay a click or financial write. Build using `--debug --no-bundle` for this stage;
 no installer is created unless explicitly requested.
+
+## Household management (0.49.0)
+
+The full driver now also creates two dedicated fictional household clients and a
+limited-information third member. It tests the ten-section household workspace,
+explicit sharing permissions, $2,400 rent split into $600/$900/$900, a full payer
+outlay, internal settlement, exact shared goal contributions, and a saved
+hypothetical rent change that does not alter active agreements. It explicitly
+reconciles a $600 individual budget share and verifies the individual plan.
+
+Native clicks switch between individual and household tabs while a household
+editor remains open, retain its draft and section, and exercise explicit Keep /
+Discard. Household editors leave global tabs/navigation accessible; keyboard
+users can return to the tab strip from the editor. The report checkpoint exports
+an immutable household PDF with independently expected figures and a shared goal,
+refuses overwrites, checks an 800px layout, clears private state on lock, restarts
+the complete process, and verifies encrypted backup recovery of the household.
+Screenshots include `native-household-overview.png` and
+`native-household-narrow.png`. Fixtures and input gestures are synthetic; typed
+replacements are observed exactly before financial submissions.
+
+Use the same standalone `--debug --no-bundle` build and native driver prerequisites
+above. Do not run Cargo while the native application/driver processes are active.
+These checks create no installer and establish no Windows installed acceptance.
