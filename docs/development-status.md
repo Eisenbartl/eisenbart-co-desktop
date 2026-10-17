@@ -27,6 +27,16 @@ Earlier failed fixture attempts remain separately logged. Native focused/full
 regression remains pending; this stage is not yet a completed full test version.
 No installer is authorized.
 
+Focused native acceptance passed with exit 0 and the final completion marker:
+`/workspace/shared/desktop-smoke-unified-focused-second`. Actual retained PDF
+canvas pages/zoom, mixed current rows, exact $100/$100/$50 purchase methods,
+shared bank/card purpose decisions, inactive older details, confirmed/reversed
+duplicates, downstream Spending Analysis, 800px layout, lock, full restart and
+encrypted recovery all passed. The first attempt passed the initial PDF/method
+checkpoint but its driver routed to the separate card page while the embedded
+form was loading. The wait now targets the embedded field; no application change
+or financial-write retry was needed. The complete native regression is pending.
+
 ## Previous stage — household management (0.49.0, schema 31)
 
 Implemented the supplied household brief and ten-section workspace using the
