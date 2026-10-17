@@ -484,6 +484,9 @@ explicit sharing permissions, $2,400 rent split into $600/$900/$900, a full paye
 outlay, internal settlement, exact shared goal contributions, and a saved
 hypothetical rent change that does not alter active agreements. It explicitly
 reconciles a $600 individual budget share and verifies the individual plan.
+Before saving, a hybrid preview also verifies a $500 fixed-only participant
+with a `0.0` remainder weight and $950/$950 equal remainder shares. Overview
+checks distinguish planned necessary/discretionary obligations from source actuals.
 
 Native clicks switch between individual and household tabs while a household
 editor remains open, retain its draft and section, and exercise explicit Keep /
@@ -495,6 +498,13 @@ the complete process, and verifies encrypted backup recovery of the household.
 Screenshots include `native-household-overview.png` and
 `native-household-narrow.png`. Fixtures and input gestures are synthetic; typed
 replacements are observed exactly before financial submissions.
+
+The full run reaches households with an already populated, horizontally scrolling
+workspace tab strip. Native tab actions wait for the actual hit target before
+one click; they never retry financial submissions. A separate synthetic probe
+also checks offscreen tab targets with eight clients and a household. The sticky
+tab header contains its own flex-start scrolling row to preserve correct hit
+regions in native WebKit.
 
 Use the same standalone `--debug --no-bundle` build and native driver prerequisites
 above. Do not run Cargo while the native application/driver processes are active.

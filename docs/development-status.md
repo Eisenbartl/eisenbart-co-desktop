@@ -1,51 +1,77 @@
 # Development status
 
-## Current stage — household management (0.49.0, schema 31; native verification in progress)
+## Current stage — household management (0.49.0, schema 31)
 
-Implemented household directory/tabs and the ten-section navy/white/slate/gold
-workspace from the supplied reference. Exact allocations, effective agreements,
-consent, source matching, payments/settlements, individual budget/cash-flow
-reconciliation, shared goals/scenarios, immutable report snapshots and offline PDF
-exports are functional. [Workflow and limits](household-management.md); original
-[household brief](household-management-specification.md).
+Implemented the supplied household brief and ten-section workspace using the
+reference's navy rail, white panels, slate text, muted gold accents, overview
+cards, category donut, member contribution bars and compact tables. Household
+and individual tabs remain independent. [Workflow and limits](household-management.md);
+[original brief](household-management-specification.md).
 
-The allocation/journal milestone was committed as `bb519a2`. The integration
-milestone now includes source-purpose reuse, restricted-income previews,
-frozen approved income ratios, account timing, retained budget/cash-flow values,
-no-overwrite PDFs and encrypted-recovery validation. Household draft/section state
-survives tab changes; lock removes it. Saving a client and opening its history
-also synchronizes navigation guards before enabling further navigation.
+Working features include exact effective-date allocations and hybrid splits,
+member linking/recorded consent, shared expenses/category rules, separate payments
+and settlements, approved-source matching and purpose history, controlled
+individual budget/cash-flow reconciliation, shared goals, non-writing scenario
+previews, explicit proposal acceptance, immutable report snapshots and offline
+PDF exports. Saved data is encrypted and recovery-validated. Switching tabs
+retains household drafts/sections; lock removes private state.
 
-Source validation passed: production frontend build, all 298 UI tests (41 files),
-the full 288-library-test Rust run and both PDF-worker tests, and Clippy all targets
-with warnings denied. After final native refinements, all 26 household tests and
-Clippy passed again; the two new regressions cover matching short household IDs
-and duplicated source links across households. There are now 290 library tests;
-the final targeted run covers the changed household/restore integration paths.
-The last standalone debug build uses `--no-bundle` and embeds frontend assets.
+Source validation passed: production frontend build, all 299 UI tests (41 files),
+the full 288-library-test Rust run plus both PDF-worker tests, and Clippy all
+targets with warnings denied. After the final refinements, all 27 household tests
+passed, covering three added regressions beyond the full run: full household-ID
+plan bindings, duplicate source links across households during recovery, and
+numerically equivalent zero allocation weights. The current library has 291 tests;
+the final targeted run covers the changed household/restore paths. Final Clippy
+and the standalone debug build with embedded frontend assets passed again.
+The desktop build used `--no-bundle`.
 
-Focused native acceptance passed with exit 0:
-`/workspace/shared/desktop-smoke-household-focused-third`. It exercised client
-links/consent, $600/$900/$900 rent shares, full payer contributions and internal
-settlements, exact goal contributions, non-writing scenario previews, controlled
-individual budgets, retained tab sections/drafts, no-overwrite offline PDF,
-800px layout, lock privacy, full restart and encrypted recovery. The first
-attempt exposed a backdrop covering workspace tabs; the editor is now nonmodal,
-keeps global navigation available and offers keyboard return to the tab strip.
-A second attempt correctly blocked a driver-appended 125% value; real keyboard
-replacement and exact-value observations fixed the harness without replaying
-financial writes. Prior failed artifacts remain separate from the passing run.
-The final identifier hardening is covered by focused source tests and is now
-undergoing the complete native regression.
+Focused native acceptance passed with exit 0 and its completion marker:
+`/workspace/shared/desktop-smoke-household-focused-final`. It exercised member
+permissions, $600/$900/$900 shares of $2,400 rent, actual full payer contributions
+and internal settlements, exact shared goal contributions, non-writing proposals,
+controlled individual budgets, retained sections/drafts, no-overwrite offline PDF,
+800px layout, lock privacy, full restart and encrypted recovery.
 
-Synthetic legacy migration fixtures remove the introduced household table when
-constructing an older schema, retaining all rollback/source-preservation
-assertions. Native verification is still in progress; do not describe the full
-regression as passed until its final completion marker is recorded.
+The complete native regression passed with exit 0, its final completion
+marker and all 114 checkpoints. Its final run also checks
+$500/$950/$950 fixed-plus-equal allocation preview with a `0.0` weight and the
+overview's necessary/discretionary obligations. It retains the existing planning,
+statement extraction/review, source classifications, card, PDF/CSV, immutable
+history, recovery, real idle-timeout and password-generation workflows.
+Artifacts: `/workspace/shared/desktop-smoke-household-complete-final`.
 
-This stage creates no installer. The user explicitly prohibited another installer
-until requested. Native verification is the next step; Windows installed
-acceptance and commercial readiness remain separate.
+Earlier failed attempts remain separately retained. A drawer covering global tabs
+was corrected with a nonmodal measured editor; an appended test input was fixed
+with real keyboard replacement and exact-value observations. The first complete
+run exposed incorrect native WebKit hit regions for end-aligned flex children
+in a sticky horizontally scrolling tab strip. The sticky header now contains a
+separate flex-start scrolling row. A native probe with eight clients and a
+household passed actual clicks including offscreen targets:
+`/workspace/shared/household-tab-probe-final`. The driver waits for the observed
+hit target before one click and never retries financial writes.
+
+Synthetic legacy migration fixtures remove the new household table when
+constructing old schemas while retaining rollback and source-preservation
+assertions. Source/binary manifests and source-test logs are retained under
+`/workspace/shared/household-validation`. The final source and binary hashes
+remained unchanged; driver ports were closed after cleanup. Desktop and 800px
+screenshots were visually inspected. No Cargo command ran while native acceptance
+was active.
+
+Application milestones are committed on `client-workspace-redesign-0.46`:
+`bb519a2`, `2fb1e1f`, `aa68c93`, `729c725`, `0e20d20` and `cc1b6d4`.
+The final documentation checkpoint records completed acceptance separately.
+
+Next priority is counselor evaluation of household agreements, permissions and
+reconciliation with fictional records; broader statement formats remain future
+parser work. Due-date agreements do not imply daily proration, unknown private
+income/accounts are not inferred, and personal debt models remain individual.
+See the workflow's explicit coverage and operational bounds.
+
+No installer was created or provided. The user prohibited another installer
+until explicitly requested. Linux development-build acceptance does not establish
+Windows installed operation or commercial readiness.
 
 ## Previous stage — transaction-focused statement extraction and review (0.48.0, schema 30)
 
