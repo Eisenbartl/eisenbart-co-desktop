@@ -61,7 +61,7 @@ Import and approval stay in their own sections. [Calculation rules, opportunitie
 and safeguards](spending-analysis.md). Current validation is recorded in
 [development status](development-status.md).
 
-## Financial health assessment — implemented in 0.51.0, final verification pending
+## Financial health assessment — completed and verified in 0.51.0
 
 The existing **Financial dashboard** now hosts the explainable health score,
 essential-evidence gates, approved income-relative measures, behavioral observations,
@@ -69,7 +69,8 @@ source/balance provenance and counselor-selected reduction previews. Existing
 Spending Analysis owns purpose edits; the existing scenario/debt/savings/calendar
 engines own hypothetical projections. No new workspace section or financial store
 was added. [Policy, reuse and acceptance](financial-health-assessment.md); executed
-checks and outstanding native acceptance are in development status.
+checks, final focused native acceptance and remaining platform/adapter limits are
+in development status.
 
 ## Future feature areas: return here before implementing
 

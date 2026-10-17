@@ -9,13 +9,39 @@ behavioral observations and existing-planner reduction previews are implemented.
 The existing Financial dashboard hosts the interface; classification edits reuse
 Spending Analysis with the assessment months carried into its filters.
 
-All 11 new Rust health tests passed. The production frontend built and all 322 UI tests passed, including the final
-assessment-period handoff and renewed acknowledgment when assumptions change. The complete Rust run passed all 316 library tests and both actual PDF-worker
-integration tests. Final Clippy with warnings denied and the embedded standalone
-no-bundle debug build passed. Native health/unified acceptance is pending. This is tested working
-progress, not completed acceptance. Next action: finish those checks and record
-actual results/limitations. No installer, household linking, business counseling,
-duplicate transaction store or new schema was introduced.
+**Completed and verified for the currently supported bank/card ledgers.** All 322
+UI tests, all 316 Rust library tests and both actual supervised PDF-worker
+integration tests passed. Clippy with warnings denied, the production frontend
+and embedded standalone no-bundle debug build passed. After two descriptive scope
+messages changed, all 91 affected UI tests and the embedded build passed again.
+A final fixture-clock reliability change was confined to tests; all 11 affected
+health tests and Clippy passed afterward. The runtime source and accepted native
+binary remained byte-identical; the full Rust matrix preceded that test-only change.
+
+The current unified-review native workflow passed all three checkpoints before
+the final descriptive copy. Final health native acceptance passed with exit 0 and
+all three checkpoints on the final app binary: withheld missing score then 95/100,
+refund-adjusted $50/month/$600/year existing-planner preview without baseline writes,
+classification editing and renewed coverage yielding 85/100, source traceability,
+800px layout, lock, full restart, encrypted recovery and client isolation. Screenshots
+were visually inspected. Evidence:
+`/workspace/shared/financial-health-validation/completed.json`; final run:
+`/workspace/shared/desktop-smoke-financial-health-final`. The historical complete
+117-checkpoint native regression was not repeated. Initial native attempts exposed
+CSV-fixture numbering and status-wait errors; fresh isolated reruns corrected the
+harness without retrying uncertain financial writes. Full details and logs are in
+[the acceptance record](financial-health-assessment.md).
+
+Remaining limits: the explainable index is a counseling policy, not a validated
+credit rating; missing essential evidence withholds a score. Existing unsupported
+OCR/institution/loan adapters and unknown planner terms remain unavailable. Old
+reports and saved plans are preserved. Linux checks do not establish Windows
+installation or commercial readiness. No installer, household linking, business
+counseling, duplicate transaction store or new schema was introduced.
+
+Next required action: counselor review of the completed workflow and thresholds
+with fictional records. Broader adapters and Windows acceptance remain separately
+scoped priorities. Do not create an installer without an explicit request.
 
 ## Previous stage — unified transaction review (0.50.0, schema 32)
 

@@ -574,6 +574,14 @@ while another client has no transaction or balance evidence from this client.
 
 Screenshots: `native-financial-health-score.png`,
 `native-financial-health-reduction.png`, `native-financial-health-narrow.png`,
-`native-financial-health-restored.png`. Native acceptance is pending until its
-recorded run completes; the development status is the authority for outcomes.
+`native-financial-health-restored.png`. Final focused health acceptance passed
+with exit 0, all three checkpoints and the completion marker in
+`/workspace/shared/desktop-smoke-financial-health-final`. The score, reduction and
+narrow images were visually inspected; source/binary hashes stayed unchanged.
+The current unified-review checkpoints passed earlier in the combined first run,
+which later stopped on a health-fixture locator error. Final harness fixes cover
+CSV record numbering, existing save-status elements and explicit coverage renewal;
+no uncertain financial write was replayed. The old complete 117-checkpoint native
+regression was not repeated for 0.51.0. Development status and
+[the acceptance record](financial-health-assessment.md) distinguish all executions.
 No installer or Windows installed-acceptance claim follows from these checks.

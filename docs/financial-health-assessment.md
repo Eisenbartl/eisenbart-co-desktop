@@ -85,12 +85,12 @@ transactions, saved plans and previously issued reports are never silently edite
 - [x] Preserve scope, original evidence, approval reversal behavior and stale-result guards.
 - [x] Cover missing/zero/irregular income, deficits, incomplete/overlapping histories,
   refunds, repayments/transfers, threshold boundaries and source corrections in tests.
-- [ ] Pass frontend/Rust/build/native acceptance, including lock/restart/recovery and isolation.
-- [ ] Record executed outcomes, outstanding limits and next actions; commit working progress.
+- [x] Pass frontend/Rust/build/native acceptance, including lock/restart/recovery and isolation.
+- [x] Record executed outcomes, outstanding limits and next actions; commit working progress.
 
-Implementation and executed checks will be recorded here and in development status.
+Implementation and executed checks are recorded here and in development status.
 
-## Implemented workflow and currently executed checks
+## Completed workflow and executed checks
 
 The Financial dashboard retains its explicit assessment-period form. Health
 components, evidence gates, income-relative rows, month-by-month behavior and
@@ -122,4 +122,66 @@ an unavailable balance payment, after which all 322 passed. The additional final
 UI pass also passed all 322 tests, including period handoff and renewed acknowledgment.
 The full Rust matrix passed all 316 library tests and both actual supervised
 PDF-worker integration tests in one sequential run. Final Clippy and the embedded
-standalone no-bundle build passed. New native health/unified acceptance is pending. No completed acceptance is claimed until those finish.
+standalone no-bundle build passed. After a final clarification of two dashboard
+scope descriptions, all 91 affected UI tests and the embedded standalone build
+passed again; the calculators, transaction review and persistence were unchanged.
+
+The current 0.51.0 unified-review native workflow passed all three checkpoints in
+`/workspace/shared/desktop-smoke-financial-health-first`: actual PDF pages/zoom,
+combined filters and payment shares, existing approval/purpose/duplicate handling,
+downstream updates, narrow layout, isolation, restart and encrypted recovery.
+That combined run later stopped at a health-fixture locator error and is not an
+overall passing run. The first two health attempts used PDF-style record numbering
+for a headered CSV; the third saved coverage successfully but waited for the wrong
+status element. Harness-only fixes retained the real financial forms and avoided
+replaying uncertain writes; every rerun used fresh isolated synthetic data.
+
+Focused health acceptance then passed, and the final run after the descriptive
+copy and narrow-capture refinement passed again with exit 0 and its completion
+marker: `/workspace/shared/desktop-smoke-financial-health-final`. Its three
+checkpoints verify missing-data withholding followed by 95/100; exact spending,
+refunds, ratios, costs and source/balance evidence; a $50/month, $600/year reduction
+through existing plans without saved-input mutation; an existing purpose edit,
+renewed coverage and 85/100; an 800px one-column score layout without page overflow;
+and lock, full restart, encrypted recovery and strict client isolation. The score,
+reduction and narrow screenshots were visually inspected. Source and standalone
+binary hashes remained unchanged throughout acceptance; native processes and
+driver ports closed before any later Cargo command. Final evidence is retained in
+`/workspace/shared/financial-health-validation/completed.json`.
+
+A subsequent test-only refinement uses the same fixed fixture date for assessment
+and reduction, preventing calendar-day rollover from breaking tests, and explicitly
+asserts that the following day invalidates an old preview context. An initial helper
+name shadowed a local value and failed compilation; renaming it corrected the test
+helper. All 11 affected health tests passed again, with Clippy warnings denied.
+The runtime source prefix and accepted standalone binary remained byte-identical.
+The full 316-test/2-worker run preceded this test-only refinement; it was not repeated.
+The historical 117-checkpoint complete native regression was not repeated for 0.51.0;
+current native evidence is the focused unified-review and health workflows above.
+
+## Remaining limits and next required actions
+
+All acceptance criteria for this assignment are satisfied for the existing supported
+bank/card ledgers. This is a development build, with these explicit limits:
+
+- The score is a transparent product-policy counseling index, not an independently
+  validated credit rating or financial prediction. Counselors should review its
+  thresholds with the client and inspect the component evidence.
+- Missing, unreconciled, overlapping, stale or incomplete essential evidence withholds
+  a definitive score. Supported periods are 1–24 months; existing bounded import,
+  classification and review limits still apply. Cross-period owned transfers remain
+  unavailable until their allocation evidence can be established.
+- Existing unsupported OCR/institution/loan/mortgage/credit-line adapters were not
+  added. Explicitly verified balances and required payments support current measures;
+  unknown planning terms retain existing unavailable-result warnings.
+- The assessment is a live projection. Historical reports and saved plans are
+  preserved; it neither silently writes proposed reductions nor adds a health score
+  to previously issued reports. Counselors use the existing reviewed scenario and
+  reporting workflows to commit agreed planning decisions.
+- Native acceptance was on Linux. Windows installation/offline distribution and
+  commercial readiness require separate verification. No installer, household
+  linking or business counseling functionality was introduced.
+
+Next action: counselor evaluation of this completed dashboard and its policy using
+fictional records. Broader adapters and Windows acceptance remain existing separately
+scoped priorities; create no installer unless explicitly requested.

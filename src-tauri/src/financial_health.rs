@@ -1051,6 +1051,20 @@ mod tests {
             .unwrap()
             .assessment
     }
+    // Exercise the exact projection/reduction path at the fixture's controlled
+    // date. Native acceptance separately covers the current-date public IPC.
+    fn preview_at_fixture_date(
+        w: &mut Workspace,
+        id: &str,
+        input: ReductionInput,
+    ) -> Result<Reduction, String> {
+        let session = w.session()?;
+        let tx = session.connection.transaction().map_err(storage_error)?;
+        let current = assess(&tx, &session.info, id, input.query.clone(), today())?;
+        let value = reduce(current, input)?;
+        tx.commit().map_err(storage_error)?;
+        Ok(value)
+    }
     fn decide(w: &mut Workspace, id: &str, record: &str, status: Status) {
         let s = w.get_client_imports(id).unwrap();
         let r = s.records.iter().find(|r| r.id == record).unwrap();
@@ -1487,9 +1501,7 @@ mod tests {
         assert!(rejected.score.is_none());
         assert!(rejected.excluded_rows > 0);
         assert!(rejected.evidence.is_empty());
-        assert!(w
-            .preview_financial_health_reduction(&id, reduction(&a))
-            .is_err());
+        assert!(preview_at_fixture_date(&mut w, &id, reduction(&a)).is_err());
         decide(&mut w, &id, &r.id, Status::Approved);
         let pending = view(&mut w, &id, query());
         assert_eq!(pending.score, None);
@@ -1766,9 +1778,7 @@ mod tests {
         let a = view(&mut w, &id, query());
         let before = serde_json::to_value(w.get_assessment_planning(&id).unwrap()).unwrap();
         let events = audit(&w);
-        let preview = w
-            .preview_financial_health_reduction(&id, reduction(&a))
-            .unwrap();
+        let preview = preview_at_fixture_date(&mut w, &id, reduction(&a)).unwrap();
         assert_eq!(preview.monthly_impact, "50.00");
         assert_eq!(preview.annual_impact, "600.00");
         assert!(preview.scenario.is_none());
@@ -1777,7 +1787,7 @@ mod tests {
         input.destination = "debt".into();
         input.allocation_line = Some(3);
         input.cash_line = Some(0);
-        let preview = w.preview_financial_health_reduction(&id, input).unwrap();
+        let preview = preview_at_fixture_date(&mut w, &id, input).unwrap();
         let c = preview.scenario.unwrap();
         assert_eq!(
             c.proposed.plans.budget.lines[2].amount.as_deref(),
@@ -1831,8 +1841,7 @@ mod tests {
         input.expense_line = Some(2);
         input.destination = "emergency".into();
         input.allocation_line = Some(4);
-        let c = w
-            .preview_financial_health_reduction(&id, input)
+        let c = preview_at_fixture_date(&mut w, &id, input)
             .unwrap()
             .scenario
             .unwrap();
@@ -1866,13 +1875,13 @@ mod tests {
         assert_eq!(view(&mut w, &id, query()).score, Some(95));
         let mut bad = reduction(&a);
         bad.reduction_percent = 101;
-        assert!(w.preview_financial_health_reduction(&id, bad).is_err());
+        assert!(preview_at_fixture_date(&mut w, &id, bad).is_err());
         let mut bad = reduction(&a);
         bad.category = "Nonexistent".into();
-        assert!(w.preview_financial_health_reduction(&id, bad).is_err());
+        assert!(preview_at_fixture_date(&mut w, &id, bad).is_err());
         let mut bad = reduction(&a);
         bad.expense_line = Some(0);
-        assert!(w.preview_financial_health_reduction(&id, bad).is_err());
+        assert!(preview_at_fixture_date(&mut w, &id, bad).is_err());
     }
     #[test]
     fn counselor_reclassification_recalculates_actual_metrics_and_reserve_score_with_preserved_history(
@@ -2003,17 +2012,27 @@ mod tests {
         let (dir, mut w, id) = fixture();
         let other = w.save_client(client_input()).unwrap();
         let a = view(&mut w, &id, query());
+        // A new counseling day invalidates the old preview context even when
+        // every transaction and plan value is unchanged.
+        let next_day = {
+            let session = w.session().unwrap();
+            assess(
+                &session.connection,
+                &session.info,
+                &id,
+                query(),
+                today().succ_opt().unwrap(),
+            )
+            .unwrap()
+        };
+        assert!(reduce(next_day, reduction(&a)).is_err());
         assert!(w.get_financial_health("not-a-client", query()).is_err());
-        assert!(w
-            .preview_financial_health_reduction(&other.id, reduction(&a))
-            .is_err());
+        assert!(preview_at_fixture_date(&mut w, &other.id, reduction(&a)).is_err());
         let mut b = client_input();
         b.id = Some(id.clone());
         b.goals = "Changed profile context".into();
         w.save_client(b).unwrap();
-        assert!(w
-            .preview_financial_health_reduction(&id, reduction(&a))
-            .is_err());
+        assert!(preview_at_fixture_date(&mut w, &id, reduction(&a)).is_err());
         coverage(&mut w, &id, &query());
         let a = view(&mut w, &id, query());
         let destination = tempfile::tempdir().unwrap();
