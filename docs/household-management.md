@@ -58,7 +58,9 @@ splits, forecasts or settlement amounts.
 Allocation supports equal, percentages, fixed-only, income-proportional and
 individual responsibility. Each participant may first receive a fixed dollar
 obligation; the remainder uses the selected method and specified participants.
-A zero remainder weight makes a participant fixed-only. Percentages of a
+A zero remainder weight makes a participant fixed-only. Valid zero forms such as
+`0`, `0.0` and `0.00` behave identically, including for a fixed-only member who
+has not shared income. Percentages of a
 nonzero remainder must total exactly 100%. Invalid/overallocated agreements
 cannot be finalized. Largest fractional remainders receive leftover cents;
 stable member IDs break ties. Allocations always sum to the entered amount.

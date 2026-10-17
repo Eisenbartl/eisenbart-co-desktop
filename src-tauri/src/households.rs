@@ -226,7 +226,7 @@ pub fn split(total: i64, a: &Allocation, d: &Data, on: &str) -> Result<Vec<Porti
     let mut fixed = 0_i64;
     let mut weights = 0_i64;
     for (share_index, s) in a.shares.iter().enumerate() {
-        weight(&s.weight)?;
+        let declared_weight = weight(&s.weight)?;
         let m = member(d, &s.member_id)?;
         if !active(m, on) {
             return Err(format!("{} is not a member on {on}.", m.name));
@@ -235,7 +235,7 @@ pub fn split(total: i64, a: &Allocation, d: &Data, on: &str) -> Result<Vec<Porti
         fixed = fixed.checked_add(f).ok_or("Allocation is too large.")?;
         let w = match a.method.as_str() {
             "equal" | "individual" => {
-                if s.weight == "0" || s.weight == "0.00" {
+                if declared_weight == 0 {
                     0
                 } else {
                     1
@@ -253,7 +253,7 @@ pub fn split(total: i64, a: &Allocation, d: &Data, on: &str) -> Result<Vec<Porti
                         .ok()
                         .filter(|w| *w >= 0 && *w <= 100_000_000_000)
                         .ok_or("Invalid approved income basis.")?
-                } else if s.weight == "0" || s.weight == "0.00" {
+                } else if declared_weight == 0 {
                     0
                 } else {
                     if !m.consent.income {
@@ -324,7 +324,7 @@ fn freeze_income(a: &mut Allocation, d: &Data) -> Result<(), String> {
     let mut basis = vec![];
     for s in &a.shares {
         let m = member(d, &s.member_id)?;
-        let value = if s.weight == "0" || s.weight == "0.00" {
+        let value = if weight(&s.weight)? == 0 {
             0
         } else {
             if !m.consent.income {
@@ -1345,5 +1345,43 @@ mod agreement_tests {
         assert_eq!(s.member_totals[0].obligation, "1200.00");
         assert_eq!(s.member_totals[2].obligation, "0.00");
         assert_eq!(s.invalid_allocations, 0);
+    }
+}
+#[cfg(test)]
+mod zero_weight_tests {
+    use super::tests::{allocation, data, expense};
+    use super::*;
+    #[test]
+    fn decimal_zero_variants_exclude_equal_and_income_remainders() {
+        for zero in ["0", "0.0", "0.00", "00.00"] {
+            let mut d = data();
+            let mut a = allocation(&d, "equal", &[zero, "1", "1"]);
+            a.shares[0].fixed = "500.00".into();
+            let shares = split(240000, &a, &d, "2026-10-01").unwrap();
+            assert_eq!(
+                shares.iter().map(|s| s.amount.as_str()).collect::<Vec<_>>(),
+                ["500.00", "950.00", "950.00"],
+                "{zero}"
+            );
+            for (i, income) in [(1, "1000"), (2, "3000")] {
+                d.members[i].consent.income = true;
+                d.members[i].monthly_income = Some(income.into());
+                d.members[i].consent.evidence = "Synthetic income permission".into();
+            }
+            a.method = "income".into();
+            let mut e = expense(&d);
+            e.allocation = Some(a);
+            apply(&mut d, &mut Action::Expense(e)).unwrap();
+            let s = summary(&d, "2026-10").unwrap();
+            assert_eq!(
+                s.member_totals
+                    .iter()
+                    .map(|m| m.obligation.as_str())
+                    .collect::<Vec<_>>(),
+                ["500.00", "475.00", "1425.00"],
+                "{zero}"
+            );
+            assert!(!d.members[0].consent.income);
+        }
     }
 }

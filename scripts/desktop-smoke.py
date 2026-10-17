@@ -229,10 +229,16 @@ class WebDriver:
                 if isinstance(value,str) and value:self.record_intents[(self.last_client_id,control)]=value
         if using=='css selector':self.workflow_for(selector)
         element = self.interactive(selector, using)
-        # WebKit's automatic scrolling can leave a partially visible control
-        # at the viewport edge and click its old position. Center first; this
-        # changes only the viewport and never invokes application commands.
-        self.scroll_element(element)
+        # Sticky workspace tabs should not be vertically centered: WebKit can
+        # retain an obsolete sticky-layer hit region after that forced scroll.
+        # Observe the real hit target before one native click; never retry writes.
+        is_tab=self.command("GET",f"/element/{element}/attribute/role")=="tab"
+        if is_tab:
+            contained=self.observe_script("const e=arguments[0],r=e.getBoundingClientRect(),p=e.closest('.workspace-tabbar')?.getBoundingClientRect();return !!p&&r.left>=p.left&&r.right<=p.right&&r.top>=p.top&&r.bottom<=p.bottom;",[{ELEMENT_KEY:element}])
+            if not contained:self.scroll_element(element,"nearest")
+            self.command("POST","/execute/async",{"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));","args":[]})
+            self.wait(lambda:self.observe_script("const e=arguments[0],r=e.getBoundingClientRect(),h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return !!h&&(h===e||e.contains(h));",[{ELEMENT_KEY:element}]) is True,"painted and unobstructed workspace tab")
+        else:self.scroll_element(element)
         self.command("GET", f"/element/{element}/displayed")
         try:
             self.command("POST", f"/element/{element}/click", {})
@@ -2061,6 +2067,7 @@ def check_households(driver: WebDriver, artifacts: Path, data_root: Path,
     status('household: two stable client links, limited member and explicit permissions')
     section('Shared Expenses');driver.click_button('Add expense')
     driver.fill(drawer+' input[data-field="expense-name"]','Rent');driver.fill(drawer+' input[data-field="amount"]','2400.00')
+    driver.replace_text(drawer+' input[aria-label="Fixed dollars for Jordan Household"]','500.00');driver.replace_text(drawer+' input[aria-label="Remainder weight for Jordan Household"]','0.0');driver.wait_text(drawer+' .household-preview','$500.00','decimal zero excludes the fixed-only participant');driver.wait_text(drawer+' .household-preview','$950.00','exact equal remainder for the other members');driver.replace_text(drawer+' input[aria-label="Fixed dollars for Jordan Household"]','0.00');driver.replace_text(drawer+' input[aria-label="Remainder weight for Jordan Household"]','1')
     driver.select(drawer+' select[data-field="allocation-method"]','Custom percentage remainder')
     for person,percent in [('Jordan Household','25'),('Nora Household','37.5'),('Michael Demo','37.5')]:
         driver.replace_text(drawer+f' input[aria-label="Remainder weight for {person}"]',percent)
