@@ -238,7 +238,11 @@ class WebDriver:
             if not contained:self.scroll_element(element,"nearest")
             self.command("POST","/execute/async",{"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));","args":[]})
             self.wait(lambda:self.observe_script("const e=arguments[0],r=e.getBoundingClientRect(),h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return !!h&&(h===e||e.contains(h));",[{ELEMENT_KEY:element}]) is True,"painted and unobstructed workspace tab")
-        else:self.scroll_element(element)
+        else:
+            self.scroll_element(element)
+            if self.observe_script("return !!arguments[0].closest('.unified-inspection');",[{ELEMENT_KEY:element}]):
+                self.command("POST","/execute/async",{"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));","args":[]})
+                self.wait(lambda:self.observe_script("const e=arguments[0],r=e.getBoundingClientRect(),h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return !!h&&(h===e||e.contains(h));",[{ELEMENT_KEY:element}]) is True,"painted and unobstructed inspection control")
         self.command("GET", f"/element/{element}/displayed")
         try:
             self.command("POST", f"/element/{element}/click", {})
@@ -2067,6 +2071,9 @@ def check_unified_review(driver: WebDriver, artifacts: Path, data_root: Path,
         driver.click(f"//table[contains(@class,'unified-table')]//tr[td/strong[normalize-space(.)={json.dumps(description)}]]//button",'xpath');driver.wait_text('.unified-extracted',description,'selected transaction evidence');driver.interactive("//button[normalize-space(.)='Correct / approve transaction']",'xpath')
     def save_details(reason: str) -> None:
         driver.fill('#inspection-reason',reason);driver.click('#inspection-ack');driver.click_button('Save inspection details');driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','supplemental details saved and refreshed');driver.interactive('#unified-search')
+        # A refreshed retained PDF remounts asynchronously and can change scroll geometry.
+        # Observe finished canvas paint before the next single native click.
+        if driver.visible('.original-document'):canvas_ready()
     def method_analysis() -> None:
         if not driver.observe_script("return document.querySelector('.unified-method-analysis')?.open===true"):driver.click('.unified-method-analysis > summary')
     def canvas_ready() -> None:

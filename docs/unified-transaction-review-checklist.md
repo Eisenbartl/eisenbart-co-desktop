@@ -39,3 +39,21 @@ No installer is authorized.
 
 Checks and outcomes will be recorded as they execute. Unavailable loan adapters,
 OCR and installed Windows acceptance must not be described as completed.
+
+## Executed stage result (0.50.0 / schema 32)
+
+The current bank/card projection, filters, supplemental details, optional original
+viewer, focused shared financial forms and exact method observations are working.
+No second financial ledger, approval pipeline or parser was introduced. Money-market
+labels reuse existing savings transactions; loan/credit-line/mortgage transaction
+adapters remain a documented dependency rather than fabricated records.
+
+All 312 UI tests passed. Rust coverage includes the 303-test matrix with its legacy
+fixture follow-up, then all 13 final affected tests (one added; 304 library tests
+now). Actual PDF-worker integration tests, Clippy and no-bundle builds passed.
+The complete native regression passed 117 checkpoints before the localized channel
+correction; final focused native acceptance passed on that corrected binary,
+including independent loan/repayment/refund treatment, source viewing, edits,
+original/history preservation, narrow layout, lock/restart and encrypted recovery.
+Exact run/binary distinctions and limits are in `development-status.md`.
+No installer was created or provided.

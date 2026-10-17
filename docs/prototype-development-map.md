@@ -311,7 +311,7 @@ source/consent revocation handling, preserved history, tab/draft privacy on lock
 native desktop/narrow layout, restart and recovery. Execution results belong in
 `development-status.md`, separately from this functionality map. No installer.
 
-## Unified transaction review — implemented in 0.50.0, native verification pending
+## Unified transaction review — working in 0.50.0, native acceptance passed
 
 **Review & reconciliation → All transactions** combines one current row per bank
 or card record, sorted by transaction date with stable same-day IDs. Combined
@@ -328,6 +328,6 @@ coverage and exclude payments/transfers/refunds/fees/interest/duplicates.
 and [workflow/limits](unified-transaction-review.md) define the feature. Loan,
 mortgage and credit-line transaction adapters remain unavailable; plans/balances
 are not invented transaction sources. Native original rendering, focused financial
-decisions, exact totals, narrow layout, lock/restart and recovery must pass before
-this stage is called a completed full test version. Executed results belong in
+decisions, exact totals, narrow layout, lock/restart and recovery passed. The full
+regression and final localized channel refinement are recorded separately in
 `development-status.md`. No installer without an explicit request.

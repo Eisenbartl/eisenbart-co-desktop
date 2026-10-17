@@ -537,3 +537,12 @@ Use the same compiled standalone `--debug --no-bundle` build and real Tauri nati
 driver as previous stages. Do not run Cargo while the application/driver are active.
 The full prior regression is retained. No installer is produced; Linux checks do
 not establish installed Windows acceptance or certify commercial readiness.
+
+The final focused refinement extends the same scenario to nine current rows by
+adding bank loan proceeds/payment and a refund/fee pair. The unchanged $250
+purchase split excludes them. ACH credit/debit and external/reversal labels must
+preserve movement/refund kinds; they must never require invented income or
+purchases. Inspection clicks wait for the actual unobstructed hit target once;
+a refreshed original canvas must finish painting before subsequent test gestures.
+No financial submission is replayed. Execution results distinguish the complete
+pre-refinement regression from final focused acceptance on the corrected binary.

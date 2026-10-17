@@ -1,51 +1,95 @@
 # Development status
 
-## Current stage — unified transaction review (0.50.0, schema 32; verification in progress)
+## Current stage — unified transaction review (0.50.0, schema 32)
 
-The user-supplied [brief](unified-transaction-review-specification.md) is mapped
-in the [reuse checklist](unified-transaction-review-checklist.md). Existing
-extraction/review/reconciliation systems remain authoritative. A current-row
-bank/card projection, combined filters, source-bound supplemental details and
-exact reconciled purchase-method analysis are implemented. Optional original-PDF
-inspection and focused embedding of existing bank/card decision forms are being
-verified. Loan/credit-line/mortgage transaction adapters are not implemented;
-no existing liability/cash records are relabeled as those ledgers.
+Implemented [the supplied brief](unified-transaction-review-specification.md) for
+currently supported bank/card transaction ledgers. The [baseline checklist](unified-transaction-review-checklist.md)
+records existing systems, improvements and adapter dependencies. [Workflow,
+calculation basis and limits](unified-transaction-review.md).
 
-Thirteen focused Rust tests pass, covering mixed chronological rows, current evidence,
-filters/paging/staleness, exact purchase totals and unknown coverage, duplicate
-and discrepancy exclusion, metadata rollback/invalidations, deposit subtypes,
-scoped retained originals and encrypted recovery. All 312 UI tests (43 files) passed; the focused 43-test run also covered the
-unified viewer and existing bank/card/history components.
-Production frontend build passed. The last full Rust library run passed 302 of
-303 tests; its one remaining legacy contents comparison omitted the introduced
-empty table. That fixture was corrected without changing old-record comparisons
-and passed its targeted rerun, covering all 303 library tests successfully across
-those runs. Both actual supervised PDF-worker integration tests passed separately
-(the main-binary unit target contains no tests and is not counted). Final Clippy
-with warnings denied and the embedded standalone `--debug --no-bundle` build pass.
-Earlier failed fixture attempts remain separately logged. Native focused/full
-regression remains pending; this stage is not yet a completed full test version.
-No installer is authorized.
+**Review & reconciliation → All transactions** now provides one current row per
+source record across accounts, chronological/date-basis sorting, combined literal
+search/filters, stable 25-row pages, immutable evidence/history and optional original
+PDF inspection. Existing bank/card forms own financial corrections, approvals,
+rejections, reversals and atomic necessary/discretionary purposes. Source-bound
+method/posting details and explicitly reviewed institution/masked identifiers use
+an encrypted append-only journal. Confirmed rejected duplicates remain distinct
+from suspicion and become inactive on a new financial decision.
+
+The optional bundled PDF.js canvas uses real authorized retained originals,
+recorded pages, page/zoom controls, local fonts/CMaps and rendering bounds. It
+creates no plaintext PDF temp file and activates no PDF scripts/attachments/form
+or link UI. Unknown locations/originals remain explicit. Purchase-method analysis
+uses exact Rust cents and eligible reconciled sources, with $100/$100/$50 credit,
+debit and unknown coverage independently verified as 40%/40%/20%. Repayments,
+transfers, refunds, fees, interest and duplicates do not inflate purchases.
+
+Source validation passed: all 312 UI tests in 43 files; all 13 new Rust tests;
+Clippy all targets with warnings denied; production frontend and embedded standalone
+debug builds. Rust library coverage includes the full 303-test matrix
+(302 passed), the corrected legacy-comparison test’s passing rerun, and all 13 final affected tests
+including one additional case. There are now 304 library tests; the complete run
+preceded the final localized channel correction described below.
+The two actual supervised PDF-worker integration tests passed separately. The
+main-binary unit target has zero tests and is not counted as worker validation.
+
+Earlier full-run failures were legacy schema fixtures retaining the newly added
+table. They now remove it when simulating an older schema. The final comparison
+also permits the introduced table while checking it starts empty and retaining
+exact comparisons of all older records. Original source/report preservation and
+rollback assertions remain. Failed attempts are retained separately.
 
 Focused native acceptance passed with exit 0 and the final completion marker:
-`/workspace/shared/desktop-smoke-unified-focused-second`. Actual retained PDF
-canvas pages/zoom, mixed current rows, exact $100/$100/$50 purchase methods,
-shared bank/card purpose decisions, inactive older details, confirmed/reversed
-duplicates, downstream Spending Analysis, 800px layout, lock, full restart and
-encrypted recovery all passed. The first attempt passed the initial PDF/method
-checkpoint but its driver routed to the separate card page while the embedded
-form was loading. The wait now targets the embedded field; no application change
-or financial-write retry was needed. The complete native regression then passed with exit 0, its completion marker
-and all 117 checkpoints: `/workspace/shared/desktop-smoke-unified-complete-final`.
-Its app source/binary hashes remained unchanged and driver ports closed afterward.
+`/workspace/shared/desktop-smoke-unified-focused-second`. It exercised actual PDF
+canvas rendering/page/zoom, current bank/card chronology and combined filters,
+exact method shares, both existing financial decision forms, source-bound history,
+confirmed/reversed duplicates, automatic Spending Analysis updates, 800px layout,
+lock, full restart and encrypted recovery with the original displayed again.
+The first attempt's driver navigated to the separate card page before its embedded
+form loaded; a scoped field wait fixed the harness without an app change or any
+retry of a financial write.
 
-A final localized correction keeps payment channels independent of economic kind:
-ACH/check/direct-deposit methods can annotate eligible movements or refunds,
-external transfers use unpaired balance movements, and reversals can retain refund
-treatment. Interest observations derive from reviewed financial kind/direction.
-All 13 affected Rust tests, final Clippy and a new standalone no-bundle build pass.
-There are now 304 library tests; the last full regression preceded this isolated
-correction, and final focused native acceptance is pending on the updated binary.
+The complete native regression passed with exit 0, its completion marker and all
+117 checkpoints before the final localized channel correction. It retained all
+prior planning, import/review, source/history, PDF/CSV, household, recovery,
+real idle-timeout and password-generation workflows.
+
+The final correction permits ACH/check/direct-deposit channels on appropriate
+financial movements/refunds, keeps external transfers unpaired movements, and
+allows reversals to retain refund treatment. Interest observations use reviewed
+financial kind/direction. Independent tests preserve $2,000 income, $5 costs,
+$25 refunds and $2,370 cash movement despite channel changes and loan proceeds.
+
+Final focused native acceptance passed on the corrected binary with exit 0 and
+its completion marker: `/workspace/shared/desktop-smoke-unified-focused-channel-final`.
+It exercised nine current rows including loan proceeds/payments, refund and fee;
+ACH/external/reversal labels preserved the underlying movements/refund and the
+$250 purchase mix. Original rendering, both financial forms, histories, narrow
+layout, lock, restart and encrypted recovery passed again. The preceding refined
+attempt hit a PDF reload/scroll timing issue in the driver. Waiting for canvas
+paint and observed control hit targets before one click fixed the harness; no
+application change or financial-write retry was needed.
+Artifacts: `/workspace/shared/desktop-smoke-unified-complete-final`.
+
+Both native builds retained their recorded source/binary hashes throughout their
+respective runs, and driver ports closed after cleanup. No Cargo command ran
+while either native application/driver was active. Desktop, original-document
+and narrow screenshots were visually inspected. Source/binary manifests and logs are retained under
+`/workspace/shared/unified-review-validation`. Application checkpoints are
+`68fd122`, `3eb462a`, `f0f0b2a`, `5773520` and `d2bfdcc` on
+`client-workspace-redesign-0.46`; `c56d014` records the original reuse assessment.
+
+Next priority is counselor evaluation with fictional statements, followed by
+explicitly scoped loan/credit-line/mortgage adapters or broader parser/OCR work.
+Those ledgers are unavailable, and debt plans/balances are not invented transaction
+sources. Money-market deposit labels reuse actual savings transactions. Originals
+must have been retained to display PDFs; precise coordinates are unavailable.
+Statement arithmetic does not establish complete account/period coverage; existing
+completeness tools retain that responsibility.
+
+No installer was created or provided. Another installer requires an explicit user
+request. This remains a development build; installed Windows acceptance and
+commercial readiness remain separate.
 
 ## Previous stage — household management (0.49.0, schema 31)
 
