@@ -16,13 +16,41 @@ preceding-period table now show separate purchase-dollar and purchase-count shar
 with existing averages, eligibility, unknown methods and exclusions preserved.
 There is no new ledger, component, navigation section, schema or installer.
 
-Current checks: all 313 UI tests passed; all 14 affected Rust tests passed after
-correcting a test expectation to honor the existing statement-discrepancy gate;
-Clippy with warnings denied, production frontend and standalone no-bundle debug
-builds passed. The full Rust matrix and updated native acceptance are in progress.
+Completed checks: all 313 UI tests passed; all 14 final affected Rust tests passed;
+Clippy with warnings denied, production frontend and embedded standalone no-bundle
+debug builds passed. The full 305-test Rust library matrix passed 304 tests; the
+process-exit fixture could not launch its executable after concurrent Cargo
+recompilation replaced it. Its sequential rerun passed all four interruption
+points. Both actual supervised PDF-worker integration tests also passed. The
+final standalone build followed all Cargo checks; no Cargo command ran during
+native acceptance. This is full-matrix coverage plus targeted reruns, not a claim
+of a single all-pass 305-test run.
+
 Initial focused UI failures clicked subtabs before the new default finished
-loading; readiness waits corrected those tests. No approval or reconciliation
-safeguard was changed. Earlier 0.50.0 acceptance below remains historical.
+loading; readiness waits corrected those tests. One additional count expectation
+was corrected to honor the existing source-discrepancy gate: rejecting a purchase
+can exclude its whole unreconciled statement, leaving the matched card source
+at 100% of eligible count. Restoring approval reinstates the eligible denominator.
+No approval or reconciliation safeguard was changed. Failed attempts are retained
+in their separate logs.
+
+Updated focused native acceptance passed with exit 0 and its completion marker:
+`/workspace/shared/desktop-smoke-unified-refinements`. It exercised default combined
+chronology, existing filters, the View Source Document action and immediate panel
+closing, actual local PDF pages/zoom, dollar/count shares with unknowns, rejection
+and reapproval, existing bank/card purpose edits and Spending Analysis, 800px
+layout, client isolation, full restart and encrypted recovery. Desktop method
+shares and narrow source layout were visually inspected. Source/binary hashes
+remained unchanged during the run; the native processes and driver ports closed.
+Evidence: `/workspace/shared/unified-review-refinements-validation/completed.json`.
+The earlier complete 117-checkpoint regression was not repeated for these focused
+refinements; its historical result and timing remain below. No installer or new
+household/business functionality was added. Windows installed acceptance remains
+unverified for this refinement.
+
+Next priority is user review of this refined workflow; the previously documented
+broader institution/loan adapters remain unsupported. Earlier 0.50.0 acceptance
+below remains historical.
 
 **Review & reconciliation → All transactions** now provides one current row per
 source record across accounts, chronological/date-basis sorting, combined literal

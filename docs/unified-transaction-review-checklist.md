@@ -82,5 +82,9 @@ averages are reused. Previously recorded acceptance results above remain histori
   dollars with 33.33% count each. Filters, rejection and restored approval recalculate
   count shares without altering original records or historical decisions.
 
-Execution results for these refinements are recorded in development status when
-checks finish. No new installer is authorized.
+Execution complete: 313 UI tests, all 14 affected Rust tests, Clippy and production/
+standalone builds passed. The 305-test library matrix passed 304 tests and its
+process-exit test passed on sequential rerun; both actual PDF-worker tests passed.
+Updated focused native acceptance passed, including count recalculation, source
+panel closing, isolation, restart and encrypted recovery. See development status
+for exact run distinctions and evidence. No installer was created.
