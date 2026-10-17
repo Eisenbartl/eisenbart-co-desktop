@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.48.0 source
+# Prototype structure and development map — 0.51.0 source (schema 32)
 
 The user requested the [client workspace redesign](client-workspace-redesign.md)
 using a supplied layout reference. The global sidebar now contains Dashboard,
@@ -13,7 +13,9 @@ Review & reconciliation, Spending Analysis, Financial dashboard and Assessments 
 `client-workspace.css` compose the redesign. Existing client editors and financial
 components remain the implementation entry points. `ImportsEditor.tsx` now also
 exposes separately mounted review subtabs. `client_workspace.rs` supplies a
-read-only summary from the existing saved-plan engines. Schema 30 adds a compatibility gate for versioned PDF transaction evidence; original report formats remain unchanged.
+read-only summary from the existing saved-plan engines. Schema 30 added the versioned PDF evidence compatibility gate; schema 31 stores
+household planning history, and schema 32 stores scoped transaction-inspection
+details. Version 0.51.0 adds no migration. Original report formats remain unchanged.
 
 Only the selected section is mounted. Tabs retain per-client section metadata,
 require explicit draft discard and close to the most recently used remaining tab.
@@ -60,6 +62,18 @@ summary cards, donut/bars, table filtering and discussion-bound Type edits.
 Import and approval stay in their own sections. [Calculation rules, opportunities
 and safeguards](spending-analysis.md). Current validation is recorded in
 [development status](development-status.md).
+
+## Unified review and household workspaces — existing supported workflows
+
+**Review & reconciliation → All transactions** is the default combined chronological
+bank/card history, with existing financial decision forms and optional retained PDF
+inspection. Dollar shares, purchase-count shares, averages and unknown methods use
+the same eligible purchase rows. See [workflow and limits](unified-transaction-review.md).
+
+Existing household tabs expose explicit members, shared expenses, allocations,
+settlements and reviewed planning handoffs. They do not infer client relationships
+or alter individual records on opening. See [household workflow](household-management.md).
+No new linking or household/business functionality is part of consolidation.
 
 ## Financial health assessment — completed and verified in 0.51.0
 

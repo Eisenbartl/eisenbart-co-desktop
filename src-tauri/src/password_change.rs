@@ -400,6 +400,108 @@ mod tests {
         }
     }
     #[test]
+    fn schema31_inspection_upgrade_rolls_back_preserves_all_evidence_and_is_idempotent() {
+        let (root, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let note = w
+            .add_client_note(&client.id, "Synthetic schema31 retained note")
+            .unwrap();
+        w.create_household("Synthetic existing household".into(), "2026-10".into())
+            .unwrap();
+        let mut doc = bank::doc("Synthetic migration checking");
+        doc.retain_source = true;
+        let records = bank::stage(
+            &mut w,
+            &client.id,
+            root.path(),
+            "migration.csv",
+            "Date,Description,Amount,Category,Type\n2026-09-01,Synthetic wages,610,Wages,income\n",
+            doc,
+        );
+        let report = w
+            .save_assessment_record(&client.id, bank::assessment_input(&records, &client))
+            .unwrap();
+        fn audits(c: &Connection) -> Vec<String> {
+            c.prepare("SELECT * FROM audit_events ORDER BY id")
+                .unwrap()
+                .query_map([], |r| {
+                    let values = (0..6)
+                        .map(|i| r.get::<_, rusqlite::types::Value>(i))
+                        .collect::<rusqlite::Result<Vec<_>>>()?;
+                    Ok(format!("{values:?}"))
+                })
+                .unwrap()
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .unwrap()
+        }
+        let c = &mut w.session.as_mut().unwrap().connection;
+        c.execute_batch("DROP TABLE transaction_inspection_details; PRAGMA user_version=31; CREATE TRIGGER inspection_details_no_update BEFORE UPDATE ON clients BEGIN SELECT RAISE(ABORT,'Synthetic migration collision'); END;").unwrap();
+        let before = contents(c);
+        let audit_before = audits(c);
+        let schema_before: String = c.query_row("SELECT group_concat(sql,';') FROM (SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name)", [], |r| r.get(0)).unwrap();
+        // Fail after the new table was created: the entire DDL transaction must roll back.
+        assert!(migrate(c, false).is_err());
+        assert_eq!(
+            c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            31
+        );
+        let schema_after: String = c.query_row("SELECT group_concat(sql,';') FROM (SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name)", [], |r| r.get(0)).unwrap();
+        assert_eq!(schema_after, schema_before);
+        assert_eq!(contents(c), before);
+        assert_eq!(audits(c), audit_before);
+        c.execute_batch("DROP TRIGGER inspection_details_no_update;")
+            .unwrap();
+        migrate(c, false).unwrap();
+        assert_eq!(
+            c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            SCHEMA_VERSION
+        );
+        let upgraded = contents(c);
+        assert_eq!(
+            upgraded
+                .iter()
+                .filter(|(name, _)| name != "transaction_inspection_details")
+                .cloned()
+                .collect::<Vec<_>>(),
+            before
+        );
+        assert_eq!(audits(c), audit_before);
+        assert_eq!(
+            c.query_row(
+                "SELECT COUNT(*) FROM transaction_inspection_details",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            0
+        );
+        migrate(c, false).unwrap();
+        assert_eq!(contents(c), upgraded);
+        assert_eq!(audits(c), audit_before);
+        w.lock_workspace();
+        let mut reopened = Workspace::new(root.path().into());
+        reopened.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(reopened.list_client_notes(&client.id).unwrap(), vec![note]);
+        assert_eq!(
+            serde_json::to_value(reopened.get_client_imports(&client.id).unwrap()).unwrap(),
+            serde_json::to_value(records).unwrap()
+        );
+        assert_eq!(
+            serde_json::to_value(
+                reopened
+                    .get_assessment_record(&client.id, &report.payload.id)
+                    .unwrap()
+                    .payload
+            )
+            .unwrap(),
+            serde_json::to_value(report.payload).unwrap()
+        );
+        assert_eq!(reopened.list_households().unwrap().len(), 1);
+        assert_eq!(contents(&reopened.session().unwrap().connection), upgraded);
+    }
+    #[test]
     fn schema27_audit_extension_is_atomic_and_preserves_populated_history() {
         let (_root, mut w, _) = configured();
         let client = w.save_client(client_input()).unwrap();

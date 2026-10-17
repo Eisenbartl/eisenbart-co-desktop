@@ -1,11 +1,39 @@
 # Windows evaluation guide
 
-This guide describes the **0.47.0 client workspace**. See the [Windows download
-instructions](windows.md) for the exact verified installer/build; source tests
-alone do not establish a downloadable package. Use fictional records while
-evaluating this unsigned development build. Independent security review and clean
+This guide describes the **0.51.0 development source (schema 32)**. The
+[Windows guide](windows.md) separates current source validation from the historical
+0.47.0 installer, which lacks newer features and cannot open schema-32 records.
+There is no 0.51.0 installer. Use fictional records while evaluating this
+development build. Independent security review and clean
 installed Windows 11 offline acceptance remain pending. There is no forgotten-
 password reset.
+
+## Current transaction review and health assessment
+
+In a client workspace, open **Review & reconciliation → All transactions** for
+combined chronological account history. Use the existing filters; **View Source
+Document** opens the retained PDF alongside the table when available. Closing it
+restores the table width. Purchase-method analysis separates dollar shares,
+purchase-count shares and average amounts, with unknown methods visible. Transfers,
+repayments, refunds and other non-purchases do not inflate purchase comparisons.
+Approve or correct transactions through their existing review forms; original
+imports and decision histories remain retained. [Detailed workflow](unified-transaction-review.md).
+
+Open **Financial dashboard**, select the completed assessment months and load the
+integrated health view. Inspect component points and the evidence checklist; missing
+essential information leaves the total unavailable. The score is a counseling aid.
+Income-relative rows distinguish expenses, debt obligations, refunds, savings and
+other transfers. Observations explain their supporting activity and uncertainty.
+Use the existing classification-edit action after discussing necessity with the
+client; renew coverage when source decisions change. Counselor-selected reduction
+previews show conditional monthly/annual impacts and can explicitly map saved
+expense/allocation/calendar lines into existing scenario engines without changing
+saved plans. [Policy, thresholds, evidence and limits](financial-health-assessment.md).
+
+Existing household workspaces provide explicit shared-planning workflows separately
+from individual financial records. [Household guide](household-management.md).
+The [0.47.0 installer](windows.md) is historical and lacks these newer source features.
+No 0.51.0 installer is available or requested.
 
 ## Spending Analysis
 
@@ -38,7 +66,7 @@ Session notes includes note corrections and searchable History & records. Import
 statements includes statement accounts, document requests and signed-card CSV
 review. Review & reconciliation separates the queue, verified figures, running
 balances, recurring payments, transfers, source checks, history, classification
-rules and completeness/bank-card reviews. Financial dashboard shows approved
+rules and completeness/bank-card reviews. Financial dashboard shows the integrated health assessment and approved
 period activity, separate from planning inputs. Assessments & reports preserves
 saved evidence, action plans, final approvals and PDF controls.
 
@@ -63,7 +91,7 @@ financial contents. Archive saved requests to keep them out of the active view;
 uncheck Archive to reactivate. Past versions are read-only. See
 [document collection](document-collection.md) for history, limits and recovery.
 
-## Install and open
+## Install and open the historical Windows preview
 
 1. Download the **windows-installer** ZIP from a successful Windows build. See
    the [Windows download instructions](windows.md).
@@ -187,7 +215,7 @@ Version 0.23.0 uses schema 16; keep using the newer version after upgrading.
 
 ## Plan savings and sinking funds
 
-Savings planning is included in the current installer.
+Savings planning is included in both current source and the historical 0.47.0 installer.
 
 Open a saved client and scroll to **Savings planning**.
 

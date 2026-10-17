@@ -13,7 +13,8 @@
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
-    "check:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked"
+    "check:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
+    "check:version": "node scripts/check-version.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.3",

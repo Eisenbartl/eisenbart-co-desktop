@@ -1,6 +1,22 @@
-# Windows development installer — 0.47.0
+# Windows validation — current 0.51.0 source; historical 0.47.0 installer
 
-The current preview adds client **Spending Analysis**: approved/categorized
+Current source is **0.51.0, schema 32**. No current installer is requested or
+provided. The 0.47.0 download below is a historical artifact with schema 29; it
+does not contain newer extraction, household, unified-review or health features.
+Do not open a schema-32 workspace in that older application. Preserve backups and
+use the current source build after upgrading.
+
+The [0.51.0 review record](branch-0.51-review.md) tracks fresh Windows source CI,
+migrations, full tests and Linux native acceptance separately from historical
+packaging. Windows CI now checks matching version inputs, formatting, frontend,
+Rust tests, Clippy and an embedded debug application with **no bundle**. Packaging
+steps remain gated by an explicit manual `package_installer=true`; leave it false.
+A green source run does not establish Windows 11 installed/offline acceptance.
+
+## Historical 0.47.0 preview and executed packaging checks
+
+
+The historical 0.47.0 preview adds client **Spending Analysis**: approved/categorized
 spending cards, category charts, transaction filters, discussed Type changes and
 supported opportunity prompts. Original imports and classification history are
 retained; all affected live results refresh after saving. The directory, client
@@ -93,13 +109,17 @@ Use the repository checkout and locked commands:
 ```powershell
 npm ci
 npm run build
+npm run check:version
 npm test
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo test --manifest-path src-tauri/Cargo.toml --locked
-npm run tauri -- build --ci --bundles nsis -- --locked
+cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+npm run tauri -- build --debug --no-bundle --ci -- --locked
 ```
 
-The output is under `src-tauri\target\release\bundle\nsis`. Building downloads
-dependencies and the offline WebView2 redistributable; essential installed
-operation is offline. Do not disable TLS, signatures or encryption to fix a build.
-A manual GitHub workflow run with `package_installer=true` performs packaging;
-ordinary source pushes only test. A green source-only run has no installer.
+The debug executable is under `src-tauri\target\debug`. No installer is created.
+Building requires dependency downloads and development WebView2 prerequisites.
+Do not disable TLS, signatures or encryption to fix a build. Ordinary pushes to
+main and PRs targeting main run source validation; manual dispatch also defaults
+to no packaging. Only an explicitly requested run with `package_installer=true`
+may build/install-test an NSIS package and the offline WebView2 redistributable.

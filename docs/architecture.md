@@ -24,10 +24,10 @@ flowchart LR
     IPC --> Core[Rust application core]
     Core --> Auth[Local authentication and session]
     Core --> DB[Encrypted SQLCipher database]
-    Core -. Future milestones .-> Calc[Decimal financial engine]
+    Core --> Calc[Existing exact-money planning engines]
     Core --> Docs[Local CSV and selectable-text PDF review]
     Core -. Future milestones .-> PDF[OCR, advanced review and reports]
-    Core -. Future milestones .-> Reports[Reports and immutable snapshots]
+    Core --> Reports[Reports and immutable snapshots]
 ```
 
 There is no required cloud service, spreadsheet integration, or shared network database. Each installation owns its local data directory. Development dependency downloads and Windows installer build downloads are separate from the installed application's essential offline workflow.
@@ -72,7 +72,7 @@ under the existing workspace mutex. No temporary PDF, schema migration, shell
 plugin, financial write or print-success claim is introduced. See
 [workflow and Windows acceptance](windows-pdf-print-workflow.md).
 
-The Windows workflow builds an NSIS installer with Tauri's `offlineInstaller` WebView2 mode. This is intended to include the WebView2 runtime installer so the resulting package can install without fetching that component during installation. Building it requires network access to obtain dependencies and the runtime redistributable.
+The Windows workflow validates source and an embedded debug executable without packaging. Only an explicitly requested manual run with `package_installer=true` builds an NSIS installer with Tauri's `offlineInstaller` WebView2 mode. This is intended to include the WebView2 runtime installer so the resulting package can install without fetching that component during installation. Building it requires network access to obtain dependencies and the runtime redistributable.
 
 The packaging configuration must be exercised on Windows. Merely committing the workflow does not produce an executable, verify the NSIS installer, demonstrate offline installation, or provide a signing certificate. Follow [windows.md](windows.md) for the build and release checks.
 

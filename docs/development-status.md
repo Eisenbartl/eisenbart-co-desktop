@@ -1,5 +1,22 @@
 # Development status
 
+## Branch consolidation — 0.51.0, unmerged review in progress
+
+The current branch was fetched against `main`: 37 original commits ahead, none
+behind, from 0.43.0/schema 27 to 0.51.0/schema 32. The
+[consolidated review guide](branch-0.51-review.md) groups the scope and migration
+boundaries without rewriting history. Fresh locked setup, matching build versions,
+production frontend and all 322 UI tests passed. The original complete 316-test
+Rust suite and both actual PDF-worker integrations passed. A new populated
+schema-31 rollback/retry/idempotence/reopen regression also passed; the final
+317-test matrix, full native regression and fresh Windows source CI are next.
+
+Windows CI adds matching-version, formatting, Clippy and embedded no-bundle
+application checks. Installer steps remain opt-in and disabled. README, map, user,
+dashboard and Windows guides now distinguish current 0.51.0 source from historical
+0.47.0 packaging and obsolete feature descriptions. Do not merge or create an
+installer while verification/review is pending.
+
 ## Current stage — financial health assessment and behavioral insights (0.51.0, schema 32)
 
 Preceding transaction-review source/binary hashes and native acceptance were
