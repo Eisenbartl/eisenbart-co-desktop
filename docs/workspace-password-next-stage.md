@@ -1,4 +1,9 @@
-# Stage requirements: local workspace password change and recovery safeguards
+# Workspace password changes — retained implementation requirements
+
+Implemented in 0.44.0/schema 28; configurable inactivity followed in 0.45.0.
+See [current usage and limits](workspace-password-change.md) and
+[development status](development-status.md). The original requirements below are
+retained context, not a request to implement an already working workflow.
 
 Implement the planned **Settings → Security** password-change workflow using
 the existing authentication, SQLCipher and generation-based recovery architecture.

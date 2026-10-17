@@ -585,3 +585,24 @@ no uncertain financial write was replayed. The old complete 117-checkpoint nativ
 regression was not repeated for 0.51.0. Development status and
 [the acceptance record](financial-health-assessment.md) distinguish all executions.
 No installer or Windows installed-acceptance claim follows from these checks.
+
+
+## Complete 0.51.0 consolidation acceptance
+
+The entire tracked native script passed with **119 checkpoints**, its completion
+marker and exit 0 in `/workspace/shared/desktop-smoke-051-consolidation-fourth`.
+This is fresh full-regression evidence beyond the earlier focused 0.51.0 runs.
+It includes all planning, reports, normal/error-screen recovery, accounts, card
+review/final approval, classification/history, spending/extraction, unified original
+PDF inspection, health, household, inactivity and password-change workflows.
+Score and 800px images were visually inspected; runtime/binary hashes stayed fixed
+and native driver ports closed before later Cargo commands.
+
+Three earlier attempts exposed old bank-queue/default-view assumptions after 9,
+13 and 105 checkpoints. Explicit legacy queue selection and unified-default
+navigation checks corrected the harness. Original financial/history/isolation
+assertions stayed in place, uncertain writes were not replayed, and each rerun
+used a fresh fictional workspace. A frontend acceptance-test guard wait changed
+during the final native run; no runtime/build input or accepted binary changed.
+See [the consolidated source/CI/recovery evidence](branch-0.51-review.md) for all
+outcomes and limits. No installer or Windows installed/offline claim follows.

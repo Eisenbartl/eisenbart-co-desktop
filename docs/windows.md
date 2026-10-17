@@ -13,6 +13,12 @@ Rust tests, Clippy and an embedded debug application with **no bundle**. Packagi
 steps remain gated by an explicit manual `package_installer=true`; leave it false.
 A green source run does not establish Windows 11 installed/offline acceptance.
 
+[Corrected 0.51.0 source CI](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/39059990292)
+passed all 322 UI tests, 318 Windows library tests, both real PDF-worker integrations,
+version consistency, formatting, warnings-denied Clippy and frontend/embedded debug
+builds on `e28d6e2`. All packaging steps were skipped and no installer artifact was
+created. See the PR's current-head checks for the final documentation follow-up.
+
 ## Historical 0.47.0 preview and executed packaging checks
 
 
@@ -52,7 +58,7 @@ or SmartScreen warning. No publisher certificate or commercial-readiness claim i
 supplied. Essential operation is offline; the installer is configured to include
 Microsoft's WebView2 offline redistributable.
 
-## Updating an earlier preview
+## Historical 0.47.0 upgrade instructions
 
 Close all application instances before installing. Preserve the existing
 workspace, its password and a supported encrypted backup. If an old preview has
@@ -72,7 +78,7 @@ passwords. Restoring an older backup restores its password and captured settings
 There is no forgotten-password reset; reinstalling cannot recover a lost password.
 Close older app versions before changing passwords or inactivity policy.
 
-## What validation establishes
+## What the historical packaging validation establishes
 
 The packaging workflow ran locked frontend builds, all 281 UI tests, all 252
 Windows library tests and both PDF-worker tests on Windows Server 2025 x64.

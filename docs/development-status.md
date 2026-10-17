@@ -1,21 +1,65 @@
 # Development status
 
-## Branch consolidation — 0.51.0, unmerged review in progress
+## Branch consolidation — 0.51.0 validated source, unmerged for review
 
-The current branch was fetched against `main`: 37 original commits ahead, none
-behind, from 0.43.0/schema 27 to 0.51.0/schema 32. The
-[consolidated review guide](branch-0.51-review.md) groups the scope and migration
-boundaries without rewriting history. Fresh locked setup, matching build versions,
-production frontend and all 322 UI tests passed. The original complete 316-test
-Rust suite and both actual PDF-worker integrations passed. A new populated
-schema-31 rollback/retry/idempotence/reopen regression also passed; the final
-317-test matrix, full native regression and fresh Windows source CI are next.
+[PR #1](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1) prepares the
+original **37 commits ahead of main, none behind**, from 0.43.0/schema 27 through
+0.51.0/schema 32. History is preserved. Subsequent consolidation commits add CI
+version/format/lint/no-bundle gates, a populated schema-31 rollback/idempotence
+regression, native-harness navigation corrections, a Windows conditional-binding
+lint fix, an asynchronous acceptance-test readiness fix and reconciled documentation.
+The [review guide](branch-0.51-review.md) groups the changes and migration boundaries.
 
-Windows CI adds matching-version, formatting, Clippy and embedded no-bundle
-application checks. Installer steps remain opt-in and disabled. README, map, user,
-dashboard and Windows guides now distinguish current 0.51.0 source from historical
-0.47.0 packaging and obsolete feature descriptions. Do not merge or create an
-installer while verification/review is pending.
+Fresh locked setup, all six matching build version inputs, the production frontend
+and all **322 UI tests** passed. The complete Linux Rust matrix passed **317 library
+tests plus two actual supervised PDF-worker integrations**, with no failures or
+ignored cases. After the platform-conditional binding correction, all 11 backup
+and eight password-change cases, formatting, warnings-denied Clippy and the embedded
+no-bundle Linux build passed again. The final current-code matrix rerun is retained
+with the validation artifacts; no zero-test target is counted as worker validation.
+
+[Corrected Windows source CI](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/39059990292)
+passed on `e28d6e2`: **322 UI tests, 318 library tests and both PDF-worker integrations**,
+version consistency, formatting, all-target Clippy with warnings denied, frontend
+and embedded no-bundle application builds. The extra Windows library test covers
+memory-lock quota behavior. All five opt-in packaging steps were skipped and the
+run produced **zero installer artifacts**. The final documentation head is also
+subject to the current [PR checks](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1/checks).
+
+The complete final native regression passed **119 checkpoints**, its completion
+marker and exit 0 in `/workspace/shared/desktop-smoke-051-consolidation-fourth`.
+It exercised all earlier planning/report/recovery workflows plus transaction-focused
+PDF selection, default unified review and real original rendering, purpose changes,
+purchase amount/count shares, financial health and existing-plan previews, household
+planning, 800px layouts, real one-minute inactivity locking, password changes and
+old/new-password recovery. Score/narrow screenshots were visually inspected.
+Runtime/build inputs and the accepted binary stayed unchanged during the run; a
+separate test-only guard-readiness edit is recorded. Driver ports closed before
+later Cargo checks. Evidence index: `/workspace/shared/branch-051-validation`.
+
+Initial Windows CI exposed a Windows-only unnecessary mutable directory binding;
+conditional declarations retain Unix mode 0700 without suppressing lint. A rerun
+exposed a React-effect timing assertion; it now waits for the same dirty=false
+expectation plus busy=false and an enabled saved Type selector. Three initial native
+attempts stopped at legacy queue/default-view assumptions after 9, 13 and 105
+checkpoints. Explicit queue selection and unified-default assertions fixed the
+harness without weakening financial checks or replaying uncertain writes. The
+successful complete fourth run used a fresh fictional workspace.
+
+Current README, roadmap, map, user/dashboard/Windows guides and retained stage notes
+identify implemented functionality and distinguish current source from the historical
+0.47.0/schema-29 installer. The schema is still 32; no new financial engine/store,
+household linking, business feature or installer was added by consolidation.
+
+Next required action: human review of PR #1 while its current-head checks are green.
+**Do not merge as part of this task.** No installer without an explicit request.
+Windows 11 installed/offline acceptance, independent security/accessibility review,
+unsupported adapters/OCR and advanced financial terms remain separate release work.
+The health score remains a counseling policy, not a validated credit rating.
+
+The milestone sections below preserve historical outcomes and original follow-up
+notes. Their old pending checks and “next” priorities are superseded by this current
+consolidation record and later milestones, rather than claims about the latest build.
 
 ## Current stage — financial health assessment and behavioral insights (0.51.0, schema 32)
 

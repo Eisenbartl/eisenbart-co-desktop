@@ -14,12 +14,12 @@ version stays **0.51.0**, schema **32**. No installer is authorized.
 
 | Change group | Existing milestones | Reviewer focus |
 | --- | --- | --- |
-| Password/recovery and inactivity policy | `4e29c96` through `d25f3a7` | Durable encrypted generation activation, old-password backup behavior, session invalidation, backend idle enforcement, rollback and crash recovery |
-| Client directory and guarded workspaces | `3cba5da` through `8504f37` | Stable client IDs, scoped tabs, dirty/busy guards, lock privacy; old installer evidence remains historical |
-| Spending and extraction | `333ecf4` through `0e59b05` | Approved-only exact totals, editable purpose history, conservative transaction candidates, original source retention and no fine-print purchases |
-| Existing household planning | `bb519a2` through `d83b653` | Exact allocations, explicit source/member mappings, encrypted journal revisions, individual handoffs and no inferred relationships |
-| Unified transaction review | `c56d014` through `b6bd43d` | Canonical bank/card rows, optional retained PDF, exact purchase amount/count shares, unknown methods, duplicate/reversal behavior, scoped source metadata |
-| Health assessment and insights | `79434c7` through `af546e0` | Versioned explainable scoring, essential-data gates, approved observations, refund/transfer boundaries, evidence and non-writing existing-planner previews |
+| Password/recovery and inactivity policy (5 commits) | `4e29c96` through `d25f3a7` | Durable encrypted generation activation, old-password backup behavior, session invalidation, backend idle enforcement, rollback and crash recovery |
+| Client directory and guarded workspaces (4 commits) | `3cba5da` through `8504f37` | Stable client IDs, scoped tabs, dirty/busy guards, lock privacy; old installer evidence remains historical |
+| Spending and extraction (6 commits) | `333ecf4` through `0e59b05` | Approved-only exact totals, editable purpose history, conservative transaction candidates, original source retention and no fine-print purchases |
+| Existing household planning (7 commits) | `bb519a2` through `d83b653` | Exact allocations, explicit source/member mappings, encrypted journal revisions, individual handoffs and no inferred relationships |
+| Unified transaction review (9 commits) | `c56d014` through `b6bd43d` | Canonical bank/card rows, optional retained PDF, exact purchase amount/count shares, unknown methods, duplicate/reversal behavior, scoped source metadata |
+| Health assessment and insights (6 commits) | `79434c7` through `af546e0` | Versioned explainable scoring, essential-data gates, approved observations, refund/transfer boundaries, evidence and non-writing existing-planner previews |
 | Consolidation | Subsequent commits on this branch | Version/format/lint/embedded-build CI gates, schema-31 late-failure rollback/idempotence regression, current docs and recorded final checks |
 
 The aggregate original diff is roughly 20,456 additions / 922 deletions. Review
@@ -46,37 +46,78 @@ rollback, unsupported-newer-version and staged encrypted recovery tests remain i
 the complete Rust suite. This does not authorize a data downgrade. Preserve the
 whole workspace and supported backups; older binaries cannot safely open schema 32.
 
-## Fresh validation for this consolidation
+## Completed validation and evidence
 
-- [x] Fetch branch/base and verify the 37-commit comparison with no divergence.
-- [x] Locked cloud setup and all six build version inputs agree on 0.51.0.
-- [x] Production frontend build and all 322 UI tests pass.
-The initial complete Rust run passed **316 library tests and two supervised
-PDF-worker integration tests** (427.05s). The new late-failure schema-31 regression
-then passed independently; the final 317-test matrix is pending. Vite emitted its
-existing advisory for chunks larger than 500 kB; type checking and bundling passed.
-No bundle-size or test assertion was weakened.
+| Check | Executed result |
+| --- | --- |
+| Source identity | 0.51.0 agrees across all six package/Cargo/Tauri inputs; mismatch rejection also verified with a temporary synthetic copy |
+| Frontend | Production typecheck/build; all 322 UI tests in 44 files pass, including the final guard-readiness correction |
+| Linux Rust | Complete 317-library-test matrix and both real PDF-worker integrations pass; no failures or ignored cases. Nineteen affected backup/password cases also pass after the platform correction |
+| Windows source CI | [Successful corrected run](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/39059990292), code `e28d6e2`: all 322 UI / 318 library / 2 PDF-worker tests, version/format/Clippy/frontend/embedded debug build pass |
+| Native Linux | Final no-bundle application: complete 119-checkpoint workflow, completion marker and exit 0; includes all earlier and current feature sections |
+| Migration/recovery | Full matrix includes upgrades, rollback, unsupported newer versions and staged recovery; new populated schema-31 late-DDL failure, retry, idempotence and reopen case passes |
+| Installer policy | All five gated packaging steps skipped; corrected Windows run produced zero installer artifacts |
+| Review state | Original 37 commits preserved, main unchanged, no merge or auto-merge; final documentation commit is subject to current PR checks |
 
-- [ ] Final complete Rust matrix, PDF-worker integrations, formatting and Clippy.
-- [ ] Current embedded Linux no-bundle build and complete native smoke workflow.
-- [ ] Fresh Windows source CI, tests/migrations, lint and no-bundle build.
-- [ ] Reconcile docs, commit results and verify the final remote review head.
+Windows has one additional memory-lock-quota test. Zero-test main/doc targets are
+not counted as PDF-worker verification. The initial 316-test baseline also passed;
+the new migration regression raised Linux coverage to 317. Later current-code full
+matrix runs, exact commands and log paths are retained in the validation index,
+rather than treating targeted reruns as a single full-matrix execution.
 
-Current working artifacts/log index:
-`/workspace/shared/branch-051-validation`. Exact outcomes and CI links will replace
-the pending items after execution. Historical focused 0.51.0 health acceptance and
-0.50.0 native results remain recorded in their feature guides and are not counted
-as a fresh complete native run here.
+[PR #1](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1) and its
+[current-head checks](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1/checks)
+are the review entry points. The successful source run above binds the app/test/CI
+changes; the final documentation head is checked again without an installer.
+Evidence index: `/workspace/shared/branch-051-validation/validation.json`.
+
+The complete native run is
+`/workspace/shared/desktop-smoke-051-consolidation-fourth`. It retains the full
+planning/report/recovery regression plus current extraction, unified review,
+health, household, real one-minute inactivity and password-change/recovery flows.
+No native section was skipped. The score and 800px screenshots were visually
+inspected. Runtime/build inputs and binary stayed unchanged; the only source delta
+during that run was the separately recorded UI acceptance-test readiness edit.
+Driver ports closed before later Cargo commands. Accepted binary SHA-256:
+
+```text
+11f62461691d20c0bf5888c518f76bbe678b003eefb4392796bcea223d960f34
+```
+
+## Diagnosed failures and bounded corrections
+
+- The [first Windows run](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/39046706118)
+  passed 322 UI, 318 library and two worker tests, then the new Clippy gate rejected
+  `unused_mut` in `backup::staging`. Platform-conditional bindings retain Unix mode
+  0700 and the original Windows behavior; no warning suppression was added.
+- The [second Windows run](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/39059470204)
+  passed 321 of 322 UI tests and exposed a save-test race between updated markup and
+  React's guard effects. The same dirty=false assertion is awaited, together with
+  busy=false and an enabled saved Type selector. Single-write and exact recalculation
+  assertions remain. All nine affected tests and the full 322-test suite pass.
+- Initial native runs stopped after 9, 13 and 105 checkpoints at legacy bank-queue
+  message/navigation/row-readiness assumptions. The harness explicitly selects the
+  old queue where intended and checks the new unified default in navigation.
+  Original financial/isolation/history assertions remain. Each rerun used a fresh
+  fictional workspace, with no uncertain write replayed. Failed artifacts are
+  retained separately; the complete fourth run passed on the final runtime code.
+
+Vite still emits its existing >500 kB chunk advisory. Windows logs also retain
+vendored OpenSSL debug-symbol and existing action-runtime deprecation advisories.
+These are distinct from the corrected Rust warning; no build threshold, checksum,
+TLS, encryption or test safeguard was weakened to obtain passing results.
 
 ## Documentation reconciliation
 
-Current README, prototype map and user guide identify 0.51.0/schema 32 and the
+Current README, roadmap, prototype map and user guide identify 0.51.0/schema 32 and the
 implemented household, unified-review and health workflows. The original bank
 financial-dashboard arithmetic is labeled as its historical appendix; saved
 reports are implemented, rather than described as the next stage. Windows docs
 distinguish current source validation from the historical 0.47.0/schema-29 download,
 remove packaging from ordinary build commands and warn against opening upgraded
-records in the old application. Earlier milestone outcomes remain historical.
+records in the old application. Earlier milestone outcomes remain historical. Completed-stage design notes now
+identify implemented password, category-rule and client-history follow-ups rather
+than scheduling them again.
 
 ## Merge and release limits
 

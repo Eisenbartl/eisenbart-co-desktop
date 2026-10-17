@@ -20,6 +20,12 @@ This assignment does not restart or replace those systems. No installer is autho
 | Debt/savings/cash flow/scenarios | `planning`, `scenarios`, `budget`, `debt`, `savings`, `cashflow` | Explicit mapping of a reduction to a saved monthly expense; delegate projections |
 | Privacy, history and reports | Authenticated client scope, SQLCipher, existing immutable reports | Source-context freshness and read-only projections; no duplicate transaction store |
 
+Current 0.51.0 branch consolidation adds a fresh **complete 119-checkpoint native
+regression** and successful Windows source CI (322 UI / 318 library / 2 PDF-worker
+tests), beyond the original feature-acceptance runs recorded below. See the
+[review and current validation record](branch-0.51-review.md). Earlier run counts
+and source boundaries below remain historical evidence rather than latest totals.
+
 ## Scoring policy — counseling-health-v1
 
 Implemented in 0.51.0 without a schema change (schema 32). Open the existing
@@ -156,8 +162,10 @@ name shadowed a local value and failed compilation; renaming it corrected the te
 helper. All 11 affected health tests passed again, with Clippy warnings denied.
 The runtime source prefix and accepted standalone binary remained byte-identical.
 The full 316-test/2-worker run preceded this test-only refinement; it was not repeated.
-The historical 117-checkpoint complete native regression was not repeated for 0.51.0;
-current native evidence is the focused unified-review and health workflows above.
+At initial feature acceptance, the historical 117-checkpoint complete regression
+had not been repeated; evidence then consisted of the focused workflows above.
+The later branch consolidation now passes the entire current script (119 checkpoints)
+and is recorded in the linked review guide.
 
 ## Remaining limits and next required actions
 

@@ -26,7 +26,7 @@ flowchart LR
     Core --> DB[Encrypted SQLCipher database]
     Core --> Calc[Existing exact-money planning engines]
     Core --> Docs[Local CSV and selectable-text PDF review]
-    Core -. Future milestones .-> PDF[OCR, advanced review and reports]
+    Core -. Future milestones .-> PDF[Scanned PDF OCR and additional adapters]
     Core --> Reports[Reports and immutable snapshots]
 ```
 

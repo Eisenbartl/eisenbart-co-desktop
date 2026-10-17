@@ -126,45 +126,20 @@ installed workflows, realistic volume tests, accessibility/usability, signing,
 security/privacy review, documentation and commercial/legal acceptance. Page
 structure does not complete these requirements.
 
-## Next implementation priority
+## Current priority and retained implementation history
 
-The latest user-directed stage is unified transaction review in 0.50.0, including
-the default combined table, optional View Source Document action and separate
-purchase-dollar/count shares within the existing method panel; see its
-[reuse checklist](unified-transaction-review-checklist.md), [workflow](unified-transaction-review.md)
-and verification status in [development status](development-status.md). The
-0.48.0 extraction/disposition workflow remains functional and is reused. No new installer is to be
-created or provided until explicitly requested. Broader institution layouts, OCR
-and installed Windows acceptance remain separate follow-on work.
+The current task is [0.51.0 consolidation and review](branch-0.51-review.md), followed
+by counselor evaluation with fictional records. Unified review (0.50.0) and financial
+health (0.51.0) are implemented; their current validation belongs in development
+status. Do not restart them as future projects. Broader adapters/OCR, retained-copy
+selection, advanced planning terms and installed Windows acceptance remain separate
+priorities requiring explicit scope. No new installer without a request.
 
-
-The user-directed client design/navigation stage and 0.47.0 Spending Analysis,
-with the explicitly requested Windows development installer, are complete:
-focused desktop/narrow visual checks,
-complete native regression and automated Windows packaging/install/launch/uninstall
-passed. See [executed evidence](development-status.md) and the [verified download](windows.md).
-Clean Windows 11 offline installation and full installed workflows, independent
-security/accessibility review and commercial acceptance remain separate gates.
-
-The next bounded feature priority remains retained-workspace recovery selection
-with original-password verification. Destructive pruning and scheduled backups
-remain separate work. Password changes and configurable inactivity are implemented
-through 0.45.0 and preserved by this redesign. Do not rebuild those completed tools.
-
-Client history and reviewed note corrections are implemented in 0.43.0; see [usage and limits](client-history.md).
-
-Reusable local category-rule CRUD is implemented in 0.42.0, including archive/reactivation and exact original-version application history; do not rebuild it.
-
-The bounded Windows saved-PDF handoff is implemented in 0.40.0. Printing is chosen
-in the external viewer; direct job submission and actual installed Windows
-viewer/printer acceptance remain separate. Do not redo report layouts or approvals.
-
-Card account CRUD, assignments, repayments, completeness/roles/debt mappings and
-bounded versioned final approval are implemented through 0.37.0 below. Build on
-them. Other loan obligations, unsupported refund roles, credits, early closure
-and split/cross-period repayments stay blocked until modeled and tested. Broader
-adapters/OCR/printing/advanced models, security/commercial review and installed
-Windows acceptance remain separate original requirements.
+Existing password changes/inactivity policy, client history, category-rule CRUD,
+report presentation and final approval must be reused. The 0.47.0 download is a
+historical package rather than a current source delivery. The milestone sections
+below retain original sequencing and acceptance context; their former “next” steps
+are superseded by later implemented milestones and the current priority above.
 
 ### 0.35.0 — integrated provisional bank/card review
 
