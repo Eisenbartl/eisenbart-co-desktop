@@ -1,3 +1,4 @@
+import {healthFixture} from './test-fixtures/health';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -8,6 +9,7 @@ import {unifiedPage,unifiedInspection} from './test-fixtures/unified';
 import type { Client, ClientNote, WorkspaceInfo } from './types';
 
 const mocks = vi.hoisted(() => ({
+  getClientDashboard:vi.fn(),getFinancialHealth:vi.fn(),previewFinancialHealthReduction:vi.fn(),
   queryUnifiedTransactions:vi.fn(),getTransactionInspection:vi.fn(),saveTransactionInspection:vi.fn(),
   getHousehold:vi.fn(),listHouseholds:vi.fn(),createHousehold:vi.fn(),saveHousehold:vi.fn(),previewHousehold:vi.fn(),
   getSpendingAnalysis:vi.fn(),changeSpendingClassification:vi.fn(),getSpendingClassificationHistory:vi.fn(),getClientWorkspaceOverview:vi.fn(),getSecurityPolicy:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
@@ -593,4 +595,15 @@ it('opens unified review for the current client, guards its detail draft and rem
  const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);Object.defineProperty(HTMLElement.prototype,'scrollIntoView',{configurable:true,value:vi.fn()});
  render(<App/>);await unlock();await selectClient('Alice Able');go('Review & reconciliation');await screen.findByRole('table',{name:'Current transactions across all accounts'});expect(screen.getByRole('button',{name:'All transactions'})).toHaveAttribute('aria-current','page');expect(screen.queryByText('No imported transactions yet')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'Review queue'}));await screen.findByText('No imported transactions yet');fireEvent.click(screen.getByRole('button',{name:'All transactions'}));await screen.findByRole('table',{name:'Current transactions across all accounts'});expect(mocks.queryUnifiedTransactions).toHaveBeenCalledWith(alice.id,expect.objectContaining({page:0,context:null}));
  fireEvent.click(screen.getByRole('button',{name:'Inspect transaction Fictional market'}));await screen.findByRole('heading',{name:'Inspect transaction'});fireEvent.click(screen.getByRole('button',{name:'Edit method & posting date'}));fireEvent.change(screen.getByLabelText('Inspection reason'),{target:{value:'Private fictional method review draft'}});go('Monthly budget');expect(confirm).toHaveBeenCalled();expect(screen.getByLabelText('Inspection reason')).toHaveValue('Private fictional method review draft');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional method review draft');expect(screen.queryByRole('region',{name:'Unified transaction review'})).not.toBeInTheDocument();
+});
+
+
+it('integrates health evidence, existing classification routes, draft guards and lock privacy in the client workspace',async()=>{
+ const totals={pending:0,needsClarification:0,approved:7,rejected:0,income:'3000.00',spending:'1850.00',refunds:'50.00',netSpending:'1800.00',netCash:'1000.00',accountNet:[],warnings:[]};
+ mocks.getClientDashboard.mockImplementation(async(clientId)=>({clientId,revision:0,periodStart:'2026-09-01',periodEnd:'2026-09-30',calculatedOnUtc:'2026-10-17',latestApprovedDate:'2026-09-07',outdated:false,totals,operatingCashflow:'1200.00',months:[],categories:[],undatedRecords:0,reviewedPercent:100,documentIds:[],warnings:[]}));
+ mocks.getFinancialHealth.mockImplementation(async(clientId)=>({...healthFixture,clientId,revision:0}));
+ render(<App/>);await unlock();await selectClient('Alice Able','Financial dashboard');fireEvent.change(await screen.findByLabelText('Assessment from month'),{target:{value:'2026-09'}});fireEvent.change(screen.getByLabelText('Assessment through month'),{target:{value:'2026-09'}});fireEvent.click(screen.getByRole('button',{name:'View financial dashboard'}));await screen.findByText('95 / 100');
+ fireEvent.click(screen.getByRole('button',{name:'Discuss and edit expense classifications'}));await screen.findByRole('table',{name:'Approved categorized transactions'});expect(mocks.getSpendingAnalysis).toHaveBeenCalledWith(alice.id,expect.objectContaining({fromMonth:'2026-09',throughMonth:'2026-09'}));
+ go('Financial dashboard');fireEvent.change(await screen.findByLabelText('Assessment from month'),{target:{value:'2026-09'}});fireEvent.change(screen.getByLabelText('Assessment through month'),{target:{value:'2026-09'}});fireEvent.click(screen.getByRole('button',{name:'View financial dashboard'}));await screen.findByText('95 / 100');fireEvent.click(screen.getByText('Discuss a spending reduction'));fireEvent.change(screen.getByLabelText('Category to discuss'),{target:{value:'Dining'}});
+ vi.mocked(window.confirm).mockReturnValue(false);go('Monthly budget');expect(screen.getByLabelText('Category to discuss')).toHaveValue('Dining');await switchClient('Bob Baker');expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');await act(async()=>mocks.lockHandler?.());expect(screen.queryByText('95 / 100')).not.toBeInTheDocument();expect(document.documentElement.outerHTML).not.toContain('Fictional service fee');expect(screen.queryByRole('region',{name:'Financial health assessment and behavioral insights'})).not.toBeInTheDocument();
 });

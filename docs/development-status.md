@@ -1,15 +1,22 @@
 # Development status
 
-## Active assignment — financial health assessment and behavioral insights
+## Current stage — financial health assessment and behavioral insights (0.51.0, schema 32)
 
-Preceding transaction-review acceptance and unchanged source/binary hashes were
-verified before starting. The [reuse map, scoring policy and acceptance checklist](financial-health-assessment.md)
-record the new work and existing service boundaries. Implementation is in progress;
-no health score or native acceptance is claimed yet. Next action: implement the
-scoped read-only projection and test evidence gates and independent financial cases.
-No installer, new household linking or business counseling is authorized.
+Preceding transaction-review source/binary hashes and native acceptance were
+verified before development. The [reuse map, scoring policy, workflow and acceptance checklist](financial-health-assessment.md)
+record the integration. The scoped health projection, score gates, evidence,
+behavioral observations and existing-planner reduction previews are implemented.
+The existing Financial dashboard hosts the interface; classification edits reuse
+Spending Analysis with the assessment months carried into its filters.
 
-## Current stage — unified transaction review (0.50.0, schema 32)
+All 11 new Rust health tests passed. The production frontend built and all 322 UI tests passed, including the final
+assessment-period handoff and renewed acknowledgment when assumptions change. The full Rust matrix, final Clippy/embedded standalone
+build and native health/unified acceptance are pending. This is tested working
+progress, not completed acceptance. Next action: finish those checks and record
+actual results/limitations. No installer, household linking, business counseling,
+duplicate transaction store or new schema was introduced.
+
+## Previous stage — unified transaction review (0.50.0, schema 32)
 
 Implemented [the supplied brief](unified-transaction-review-specification.md) for
 currently supported bank/card transaction ledgers. The [baseline checklist](unified-transaction-review-checklist.md)

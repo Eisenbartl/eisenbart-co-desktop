@@ -220,7 +220,7 @@ pub struct Metrics {
     pub take_home_payment_percent_estimate: Option<String>,
     pub debt_balances: Vec<BalanceBar>,
 }
-fn ratio(n: i64, d: i64, mult: i64) -> Option<String> {
+pub(crate) fn ratio(n: i64, d: i64, mult: i64) -> Option<String> {
     if d <= 0 {
         return None;
     }

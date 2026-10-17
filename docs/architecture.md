@@ -365,3 +365,24 @@ Local allowlisted fonts/CMaps, image/canvas/time bounds and destroyed-on-close
 state constrain inspection. Reliable page locators are used without invented
 coordinates. CSP changes allow local asset fetches and bundled workers; remote
 PDF viewers remain unavailable. See [workflow and limits](unified-transaction-review.md).
+
+
+## Financial health projection (0.51.0)
+
+`storage::financial_health` runs scoped, consistent read transactions over existing
+bank/card records, current unified eligibility, immutable role/fact histories and
+saved coverage reviews. It reuses Spending Analysis totals/opportunities, dashboard
+and coverage diagnostics, card reconciliation/completeness, financial-facts ratios
+and shared savings-target arithmetic. A versioned counseling score is withheld
+when essential evidence is incomplete; no merchant or payment preference supplies
+a moral classification or a score penalty. Exact source/approval/balance-review
+bindings remain visible. See [policy and workflow](financial-health-assessment.md).
+
+Reduction previews bind the source and plan context, use refund-adjusted category
+amounts, and delegate explicit saved-line changes to `scenarios::compare` and its
+existing budget/debt/savings/cashflow engines. They do not write ledgers, plans,
+audit events or historical reports. No migration or duplicate transaction store is
+needed. `FinancialHealth` sits inside `FinancialDashboard`, reuses
+`CombinedScenarioView`, and routes classification edits to existing Spending
+Analysis for the selected months. Root draft/busy guards and generation checks
+prevent stale replies from crossing clients or surviving lock/navigation.

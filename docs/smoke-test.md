@@ -551,3 +551,29 @@ purchases. Inspection clicks wait for the actual unobstructed hit target once;
 a refreshed original canvas must finish painting before subsequent test gestures.
 No financial submission is replayed. Execution results distinguish the complete
 pre-refinement regression from final focused acceptance on the corrected binary.
+
+
+## Financial health and behavioral insights (0.51.0)
+
+The existing native driver now includes `check_financial_health` after unified
+review. A synthetic Morgan Health client imports a retained CSV and approves its
+seven real transactions through existing forms. Missing inventory first withholds
+the score. Verified income/purposes, period-end balances and saved coverage yield
+95/100, $1,800 net spending, 51.66% necessary expenses and preserved refund/principal
+boundaries. The exact balance evidence remains inspectable.
+
+The script enters existing budget/debt/savings/calendar plans, discusses 20% of
+$250 net Dining activity, and verifies $50/month and $600/year impacts. Explicit
+line mapping uses the existing combined scenario table, loan payoff and dated
+calendar calculations, with original saved plan inputs unchanged. The current
+Spending Analysis workflow changes Dining to Necessary; live amounts update,
+the score waits for renewed coverage, then becomes 85/100 with 2.70 reserve months.
+At 800px, components stack and tables scroll within the page. Private health data
+clears on lock; full restart and encrypted recovery recompute the same score,
+while another client has no transaction or balance evidence from this client.
+
+Screenshots: `native-financial-health-score.png`,
+`native-financial-health-reduction.png`, `native-financial-health-narrow.png`,
+`native-financial-health-restored.png`. Native acceptance is pending until its
+recorded run completes; the development status is the authority for outcomes.
+No installer or Windows installed-acceptance claim follows from these checks.

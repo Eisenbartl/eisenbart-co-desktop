@@ -22,6 +22,10 @@ This assignment does not restart or replace those systems. No installer is autho
 
 ## Scoring policy — counseling-health-v1
 
+Implemented in 0.51.0 without a schema change (schema 32). Open the existing
+client **Financial dashboard**, choose months, and use the integrated health view.
+The earlier bank dashboard remains available in its disclosure.
+
 The 0–100 index is an explainable counseling aid, not a credit score, diagnosis,
 validated prediction or guarantee. No merchant, identity or payment-card preference
 changes a score. Three components sum to 100 possible points:
@@ -43,7 +47,8 @@ changes a score. Three components sum to 100 possible points:
 Thresholds are product policy, not mandatory client targets. Components explain
 their figures, thresholds, points and missing evidence separately. The overall
 score is withheld unless essential transaction coverage, period, current roles,
-balances and required-payment facts are complete. Coverage must be reviewed;
+balances and required-payment facts are complete. Current reciprocal transfer
+legs are also required; cross-period transfers leave allocation metrics unavailable. Coverage must be reviewed;
 empty imports do not prove zero income or absence of cards. Verified zero values
 are distinguishable from unknown values. Incomplete observed activity can still
 be displayed with an explicit limitation and without a definitive score.
@@ -51,7 +56,8 @@ be displayed with an explicit limitation and without a definitive score.
 ## Arithmetic and presentation boundaries
 
 Use Rust integer cents and wider integer intermediates. Ratios truncate to two
-decimal places; monthly averages and reduction amounts round half a cent upward.
+decimal places; monthly averages and reduction amounts round half a cent upward. Freshness and completed-month checks use America/Chicago
+calendar dates, consistent with the application’s counseling workflow.
 Compare score thresholds against exact underlying values, not rounded ratios.
 Monthly figures use every calendar month selected, including verified zero-income
 months; irregular income is shown by month and never projected as guaranteed.
@@ -70,16 +76,49 @@ transactions, saved plans and previously issued reports are never silently edite
 ## Acceptance checklist
 
 - [x] Verify preceding transaction-review evidence and inspect canonical services.
-- [ ] Show score/components/explanations and withhold overall score for essential unknowns.
-- [ ] Show approved monthly patterns, costs, recurring expenses and current purposes.
-- [ ] Show income-relative expenses, obligations, savings and transfers with distinct bases.
-- [ ] Support existing classification editing and explicit monthly/annual reduction previews.
-- [ ] Explain every recommendation with actual evidence, impact and uncertainty.
-- [ ] Delegate saved-plan projections to existing engines with no automatic plan writes.
-- [ ] Preserve scope, original evidence, approval reversal behavior and stale-result guards.
-- [ ] Cover missing/zero/irregular income, deficits, incomplete/overlapping histories,
+- [x] Show score/components/explanations and withhold overall score for essential unknowns.
+- [x] Show approved monthly patterns, costs, recurring expenses and current purposes.
+- [x] Show income-relative expenses, obligations, savings and transfers with distinct bases.
+- [x] Support existing classification editing and explicit monthly/annual reduction previews.
+- [x] Explain every recommendation with actual evidence, impact and uncertainty.
+- [x] Delegate saved-plan projections to existing engines with no automatic plan writes.
+- [x] Preserve scope, original evidence, approval reversal behavior and stale-result guards.
+- [x] Cover missing/zero/irregular income, deficits, incomplete/overlapping histories,
   refunds, repayments/transfers, threshold boundaries and source corrections in tests.
 - [ ] Pass frontend/Rust/build/native acceptance, including lock/restart/recovery and isolation.
 - [ ] Record executed outcomes, outstanding limits and next actions; commit working progress.
 
 Implementation and executed checks will be recorded here and in development status.
+
+## Implemented workflow and currently executed checks
+
+The Financial dashboard retains its explicit assessment-period form. Health
+components, evidence gates, income-relative rows, month-by-month behavior and
+conditional recommendations appear above the existing bank-detail disclosure.
+Balance facts retain their exact review ID, as-of date, counselor and evidence;
+transaction evidence retains source hash, approval ID and actual page/line.
+Existing classification editing opens Spending Analysis for the same months.
+A discussion-bound purpose change recalculates current metrics immediately and
+withholds the definitive score until its inventory review is renewed.
+
+The optional reduction preview uses net category activity after refunds, explicit
+percentage, counselor acknowledgment and optional saved monthly-line mappings.
+Changing an assumption requires acknowledgment again. It can reuse the existing
+combined scenario view for debt or emergency funding and an explicitly mapped
+dated expense. It never writes transactions, classifications, saved plans or old
+reports. Unmapped calendar obligations remain unchanged and are clearly disclosed.
+Saved scenarios and final reports continue through their existing reviewed flows.
+
+Ten initial health tests and the additional cross-period transfer test passed,
+including independent score thresholds, genuinely zero income, negative cash
+flow, irregular receipts, mixed bank/card repayments and refunds, classification
+changes, overlaps/gaps, stale contexts, client scope and encrypted recovery.
+Independent planner examples verify a $50/month, $600/year reduction after a $50
+refund, a zero-interest loan payoff changing from five months to four, and an
+emergency goal changing from 17 months to 14, with unchanged saved inputs/audit.
+The frontend production build passed. Initial complete UI verification reached
+322 tests; one assertion needed to distinguish unavailable component points from
+an unavailable balance payment, after which all 322 passed. The additional final
+UI pass also passed all 322 tests, including period handoff and renewed acknowledgment.
+The full Rust matrix, final Clippy/standalone build and new native acceptance are
+still running/pending. No completed acceptance is claimed until those finish.

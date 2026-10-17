@@ -1,13 +1,19 @@
-import {useEffect,useState,type FormEvent} from 'react';
+import FinancialHealth from './FinancialHealth';
+import {confirmDiscard} from './ConfirmationDialog';
+import type {HealthArea} from './healthTypes';
+import {useEffect,useLayoutEffect,useState,type FormEvent} from 'react';
 import FactMetricsView from './FactMetricsView';
 import {api} from './api';
 import {usd} from './BudgetEditor';
 import type {ClientImports,FinancialAssessment} from './types';
+const noop=()=>{};
 
 function Bar({scale,kind}:{scale:number;kind:string}) {
  return <svg className={`financial-bar ${kind}`} viewBox="0 0 1000 16" preserveAspectRatio="none" aria-hidden="true"><rect width="1000" height="16" className="track"/><rect width={scale} height="16"/></svg>;
 }
-export default function FinancialDashboard({source,disabled}:{source:ClientImports;disabled:boolean}) {
+export default function FinancialDashboard({source,disabled,onDirty=noop,onBusy=noop,onOpenExisting,onReload}:{source:ClientImports;disabled:boolean;onDirty?:(v:boolean)=>void;onBusy?:(v:boolean)=>void;onOpenExisting?:(area:HealthArea,period?:import('./healthTypes').HealthQuery)=>void;onReload?:()=>void}) {
+ const [healthDirty,setHealthDirty]=useState(false),[healthBusy,setHealthBusy]=useState(false);
+ useLayoutEffect(()=>{onDirty(healthDirty);return()=>onDirty(false);},[healthDirty,onDirty]);useLayoutEffect(()=>{onBusy(healthBusy);return()=>onBusy(false);},[healthBusy,onBusy]);
  const [from,setFrom]=useState(''),[through,setThrough]=useState('');
  const [period,setPeriod]=useState<{fromMonth:string;throughMonth:string}|null>(null);
  const [result,setResult]=useState<FinancialAssessment|null>(null),[loading,setLoading]=useState(false),[error,setError]=useState(''),[retry,setRetry]=useState(0);
@@ -22,16 +28,16 @@ export default function FinancialDashboard({source,disabled}:{source:ClientImpor
   }).catch(e=>{if(active)setError(e instanceof Error?e.message:String(e));}).finally(()=>{if(active)setLoading(false);});
   return()=>{active=false;};
  },[source.clientId,source.revision,period,retry]);
- function apply(e:FormEvent){e.preventDefault();if(disabled||loading)return;setPeriod({fromMonth:from,throughMonth:through});}
+ function apply(e:FormEvent){e.preventDefault();if(disabled||loading||healthBusy)return;const update=()=>setPeriod({fromMonth:from,throughMonth:through});if(healthDirty)confirmDiscard('Discard temporary reduction choices and change the assessment period?',update);else update();}
  const draft=period&&(from!==period.fromMonth||through!==period.throughMonth);
  return <section className="financial-dashboard" aria-label="Client financial dashboard">
   <h3>Client financial dashboard</h3><p className="field-help">Choose 1–24 complete calendar months. This read-only view uses approved imported transactions; the planning panels above contain separate estimates. Period choices last while this client is open.</p>
-  <form onSubmit={apply}><fieldset disabled={disabled||loading}><div className="form-grid"><label htmlFor="assessment-from">Assessment from month<input id="assessment-from" type="text" placeholder="YYYY-MM" pattern="[0-9]{4}-[0-9]{2}" required value={from} onChange={e=>setFrom(e.target.value)}/></label><label htmlFor="assessment-through">Assessment through month<input id="assessment-through" type="text" placeholder="YYYY-MM" pattern="[0-9]{4}-[0-9]{2}" required value={through} onChange={e=>setThrough(e.target.value)}/></label></div><button className="button secondary" type="submit">View financial dashboard</button></fieldset></form>
+  <form onSubmit={apply}><fieldset disabled={disabled||loading||healthBusy}><div className="form-grid"><label htmlFor="assessment-from">Assessment from month<input id="assessment-from" type="text" placeholder="YYYY-MM" pattern="[0-9]{4}-[0-9]{2}" required value={from} onChange={e=>setFrom(e.target.value)}/></label><label htmlFor="assessment-through">Assessment through month<input id="assessment-through" type="text" placeholder="YYYY-MM" pattern="[0-9]{4}-[0-9]{2}" required value={through} onChange={e=>setThrough(e.target.value)}/></label></div><button className="button secondary" type="submit">View financial dashboard</button></fieldset></form>
   {draft&&<p role="status">Period inputs changed. Results below still use the displayed assessment period; apply the new months to update them.</p>}
   {loading&&<p role="status">Calculating approved assessment…</p>}
   {error&&<div role="alert" className="alert error">{error}<button className="text-button" disabled={disabled||loading} onClick={()=>setRetry(v=>v+1)}>Retry financial dashboard</button></div>}
   {!period&&<p className="empty-note">Select an assessment period to see approved financial activity.</p>}
-  {result&&<FinancialAssessmentView value={result}/> }
+  {result&&period&&<><FinancialHealth clientId={source.clientId} revision={source.revision} query={period} disabled={disabled||loading||Boolean(draft)} onDirty={setHealthDirty} onBusy={setHealthBusy} onOpenExisting={onOpenExisting} onReload={onReload}/><details className="health-bank-details"><summary>Existing approved bank dashboard details</summary><FinancialAssessmentView value={result}/></details></>}
  </section>;
 }
 

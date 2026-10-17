@@ -506,6 +506,34 @@ async fn get_assessment_planning(
     .map_err(|_| "Saved planning context could not be loaded.".to_owned())?
 }
 #[tauri::command]
+async fn get_financial_health(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::financial_health::Input,
+) -> Result<storage::financial_health::Assessment, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_financial_health(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Financial health assessment could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn preview_financial_health_reduction(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::financial_health::ReductionInput,
+) -> Result<storage::financial_health::Reduction, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.preview_financial_health_reduction(&client_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "Financial health preview could not finish.".to_owned())?
+}
+#[tauri::command]
 async fn get_spending_analysis(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -1736,6 +1764,8 @@ pub fn run() {
             get_assessment_planning,
             get_client_workspace_overview,
             get_spending_analysis,
+            get_financial_health,
+            preview_financial_health_reduction,
             change_spending_classification,
             get_spending_classification_history,
             get_assessment_evidence,

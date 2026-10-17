@@ -130,7 +130,7 @@ pub struct Row {
     #[serde(skip)]
     purchase: bool,
     #[serde(skip)]
-    eligible: bool,
+    pub(super) eligible: bool,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -199,6 +199,16 @@ struct State {
     history: Vec<DetailEvent>,
     revision: i64,
     token: String,
+}
+/// Current rows and real source checks for the integrated health projection.
+/// No additional ledger, decision state or account inference is introduced.
+pub(super) fn health_evidence(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    id: &str,
+) -> Result<(Vec<Row>, Vec<Source>), String> {
+    let st = state(c, w, id)?;
+    Ok((st.rows, st.sources))
 }
 fn hash(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))

@@ -286,6 +286,12 @@ fn schedule(
     Ok(rows)
 }
 
+/// Shared exact emergency target arithmetic for saved plans and verified facts.
+pub(crate) fn reserve_target(necessary: Option<i64>, months: u32) -> Option<i64> {
+    necessary
+        .filter(|n| *n > 0)
+        .and_then(|n| n.checked_mul(i64::from(months)))
+}
 pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Summary), String> {
     let start = month_number(&data.start_month)?;
     if !(1..=60).contains(&data.target_months) {
@@ -438,7 +444,7 @@ pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Sum
     if expense.is_none() {
         warnings.push("A positive, complete necessary-expense base is required from the saved budget for emergency coverage and targets.".to_owned());
     }
-    let target = expense.map(|expense| expense * i64::from(data.target_months));
+    let target = reserve_target(expense, data.target_months);
     let remaining = target
         .zip(accessible)
         .map(|(target, available)| (target - available).max(0));

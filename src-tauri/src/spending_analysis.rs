@@ -62,7 +62,7 @@ pub struct Row {
     pub source_label: String,
     pub editable: bool,
     #[serde(skip)]
-    cents: i64,
+    pub(super) cents: i64,
     #[serde(skip)]
     purchase: bool,
     #[serde(skip)]
@@ -401,7 +401,7 @@ fn rows(c: &Context) -> Result<(Vec<Row>, usize, usize), String> {
     }
     Ok((out, unapproved, uncategorized))
 }
-fn totals(rows: &[Row]) -> Result<Totals, String> {
+pub(super) fn totals(rows: &[Row]) -> Result<Totals, String> {
     let (
         mut spending,
         mut necessary,
@@ -548,8 +548,18 @@ fn table_match(r: &Row, q: &Input) -> bool {
             .contains(&q.search.trim().to_lowercase()))
 }
 fn analyze(c: &Context, q: &Input) -> Result<Analysis, String> {
+    analyze_eligible(c, q, None)
+}
+fn analyze_eligible(
+    c: &Context,
+    q: &Input,
+    eligible: Option<&BTreeSet<String>>,
+) -> Result<Analysis, String> {
     let (start, end, months) = period(q)?;
-    let (all, unapproved, uncategorized) = rows(c)?;
+    let (mut all, unapproved, uncategorized) = rows(c)?;
+    if let Some(ids) = eligible {
+        all.retain(|r| ids.contains(&r.id));
+    }
     let accounts = all
         .iter()
         .map(|r| (r.account_id.clone(), r.account_label.clone()))
@@ -944,6 +954,26 @@ impl Workspace {
             events,
         })
     }
+}
+
+/// Health assessment reuses these totals, current purposes and opportunity rules.
+/// The caller supplies IDs accepted by the existing unified source checks.
+pub(super) fn health_activity(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    id: &str,
+    q: &Input,
+    eligible: &BTreeSet<String>,
+) -> Result<(Analysis, Vec<Row>), String> {
+    let ctx = context(c, w, id)?;
+    let analysis = analyze_eligible(&ctx, q, Some(eligible))?;
+    let (all, _, _) = rows(&ctx)?;
+    Ok((
+        analysis,
+        all.into_iter()
+            .filter(|r| eligible.contains(&r.id))
+            .collect(),
+    ))
 }
 
 /// Household adapters reuse the same live approvals, duplicate exclusions and purpose bindings.

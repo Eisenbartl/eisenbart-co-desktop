@@ -32,6 +32,8 @@ pub mod coverage_review_store;
 pub mod document_collection_store;
 #[path = "final_reports_store.rs"]
 pub mod final_reports_store;
+#[path = "financial_health.rs"]
+pub mod financial_health;
 #[path = "households_store.rs"]
 pub mod households_store;
 #[path = "imports_store.rs"]

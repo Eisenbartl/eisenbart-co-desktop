@@ -1,5 +1,6 @@
+import type {HealthArea} from './healthTypes';
 import {confirmDiscard} from './ConfirmationDialog';
-import {useEffect,useRef,useState,type FormEvent} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState,type FormEvent} from 'react';
 import {api} from './api';
 import PdfTransactionInspection from './PdfTransactionInspection';
 import {pdfConfig} from './pdfTypes';
@@ -19,9 +20,10 @@ const errorText=(e:unknown)=>e instanceof Error?e.message:String(e);
 const blankMapping=():CsvMapping=>({date:-1,description:-1,amountMode:'signed',amount:-1,debit:null,credit:null,signedIsDebit:false,dateFormat:'iso',merchant:null,category:null,kind:null,reference:null,balance:null});
 const blankDocument=():CsvDocumentInput=>({balanceOrder:null,accountId:null,accountLabel:'',accountKind:'checking',periodStart:null,periodEnd:null,openingBalance:null,closingBalance:null,retainSource:false,mapping:blankMapping()});
 export type ImportPage = 'all'|'documents'|'transactions'|'review'|'reports'|'classification'|'dashboard'|'facts'|'balances'|'recurring'|'transfers'|'sources'|'focused';
-export default function ImportsEditor({client,onDirty,onBusy,otherSaving,page='all',focusRecord,onDecisionSaved}:{client:Client;onDirty:(v:boolean)=>void;onBusy:(v:boolean)=>void;otherSaving:boolean;page?:ImportPage;focusRecord?:string;onDecisionSaved?:()=>void}) {
+export default function ImportsEditor({client,onDirty,onBusy,otherSaving,page='all',focusRecord,onDecisionSaved,onOpenHealthArea}:{client:Client;onDirty:(v:boolean)=>void;onBusy:(v:boolean)=>void;otherSaving:boolean;page?:ImportPage;focusRecord?:string;onDecisionSaved?:()=>void;onOpenHealthArea?:(area:HealthArea,period?:import('./healthTypes').HealthQuery)=>void}) {
  const show=(p:ImportPage)=>page==='all'||page===p;
  const [ruleSelection,setRuleSelection]=useState<import('./types').CategoryRuleSelection|null>(null),[rulesDirty,setRulesDirty]=useState(false),[rulesBusy,setRulesBusy]=useState(false),[ruleEpoch,setRuleEpoch]=useState(0);
+ const [healthDirty,setHealthDirty]=useState(false),[healthBusy,setHealthBusy]=useState(false);
  const [reportDirty,setReportDirty]=useState(false),[reportBusy,setReportBusy]=useState(false);
  const [factsDirty,setFactsDirty]=useState(false);
  const [balanceDirty,setBalanceDirty]=useState(false);
@@ -39,8 +41,8 @@ export default function ImportsEditor({client,onDirty,onBusy,otherSaving,page='a
  const generation=useRef(0),token=useRef<string|null>(null);
  const currentRow=saved?.records.find(r=>r.id===selected);
  const rowDirty=Boolean(currentRow&&draft&&(spendingRole!==''||JSON.stringify(draft)!==JSON.stringify(currentRow.fields)||decision!==currentRow.status||reason!==currentRow.reason));
- const dirty=Boolean(path||preview||rowDirty||rulesDirty||recurringDirty||balanceDirty||factsDirty||reportDirty||pairLeft||pairRight||pairReason);
- useEffect(()=>{onDirty(dirty);},[dirty,onDirty]);useEffect(()=>{onBusy(busy||reportBusy||rulesBusy||inspectionBusy);},[busy,reportBusy,rulesBusy,inspectionBusy,onBusy]);
+ const dirty=Boolean(path||preview||rowDirty||rulesDirty||recurringDirty||balanceDirty||factsDirty||reportDirty||healthDirty||pairLeft||pairRight||pairReason);
+ useLayoutEffect(()=>{onDirty(dirty);},[dirty,onDirty]);useLayoutEffect(()=>{onBusy(busy||reportBusy||rulesBusy||inspectionBusy||healthBusy);},[busy,reportBusy,rulesBusy,inspectionBusy,healthBusy,onBusy]);
  useEffect(()=>{
   const current=++generation.current;setSaved(null);setManaged(null);setLoading(true);setBusy(false);setLoadError('');setError('');setNotice('');setPath('');setPreview(null);setSelected(null);setDraft(null);setRuleSelection(null);setBulk([]);
   Promise.all([api.getClientImports(client.id),api.getStatementAccounts(client.id)]).then(([value,accounts])=>{if(current!==generation.current)return;if(value.clientId!==client.id||accounts.clientId!==client.id){setLoadError('The imported data did not match this client.');return;}setSaved(value);setManaged(accounts);if(focusRecord){const row=value.records.find(r=>r.id===focusRecord);if(row)selectRow(row);else setLoadError("This source record is unavailable for review.");}}).catch(e=>{if(current===generation.current)setLoadError(errorText(e));}).finally(()=>{if(current===generation.current)setLoading(false);});
@@ -111,7 +113,7 @@ export default function ImportsEditor({client,onDirty,onBusy,otherSaving,page='a
    </>}
    {error&&<div role="alert" className="alert error">{error}</div>}{notice&&<p role="status" className="success-message">{notice}</p>}{busy&&<p role="status">Working on CSV/review data…</p>}
    {(show('review')||page==='facts')&&<FinancialFactsEditor saved={saved} disabled={busy||reportBusy||otherSaving||rowDirty||recurringDirty||balanceDirty||reportDirty||Boolean(preview)||Boolean(pairLeft||pairRight||pairReason)} onDirty={setFactsDirty} onReview={input=>action(()=>api.reviewFinancialFacts(client.id,input),'Verified financial facts saved; dashboard updated.')}/>}
-   {(show('review')||page==='dashboard')&&<FinancialDashboard source={saved} disabled={busy||reportBusy||otherSaving}/>}
+   {(show('review')||page==='dashboard')&&<FinancialDashboard source={saved} disabled={busy||reportBusy||otherSaving} onDirty={setHealthDirty} onBusy={setHealthBusy} onOpenExisting={onOpenHealthArea} onReload={()=>setAttempt(v=>v+1)}/>}
    {show('reports')&&<AssessmentRecords client={client} source={saved} disabled={busy||otherSaving||rowDirty||recurringDirty||balanceDirty||factsDirty||Boolean(path||preview)||Boolean(pairLeft||pairRight||pairReason)} onDirty={setReportDirty} onBusy={setReportBusy}/>}
    {(show('transactions')||show('review'))&&<>
    <h3 className="savings-section-title">Approved statement totals — all imported dates</h3>
