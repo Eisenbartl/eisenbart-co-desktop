@@ -128,8 +128,10 @@ structure does not complete these requirements.
 
 ## Current priority and retained implementation history
 
-The current task is the [end-to-end workflow integration audit](workflow-integration-audit.md)
-on the consolidated 0.51.0 review branch, followed by counselor evaluation with fictional records. Unified review (0.50.0) and financial
+The [end-to-end workflow integration audit](workflow-integration-audit.md) now
+verifies the consolidated 0.51.0 source. Next is human review with current-head
+checks green, followed by counselor evaluation with fictional records.
+Unified review (0.50.0) and financial
 health (0.51.0) are implemented; their current validation belongs in development
 status. Do not restart them as future projects. Broader adapters/OCR, retained-copy
 selection, advanced planning terms and installed Windows acceptance remain separate

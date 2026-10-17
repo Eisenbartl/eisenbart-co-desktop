@@ -1,6 +1,6 @@
 # Development status
 
-## Current task — end-to-end workflow integration audit (0.51.0, schema 32)
+## End-to-end workflow integration audit — verified source (0.51.0, schema 32)
 
 The [handoff matrix and acceptance record](workflow-integration-audit.md) trace
 intake, statement import, canonical approvals, spending/health, saved plans,
@@ -16,12 +16,28 @@ A new real-service workflow regression checks exact live totals, corrections,
 reversals, unchanged plans, refreshed plan contexts, stale-save rejection, original
 PDF evidence, client isolation, restart and encrypted recovery. A new App regression
 checks the section handoffs and zero implicit plan/approval writes. Both focused
-Rust regressions and all 96 affected UI tests pass. Full suites and the complete
-native workflow are in progress; this task is not yet marked complete.
+Rust regressions and all 96 affected UI tests pass. The full automated suites
+passed: **323 UI tests in 44 files**, **318 Rust library tests plus two actual
+PDF-worker integrations**, version consistency, production frontend, formatting,
+warnings-denied all-target Clippy and the embedded debug no-bundle build. The
+complete native workflow passed **119 checkpoints**, its completion marker and
+exit 0 in `/workspace/shared/desktop-smoke-workflow-audit-final`. It verifies
+the new intake-directory flag alongside the opened report, actual approvals,
+reversals, classifications, exact analysis/health, existing planning/scenario/report
+flows, both recovery paths, original PDFs, 800px layout and client separation.
+All tracked non-documentation inputs and the binary stayed unchanged; driver
+ports closed. Intake and narrow spending screenshots were visually inspected.
 
-No installer or merge. The preceding branch-consolidation outcome below remains
-historical evidence for its own validated head; audit changes require their own
-checks before review.
+Evidence index: `/workspace/shared/workflow-integration-audit`. The initial native
+launch omitted the documented cloud runtime wrapper and failed before any workflow
+action. A fresh fictional workspace with the existing wrapper passed the entire
+script; no uncertain financial write was replayed.
+
+Next required action: human review of [PR #1](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1)
+with its [current-head Windows source checks](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1/checks) green.
+**No installer or merge.** Windows 11 installed/offline and other documented release
+acceptance remain separate. The earlier branch-consolidation outcome below is
+historical evidence for its own validated head.
 
 ## Branch consolidation — 0.51.0 validated source, unmerged for review
 

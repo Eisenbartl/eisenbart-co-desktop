@@ -15,7 +15,7 @@ consent and planning-handoff boundaries. No installer or merge is authorized.
 | Approved transactions → Spending Analysis | `spending_analysis` reads current bank/card records and purpose histories; its save rereads current totals, mix, category bars, opportunities and table. Navigating back also reloads. | Unapproved/uncategorized/ineligible rows are excluded; refunds and transfers keep their separate bases. Purpose edits require a discussion/reason and acknowledgment. Original import data is unchanged. |
 | Spending / verified facts → Financial dashboard | `dashboard` retains its labeled bank-only basis; `financial_health` combines supported bank/card services, exact existing arithmetic, coverage and verified inventories. Opening the section reads the latest source revision. | Required missing, stale, overlapping or unreconciled evidence withholds a definitive score. Reclassification/reapproval can require renewed facts/completeness review. The health score is a counseling policy, not a credit rating. |
 | Actual financial observations → saved budget/debt/savings/calendar | Existing explicit editors own these assumptions. Transaction changes refresh actual analysis and do not write plan inputs. Health reductions call existing scenario/planning engines for a temporary preview. | Review the revised evidence with the client, explicitly edit the intended saved lines and save each agreed plan. A transaction, preview or scenario does not implicitly approve a plan change. Decision-success messages now state this handoff. |
-| Saved budget → debt → savings → cash flow | `planning::debt_context`, `savings_context` and `cashflow_context` are reused by storage reads, combined scenarios, health previews and report validation. Current reads recompute dependent capacity, emergency targets and warnings from saved versions. | Debt terms/payment inputs, savings reserves/contributions and dated schedules stay independently entered. Changing the budget does not invent loan payments, move reserves or reschedule bills. Mismatches and unknowns remain visible. |
+| Saved budget → debt → savings → cash flow | `planning::debt_context`, `savings_context` and `cashflow_context` are reused by storage reads, combined scenarios, health previews and report validation. Current reads recompute dependent capacity, emergency targets and warnings from saved versions. The saved discretionary budget also supplies Spending Analysis comparison targets; actual spending is unchanged. | Debt terms/payment inputs, savings reserves/contributions and dated schedules stay independently entered. Changing the budget does not invent loan payments, move reserves or reschedule bills. Mismatches and unknowns remain visible. |
 | Plans → scenarios | `get_assessment_planning` reads all four plans in one transaction. `scenarios` delegates to the same budget/debt/savings/calendar engines; `scenarios_store` saves immutable hypothetical proposals. | Expected plan revisions reject stale comparisons/saves. Saving a scenario does not apply it to live plans or create an agreement. Later plan changes mark its baseline Needs review; a plan-only scenario does not claim to validate actual transactions. |
 | Current sources + selected intake/plans/scenario → assessments | `assessments_store` checks source/profile, selected intake, notes, branding, completeness/card evidence and plan/scenario versions in the save transaction. | Acknowledge the current context before saving a new record. Changed context rejects the save. Older payloads, figures, selected assumptions and digests stay unchanged. Summary-list and opened-record intake review flags now agree. |
 | Assessments → action plans / final approval / reports | Existing `action_plans_store`, `final_reports_store`, `report_presentation_store` and `assessment_pdf` reuse scoped immutable parents and current review flags. Final policy/receipt and export checks run again at the relevant action. | New conclusions require a new reviewed assessment and applicable approval. Historical exports remain historical and disclose changed context. Explicit file export cannot overwrite an existing file or write inside the encrypted workspace. Older provisional card supplements need a new card-complete assessment; current card-inclusive approval already exists. |
@@ -82,12 +82,35 @@ immutable client agreements, report receipts, migration/rollback, source traceab
 authenticated isolation and encrypted recovery. The existing complete native smoke
 workflow exercises their visible controls and original PDF rendering.
 
-Executed so far: both focused Rust regressions passed; all 96 affected interface
-tests passed. The initial interface run had four exact-copy expectation failures
-following the new messages; expectations now assert the complete new guidance.
-The first backend workflow attempt correctly rejected a PDF destination inside its
-test workspace; the fixture now uses a separate export directory. Full automated
-and native validation results will be recorded below before closing the audit.
+Automated validation passed: all **323 UI tests in 44 files**, all **318 Rust
+library tests** and both actual supervised **PDF-worker integrations**, version
+consistency, production frontend build, Rust formatting, warnings-denied all-target
+Clippy and the embedded debug no-bundle desktop build. Both focused Rust
+regressions and all 96 affected interface tests also passed.
+
+The complete native workflow passed **119 checkpoints**, its completion marker
+and exit 0 in `/workspace/shared/desktop-smoke-workflow-audit-final`. The added
+visible intake checks verify directory/opened-record parity for unrelated edits,
+selected changes and reversion. All earlier source, financial, scenario, report,
+card/household, lock/restart and encrypted recovery cases remained enabled.
+Intake and 800px Spending Analysis screenshots were visually inspected, including
+the new explicit planning-save guidance. Every tracked non-documentation input
+and the accepted binary stayed unchanged; driver ports were closed afterward.
+The evidence index is `/workspace/shared/workflow-integration-audit`.
+
+Initial failures are retained. The old intake implementation failed the new list
+assertion before the fix. Four interface expectations needed the complete new
+message text. The first backend fixture correctly rejected a PDF destination
+inside its workspace; it now uses a separate export directory. An initial native
+launch omitted `cloud-native-run.sh` and failed before any workflow action. The
+fresh successful run uses the existing documented wrapper, private D-Bus/display
+and synthetic-test-only sandbox exception. Nothing changed in product startup,
+and no uncertain financial write was replayed.
+
+Current-head Windows source CI results belong to the existing
+[PR checks](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1/checks).
+Review only with those checks green; packaging remains explicitly opt-in and was
+not requested. This separates source verification from installed Windows acceptance.
 
 ## Limits and next action
 
@@ -99,5 +122,6 @@ live; existing historical report formats do not silently acquire its newer score
 
 Windows 11 installed/offline acceptance, maximum-volume and independent
 security/accessibility/commercial verification remain separate release work.
-After the automated/native checks, review the audit changes in the existing PR.
+Next: review the completed audit changes in the existing PR with current-head
+source checks green.
 Leave main unmerged and create no installer unless explicitly requested.

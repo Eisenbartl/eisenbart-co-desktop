@@ -43,6 +43,8 @@ serialization, preserving their original bytes/digests. Older applications do
 not understand format 5: do not reopen an updated workspace in an older build.
 There is no new installer for this source checkpoint.
 
-This remains an incomplete internal assessment workflow. Final report acceptance,
-organization logo/contact branding, remaining model/document requirements and
-commercial release verification remain separate work.
+Selected intake remains part of internal assessment context. The existing Final
+report checklist owns final approval, and firm branding has its own saved review.
+Installed Windows acceptance, remaining model/document requirements and commercial
+release verification remain separate work. The current cross-workflow behavior is
+recorded in the [integration audit](workflow-integration-audit.md).

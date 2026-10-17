@@ -606,3 +606,22 @@ used a fresh fictional workspace. A frontend acceptance-test guard wait changed
 during the final native run; no runtime/build input or accepted binary changed.
 See [the consolidated source/CI/recovery evidence](branch-0.51-review.md) for all
 outcomes and limits. No installer or Windows installed/offline claim follows.
+
+
+## Workflow integration audit acceptance (0.51.0)
+
+The entire script passed again with **119 checkpoints**, its completion marker
+and exit 0 in `/workspace/shared/desktop-smoke-workflow-audit-final`. The selected
+intake checkpoint now also checks the assessment directory: unrelated edits leave
+it current, selected changes flag it, and reverting selected values never removes
+the flag. Existing approval, calculation, plan/scenario/report, original PDF, card,
+household, lock/restart and both recovery paths stayed enabled. Intake and 800px
+Spending Analysis screenshots were visually inspected. All tracked non-documentation
+inputs and the binary stayed fixed; native driver ports closed afterward.
+
+An initial launch omitted the existing cloud-native runtime wrapper and failed
+before any workflow action. The fresh full run used `cloud-native-run.sh` with
+private D-Bus/display and the existing synthetic-test-only sandbox exception.
+No application safeguard or assertion was disabled and no uncertain financial
+write was replayed. See [the handoff matrix and evidence](workflow-integration-audit.md).
+No installer or Windows installed/offline acceptance claim follows.
