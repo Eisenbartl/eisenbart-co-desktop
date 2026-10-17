@@ -552,6 +552,7 @@ impl Workspace {
         if ids.len() > 1000 {
             return Err("This backup exceeds the current 1,000-client recovery limit. Your current workspace has not been changed.".into());
         }
+        households_store::validate_all(&connection, &workspace_info)?;
         security_policy::read(&connection, &workspace_info)?;
         branding_store::read(&connection, &workspace_info)?;
         for id in &ids {

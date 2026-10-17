@@ -3421,3 +3421,18 @@ These stages differ greatly in size and will be split into smaller tested
 checkpoints. A stage count is not a percentage or a reliable calendar estimate.
 The complete specified application remains substantial work; the development
 installer is suitable for evaluating the implemented foundation.
+
+## Household management — allocation and journal milestone (in development)
+
+The user-provided [household specification](household-management-specification.md)
+now guides the next stage. The first milestone adds an exact-cent allocation
+engine and counselor-scoped, encrypted append-only household journal (schema 31).
+It preserves immutable expense/rule revisions, payment corrections, consent
+history, scenario proposals and report snapshots. Approved-source adapters reuse
+individual spending approvals/classifications. Budget reconciliation is explicit,
+revision-checked, transactional and retains before/after values in the journal.
+
+Validation so far: 14 focused Rust tests pass, including the $2,400 rent example,
+rounding, effective dates, restricted income, partial payments/refunds, revision
+conflicts, joint-account timing and reopening. Household interface and complete
+integration verification are still in progress. No installer was created.

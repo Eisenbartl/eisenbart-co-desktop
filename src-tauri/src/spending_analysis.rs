@@ -1586,3 +1586,18 @@ mod tests {
             .is_none());
     }
 }
+
+/// Household adapters reuse the same live approvals, duplicate exclusions and purpose bindings.
+pub(super) fn household_rows(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    id: &str,
+    month: &str,
+) -> Result<Vec<Row>, String> {
+    let (start, end) = crate::households::bounds(month)?;
+    let (all, _, _) = rows(&context(c, w, id)?)?;
+    Ok(all
+        .into_iter()
+        .filter(|r| r.date >= start.to_string() && r.date <= end.to_string())
+        .collect())
+}

@@ -32,6 +32,8 @@ pub mod coverage_review_store;
 pub mod document_collection_store;
 #[path = "final_reports_store.rs"]
 pub mod final_reports_store;
+#[path = "households_store.rs"]
+pub mod households_store;
 #[path = "imports_store.rs"]
 pub mod imports_store;
 #[path = "password_change.rs"]
@@ -72,7 +74,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 30;
+const SCHEMA_VERSION: i32 = 31;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -1242,6 +1244,12 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
         // No existing sources, report payloads or historical bytes are rewritten.
         transaction
             .execute_batch("PRAGMA user_version=30;")
+            .map_err(storage_error)?;
+        version = 30;
+    }
+    if version == 30 {
+        transaction
+            .execute_batch(include_str!("households-schema.sql"))
             .map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;

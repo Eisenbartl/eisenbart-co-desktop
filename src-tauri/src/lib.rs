@@ -21,6 +21,7 @@ mod document_collection;
 mod final_reports;
 mod financial_facts;
 mod follow_up_overview;
+mod households;
 mod imports;
 mod income_periods;
 mod models;
@@ -69,6 +70,152 @@ fn access<T>(
     workspace.with_operation(operation)
 }
 
+#[tauri::command]
+async fn list_households(
+    state: State<'_, DesktopState>,
+) -> Result<Vec<storage::households_store::DirectoryItem>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || access(&state, |w| w.list_households()))
+        .await
+        .map_err(|_| {
+            "Household operation could not be confirmed. Reload before retrying.".to_owned()
+        })?
+}
+#[tauri::command]
+async fn create_household(
+    state: State<'_, DesktopState>,
+    name: String,
+    month: String,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.create_household(name, month))
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn get_household(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    month: String,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_household(&household_id, &month))
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn save_household(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    month: String,
+    input: households::Input,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_household(&household_id, &month, input))
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn preview_household(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    month: String,
+    input: households::Input,
+) -> Result<households::Summary, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.preview_household(&household_id, &month, input)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn household_sources(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    member_id: String,
+    month: String,
+) -> Result<Vec<storage::spending_analysis::Row>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_sources(&household_id, &member_id, &month)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn household_classify(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    member_id: String,
+    input: storage::spending_analysis::Change,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_classify(&household_id, &member_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn record_household_report(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    month: String,
+    expected: i64,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.record_household_report(&household_id, &month, expected)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn household_budget_preview(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    member_id: String,
+    month: String,
+) -> Result<storage::households_store::BudgetPreview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_budget_preview(&household_id, &member_id, &month)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn household_budget_reconcile(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    input: storage::households_store::BudgetChange,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_budget_reconcile(&household_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
 #[tauri::command]
 async fn choose_client_csv(
     state: State<'_, DesktopState>,
@@ -1429,6 +1576,16 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            list_households,
+            create_household,
+            get_household,
+            save_household,
+            preview_household,
+            household_sources,
+            household_classify,
+            record_household_report,
+            household_budget_preview,
+            household_budget_reconcile,
             choose_client_csv,
             choose_client_pdf,
             inspect_client_pdf,
