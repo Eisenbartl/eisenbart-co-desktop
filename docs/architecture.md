@@ -345,3 +345,23 @@ tabs, hide inactive views, and unmount all private state on workspace lock.
 `HouseholdWorkspace` collects inputs and renders authoritative Rust amounts/scales;
 it does not implement a second financial engine. See `household-management.md`
 for allocation rounding, consent, timing, report semantics and operational limits.
+
+`storage::unified_review` adds the schema-32 supplemental inspection journal and a
+single current bank/card transaction projection. Existing source/review ledgers
+remain the financial authority; the projection never sums historical decision
+events. It reuses Spending Analysis eligibility, statement arithmetic, existing
+account identity and exact approved fields. Supplemental methods/posting dates
+bind to an exact decision; account institution/masked identifiers are explicit
+review metadata. Revision checks, atomic audit, append-only digest chains and
+recovery validation protect those details without changing source/report bytes.
+The original bank/card forms can mount in a focused inspection context while
+calling their unchanged decision/purpose APIs.
+
+`OriginalDocumentViewer` lazy-loads pinned locally bundled PDF.js canvas/worker
+assets. A scoped Rust read returns only authorized retained original bytes after
+hash verification; no plaintext PDF temp file or external document service is
+introduced. Renderer scripting, annotation/link/form UI and XFA are not enabled.
+Local allowlisted fonts/CMaps, image/canvas/time bounds and destroyed-on-close
+state constrain inspection. Reliable page locators are used without invented
+coordinates. CSP changes allow local asset fetches and bundled workers; remote
+PDF viewers remain unavailable. See [workflow and limits](unified-transaction-review.md).

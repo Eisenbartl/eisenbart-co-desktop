@@ -103,9 +103,10 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-The latest user-directed extraction/disposition stage is complete in 0.48.0;
-see the [current workflow and parser limits](pdf-import-review.md) and executed
-checks in [development status](development-status.md). No new installer is to be
+The latest user-directed stage is unified transaction review in 0.50.0; see its
+[reuse checklist](unified-transaction-review-checklist.md), [workflow](unified-transaction-review.md)
+and verification status in [development status](development-status.md). The
+0.48.0 extraction/disposition workflow remains functional and is reused. No new installer is to be
 created or provided until explicitly requested. Broader institution layouts, OCR
 and installed Windows acceptance remain separate follow-on work.
 
@@ -309,3 +310,24 @@ inflation from internal reimbursements, explicit individual reconciliation,
 source/consent revocation handling, preserved history, tab/draft privacy on lock,
 native desktop/narrow layout, restart and recovery. Execution results belong in
 `development-status.md`, separately from this functionality map. No installer.
+
+## Unified transaction review — implemented in 0.50.0, native verification pending
+
+**Review & reconciliation → All transactions** combines one current row per bank
+or card record, sorted by transaction date with stable same-day IDs. Combined
+filters/search, posting-date basis, bounded pages, original/history access and
+optional PDF inspection extend existing intake/review rather than duplicate it.
+Focused bank/card forms retain their original audited approval/purpose APIs.
+Source-bound method/posting details and reviewed institution/masked account
+metadata use an encrypted append-only schema-32 journal. Suspected duplicates and
+explicitly confirmed rejected duplicates remain distinct; reapproval invalidates
+old detail bindings. Reconciled approved purchase-method figures include unknown
+coverage and exclude payments/transfers/refunds/fees/interest/duplicates.
+
+[Baseline reuse checklist](unified-transaction-review-checklist.md), [brief](unified-transaction-review-specification.md)
+and [workflow/limits](unified-transaction-review.md) define the feature. Loan,
+mortgage and credit-line transaction adapters remain unavailable; plans/balances
+are not invented transaction sources. Native original rendering, focused financial
+decisions, exact totals, narrow layout, lock/restart and recovery must pass before
+this stage is called a completed full test version. Executed results belong in
+`development-status.md`. No installer without an explicit request.

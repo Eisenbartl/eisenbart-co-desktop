@@ -4,9 +4,11 @@ import App from './App';
 import {householdFixture} from './test-fixtures/household';
 import {currentMonth} from './HouseholdDirectory';
 import {spendingFixture} from './test-fixtures/spending';
+import {unifiedPage,unifiedInspection} from './test-fixtures/unified';
 import type { Client, ClientNote, WorkspaceInfo } from './types';
 
 const mocks = vi.hoisted(() => ({
+  queryUnifiedTransactions:vi.fn(),getTransactionInspection:vi.fn(),saveTransactionInspection:vi.fn(),
   getHousehold:vi.fn(),listHouseholds:vi.fn(),createHousehold:vi.fn(),saveHousehold:vi.fn(),previewHousehold:vi.fn(),
   getSpendingAnalysis:vi.fn(),changeSpendingClassification:vi.fn(),getSpendingClassificationHistory:vi.fn(),getClientWorkspaceOverview:vi.fn(),getSecurityPolicy:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
   getReportPresentation:vi.fn(),chooseReportPresentationPdf:vi.fn(),exportReportPresentation:vi.fn(),
@@ -583,4 +585,11 @@ it('keeps individual and household tabs open, preserves household drafts across 
  fireEvent.click(within(screen.getByRole('navigation',{name:'Household sections'})).getByRole('button',{name:'Members & Permissions'}));fireEvent.click(screen.getByRole('button',{name:'Add member'}));fireEvent.change(screen.getByLabelText('Member name'),{target:{value:'Private household draft'}});
  fireEvent.click(screen.getByRole('button',{name:'Workspace tabs'}));expect(screen.getByRole('tab',{name:'Oak Street Household'})).toHaveFocus();fireEvent.keyDown(screen.getByRole('tab',{name:'Oak Street Household'}),{key:'ArrowLeft'});await screen.findByRole('heading',{name:'Alice Able'});expect(screen.queryByRole('dialog',{name:'Member & permissions'})).not.toBeInTheDocument();fireEvent.click(screen.getByRole('tab',{name:'Oak Street Household'}));expect(screen.getByLabelText('Member name')).toHaveValue('Private household draft');expect(mocks.getHousehold).toHaveBeenCalledOnce();
  vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Close household Oak Street Household'}));expect(screen.getByLabelText('Member name')).toHaveValue('Private household draft');vi.mocked(window.confirm).mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:'Lock workspace'}));await screen.findByRole('heading',{name:'Welcome back'});expect(document.documentElement.outerHTML).not.toContain('Private household draft');expect(screen.queryByRole('tab',{name:'Oak Street Household'})).not.toBeInTheDocument();
+});
+
+it('opens unified review for the current client, guards its detail draft and removes it on lock',async()=>{
+ mocks.queryUnifiedTransactions.mockImplementation(async(clientId,input)=>({...unifiedPage,clientId,query:input}));mocks.getTransactionInspection.mockResolvedValue({...unifiedInspection,clientId:alice.id});
+ const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);Object.defineProperty(HTMLElement.prototype,'scrollIntoView',{configurable:true,value:vi.fn()});
+ render(<App/>);await unlock();await selectClient('Alice Able');go('Review & reconciliation');await screen.findByText('No imported transactions yet');fireEvent.click(screen.getByRole('button',{name:'All transactions'}));await screen.findByRole('table',{name:'Current transactions across all accounts'});expect(mocks.queryUnifiedTransactions).toHaveBeenCalledWith(alice.id,expect.objectContaining({page:0,context:null}));
+ fireEvent.click(screen.getByRole('button',{name:'Inspect transaction Fictional market'}));await screen.findByRole('heading',{name:'Inspect transaction'});fireEvent.click(screen.getByRole('button',{name:'Edit method & posting date'}));fireEvent.change(screen.getByLabelText('Inspection reason'),{target:{value:'Private fictional method review draft'}});go('Monthly budget');expect(confirm).toHaveBeenCalled();expect(screen.getByLabelText('Inspection reason')).toHaveValue('Private fictional method review draft');await act(async()=>mocks.lockHandler?.());expect(document.documentElement.outerHTML).not.toContain('Private fictional method review draft');expect(screen.queryByRole('region',{name:'Unified transaction review'})).not.toBeInTheDocument();
 });

@@ -3,7 +3,7 @@ import {api} from './api';
 import type {ActivityEvent,ActivityPage,ActivityQuery,ActivitySource,ReviewStatus} from './types';
 const empty=():ActivityQuery=>({text:'',from:null,through:null,sourceKind:null,sourceId:null,accountId:null,status:null,offset:0,snapshot:null});
 const unknown=(s:string|null|undefined)=>s||'Unknown';
-export default function TransactionActivity({clientId}:{clientId:string}) {
+export default function TransactionActivity({clientId,initialRecord}:{clientId:string;initialRecord?:{sourceId:string;recordId:string}}) {
  const [draft,setDraft]=useState(empty),[page,setPage]=useState<ActivityPage|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [choices,setChoices]=useState<{clientId:string;sources:ActivitySource[]}|null>(null);
  const generation=useRef(0);
@@ -13,7 +13,7 @@ export default function TransactionActivity({clientId}:{clientId:string}) {
   catch(e){if(ticket===generation.current)setError(String(e));}
   finally{if(ticket===generation.current)setBusy(false);}
  }
- useEffect(()=>{setDraft(empty());setPage(null);setChoices(null);setError('');void load(empty());return()=>{generation.current++;};},[clientId]);
+ useEffect(()=>{const first={...empty(),sourceId:initialRecord?.sourceId??null,text:initialRecord?.recordId??''};setDraft(first);setPage(null);setChoices(null);setError('');void load(first);return()=>{generation.current++;};},[clientId,initialRecord?.sourceId,initialRecord?.recordId]);
  const sources=choices?.clientId===clientId?choices.sources:[];
  function search(input:ActivityQuery){setDraft({...input,offset:0,snapshot:null});void load({...input,offset:0,snapshot:null});}
  function follow(sourceId:string,text:string){search({...empty(),sourceId,text});}

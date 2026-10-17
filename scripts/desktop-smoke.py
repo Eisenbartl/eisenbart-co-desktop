@@ -2025,9 +2025,94 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_client_history(driver, artifacts, data_root, password, binary, restart_driver)
     check_spending_analysis(driver, artifacts, data_root, password, binary, restart_driver)
     check_statement_extraction(driver, artifacts, data_root, password, binary, restart_driver)
+    check_unified_review(driver, artifacts, data_root, password, binary, restart_driver)
     check_households(driver, artifacts, data_root, password, binary, restart_driver)
     check_inactivity_policy(driver, artifacts, data_root, password, binary, restart_driver)
     check_password_change(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_unified_review(driver: WebDriver, artifacts: Path, data_root: Path,
+                         password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """One current ledger, real original PDF canvas, shared decisions and encrypted recovery."""
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click_button('Add client');driver.fill('#first-name','Taylor');driver.fill('#last-name','Review');driver.click_button('Create client')
+    driver.wait_text('.client-workspace-header','Taylor Review','dedicated unified review client')
+    bank=data_root/'unified-bank.pdf';bank.write_bytes(build_pdf([
+        ['Fictional unified financial institution','Questions? Please contact us'],
+        ['Statement period 2026-09-01 to 2026-09-30','Date Description Amount Balance','Opening balance 0.00',
+         '2026-09-01 Fictional unified payroll 1000.00 1000.00','2026-09-02 Fictional debit purchase -100.00 900.00',
+         '2026-09-03 Fictional unknown purchase -50.00 850.00','Closing balance 850.00']]))
+    driver.client_section('Import statements');driver.select('#statement-format','Selectable-text PDF');driver.fill('#csv-path',str(bank));driver.click_button('Inspect PDF')
+    driver.wait_text('.pdf-selected-summary','Selected transactions: 3 / 500','three financial rows selected')
+    for selector,value in [('#csv-account-label','Fictional unified checking'),('#csv-periodStart','2026-09-01'),('#csv-periodEnd','2026-09-30'),('#csv-openingBalance','0'),('#csv-closingBalance','850')]:driver.fill(selector,value)
+    driver.click("//label[contains(.,'Authorize retaining the complete original PDF')]/input",'xpath');driver.click_button('Import into review queue');driver.wait_text('.imports-panel > .success-message','Every PDF record needs individual verification.','bank source captured')
+    driver.client_section('Review & reconciliation');driver.click_button('Review queue')
+    for number,kind,category,purpose in [(1,'Income','Wages',''),(2,'Expense','Food','Necessary spending'),(3,'Expense','Shopping','Discretionary spending')]:
+        driver.click_button(f'Review {bank.name} record {number}');driver.select('#review-kind',kind);driver.fill('#review-category',category);driver.select('#review-status','Approved')
+        if purpose:driver.select('#review-spending-role',purpose)
+        driver.fill('#review-reason','Verified original fictional source and discussed spending purpose');driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','bank row approved explicitly');driver.interactive('.imports-table tbody button')
+    card=data_root/'unified-card.pdf';card.write_bytes(build_pdf([['Billing period 09/01/2026 to 09/30/2026','Purchases','09/02 Fictional unified card purchase 100.00','Payments and credits','09/05 Fictional unified card payment 50.00 CR'],['Questions? Please contact us','Total purchases 100.00']]))
+    driver.client_section('Import statements');driver.click_button('Credit-card statements');driver.click('.card-import > summary');driver.select('#card-source-format','Selectable-text PDF');driver.fill('#card-csv-path',str(card));driver.click_button('Inspect card PDF')
+    driver.wait_text('.pdf-selected-summary','Selected transactions: 2 / 200','card source rows selected')
+    for selector,value in [('#card-account','Fictional unified credit'),('#card-period-start','2026-09-01'),('#card-period-end','2026-09-30'),('#card-opening','0'),('#card-closing','50')]:driver.fill(selector,value)
+    driver.click('#card-retain');driver.click_button('Save card statement for individual review');driver.wait_text('.card-progress','Needs Clarification 2','card source captured')
+    driver.client_section('Review & reconciliation');driver.click_button('Card transactions')
+    for row,kind,category,purpose in [(1,'purchase','Food','Necessary spending'),(2,'payment','Card payment','')]:
+        driver.click_button(f'Review card row {row}');driver.select('#card-row-kind',kind);driver.fill('#card-row-category',category);driver.select('#card-row-status','Approved')
+        if purpose:driver.select('#card-row-purpose',purpose);driver.interactive('#card-row-reason')
+        driver.fill('#card-row-reason','Verified fictional card source; payment is not another purchase');driver.click('#card-row-ack');driver.click_button('Save card transaction decision');driver.wait_text('.card-statements > .success-message','Card transaction decision saved','card decision saved')
+    def current() -> None:
+        driver.client_section('Review & reconciliation');driver.click_button('All transactions');driver.interactive('#unified-search');driver.wait_text('.unified-pagination','of 5 transactions','one current row for each source record')
+    def inspect(description: str) -> None:
+        driver.click(f"//table[contains(@class,'unified-table')]//tr[td/strong[normalize-space(.)={json.dumps(description)}]]//button",'xpath');driver.wait_text('.unified-extracted',description,'selected transaction evidence');driver.interactive("//button[normalize-space(.)='Correct / approve transaction']",'xpath')
+    def save_details(reason: str) -> None:
+        driver.fill('#inspection-reason',reason);driver.click('#inspection-ack');driver.click_button('Save inspection details');driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','supplemental details saved and refreshed');driver.interactive('#unified-search')
+    def method_analysis() -> None:
+        if not driver.observe_script("return document.querySelector('.unified-method-analysis')?.open===true"):driver.click('.unified-method-analysis > summary')
+    def canvas_ready() -> None:
+        driver.wait(lambda:driver.observe_script("return (()=>{const c=document.querySelector('.original-document canvas');if(!c||c.hidden||c.width<100||document.querySelector('.original-document [role=alert]'))return false;const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i+3]>0&&d[i]<180&&d[i+1]<180&&d[i+2]<180)n++;return n>200;})()"),'actual nonblank original PDF page rendered',45)
+    current()
+    dates=driver.observe_script("return Array.from(document.querySelectorAll('.unified-table tbody tr')).map(r=>r.cells[0].firstChild.textContent)")
+    if dates!=['2026-09-05','2026-09-03','2026-09-02','2026-09-02','2026-09-01']:raise SmokeFailure('Current transactions did not sort chronologically across accounts')
+    driver.select('#unified-order','Oldest first');driver.click_button('Apply transaction filters');driver.interactive('#unified-search')
+    if driver.observe_script("return document.querySelector('.unified-table tbody tr').cells[0].firstChild.textContent")!='2026-09-01':raise SmokeFailure('Oldest-first sort was not applied')
+    driver.click('.unified-more-filters > summary');driver.select('#unified-accountType','Credit card');driver.select('#unified-kind','purchase');driver.click_button('Apply transaction filters');driver.wait_text('.unified-pagination','of 1 transactions','combined account/type filter')
+    driver.click_button('Reset transaction filters');driver.wait_text('.unified-pagination','of 5 transactions','reset restores combined table')
+    method_analysis();driver.wait_text('.unified-method-analysis > summary','$250.00','payment excluded from purchase total')
+    inspect('Fictional debit purchase');driver.click_button('Open original document');canvas_ready();driver.wait_value('#original-pdf-page','2','known source page navigation')
+    driver.select('#original-pdf-zoom','75%');canvas_ready();driver.click_button('Previous PDF page');driver.wait_value('#original-pdf-page','1','PDF page control');canvas_ready();driver.click_button('Next PDF page');canvas_ready()
+    driver.command('POST','/window/rect',{'width':1600,'height':1100});driver.scroll_to('.unified-inspection','start');driver.screenshot(artifacts/'native-unified-original.png')
+    driver.click_button('Review account details');driver.fill('#inspection-institution','Fictional Unified Bank');driver.fill('#inspection-last-four','9876');save_details('Verified fictional institution and last four digits from original')
+    driver.click_button('Edit method & posting date');driver.select('#inspection-method','Debit-card purchase');driver.fill_native_date('#inspection-posting-date','2026-09-03');save_details('Verified checking-linked debit card method and separate posting date')
+    method_analysis();expected=['$100.00 · 40.00%','$100.00 · 40.00%','$50.00 · 20.00%']
+    driver.wait(lambda:driver.observe_script("return Array.from(document.querySelectorAll('.unified-method strong')).slice(0,3).map(e=>e.textContent)")==expected,'exact credit/debit/unknown shares with unknown in denominator')
+    status('unified review: current chronological bank/card rows, compound filters, real local PDF pages/zoom, scoped account details and exact purchase-method coverage')
+    driver.click_button('Correct / approve transaction');driver.interactive('#review-status');driver.select('#review-spending-role','Discretionary spending');driver.fill('#review-reason','Discussed changed purpose; preserve original source and inactive inspection details');driver.click('#review-ack');driver.click_button('Save transaction decision')
+    driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','shared bank decision refreshed current table')
+    driver.wait_text('.unified-extracted','Unclassified method','earlier method binding made inactive after financial decision')
+    driver.click_button('Original values & history');driver.wait_text('.unified-extracted','Verified checking-linked debit card method','earlier method reason retained');driver.wait_text('.transaction-activity','Discussed changed purpose','existing financial history reused')
+    driver.click_button('Edit method & posting date');driver.select('#inspection-method','Debit-card purchase');driver.fill_native_date('#inspection-posting-date','2026-09-03');save_details('Reverified method after the new financial approval')
+    driver.click_button('Close inspection');inspect('Fictional unknown purchase');driver.click_button('Correct / approve transaction');driver.interactive('#review-status');driver.select('#review-status','Rejected');driver.fill('#review-reason','Synthetic duplicate concern pending clarification');driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','rejection uses existing bank workflow')
+    driver.click_button('Edit method & posting date');driver.click('#inspection-duplicate');save_details('Confirmed rejected duplicate as a synthetic review case')
+    driver.click_button('Close inspection');driver.select('#unified-reconciliation','Confirmed duplicate (rejected)');driver.click_button('Apply transaction filters');driver.wait_text('.unified-pagination','of 1 transactions','confirmed duplicate distinguished from suspicion');driver.wait_text('.unified-table','Confirmed duplicate · excluded','confirmed exclusion remains visible')
+    driver.click_button('Reset transaction filters');driver.wait_text('.unified-pagination','of 5 transactions','source rows not deleted');inspect('Fictional unknown purchase');driver.click_button('Correct / approve transaction');driver.interactive('#review-status');driver.select('#review-status','Approved');driver.select('#review-spending-role','Discretionary spending');driver.fill('#review-reason','Clarified synthetic concern: this is a separate purchase; reverse duplicate rejection');driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','reapproval preserves duplicate history and restores eligible figures')
+    driver.click_button('Close inspection');inspect('Fictional unified card purchase');driver.click_button('Correct / approve transaction');driver.interactive('#card-row-status');driver.select('#card-row-purpose','Discretionary spending');driver.interactive('#card-row-reason');driver.fill('#card-row-reason','Client discussed card purchase purpose; original card evidence unchanged');driver.click('#card-row-ack');driver.click_button('Save card transaction decision');driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','shared card purpose decision saved from unified inspection')
+    driver.click_button('Close inspection');driver.client_section('Spending Analysis');driver.interactive('#spending-search');driver.fill('#spending-from','2026-09');driver.fill('#spending-through','2026-09');driver.click_button('Update analysis');driver.interactive('#spending-search');driver.wait_text('.sa-metrics','$250.00','combined spending receives existing financial decisions');driver.wait_value("select[aria-label='Type for Fictional debit purchase on 2026-09-02']",'discretionary','bank purpose propagated');driver.wait_value("select[aria-label='Type for Fictional unified card purchase on 2026-09-02']",'discretionary','card purpose propagated')
+    current();method_analysis();driver.wait_text('.unified-method-analysis > summary','$250.00','repayments/refunds not doubled after amendments');driver.scroll_to('.unified-panel-heading','start');driver.screenshot(artifacts/'native-unified-transactions.png')
+    driver.command('POST','/window/rect',{'width':800,'height':700});inspect('Fictional debit purchase');driver.click_button('Open original document');canvas_ready()
+    if driver.observe_script('return document.documentElement.scrollWidth>document.documentElement.clientWidth'):raise SmokeFailure('Unified inspection overflows an 800px workspace')
+    driver.scroll_to('.unified-inspection','start');driver.screenshot(artifacts/'native-unified-narrow.png');driver.command('POST','/window/rect',{'width':1200,'height':800});driver.click_button('Close inspection')
+    status('unified review: shared bank/card purpose decisions, stale-detail invalidation, original history, confirmed/reversed duplicate handling, downstream analysis and narrow source inspection')
+    folder=data_root/'unified-review-backups';folder.mkdir();firm=driver.text('.workspace-label strong')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','unified evidence and detail history backed up');backup=driver.text('.backup-file-path')
+    driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','unified workspace locked')
+    if driver.observe_script("return document.querySelector('.unified-transactions,.original-document')!==null"):raise SmokeFailure('Unified source data remained visible on lock')
+    restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Taylor Review');current();method_analysis();driver.wait_text('.unified-method-analysis > summary','$250.00','exact methods persist across restart')
+    driver.click('.lock-button');driver.wait_text('.auth-card','Welcome back','lock before unified recovery');driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review',firm,'unified metadata and source histories validated');driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','unified recovery activated');driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Taylor Review');current();inspect('Fictional debit purchase');driver.click_button('Original values & history');driver.wait_text('.unified-extracted','Reverified method after the new financial approval','supplemental history restored');driver.click_button('Open original document');canvas_ready()
+    driver.click_button('Close inspection');driver.open_client('Robin Synthetic');driver.client_section('Review & reconciliation');driver.click_button('All transactions');driver.wait_text('.unified-transactions','No current transactions match these filters.','other client has no source rows')
+    if 'Fictional Unified Bank' in driver.text('.unified-transactions'):raise SmokeFailure('Unified account metadata crossed client scope')
+    driver.open_client('Alex Fictional');driver.client_section('Profile & intake')
+    status('unified review: actual original PDF and supplemental/financial history survive lock, full restart and encrypted recovery; client isolation preserved')
 
 
 def check_households(driver: WebDriver, artifacts: Path, data_root: Path,

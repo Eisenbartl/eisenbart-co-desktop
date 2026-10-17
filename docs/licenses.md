@@ -42,3 +42,19 @@ For dual-licensed components, select and record the license under which the rele
 ## Before distribution
 
 Generate a complete software bill of materials from both lockfiles and the Windows artifact; review transitive licenses, vulnerability results, bundled assets, and runtime terms; include third-party notices in the installer; and obtain appropriate legal review for branding, end-user terms, privacy documentation, and commercial licensing. Dependency upgrades must refresh this inventory. No conclusion about all dependencies' commercial suitability is made here.
+
+## Local original-document inspection (0.50.0)
+
+`pdfjs-dist` 6.4.299 is pinned in both frontend manifests (Apache-2.0). The
+original-document panel bundles its PDF canvas renderer, worker, Adobe CMaps and
+standard font assets locally. It does not use the viewer application, scripting
+sandbox, annotation/link/form UI, external fonts or a remote document service.
+Wasm and optional Node canvas are not used in the browser renderer. Existing Rust
+PDF intake validation and source retention remain authoritative.
+
+The upstream Apache license, Adobe CMap notice, Foxit standard-font notice and
+Liberation font notice are copied unchanged to `public/licenses/pdfjs/` and are
+included by the normal frontend build. These files cover the specifically bundled
+viewer assets; they do not replace the full release SBOM/transitive/native review.
+`@napi-rs/canvas` is an upstream optional Node dependency, not imported into the
+browser bundle. The renderer's asset map allows only bundled font/CMap filenames.
