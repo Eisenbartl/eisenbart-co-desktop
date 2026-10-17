@@ -1,6 +1,25 @@
 # Development status
 
-## Current stage — household management (0.49.0, schema 31)
+## Current stage — unified transaction review (0.50.0, schema 32; verification in progress)
+
+The user-supplied [brief](unified-transaction-review-specification.md) is mapped
+in the [reuse checklist](unified-transaction-review-checklist.md). Existing
+extraction/review/reconciliation systems remain authoritative. A current-row
+bank/card projection, combined filters, source-bound supplemental details and
+exact reconciled purchase-method analysis are implemented. Optional original-PDF
+inspection and focused embedding of existing bank/card decision forms are being
+verified. Loan/credit-line/mortgage transaction adapters are not implemented;
+no existing liability/cash records are relabeled as those ledgers.
+
+Twelve focused Rust tests pass, covering mixed chronological rows, current evidence,
+filters/paging/staleness, exact purchase totals and unknown coverage, duplicate
+and discrepancy exclusion, metadata rollback/invalidations, deposit subtypes,
+scoped retained originals and encrypted recovery. All 310 UI tests (43 files) passed; the focused 43-test run also covered the
+unified viewer and existing bank/card/history components.
+Production frontend build passed. Full source/native regression remains pending;
+this stage is not yet a new full test version. No installer is authorized.
+
+## Previous stage — household management (0.49.0, schema 31)
 
 Implemented the supplied household brief and ten-section workspace using the
 reference's navy rail, white panels, slate text, muted gold accents, overview

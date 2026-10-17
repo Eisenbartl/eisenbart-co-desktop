@@ -997,6 +997,29 @@ pub(super) fn household_subscription_rows(
         .collect())
 }
 
+// Reuse the same approved/categorized source eligibility and duplicate treatment.
+pub(super) fn inspection_rows(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    id: &str,
+) -> Result<BTreeMap<String, (bool, String)>, String> {
+    let ctx = context(c, w, id)?;
+    let (rows, _, _) = rows(&ctx)?;
+    Ok(rows
+        .into_iter()
+        .filter(|r| {
+            r.card.is_some()
+                || ctx
+                    .bank
+                    .records
+                    .iter()
+                    .find(|b| b.id == r.record_id)
+                    .is_some_and(|b| b.duplicate_ids.is_empty())
+        })
+        .map(|r| (r.id, (r.purchase, r.role)))
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

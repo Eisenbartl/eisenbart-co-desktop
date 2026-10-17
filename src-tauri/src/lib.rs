@@ -634,6 +634,60 @@ async fn preview_card_review(
     .map_err(|_| "Card review could not finish.".to_owned())?
 }
 #[tauri::command]
+async fn query_unified_transactions(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::unified_review::Query,
+) -> Result<storage::unified_review::Page, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.query_unified_transactions(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Transaction inspection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn get_transaction_inspection(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    row_id: String,
+) -> Result<storage::unified_review::Evidence, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.get_transaction_inspection(&client_id, &row_id)
+        })
+    })
+    .await
+    .map_err(|_| "Transaction inspection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn save_transaction_inspection(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::unified_review::Save,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_transaction_inspection(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Transaction inspection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn get_original_statement(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    source_id: String,
+) -> Result<storage::unified_review::Original, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_original_statement(&client_id, &source_id))
+    })
+    .await
+    .map_err(|_| "Transaction inspection could not finish.".to_owned())?
+}
+#[tauri::command]
 async fn query_transaction_activity(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -1698,6 +1752,10 @@ pub fn run() {
             get_card_review,
             save_card_review,
             preview_card_review,
+            query_unified_transactions,
+            get_transaction_inspection,
+            save_transaction_inspection,
+            get_original_statement,
             query_transaction_activity,
             get_card_statements,
             stage_card_statement,
