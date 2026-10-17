@@ -7,6 +7,23 @@ currently supported bank/card transaction ledgers. The [baseline checklist](unif
 records existing systems, improvements and adapter dependencies. [Workflow,
 calculation basis and limits](unified-transaction-review.md).
 
+### Supplemental viewing and purchase-frequency refinements
+
+Within the same 0.50.0 assignment, opening **Review & reconciliation** now defaults
+to **All transactions**; the existing bank Review queue remains selectable. The
+optional action reads **View Source Document**. The same payment-method panel and
+preceding-period table now show separate purchase-dollar and purchase-count shares,
+with existing averages, eligibility, unknown methods and exclusions preserved.
+There is no new ledger, component, navigation section, schema or installer.
+
+Current checks: all 313 UI tests passed; all 14 affected Rust tests passed after
+correcting a test expectation to honor the existing statement-discrepancy gate;
+Clippy with warnings denied, production frontend and standalone no-bundle debug
+builds passed. The full Rust matrix and updated native acceptance are in progress.
+Initial focused UI failures clicked subtabs before the new default finished
+loading; readiness waits corrected those tests. No approval or reconciliation
+safeguard was changed. Earlier 0.50.0 acceptance below remains historical.
+
 **Review & reconciliation → All transactions** now provides one current row per
 source record across accounts, chronological/date-basis sorting, combined literal
 search/filters, stable 25-row pages, immutable evidence/history and optional original

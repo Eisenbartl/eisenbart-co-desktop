@@ -103,7 +103,9 @@ structure does not complete these requirements.
 
 ## Next implementation priority
 
-The latest user-directed stage is unified transaction review in 0.50.0; see its
+The latest user-directed stage is unified transaction review in 0.50.0, including
+the default combined table, optional View Source Document action and separate
+purchase-dollar/count shares within the existing method panel; see its
 [reuse checklist](unified-transaction-review-checklist.md), [workflow](unified-transaction-review.md)
 and verification status in [development status](development-status.md). The
 0.48.0 extraction/disposition workflow remains functional and is reused. No new installer is to be

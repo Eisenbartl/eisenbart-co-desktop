@@ -138,6 +138,7 @@ pub struct MethodTotal {
     pub method: String,
     pub amount: String,
     pub count: usize,
+    pub count_share: Option<String>,
     pub average: Option<String>,
     pub share: Option<String>,
     pub basis_points: u16,
@@ -779,6 +780,7 @@ fn method_totals(rows: &[&Row]) -> Result<(Vec<MethodTotal>, i64, i64), String> 
             unknown = unknown.checked_add(n).ok_or(STORAGE_ERROR)?;
         }
     }
+    let purchase_count: usize = amounts.values().map(|(_, count)| count).sum();
     let classified = total - unknown;
     let methods = ["creditCard", "debitCard", "unclassified", "otherMethod"]
         .iter()
@@ -788,6 +790,7 @@ fn method_totals(rows: &[&Row]) -> Result<(Vec<MethodTotal>, i64, i64), String> 
                 method: (*m).into(),
                 amount: money(n),
                 count,
+                count_share: percent(count as i64, purchase_count as i64),
                 average: (count > 0).then(|| money((n + count as i64 / 2) / count as i64)),
                 share: percent(n, total),
                 basis_points: if total == 0 {
@@ -1459,6 +1462,9 @@ mod tests {
         let totals = &p.analysis.methods;
         assert_eq!(totals[0].amount, "100.01");
         assert_eq!(totals[0].count, 1);
+        assert_eq!(totals[0].count_share.as_deref(), Some("33.33%"));
+        assert_eq!(totals[1].count_share.as_deref(), Some("33.33%"));
+        assert_eq!(totals[2].count_share.as_deref(), Some("33.33%"));
         assert_eq!(totals[0].average.as_deref(), Some("100.01"));
         assert_eq!(totals[0].share.as_deref(), Some("40.00%"));
         assert_eq!(totals[1].amount, "100.00");
@@ -1475,6 +1481,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(posted.total, 1);
+        assert_eq!(
+            posted.analysis.methods[1].count_share.as_deref(),
+            Some("100.00%")
+        );
         assert_eq!(posted.rows[0].date.as_deref(), Some("2026-09-01"));
         assert_eq!(posted.rows[0].posting_date.as_deref(), Some("2026-09-02"));
     }
@@ -1949,6 +1959,17 @@ mod tests {
         )
         .is_err());
         approve(&mut w, &c.id, &record, Status::Rejected);
+        let current = w
+            .query_unified_transactions(&c.id, Query::default())
+            .unwrap();
+        assert_eq!(
+            current.analysis.methods[0].count_share.as_deref(),
+            Some("100.00%")
+        );
+        assert_eq!(
+            current.analysis.methods[2].count_share.as_deref(),
+            Some("0.00%")
+        );
         let e = w.get_transaction_inspection(&c.id, &row).unwrap();
         save(
             &mut w,
@@ -1975,11 +1996,56 @@ mod tests {
         assert_eq!(p.rows[0].status, Status::Rejected);
         assert!(p.rows[0].confirmed_duplicate);
         assert_eq!(p.analysis.purchase_total, "0.00");
+        assert!(p.analysis.methods.iter().all(|m| m.count_share.is_none()));
         approve(&mut w, &c.id, &record, Status::Approved);
+        let current = w
+            .query_unified_transactions(&c.id, Query::default())
+            .unwrap();
+        assert_eq!(
+            current.analysis.methods[0].count_share.as_deref(),
+            Some("33.33%")
+        );
+        assert_eq!(
+            current.analysis.methods[2].count_share.as_deref(),
+            Some("66.66%")
+        );
         let e = w.get_transaction_inspection(&c.id, &row).unwrap();
         assert!(!e.row.confirmed_duplicate);
         assert_eq!(e.metadata_history.len(), 1);
         assert_eq!(e.original.reported_amount.as_deref(), Some("-100.00"));
+    }
+    #[test]
+    fn purchase_frequency_and_dollar_shares_have_separate_denominators() {
+        let (dir, mut w, _) = configured();
+        let c = w.save_client(client_input()).unwrap();
+        fixture(&mut w, &c.id, dir.path());
+        let page = w
+            .query_unified_transactions(&c.id, Query::default())
+            .unwrap();
+        let template = page.rows.iter().find(|r| r.purchase).unwrap();
+        // Four $10 credit purchases and one $160 debit purchase: 80% of
+        // purchases by count use credit, but debit supplies 80% of dollars.
+        let rows: Vec<Row> = (0..5)
+            .map(|i| Row {
+                method: if i < 4 { "creditCard" } else { "debitCard" }.into(),
+                amount: Some(if i < 4 { "-10.00" } else { "-160.00" }.into()),
+                ..template.clone()
+            })
+            .collect();
+        let (methods, _, total) = method_totals(&rows.iter().collect::<Vec<_>>()).unwrap();
+        assert_eq!(total, 20000);
+        assert_eq!(methods[0].share.as_deref(), Some("20.00%"));
+        assert_eq!(methods[0].count_share.as_deref(), Some("80.00%"));
+        assert_eq!(methods[0].average.as_deref(), Some("10.00"));
+        assert_eq!(methods[1].share.as_deref(), Some("80.00%"));
+        assert_eq!(methods[1].count_share.as_deref(), Some("20.00%"));
+        assert_eq!(methods[1].average.as_deref(), Some("160.00"));
+        assert_eq!(methods[2].count_share.as_deref(), Some("0.00%"));
+        let (empty, _, total) = method_totals(&[]).unwrap();
+        assert_eq!(total, 0);
+        assert!(empty
+            .iter()
+            .all(|m| m.count_share.is_none() && m.share.is_none() && m.average.is_none()));
     }
     #[test]
     fn payment_observations_use_exact_values_instead_of_rounded_percent_thresholds() {

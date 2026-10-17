@@ -35,6 +35,8 @@ import { listen } from '@tauri-apps/api/event';
 import { api, desktopAvailable, resetApiSession } from './api';
 import { CLIENT_STATUSES, type Client, type ClientInput, type ClientNote, type SetupInput, type RestoreResult, type WorkspaceInfo } from './types';
 
+const defaultModuleArea=(view:View)=>view==='Transactions'?'All transactions':'Working tools';
+
 type Phase = 'checking' | 'setup' | 'locked' | 'unlocked' | 'error';
 
 
@@ -515,7 +517,7 @@ export default function App() {
     dirty.current=false;editorBusy.current=false;setTargetFollowUp(undefined);
     if(next==='Clients'&&section){setView('Clients');setClientSection(section);setEditing(Boolean(selected));}
     else if(next==='Clients'){requestedFocus.current='directory';clearSelection();setView('Clients');document.getElementById('directory-tab')?.focus();}
-    else {setView(next);setEditing(Boolean(selected));setModuleArea('Working tools');}
+    else {setView(next);setEditing(Boolean(selected));setModuleArea(defaultModuleArea(next));}
   }
 
   function createClient() {
@@ -534,7 +536,7 @@ export default function App() {
     const request = selectionRequest.current;
     const currentSession = session.current;
     const nextView=followUpId?'Clients':targetView??existing?.view??'Clients';
-    setView(nextView);setModuleArea(targetView?'Working tools':existing?.area??'Working tools');
+    setView(nextView);setModuleArea(targetView?defaultModuleArea(nextView):existing?.area??defaultModuleArea(nextView));
     setClientSection(followUpId?'intake':targetView?'overview':existing?.section??'overview');
     setSelectionLoading(true);
     try {
@@ -542,7 +544,7 @@ export default function App() {
       if (request === selectionRequest.current && currentSession === session.current) {
         if(result.id!==id)throw new Error('The client response did not match the selected record.');
         requestedFocus.current=id;setTargetFollowUp(followUpId);setSelected(result);setEditing(true);
-        setTabs(previous=>previous.some(t=>t.id===id)?previous: [...previous,{id,client:result,view:nextView,section:followUpId?'intake':'overview',area:'Working tools'}]);
+        setTabs(previous=>previous.some(t=>t.id===id)?previous: [...previous,{id,client:result,view:nextView,section:followUpId?'intake':'overview',area:defaultModuleArea(nextView)}]);
         setRecentTabs(previous=>[...previous.filter(t=>t!==id),id]);
       }
     } catch (caught) {
@@ -649,7 +651,7 @@ export default function App() {
          {view==='Spending Analysis'?<SpendingAnalysis key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy} onOpenReview={()=>navigate('Transactions')}/>:<>
          {view==='Financial Scenarios'&&<p className="field-help">Temporary previews reset when leaving this page. Save a reviewed scenario to retain it.</p>}
          <div className="workspace-module-heading"><p className="eyebrow">{view==='Documents'?'DOCUMENTS & REVIEW':view==='Transactions'?'DOCUMENTS & REVIEW':view==='Reports'?'ASSESSMENTS & REPORTS':'CLIENT TOOLS'}</p><h2>{view==='Documents'?'Import statements':view==='Transactions'?'Review & reconciliation':view==='Financial Review'?'Financial dashboard':view==='Budget Planner'?'Monthly budget':view==='Debt Planner'?'Debt payoff':view==='Savings Planner'?'Savings & sinking funds':view==='Financial Scenarios'?'Scenario comparisons':view}</h2><p>{workspacePages.find(p=>p.id===view)?.description}</p></div>
-         <nav className="section-navigation" aria-label={`${view} sections`}>{['Working tools',...(workingAreas[view]??[]),...plannedAreas[view].map(a=>a.title)].map(area=><button key={area} type="button" aria-current={moduleArea===area?'page':undefined} onClick={()=>selectArea(area)}>{area==='Working tools'?(view==='Transactions'?'Review queue':view==='Financial Review'?'Approved activity':view==='Reports'?'Assessments & action plans':view==='Documents'?'Import & sources':area):area}{plannedAreas[view].some(a=>a.title===area)&&<span className="planned-tab-label">Planned</span>}</button>)}</nav>
+         <nav className="section-navigation" aria-label={`${view} sections`}>{[...(view==='Transactions'?['All transactions','Working tools',...(workingAreas[view]??[]).filter(a=>a!=='All transactions')]:['Working tools',...(workingAreas[view]??[])]),...plannedAreas[view].map(a=>a.title)].map(area=><button key={area} type="button" aria-current={moduleArea===area?'page':undefined} onClick={()=>selectArea(area)}>{area==='Working tools'?(view==='Transactions'?'Review queue':view==='Financial Review'?'Approved activity':view==='Reports'?'Assessments & action plans':view==='Documents'?'Import & sources':area):area}{plannedAreas[view].some(a=>a.title===area)&&<span className="planned-tab-label">Planned</span>}</button>)}</nav>
          {selectionError&&<ErrorMessage>{selectionError}</ErrorMessage>}
          {selectionLoading?<p className="panel settings-panel" role="status">Opening client record…</p>:moduleArea!=='Working tools'&&!workingAreas[view]?.includes(moduleArea)?<PlannedWorkspaceArea view={view} title={moduleArea}/>:selected?view==='Reports'&&moduleArea==='Print & presentation'?<ReportPresentation key={selected.id} clientId={selected.id} onBusy={onBusy}/>:view==='Transactions'&&moduleArea==='All transactions'?<UnifiedTransactions key={selected.id} client={selected} onDirty={onDirty} onBusy={onBusy} onOpenExisting={area=>area==='Spending Analysis'?navigate('Spending Analysis'):selectArea(area)}/>:view==='Transactions'&&moduleArea==='Classification assistance'?<ImportsEditor key={`${selected.id}:classification`} client={selected} page="classification" onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:view==='Transactions'&&moduleArea==='Activity history'?<TransactionActivity key={selected.id} clientId={selected.id}/>:(view==='Financial Review'||view==='Transactions')&&moduleArea==='Card completeness'?<CardCompleteness key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:(view==='Financial Review'||view==='Transactions')&&moduleArea==='Bank & card activity'?<CardFinancialReview key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:(view==='Financial Review'||view==='Transactions')&&moduleArea==='Completeness & final validation'?<CompletenessReview key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Reports'&&moduleArea==='Final report checklist'?<SavedReportChecklist key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Transactions'&&moduleArea==='Card transactions'?<CardStatements key={selected.id} clientId={selected.id} mode="review" onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Credit-card statements'?<CardStatements key={selected.id} clientId={selected.id} mode="import" onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Statement accounts'?<StatementAccounts key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Collection checklist'?<DocumentCollection key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Transactions'?<ImportsEditor key={`${selected.id}:${moduleArea}`} client={selected} page={({"Verified figures":'facts',"Running balances":'balances',"Recurring payments":'recurring',"Transfer matching":'transfers',"Source checks":'sources'} as const)[moduleArea as 'Verified figures']??'transactions'} onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:view==='Financial Review'?<ImportsEditor key={selected.id} client={selected} page="dashboard" onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:<ClientEditor key={`${selected.id}:${view}`} section={view} client={selected} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onNavigate={navigate} onCancel={cancelClient}/>:<section className="panel module-empty"><Icon name={workspacePages.find(p=>p.id===view)?.icon??'file'} size={32}/><h2>Select a client to open {view}</h2><p className="muted">{clientsLoading?'Loading the client directory…':clientsError?'Reload the client directory using the retry above.':clients.length?'Select a client above. Their saved data will load here.':'No clients yet. Add a fictional client to try this workflow.'}</p></section>}
                  </>}

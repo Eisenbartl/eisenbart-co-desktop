@@ -57,3 +57,30 @@ including independent loan/repayment/refund treatment, source viewing, edits,
 original/history preservation, narrow layout, lock/restart and encrypted recovery.
 Exact run/binary distinctions and limits are in `development-status.md`.
 No installer was created or provided.
+
+## Supplemental refinements within the same assignment
+
+These complete gaps in the existing 0.50.0 implementation; there is no additional
+phase, transaction store, approval service, analysis system or navigation section.
+The existing optional viewer, purchase exclusions, unknown-method coverage and
+averages are reused. Previously recorded acceptance results above remain historical.
+
+- [x] Opening Review & reconciliation defaults to the existing combined current
+  chronological table. All transactions is first; the original Review queue remains
+  selectable. Switching client tabs preserves the deliberately selected section.
+- [x] The optional action reads **View Source Document**. Closing its panel removes
+  the source split immediately; the original full-width transaction table stays
+  available. Existing resize/collapse/narrow-window behavior remains.
+- [x] The existing Rust method totals supply separate dollar and count percentages,
+  plus averages, for the same approved purchase selection and preceding period.
+  Unknown/other methods remain separate and in both denominators. Existing
+  transfer, card/loan repayment, refund, fee, interest, discrepancy and duplicate
+  exclusions are reused. Empty denominators remain explicitly unavailable.
+- [x] Independent acceptance example: four $10 credit purchases and one $160 debit
+  purchase produce credit 20% dollars / 80% count / $10 average, and debit 80%
+  dollars / 20% count / $160 average. Unknown-method example produces 40%/40%/20%
+  dollars with 33.33% count each. Filters, rejection and restored approval recalculate
+  count shares without altering original records or historical decisions.
+
+Execution results for these refinements are recorded in development status when
+checks finish. No new installer is authorized.

@@ -1,7 +1,8 @@
 # Unified transaction review and document inspection
 
-Open a client’s **Review & reconciliation → All transactions**. This is a current
-transaction table over the existing bank/card records, not a second transaction
+Open a client’s **Review & reconciliation**. **All transactions** is the default
+section; the existing **Review queue** remains available for focused bank review.
+This is a current transaction table over the existing bank/card records, not a second transaction
 store. Each source record appears once using its latest financial decision.
 **Activity history** still shows every import and review event separately.
 
@@ -54,7 +55,7 @@ liability amount remains visible in evidence and the original review form.
 
 ## Optional original PDF inspection
 
-Choose **Open original document** after selecting a row. Authorized retained PDF
+Choose **View Source Document** after selecting a row. Authorized retained PDF
 bytes are read from SQLCipher with scoped client/source and SHA-256 checks. They
 are not exported to temporary plaintext files or external viewers/services. If
 original bytes were not retained, or the source is CSV, captured original fields
@@ -118,7 +119,16 @@ supplemental history before activation.
 Expand **Payment methods & observed patterns**. Calculations use all rows matching
 the applied filters, not only the visible page. Rust uses integer cents; averages
 round half a cent upward and percentages truncate to two decimals. Rounded shares
-can therefore sum below 100%.
+can therefore sum below 100%. Each method shows separate dollar and purchase-count
+shares, plus its average purchase value. Dollar share divides that method’s gross
+purchase cents by all eligible purchase cents; count share divides its eligible
+purchase count by all eligible purchases. Both include unknown/other methods in
+the denominator and use the full applied selection, including other pages. No
+purchases yields unavailable shares/averages rather than a misleading zero percent.
+For example, four $10 credit purchases and one $160 debit purchase give credit
+20% of purchase dollars and 80% of purchase count, averaging $10; debit gives
+80% of dollars and 20% of count, averaging $160. The preceding-period table uses
+the same separate measures.
 
 Only current approved, categorized, nonduplicate rows from arithmetically matched
 statements contribute. Missing balances, pending decisions or discrepancies

@@ -514,21 +514,26 @@ These checks create no installer and establish no Windows installed acceptance.
 
 The full driver adds a fictional Taylor Review client after extraction acceptance.
 It imports retained two-page bank/card PDFs through the real bounded parser,
-approves each transaction using existing forms and then opens **All transactions**.
+approves each transaction using existing forms and then checks that opening
+**Review & reconciliation** defaults to **All transactions**.
 It checks one row per record, mixed same-day chronology, oldest-first and combined
 account/type filters. Repayments do not inflate the exact $250 purchase total.
 
-Native inspection opens the bank original on its actual recorded page 2, verifies
-nonblank canvas rendering, navigates pages and zoom, and saves explicit institution,
+Native inspection uses **View Source Document** to open the bank original on its
+actual recorded page 2, verifies nonblank canvas rendering, navigates pages and zoom, and saves explicit institution,
 last-four, debit-card and posting-date details. Credit/debit/unknown purchase shares
-are independently $100/$100/$50 (40%/40%/20%). Financial decisions use the existing
-embedded bank/card forms and update Spending Analysis. Earlier supplemental
+are independently $100/$100/$50 (40%/40%/20% of dollars), while each method
+supplies one purchase (33.33% of count). Closing the source removes the split
+immediately with the transaction table available. Rejecting a purchase changes
+the now-discrepant bank statement’s eligibility; only the matched card source
+contributes (100% of eligible purchase count) until the bank source is reconciled.
+Financial decisions use the existing embedded bank/card forms and update Spending Analysis. Earlier supplemental
 details become inactive on a new approval and remain visible in original history.
 The script rejects/confirms a synthetic duplicate, filters that confirmation,
 then reapproves after clarification and verifies the restored eligible total.
 
 Screenshots: `native-unified-transactions.png`, `native-unified-original.png`,
-`native-unified-narrow.png`. An 800px check stacks source/evidence without document
+`native-unified-payment-shares.png`, `native-unified-narrow.png`. An 800px check stacks source/evidence without document
 wide overflow. Lock removes private UI, a complete restart preserves saved data,
 and encrypted backup recovery validates source/detail history and displays the
 actual PDF again. A second client has neither rows nor leaked institution data.
