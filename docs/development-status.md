@@ -11,7 +11,7 @@ inspection and focused embedding of existing bank/card decision forms are being
 verified. Loan/credit-line/mortgage transaction adapters are not implemented;
 no existing liability/cash records are relabeled as those ledgers.
 
-Twelve focused Rust tests pass, covering mixed chronological rows, current evidence,
+Thirteen focused Rust tests pass, covering mixed chronological rows, current evidence,
 filters/paging/staleness, exact purchase totals and unknown coverage, duplicate
 and discrepancy exclusion, metadata rollback/invalidations, deposit subtypes,
 scoped retained originals and encrypted recovery. All 312 UI tests (43 files) passed; the focused 43-test run also covered the
@@ -35,7 +35,17 @@ duplicates, downstream Spending Analysis, 800px layout, lock, full restart and
 encrypted recovery all passed. The first attempt passed the initial PDF/method
 checkpoint but its driver routed to the separate card page while the embedded
 form was loading. The wait now targets the embedded field; no application change
-or financial-write retry was needed. The complete native regression is pending.
+or financial-write retry was needed. The complete native regression then passed with exit 0, its completion marker
+and all 117 checkpoints: `/workspace/shared/desktop-smoke-unified-complete-final`.
+Its app source/binary hashes remained unchanged and driver ports closed afterward.
+
+A final localized correction keeps payment channels independent of economic kind:
+ACH/check/direct-deposit methods can annotate eligible movements or refunds,
+external transfers use unpaired balance movements, and reversals can retain refund
+treatment. Interest observations derive from reviewed financial kind/direction.
+All 13 affected Rust tests, final Clippy and a new standalone no-bundle build pass.
+There are now 304 library tests; the last full regression preceded this isolated
+correction, and final focused native acceptance is pending on the updated binary.
 
 ## Previous stage — household management (0.49.0, schema 31)
 

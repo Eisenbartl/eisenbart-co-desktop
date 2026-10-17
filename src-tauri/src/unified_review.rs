@@ -836,7 +836,12 @@ fn analysis(st: &State, selected: &[&Row], q: &Query) -> Result<Analysis, String
     let mut categories = BTreeMap::<String, i64>::new();
     let mut frequency = BTreeMap::<&str, usize>::new();
     for r in &rows {
-        *frequency.entry(&r.method).or_default() += 1;
+        let observed = if r.kind == "interest" && r.direction == "debit" {
+            "interestCharged"
+        } else {
+            r.method.as_str()
+        };
+        *frequency.entry(observed).or_default() += 1;
         if r.purchase {
             let n = imports::signed_money(r.amount.as_deref().ok_or(STORAGE_ERROR)?)?.abs();
             let amount = categories.entry(r.category.clone()).or_default();
@@ -1223,27 +1228,39 @@ fn compatible(r: &Row, m: &str) -> bool {
             (r.kind.as_str(), m),
             ("purchase", "creditCard")
                 | ("payment", "cardPayment")
-                | ("refund", "refund")
+                | ("refund", "refund" | "reversal")
                 | ("adjustment", "reversal")
                 | ("interest", "interestCharged")
                 | ("fee", "fee" | "overdraftFee" | "nsfFee")
         );
     }
     match m {
-        "debitCard" | "check" | "achDebit" => r.direction == "debit" && r.kind == "expense",
+        "debitCard" => r.direction == "debit" && r.kind == "expense",
+        "check" | "achDebit" => {
+            r.direction == "debit"
+                && matches!(
+                    r.kind.as_str(),
+                    "expense" | "fee" | "interest" | "balanceMovement" | "transfer"
+                )
+        }
         "achCredit" | "directDeposit" | "cashDeposit" | "otherDeposit" => {
-            r.direction == "credit" && r.kind == "income"
+            r.direction == "credit"
+                && matches!(
+                    r.kind.as_str(),
+                    "income" | "refund" | "interest" | "balanceMovement" | "transfer"
+                )
         }
         "cashWithdrawal" | "otherWithdrawal" => {
             r.direction == "debit" && r.kind == "balanceMovement"
         }
-        "internalTransfer" | "externalTransfer" => r.kind == "transfer",
+        "internalTransfer" => r.kind == "transfer",
+        "externalTransfer" => r.kind == "balanceMovement",
         "cardPayment" | "loanPayment" => r.direction == "debit" && r.kind == "balanceMovement",
         "interestEarned" => r.direction == "credit" && r.kind == "interest",
         "interestCharged" => r.direction == "debit" && r.kind == "interest",
         "fee" | "overdraftFee" | "nsfFee" => r.direction == "debit" && r.kind == "fee",
         "refund" => r.direction == "credit" && r.kind == "refund",
-        "reversal" => r.kind == "balanceMovement",
+        "reversal" => matches!(r.kind.as_str(), "balanceMovement" | "refund"),
         _ => false,
     }
 }
@@ -2015,5 +2032,101 @@ mod tests {
             .observations
             .iter()
             .any(|s| s.contains("Credit cards account for at least 60%")));
+    }
+    #[test]
+    fn reviewed_channels_preserve_movements_refunds_and_interest_instead_of_forcing_income_or_purchases(
+    ) {
+        let (dir, mut w, _) = configured();
+        let c = w.save_client(client_input()).unwrap();
+        let mut d = bank::doc("Channel checking");
+        d.opening_balance = Some("0".into());
+        d.closing_balance = Some("2370".into());
+        let staged=bank::stage(&mut w,&c.id,dir.path(),"channels.csv","Date,Description,Amount,Category,Type\n2026-09-01,Loan proceeds,500,Debt,balanceMovement\n2026-09-02,Loan repayment,-100,Debt,balanceMovement\n2026-09-03,Actual wages,2000,Wages,income\n2026-09-04,Reversed purchase,25,Food,refund\n2026-09-05,External movement,-50,Transfers,balanceMovement\n2026-09-06,Interest one,-2,Interest,interest\n2026-09-07,Interest two,-3,Interest,interest\n",d);
+        for r in &staged.records {
+            approve(&mut w, &c.id, &r.id, Status::Approved);
+        }
+        let before = w.get_client_imports(&c.id).unwrap();
+        let originals = json(
+            &before
+                .records
+                .iter()
+                .map(|r| (&r.raw, &r.fields))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        for (name, method) in [
+            ("Loan proceeds", "achCredit"),
+            ("Loan proceeds", "directDeposit"),
+            ("Loan proceeds", "externalTransfer"),
+            ("Loan repayment", "achDebit"),
+            ("Loan repayment", "check"),
+            ("Actual wages", "directDeposit"),
+            ("Reversed purchase", "achCredit"),
+            ("Reversed purchase", "reversal"),
+            ("External movement", "externalTransfer"),
+            ("Interest one", "achDebit"),
+        ] {
+            let p = w
+                .query_unified_transactions(&c.id, Query::default())
+                .unwrap();
+            let r = p.rows.iter().find(|r| r.description == name).unwrap();
+            save(
+                &mut w,
+                &c.id,
+                Data::Transaction {
+                    row_id: r.id.clone(),
+                    binding: r.binding.clone(),
+                    posting_date: None,
+                    method: method.into(),
+                    confirmed_duplicate: false,
+                },
+            )
+            .unwrap();
+        }
+        let after = w.get_client_imports(&c.id).unwrap();
+        assert_eq!(after.summary.income, "2000.00");
+        assert_eq!(after.summary.spending, "5.00");
+        assert_eq!(after.summary.refunds, "25.00");
+        assert_eq!(after.summary.net_cash, "2370.00");
+        assert_eq!(after.history.len(), before.history.len());
+        assert_eq!(
+            json(
+                &after
+                    .records
+                    .iter()
+                    .map(|r| (&r.raw, &r.fields))
+                    .collect::<Vec<_>>()
+            )
+            .unwrap(),
+            originals
+        );
+        let p = w
+            .query_unified_transactions(&c.id, Query::default())
+            .unwrap();
+        assert_eq!(p.total, 7);
+        assert_eq!(p.analysis.purchase_total, "0.00");
+        assert!(p
+            .analysis
+            .observations
+            .iter()
+            .any(|s| s.contains("2 reviewed interest charges")));
+        assert_eq!(
+            p.rows
+                .iter()
+                .find(|r| r.description == "Loan proceeds")
+                .unwrap()
+                .kind,
+            "balanceMovement"
+        );
+        assert_eq!(
+            p.rows
+                .iter()
+                .find(|r| r.description == "Reversed purchase")
+                .unwrap()
+                .kind,
+            "refund"
+        );
+        let session = w.session.as_ref().unwrap();
+        validate_all(&session.connection, &session.info).unwrap();
     }
 }

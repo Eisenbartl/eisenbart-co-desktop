@@ -90,7 +90,10 @@ existing financial treatment. Transfer pairing remains in **Transfer matching**.
 posting date, with reason and acknowledgment. Checking expenses are not assumed
 to be debit-card purchases. A method must agree with the financial kind, direction
 and supported account type. Correct financial fields through the original review
-form first when they conflict. Cash withdrawals and debt payments are movements,
+form first when they conflict. ACH/check/direct-deposit channels may describe
+income, refunds or balance movements without changing that financial treatment.
+External transfers remain unpaired balance movements; owned transfers retain the
+existing paired-transfer workflow. Cash withdrawals and debt payments are movements,
 not automatically new consumer purchases.
 
 Suspected duplicates stay visible and are excluded from method analysis. To mark
