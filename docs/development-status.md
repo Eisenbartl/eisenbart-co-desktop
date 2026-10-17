@@ -14,10 +14,18 @@ no existing liability/cash records are relabeled as those ledgers.
 Twelve focused Rust tests pass, covering mixed chronological rows, current evidence,
 filters/paging/staleness, exact purchase totals and unknown coverage, duplicate
 and discrepancy exclusion, metadata rollback/invalidations, deposit subtypes,
-scoped retained originals and encrypted recovery. All 310 UI tests (43 files) passed; the focused 43-test run also covered the
+scoped retained originals and encrypted recovery. All 312 UI tests (43 files) passed; the focused 43-test run also covered the
 unified viewer and existing bank/card/history components.
-Production frontend build passed. Full source/native regression remains pending;
-this stage is not yet a new full test version. No installer is authorized.
+Production frontend build passed. The last full Rust library run passed 302 of
+303 tests; its one remaining legacy contents comparison omitted the introduced
+empty table. That fixture was corrected without changing old-record comparisons
+and passed its targeted rerun, covering all 303 library tests successfully across
+those runs. Both actual supervised PDF-worker integration tests passed separately
+(the main-binary unit target contains no tests and is not counted). Final Clippy
+with warnings denied and the embedded standalone `--debug --no-bundle` build pass.
+Earlier failed fixture attempts remain separately logged. Native focused/full
+regression remains pending; this stage is not yet a completed full test version.
+No installer is authorized.
 
 ## Previous stage — household management (0.49.0, schema 31)
 

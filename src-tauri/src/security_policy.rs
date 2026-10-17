@@ -286,7 +286,7 @@ mod tests {
             .add_client_note(&client.id, "Synthetic legacy timeout note")
             .unwrap();
         let c = &mut w.session.as_mut().unwrap().connection;
-        c.execute_batch("DROP TABLE household_events; DROP TABLE workspace_security_history; PRAGMA user_version=28; CREATE TABLE audit_events_v29(collision TEXT);").unwrap();
+        c.execute_batch("DROP TABLE IF EXISTS transaction_inspection_details; DROP TABLE household_events; DROP TABLE workspace_security_history; PRAGMA user_version=28; CREATE TABLE audit_events_v29(collision TEXT);").unwrap();
         assert!(migrate(c, false).is_err());
         assert_eq!(
             c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))

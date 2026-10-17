@@ -5762,7 +5762,9 @@ mod statement_extraction_tests {
             .as_ref()
             .unwrap()
             .connection
-            .execute_batch("DROP TABLE household_events;")
+            .execute_batch(
+                "DROP TABLE IF EXISTS transaction_inspection_details; DROP TABLE household_events;",
+            )
             .unwrap();
         w.session
             .as_ref()

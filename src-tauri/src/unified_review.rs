@@ -1230,13 +1230,13 @@ fn compatible(r: &Row, m: &str) -> bool {
         );
     }
     match m {
-        "debitCard" | "check" | "achDebit" | "otherWithdrawal" => {
-            r.direction == "debit" && r.kind == "expense"
-        }
+        "debitCard" | "check" | "achDebit" => r.direction == "debit" && r.kind == "expense",
         "achCredit" | "directDeposit" | "cashDeposit" | "otherDeposit" => {
             r.direction == "credit" && r.kind == "income"
         }
-        "cashWithdrawal" => r.direction == "debit" && r.kind == "balanceMovement",
+        "cashWithdrawal" | "otherWithdrawal" => {
+            r.direction == "debit" && r.kind == "balanceMovement"
+        }
         "internalTransfer" | "externalTransfer" => r.kind == "transfer",
         "cardPayment" | "loanPayment" => r.direction == "debit" && r.kind == "balanceMovement",
         "interestEarned" => r.direction == "credit" && r.kind == "interest",
@@ -1623,6 +1623,8 @@ mod tests {
             .iter()
             .find(|r| r.description == "Debit market")
             .unwrap();
+        assert!(!compatible(r, "cashWithdrawal"));
+        assert!(!compatible(r, "otherWithdrawal"));
         let id = r.id.clone();
         let record = r.record_id.clone();
         let data = Data::Transaction {
