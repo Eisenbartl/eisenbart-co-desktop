@@ -13,10 +13,28 @@ Card import and card review now have separate client sections/subtabs.
 Source checks passed: production frontend build, all 288 UI tests (39 files),
 261 Rust library tests plus both PDF-worker tests, and Clippy all targets with
 warnings denied. After final date/period/filter refinements, all 6 detector,
-4 extraction-storage and 2 disposition tests passed, including the two added
-edge-case tests beyond the full-suite count. The final desktop debug build embeds
+4 extraction-storage and 3 disposition tests passed, including the three added
+edge-case tests beyond the full-suite count. All 4 card-facts and 5 Spending
+Analysis tests passed again after the stale-card-purpose fix. The final desktop debug build embeds
 frontend assets and used `--no-bundle`. Desktop workflow validation is in progress;
 its outcome and artifacts will be recorded below.
+
+The focused native workflow passed with exit 0 and the final completion marker:
+`/workspace/shared/desktop-smoke-extraction-focused-final`. It verified structural
+filtering across three PDF pages, exact editable selection totals, only checked
+imports, separate bank/card review, necessary/discretionary propagation, original
+history, restart, encrypted recovery, client isolation and an 800px layout. Its
+candidate/spending screenshots were visually inspected. Earlier failed attempts
+remain separate: one assumed printed PDF line numbers, and two exposed the last
+review action touching the native horizontal scrollbar. Transaction-text locators
+and padded review cells fixed those failures without replaying writes. The old
+raw-text scroll box is overridden explicitly and source-page counts are labeled.
+
+A new regression first reproduced stale card purposes blocking a discussion on
+another row. The helper now excludes inactive bindings from the next review while
+preserving their historical snapshots; it never revives them on newer approvals.
+All affected Rust checks and the final embedded debug build passed. The complete
+native regression is the remaining acceptance check.
 
 The user explicitly prohibited creating/providing another installer until asked.
 No packaging or installer workflow is part of this stage.

@@ -230,8 +230,22 @@ pub(super) fn purpose_data(
             classifications: vec![],
             conclusion: String::new(),
         });
-    data.classifications
-        .retain(|x| x.statement_id != statement_id || x.row != row);
+    // A previous source correction may have invalidated another row's purpose.
+    // Keep it in its historical snapshot, not in the next active review. Never
+    // bind an old discussion to a newer approval just to make this save succeed.
+    data.classifications.retain(|x| {
+        (x.statement_id != statement_id || x.row != row)
+            && current
+                .choices
+                .sources
+                .iter()
+                .find(|s| s.id == x.statement_id)
+                .and_then(|s| s.rows.iter().find(|r| r.row == x.row))
+                .is_some_and(|r| {
+                    r.status == crate::imports::Status::Approved
+                        && r.approval_id.as_deref() == Some(x.approval_id.as_str())
+                })
+    });
     data.classifications.push(cf::Classification {
         statement_id,
         row,

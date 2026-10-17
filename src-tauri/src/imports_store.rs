@@ -5998,4 +5998,50 @@ mod disposition_tests {
         );
         assert_eq!(w.get_card_facts(&c.id).unwrap().history.len(), 2);
     }
+    #[test]
+    fn card_disposition_does_not_revive_stale_other_purposes_or_block_new_discussions() {
+        let (_root, mut w, _) = configured();
+        let d = tempdir().unwrap();
+        let c = w.save_client(client_input()).unwrap();
+        let s = card::stage(&mut w, &c.id, d.path());
+        let original = serde_json::to_vec(&s.statements[0].source).unwrap();
+        let f = w.get_card_facts(&c.id).unwrap();
+        let s = w
+            .review_card_disposition(&c.id, card_decision(&s, &f, 0, cf::Role::Necessary))
+            .unwrap();
+        let f = w.get_card_facts(&c.id).unwrap();
+        let mut fee = card_decision(&s, &f, 3, cf::Role::Discretionary);
+        fee.decision.fields.kind = crate::cards::Kind::Fee;
+        let s = w.review_card_disposition(&c.id, fee).unwrap();
+        let before = w.get_card_facts(&c.id).unwrap();
+        assert_eq!(
+            before.snapshot.as_ref().unwrap().data.classifications.len(),
+            2
+        );
+        let s = w
+            .review_card_transaction(
+                &c.id,
+                card::decision(&s, 0, crate::cards::Kind::Purchase, Status::Approved),
+            )
+            .unwrap();
+        let f = w.get_card_facts(&c.id).unwrap();
+        let mut fee = card_decision(&s, &f, 3, cf::Role::Necessary);
+        fee.decision.fields.kind = crate::cards::Kind::Fee;
+        let s = w.review_card_disposition(&c.id, fee).unwrap();
+        let f = w.get_card_facts(&c.id).unwrap();
+        let data = &f.snapshot.as_ref().unwrap().data;
+        assert_eq!(data.classifications.len(), 1);
+        assert_eq!(data.classifications[0].row, 3);
+        assert_eq!(data.classifications[0].role, cf::Role::Necessary);
+        assert_eq!(f.history[1], before.history[1]);
+        let analysis = w.get_spending_analysis(&c.id, query()).unwrap();
+        assert_eq!(analysis.totals.spending, "105.05");
+        assert_eq!(analysis.totals.necessary, "5.04");
+        assert_eq!(analysis.totals.unclassified, "100.01");
+        assert_eq!(analysis.totals.discretionary, "0.00");
+        assert_eq!(
+            serde_json::to_vec(&s.statements[0].source).unwrap(),
+            original
+        );
+    }
 }

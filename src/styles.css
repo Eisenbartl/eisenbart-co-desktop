@@ -407,6 +407,8 @@ textarea { resize: vertical; min-height: 100px; }
 .imports-progress { font-size:12px; font-weight:600; margin:18px 0; }
 
 .imports-table { min-width:690px; }
+/* Keep the last review action clear of native horizontal scrollbars. */
+.imports-table th,.imports-table td { padding:12px 8px; vertical-align:top; text-align:left; border-bottom:1px solid var(--line); }
 .imports-panel .imports-table th:first-child { min-width:55px; overflow-wrap:normal; }
 
 .imports-panel input[type="checkbox"] { width:16px; height:16px; padding:0; flex:0 0 16px; }

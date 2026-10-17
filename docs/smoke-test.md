@@ -457,3 +457,21 @@ private lock clearing, full process restart, encrypted backup restoration of
 classifications/reasons and second-client isolation. Screenshots:
 `native-spending-desktop.png`, `native-spending-history.png`,
 `native-spending-narrow.png`. Results are recorded only after the run finishes.
+
+
+## Transaction-focused extraction and review (0.48.0)
+
+The complete workflow now also creates Morgan Extraction with fictional savings
+and card PDFs. It excludes contact text, fine-print pages, totals and running
+balances from the checklist; asserts confident preselection and manual exclusion;
+checks exact selected sums and imported row counts; saves source-bound purposes
+in separate bank/card review pages; verifies automatic combined Spending Analysis,
+classification history, process restart, encrypted recovery and client isolation.
+It checks the unclipped inspector and 800px layout. Screenshots are
+`native-extracted-candidates.png` and `native-extracted-spending.png`.
+
+The PDF worker can insert extracted blank lines. The harness locates transactions
+by their actual text and reads their extracted locators, rather than assuming
+printed line positions. Native click failures report read-only geometry and never
+replay a click or financial write. Build using `--debug --no-bundle` for this stage;
+no installer is created unless explicitly requested.

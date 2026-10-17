@@ -62,7 +62,9 @@ financial treatment; a card payment is not another purchase.
 For an approved bank expense/fee/interest withdrawal or card purchase/fee/interest,
 choose **Necessary spending** or **Discretionary spending**, enter the discussion
 reason and confirm individual review. Source approval and purpose save atomically.
-Errors or stale context leave both unchanged and retain the draft. Purpose decisions
+Errors or stale context leave both unchanged and retain the draft. An inactive
+classification on another corrected card row stays in history, remains excluded
+from current figures, and cannot block a new discussion or revive automatically. Purpose decisions
 bind to the exact current approval; an unrelated correction/reversal invalidates
 the old binding unless a new purpose is explicitly saved. Every earlier decision
 and original imported field remains available in history.
