@@ -15,9 +15,9 @@ Source checks passed: production frontend build, all 288 UI tests (39 files),
 warnings denied. After final date/period/filter refinements, all 6 detector,
 4 extraction-storage and 3 disposition tests passed, including the three added
 edge-case tests beyond the full-suite count. All 4 card-facts and 5 Spending
-Analysis tests passed again after the stale-card-purpose fix. The final desktop debug build embeds
-frontend assets and used `--no-bundle`. Desktop workflow validation is in progress;
-its outcome and artifacts will be recorded below.
+Analysis tests passed again after the stale-card-purpose fix. The final desktop
+debug build embeds frontend assets and used `--no-bundle`. Acceptance ran on
+2026-10-16 (America/Chicago); outcomes and artifacts are recorded below.
 
 The focused native workflow passed with exit 0 and the final completion marker:
 `/workspace/shared/desktop-smoke-extraction-focused-final`. It verified structural
@@ -33,8 +33,27 @@ raw-text scroll box is overridden explicitly and source-page counts are labeled.
 A new regression first reproduced stale card purposes blocking a discussion on
 another row. The helper now excludes inactive bindings from the next review while
 preserving their historical snapshots; it never revives them on newer approvals.
-All affected Rust checks and the final embedded debug build passed. The complete
-native regression is the remaining acceptance check.
+All affected Rust checks and the final embedded debug build passed.
+
+The complete native regression also passed with exit 0 and its final completion
+marker: `/workspace/shared/desktop-smoke-extraction-complete`. It retained all
+prior planning, PDF/CSV, card, report, classification, source approval, immutable
+history, lock/restart, encrypted/error-screen recovery, actual idle timeout and
+password-generation checks, then passed the new extraction/disposition workflow
+again in that full application context. The binary SHA-256 stayed unchanged.
+No Cargo command ran while native acceptance was active.
+
+Final frontend verification passed all 288 tests. One pre-existing navigation test
+was made to await the asynchronously loaded profile editor; its required control
+and validation assertions are unchanged. Application work is committed as
+`1a146f4` and `7969196` on `client-workspace-redesign-0.46`; the final documentation/
+test-only checkpoint records this outcome. Logs and the source/binary manifest
+are retained under `/workspace/shared/extraction-validation`.
+
+Remaining limits: selectable-text PDFs and documented layouts only; scanned/OCR,
+month-name dates and broader institution formats remain future parser work.
+Selections do not prove complete statements. Windows 0.48.0 installed acceptance
+has not been performed; this stage creates no installer.
 
 The user explicitly prohibited creating/providing another installer until asked.
 No packaging or installer workflow is part of this stage.

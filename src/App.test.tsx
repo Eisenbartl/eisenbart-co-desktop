@@ -311,7 +311,7 @@ describe('desktop workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create client' }));
     await screen.findByRole('heading', { name: 'Fictional Client' });
     expect(mocks.saveClient).toHaveBeenCalledWith(expect.objectContaining({ firstName: 'Fictional', lastName: 'Client', email: 'client@example.test', status: 'New Intake', householdSize: 1, goals: 'Build a fictional savings plan' }));
-    go('Profile & intake');expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+    go('Profile & intake');expect(await screen.findByRole('button', { name: 'Save changes' })).toBeInTheDocument();
   });
 
   it('updates the selected client identity and counseling status without changing client ownership', async () => {

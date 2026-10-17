@@ -72,8 +72,8 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | UI home | Next implementation files / dependencies | Acceptance before marking working |
 |---|---|---|
 | Documents → Collection checklist — working in 0.28.0 | `DocumentCollection.tsx`, `document_collection.rs`, `document_collection_store.rs`, schema 18; see [usage and limits](document-collection.md) | Implemented create/reopen/edit/archive/reactivate, explicit receipt and scoped source links, history, stale-save/audit rollback, restart/recovery checks; expand limits and usability only with evidence |
-| Documents → Credit-card statements — signed CSV review working | `cards.rs`, `cards_store.rs`, `CardStatements.tsx`, schema 23 | Scoped encrypted sources, explicit signed mapping, individual decisions/history, exact liability/spending/payment checks, bank-report guard and restart/recovery. [Limits and integration work](credit-card-review.md) |
-| Documents → Additional document types | `pdf.rs`, `imports.rs`, supervised parser adapters and import UI | Synthetic card/loan/paystub/institution fixtures, bounded parse, original locators, individual review, duplicate/sign/balance controls |
+| Import statements → Credit-card statements; Review & reconciliation → Card transactions — CSV/PDF working in 0.48.0 | `cards.rs`, `cards_store.rs`, `statement_pdf.rs`, `CardStatements.tsx`, `PdfTransactionInspection.tsx`, schema 30 | Scoped encrypted sources, explicit CSV mappings, editable PDF preselection and exact selected totals, separate individual review, atomic necessary/discretionary dispositions, immutable evidence/history, exact liability/spending/payment checks and restart/recovery. [Usage and limits](credit-card-review.md) |
+| Documents → Additional document types | `pdf.rs`, `imports.rs`, supervised parser adapters and import UI | Broader card/loan/paystub/institution fixtures, bounded parse, original locators, individual review, duplicate/sign/balance controls |
 | Documents → Scanned documents / OCR | Extend supervised `pdf_process.rs`; vetted offline OCR assets/dependencies | Scanned/mixed/rotated/low-quality fixtures, time/memory/page limits, no guessed facts, explicit review, offline/license checks |
 | Transactions → Classification assistance — suggestions and rule CRUD working through 0.42.0 | `classification.rs`, `classification_store.rs`, `ClassificationAssistance.tsx`, existing `ImportsEditor.tsx` review | Scoped 25-record pages, exact current approvals, unresolved conflicts/unknowns, fingerprint-bound unsaved category drafts, explicit audited decisions, reversal, restart/recovery and client isolation. Scoped rule create/edit/archive/reactivate, exact original-version application, conflict/stale/rollback/recovery checks and no automatic approval. [Rules](local-category-rules.md) and [suggestions](classification-assistance.md) |
 | Transactions → Activity history — working in 0.38.0 | `activity_store.rs`, `TransactionActivity.tsx`; existing schema 25 | Scoped 25-event pages, literal/date/account/source/status filters, original/corrected decision evidence, both transfer legs, exact current/obsolete repayment locators, stale-token rejection, ownership, read-only failure and recovery. [Limits](transaction-activity-history.md) |
@@ -102,6 +102,13 @@ security/privacy review, documentation and commercial/legal acceptance. Page
 structure does not complete these requirements.
 
 ## Next implementation priority
+
+The latest user-directed extraction/disposition stage is complete in 0.48.0;
+see the [current workflow and parser limits](pdf-import-review.md) and executed
+checks in [development status](development-status.md). No new installer is to be
+created or provided until explicitly requested. Broader institution layouts, OCR
+and installed Windows acceptance remain separate follow-on work.
+
 
 The user-directed client design/navigation stage and 0.47.0 Spending Analysis,
 with the explicitly requested Windows development installer, are complete:

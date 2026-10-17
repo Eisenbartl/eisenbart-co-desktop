@@ -49,57 +49,51 @@ purchase correction makes only the approved closing difference **0.01**; origina
 source arithmetic stays unchanged. Rejecting that purchase leaves card spending
 **-12.93**, reflecting refunds exceeding the remaining charges, not income.
 
-## Bank reports and current limits
+## Downstream figures and current limits
 
-Card statements do **not** feed bank dashboards, budgets, debt forecasts, cash-flow
-calendars, report amounts or balance facts in this stage. The page and bank tools
-state this boundary. Do not import card purchases as bank cash movements or label
-repayment as spending to work around it.
+Approved and categorized card rows feed Spending Analysis. Card account/repayment
+links, reviewed combined cash-versus-spending figures, card completeness and
+card-inclusive final reports use the existing Bank & card activity, Card
+completeness and final-report workflows. A bank-only dashboard retains its bank
+scope. Importing or classifying card activity never rewrites saved budget, debt,
+savings or cash-flow estimates, verified balance facts, or earlier report bytes.
+A card payment reduces debt and must not become another purchase.
 
-Recorded card evidence bumps the shared source revision and flags every existing
-or newly recorded bank assessment and linked client plan. Final bank-report
-approval is blocked for any client with known card statements, even a completely
-reconciled card statement: integrated card capture/reporting is not yet supported.
-Original assessment/approval payloads and digests remain unchanged; historical
-approvals remain readable with explicit current review flags. Other clients are
-unaffected. No final-report policy v1 meaning is rewritten.
+Source changes bump the shared source revision and mark affected captured reports
+for renewed review. Purpose changes also clear the previous card-inventory review.
+Final card-inclusive approval still requires current source, repayment and
+completeness evidence; a reconciled statement alone does not prove completeness.
+Original report formats, approvals and digests stay immutable.
 
-Limits: 256 KiB/CSV, 1–200 rows/statement, 20 statements/client, 1 MiB captured
-source JSON, 4,000 individual decisions/client and 8 MiB decision fields. Source
-periods span at most 367 days. USD, signed amount columns and ISO/US/EU explicit
-source dates are supported. Separate debit/credit card columns, card PDFs, OCR,
-per-row reported card running balances, automated bank-specific parsing, cash
-advances, installment terms and card account metadata CRUD are future work.
-Card names identify source groups for overlap warnings; they are not durable
-bank-account IDs or planning-account links. Exact repeated source hashes are
-rejected per client. Repeated row fingerprints and overlapping periods under the
-same card name warn without automatically removing potentially legitimate rows.
-Statement summaries are not combined, preventing silent duplicate aggregation.
+Limits: 256 KiB/CSV or 2 MiB / 100 pages per selectable-text PDF, 1–200 selected
+transactions/statement, 20 statements/client, 1 MiB captured source JSON,
+4,000 individual source decisions/client and 8 MiB decision fields. Source periods
+span at most 367 days. USD and documented numeric date/sign/column layouts are
+supported. PDF running balances are reference evidence. Blank flattened debit/
+credit cells, OCR, month-name dates, arbitrary institution layouts, cash advances,
+installment terms and planning-account mappings need later work. Follow the
+[PDF inspection rules](pdf-import-review.md) for ambiguous candidates.
 
-## Persistence, recovery and future integration
+Exact repeated source hashes are rejected per client. Repeated row fingerprints
+and overlapping periods warn without automatically deleting potentially legitimate
+rows. Durable card identities and explicit repayment links belong to Bank & card
+activity; individual statement arithmetic remains separately visible.
 
-Rust derives firm/counselor/client scope from the authenticated workspace. Schema
-23 adds immutable card sources and append-only individual decisions, compound
-ownership links and audit events. Immediate transactions recheck the shared
-source revision and save source/decision, revision and audit together. Failed
-writes preserve state and drafts. Existing bounded CSV inspection supplies
-short-lived, client-bound tokens; lock/unmount clears previews.
+## Persistence and recovery
 
-Reads and encrypted recovery validate bounded sources, original hashes/retained
-bytes, captured CSV cell extraction, canonical decisions, source row ownership,
-chronological revision history and scoped links. Corrupt decisions cannot be
-activated through recovery. No financial calculations use JavaScript or binary
-floating point. No dependencies, network services or installer were added.
+Rust derives firm/counselor/client scope from the authenticated workspace. Scoped
+immutable sources, individual decisions and purpose histories use immediate
+revision/audit transactions. A purpose saved during source review binds to that
+exact new approval in the same transaction. Failure rolls back both writes.
+CSV/PDF inspection tokens are short-lived and client-bound; lock/unmount clears
+private previews.
 
-Next priority: integrate card spending/liability evidence and explicitly linked
-bank repayments into financial review and versioned report snapshots. Introduce
-durable, reviewed card-account links before aggregating successive statements.
-Define the cash-versus-spending views, verify independent combined examples,
-retain legacy report bytes, and require complete evidence before a new final
-policy can approve card-inclusive reports. Do not remove the conservative
-bank-report block until that acceptance passes. Card PDF extraction and full
-card-account renaming/archive and planning mappings follow as separate bounded
-work.
+Reads and encrypted recovery validate original hashes/retained bytes, captured CSV
+cells or canonical versioned PDF evidence, decisions, source ownership, revision
+history and links. Corrupt evidence cannot activate through recovery. Schema 30
+protects the new PDF format from older writers without rewriting legacy sources
+or report payloads. Calculations use exact Rust integer cents. This stage adds no
+external service, dependency or installer.
 
 Verification covers exact amounts and signs, mandatory decisions, source mapping,
 unknown/date/zero/limit failures, scope, stale revisions, duplicate files, atomic
@@ -117,5 +111,6 @@ Executed results are recorded in development-status.md.
 Durable reviewed card-account/source links, explicit bank repayment matching and a
 provisional internal report supplement are now implemented. Use Financial Review
 → Bank & card activity and see [bank-card-review.md](bank-card-review.md). Original
-bank dashboard/planning figures remain unchanged. Card-inclusive final approval
-still requires the next completeness/balance mapping policy.
+bank dashboard/planning figures remain unchanged. Current [card completeness](card-completeness-evidence.md) and
+[card-inclusive final approval](card-inclusive-final-approval.md) add the required
+reviewed inventory, balance mappings, source and repayment evidence.
