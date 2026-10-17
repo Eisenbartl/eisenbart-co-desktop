@@ -16,12 +16,32 @@ no-overwrite PDFs and encrypted-recovery validation. Household draft/section sta
 survives tab changes; lock removes it. Saving a client and opening its history
 also synchronizes navigation guards before enabling further navigation.
 
-Executed so far: production frontend build; all 298 UI tests (41 files); current
-58 focused UI/navigation tests. All 24 new household Rust tests have passed in
-the ongoing 288-test library run; full-suite completion, Clippy, standalone build
-and focused/full native acceptance are still pending. Synthetic legacy migration
-fixtures now remove the newly introduced household table when constructing an
-older schema, retaining all rollback/source-preservation assertions.
+Source validation passed: production frontend build, all 298 UI tests (41 files),
+the full 288-library-test Rust run and both PDF-worker tests, and Clippy all targets
+with warnings denied. After final native refinements, all 26 household tests and
+Clippy passed again; the two new regressions cover matching short household IDs
+and duplicated source links across households. There are now 290 library tests;
+the final targeted run covers the changed household/restore integration paths.
+The last standalone debug build uses `--no-bundle` and embeds frontend assets.
+
+Focused native acceptance passed with exit 0:
+`/workspace/shared/desktop-smoke-household-focused-third`. It exercised client
+links/consent, $600/$900/$900 rent shares, full payer contributions and internal
+settlements, exact goal contributions, non-writing scenario previews, controlled
+individual budgets, retained tab sections/drafts, no-overwrite offline PDF,
+800px layout, lock privacy, full restart and encrypted recovery. The first
+attempt exposed a backdrop covering workspace tabs; the editor is now nonmodal,
+keeps global navigation available and offers keyboard return to the tab strip.
+A second attempt correctly blocked a driver-appended 125% value; real keyboard
+replacement and exact-value observations fixed the harness without replaying
+financial writes. Prior failed artifacts remain separate from the passing run.
+The final identifier hardening is covered by focused source tests and is now
+undergoing the complete native regression.
+
+Synthetic legacy migration fixtures remove the introduced household table when
+constructing an older schema, retaining all rollback/source-preservation
+assertions. Native verification is still in progress; do not describe the full
+regression as passed until its final completion marker is recorded.
 
 This stage creates no installer. The user explicitly prohibited another installer
 until requested. Native verification is the next step; Windows installed

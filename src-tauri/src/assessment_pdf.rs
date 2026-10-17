@@ -2220,6 +2220,23 @@ pub fn render_household(
             ),
         )?;
     }
+    let body: serde_json::Value = serde_json::from_str(&report.body).map_err(|_| ERROR)?;
+    if let Some(goals) = body.get("goals") {
+        let goals: Vec<crate::households::Goal> =
+            serde_json::from_value(goals.clone()).map_err(|_| ERROR)?;
+        if !goals.is_empty() {
+            l.text("Shared savings goals", 13.0)?;
+            for g in goals {
+                l.value(
+                    &g.label,
+                    &format!(
+                        "Target ${}; reserved ${}; planned monthly contribution ${}.",
+                        g.target, g.reserved, g.monthly
+                    ),
+                )?;
+            }
+        }
+    }
     for warning in &summary.warnings {
         l.text(warning, 9.0)?;
     }

@@ -195,8 +195,16 @@ fn append(
     audit(c, w, "household_changed", Some(id))
 }
 pub(super) fn validate_all(c: &Connection, w: &WorkspaceInfo) -> Result<(), String> {
+    let mut linked = BTreeSet::new();
     for id in ids(c, w)? {
         let (d, _, _, _) = read(c, w, &id, None)?;
+        for p in d.payments.iter().filter(|p| !d.voids.contains(&p.id)) {
+            if let Some(source) = &p.source {
+                if !linked.insert((source.client_id.clone(), source.row_id.clone())) {
+                    return Err("Duplicate household source links cannot be recovered as independent payments.".into());
+                }
+            }
+        }
         for m in &d.members {
             if let Some(client) = &m.client_id {
                 scoped_client(c, w, client)?;
@@ -970,7 +978,7 @@ impl Workspace {
             return Err("Household changed. Reload before recording a report.".into());
         }
         let current = record(&tx, &s.info, id, month)?;
-        let body=serde_json::to_string(&serde_json::json!({"name":d.name,"summary":current.summary,"actualTotal":current.actual_total,"actualNecessary":current.actual_necessary,"actualDiscretionary":current.actual_discretionary,"sourceRows":current.source_rows,"cashflow":current.cashflow,"warnings":current.cashflow_warnings})).map_err(|_|STORAGE_ERROR)?;
+        let body=serde_json::to_string(&serde_json::json!({"name":d.name,"summary":current.summary,"actualTotal":current.actual_total,"actualNecessary":current.actual_necessary,"actualDiscretionary":current.actual_discretionary,"sourceRows":current.source_rows,"cashflow":current.cashflow,"warnings":current.cashflow_warnings,"goals":current.data.goals,"goalResults":current.goal_results})).map_err(|_|STORAGE_ERROR)?;
         let action = Action::Report(h::Report {
             id: Uuid::new_v4().to_string(),
             month: month.into(),
@@ -984,6 +992,40 @@ impl Workspace {
         tx.commit().map_err(storage_error)?;
         Ok(result)
     }
+}
+struct PlanTag {
+    prefix: String,
+    legacy: Option<String>,
+    short: String,
+}
+impl PlanTag {
+    fn owns(&self, label: &str) -> bool {
+        label.starts_with(&self.prefix)
+            || self.legacy.as_ref().is_some_and(|s| label.starts_with(s))
+    }
+    fn owns_schedule(&self, label: &str, month: &str) -> bool {
+        label.starts_with(&format!("{}{month} ", self.prefix))
+            || self
+                .legacy
+                .as_ref()
+                .is_some_and(|s| label.starts_with(&format!("{s}{month} ")))
+    }
+    fn ambiguous(&self, label: &str) -> bool {
+        self.legacy.is_none() && label.starts_with(&self.short)
+    }
+}
+fn plan_tag(c: &Connection, w: &WorkspaceInfo, id: &str) -> Result<PlanTag, String> {
+    let short = format!("HH:{}:", &id[..8]);
+    let unique = ids(c, w)?
+        .iter()
+        .filter(|other| other.get(..8) == id.get(..8))
+        .count()
+        == 1;
+    Ok(PlanTag {
+        prefix: format!("HH:{id}:"),
+        legacy: if unique { Some(short.clone()) } else { None },
+        short,
+    })
 }
 fn budget_preview(
     c: &Connection,
@@ -1006,7 +1048,11 @@ fn budget_preview(
             "Resolve unallocated household bills before reconciling an individual budget.".into(),
         );
     }
-    let prefix = format!("HH:{}:", &id[..8]);
+    let tag = plan_tag(c, w, id)?;
+    let prefix = &tag.prefix;
+    if budget.lines.iter().any(|line| tag.ambiguous(&line.label)) {
+        return Err("Older shortened household labels are ambiguous. Review and rename their entries in the individual budget before reconciling these households.".into());
+    }
     let mut grouped = std::collections::BTreeMap::<(String, String, String), i64>::new();
     for b in &summary.bills {
         if b.status != "confirmed" {
@@ -1024,7 +1070,7 @@ fn budget_preview(
             label: format!(
                 "{prefix}{} {}",
                 &agreement[..8],
-                name.chars().take(80).collect::<String>()
+                name.chars().take(64).collect::<String>()
             ),
             kind: match purpose.as_str() {
                 "necessary" => budget::Kind::Necessary,
@@ -1048,7 +1094,7 @@ fn budget_preview(
                     label: format!(
                         "{prefix}{} {}",
                         &goal.id[..8],
-                        goal.label.chars().take(80).collect::<String>()
+                        goal.label.chars().take(64).collect::<String>()
                     ),
                     kind: budget::Kind::Savings,
                     amount: Some(share.amount),
@@ -1063,7 +1109,7 @@ fn budget_preview(
         .lines
         .iter()
         .enumerate()
-        .filter(|(_, line)| line.label.starts_with(&prefix))
+        .filter(|(_, line)| tag.owns(&line.label))
         .map(|(i, _)| i)
         .collect();
     if proposed_lines.is_empty() {
@@ -1126,6 +1172,7 @@ impl Workspace {
                     .into(),
             );
         }
+        let tag = plan_tag(&tx, &s.info, id)?;
         let selected: BTreeSet<_> = input.replace_indices.iter().copied().collect();
         if selected.len() != input.replace_indices.len()
             || selected.iter().any(|i| {
@@ -1136,20 +1183,17 @@ impl Workspace {
                             | budget::Kind::Discretionary
                             | budget::Kind::DebtPayment
                     ) && !(preview.budget.lines[*i].kind == budget::Kind::Savings
-                        && preview.budget.lines[*i]
-                            .label
-                            .starts_with(&format!("HH:{}:", &id[..8])))
+                        && tag.owns(&preview.budget.lines[*i].label))
             })
         {
             return Err("Choose distinct existing expense rows to replace; income and savings cannot be removed here.".into());
         }
-        let prefix = format!("HH:{}:", &id[..8]);
         if preview
             .budget
             .lines
             .iter()
             .enumerate()
-            .any(|(i, l)| l.label.starts_with(&prefix) && !selected.contains(&i))
+            .any(|(i, l)| tag.owns(&l.label) && !selected.contains(&i))
         {
             return Err("Select all prior shares from this household for replacement to prevent double counting.".into());
         }
@@ -1278,11 +1322,15 @@ fn cashflow_preview(
             "Resolve unallocated household bills before reconciling individual cash flow.".into(),
         );
     }
-    let prefix = format!("HH:{}:{month} ", &id[..8]);
+    let tag = plan_tag(c, w, id)?;
+    let prefix = format!("{}{month} ", tag.prefix);
+    if plan.schedules.iter().any(|s| tag.ambiguous(&s.label)) {
+        return Err("Older shortened household schedule labels are ambiguous. Review and rename their individual schedules before reconciling these households.".into());
+    }
     let mut proposed = vec![];
     let mut add = |label: String, date: String, amount: String, inflow: bool, confirmed: bool| {
         proposed.push(cashflow::Schedule {
-            label: format!("{prefix}{}", label.chars().take(90).collect::<String>()),
+            label: format!("{prefix}{}", label.chars().take(64).collect::<String>()),
             account_id: account_id.unwrap_or("").into(),
             destination_id: None,
             kind: if inflow {
@@ -1406,7 +1454,7 @@ fn cashflow_preview(
         .schedules
         .iter()
         .enumerate()
-        .filter(|(_, s)| s.label.starts_with(&prefix))
+        .filter(|(_, s)| tag.owns_schedule(&s.label, month))
         .map(|(i, _)| i)
         .collect();
     let mut existing = plan.schedules;
@@ -1414,7 +1462,7 @@ fn cashflow_preview(
         if matches!(
             s.kind,
             cashflow::Kind::Paycheck | cashflow::Kind::OtherInflow
-        ) && !s.label.starts_with(&format!("HH:{}:", &id[..8]))
+        ) && !tag.owns(&s.label)
             && !m.consent.income
         {
             s.amount = None;
@@ -2141,5 +2189,133 @@ mod tests {
         assert!(w
             .household_sources(&r.id, &r.data.members[0].id, "2026-10")
             .is_err());
+    }
+}
+#[cfg(test)]
+mod household_identity_tests {
+    use super::super::tests::{client_input, configured};
+    use super::*;
+    use crate::households::tests::{expense, member};
+    #[test]
+    fn matching_short_ids_never_replace_another_households_budget_shares() {
+        let (_dir, mut w, info) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let a = w
+            .create_household("First household".into(), "2026-10".into())
+            .unwrap();
+        let b = format!("{}{}", &a.id[..8], &Uuid::new_v4().to_string()[8..]);
+        {
+            let s = w.session().unwrap();
+            let tx = s.connection.transaction().unwrap();
+            append(
+                &tx,
+                &info,
+                &b,
+                1,
+                "",
+                &Action::Create("Second household".into()),
+            )
+            .unwrap();
+            tx.commit().unwrap();
+        }
+        for id in [&a.id, &b] {
+            let mut r = w.get_household(id, "2026-10").unwrap();
+            for n in 1..=3 {
+                let mut m = member(n);
+                if n == 1 {
+                    m.client_id = Some(client.id.clone());
+                    m.consent.planning = true;
+                    m.consent.evidence = "Synthetic shared planning authorization".into()
+                }
+                r = w
+                    .save_household(
+                        id,
+                        "2026-10",
+                        h::Input {
+                            expected_revision: r.revision,
+                            action: Action::Member(m),
+                        },
+                    )
+                    .unwrap();
+            }
+            let mut e = expense(&r.data);
+            if id == &b {
+                e.amount = "300.00".into();
+                e.name = "Utilities".into()
+            }
+            r = w
+                .save_household(
+                    id,
+                    "2026-10",
+                    h::Input {
+                        expected_revision: r.revision,
+                        action: Action::Expense(e),
+                    },
+                )
+                .unwrap();
+            let budget_revision = w.get_client_budget(&client.id).unwrap().revision;
+            let preview = w
+                .household_budget_preview(id, &r.data.members[0].id, "2026-10")
+                .unwrap();
+            assert!(preview.suggested_replacements.is_empty());
+            w.household_budget_reconcile(
+                id,
+                BudgetChange {
+                    expected_revision: r.revision,
+                    budget_revision,
+                    member_id: r.data.members[0].id.clone(),
+                    month: "2026-10".into(),
+                    replace_indices: vec![],
+                    acknowledge: true,
+                },
+            )
+            .unwrap();
+        }
+        let budget = w.get_client_budget(&client.id).unwrap();
+        assert_eq!(budget.lines.len(), 2);
+        assert_eq!(budget.summary.necessary_expenses, "675.00");
+        assert!(budget.lines[0].label.contains(&a.id));
+        assert!(budget.lines[1].label.contains(&b));
+        let r = w.get_household(&a.id, "2026-10").unwrap();
+        let preview = w
+            .household_budget_preview(&a.id, &r.data.members[0].id, "2026-10")
+            .unwrap();
+        assert_eq!(preview.suggested_replacements, vec![0]);
+        let s = w.session().unwrap();
+        let tag = plan_tag(&s.connection, &s.info, &a.id).unwrap();
+        assert!(tag.owns_schedule(&format!("HH:{}:2026-10 rent", a.id), "2026-10"));
+        assert!(!tag.owns_schedule(&format!("HH:{b}:2026-10 utilities"), "2026-10"));
+        assert!(tag.ambiguous(&format!("HH:{}:old rent", &a.id[..8])));
+    }
+    #[test]
+    fn backup_validation_rejects_duplicate_source_links_across_households() {
+        let (_dir, mut w, info) = configured();
+        let mut data = crate::households::tests::data();
+        let e = expense(&data);
+        h::apply(&mut data, &mut Action::Expense(e.clone())).unwrap();
+        let mut p = crate::households::tests::payment(&data, &e, 0, "2400.00", "bill", None);
+        p.source = Some(h::Source {
+            client_id: Uuid::new_v4().to_string(),
+            row_id: "bank:synthetic-duplicate".into(),
+            approval_id: Uuid::new_v4().to_string(),
+        });
+        let s = w.session().unwrap();
+        for _ in 0..2 {
+            let id = Uuid::new_v4().to_string();
+            let tx = s.connection.transaction().unwrap();
+            let mut previous = String::new();
+            let mut actions = vec![Action::Create("Synthetic duplicate fixture".into())];
+            actions.extend(data.members.iter().cloned().map(Action::Member));
+            actions.push(Action::Expense(e.clone()));
+            actions.push(Action::Payment(p.clone()));
+            for (i, action) in actions.into_iter().enumerate() {
+                append(&tx, &info, &id, (i + 1) as i64, &previous, &action).unwrap();
+                previous = read(&tx, &info, &id, None).unwrap().3;
+            }
+            tx.commit().unwrap();
+        }
+        assert!(validate_all(&s.connection, &info)
+            .unwrap_err()
+            .contains("Duplicate household source"));
     }
 }

@@ -4,3 +4,5 @@
 @media(max-width:760px){.household-workspace{display:block}.household-rail{padding:8px;border-right:0}.household-identity{display:none}.household-rail nav{flex-direction:row;overflow-x:auto}.household-rail nav button{white-space:nowrap;padding:9px}.household-content{padding:16px 12px}.household-form-grid{grid-template-columns:1fr}.household-mix{flex-wrap:wrap}.household-donut{width:100%;max-width:230px;margin:auto}.household-contribution-row{grid-template-columns:30px 65px minmax(30px,1fr) 65px;gap:6px}.household-stat{padding:12px;gap:8px}.household-stat strong{font-size:19px}.household-stat svg{display:none}.household-create{flex-wrap:wrap}.household-create label{min-width:100%}}
 
 .household-chart-bars{display:grid;gap:16px;padding:14px 0}.household-chart-bars>div{display:grid;grid-template-columns:minmax(80px,1fr) minmax(70px,2fr) 78px;gap:12px;align-items:center;font-size:12px}.household-chart-bars .household-bar-track{height:22px}.household-chart-bars strong{text-align:right;font-size:11px}
+
+.household-page-heading,.household-page-heading h1{scroll-margin-top:130px}

@@ -142,6 +142,12 @@ entries, and requires acknowledgment before saving. The server checks both
 household and individual revisions, prevents duplicate prior household entries,
 retains before/after data in the encrypted journal, and saves the plan and audit
 records in one transaction. Income cannot be removed through these workflows.
+Plan bindings use complete household identifiers, so matching shortened display IDs
+cannot replace another household's shares or schedules. Earlier short labels are
+recognized only when unambiguous; ambiguous legacy entries require explicit
+individual-plan review. Recovery also rejects duplicate active source links
+across households.
+
 New budget context feeds existing debt/savings/cash-flow tools without silently
 replacing their independently saved assumptions. Goal deposits need explicitly
 dated individual savings schedules; no contribution date is invented.

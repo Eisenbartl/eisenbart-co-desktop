@@ -2063,7 +2063,7 @@ def check_households(driver: WebDriver, artifacts: Path, data_root: Path,
     driver.fill(drawer+' input[data-field="expense-name"]','Rent');driver.fill(drawer+' input[data-field="amount"]','2400.00')
     driver.select(drawer+' select[data-field="allocation-method"]','Custom percentage remainder')
     for person,percent in [('Jordan Household','25'),('Nora Household','37.5'),('Michael Demo','37.5')]:
-        driver.fill(drawer+f' input[aria-label="Remainder weight for {person}"]',percent)
+        driver.replace_text(drawer+f' input[aria-label="Remainder weight for {person}"]',percent)
     driver.wait_text(drawer+' .household-preview','$600.00','exact Jordan responsibility preview')
     driver.wait_text(drawer+' .household-preview','$900.00','exact remaining member shares')
     driver.click_button('Save expense agreement');driver.wait(lambda:not driver.visible(drawer),'agreement saved');ready()
@@ -2079,6 +2079,9 @@ def check_households(driver: WebDriver, artifacts: Path, data_root: Path,
     status('household: exact $600/$900/$900 agreement, fronted bill and confirmed internal settlement')
     section('Household Budget');driver.select(active+' .household-toolbar select','Jordan Household');driver.click_button('Preview budget reconciliation');driver.wait_text(active+' .household-content','Household shares to add','controlled budget preview');driver.wait_text(active+' .household-content','$600.00','only member share proposed')
     driver.click(active+' input[data-field="budget-ack"]');driver.click_button('Save reconciled individual budget');ready();driver.wait_text(active+' .household-notice','Individual budget saved','explicit budget revision')
+    section('Goals & Scenarios');driver.click_button('Add shared goal');driver.fill(drawer+' input[data-field="goal-name"]','Shared emergency reserve');driver.fill(drawer+' input[data-field="goal-target"]','1200.00');driver.fill(drawer+' input[data-field="goal-monthly"]','100.00');driver.click_button('Save shared goal');driver.wait(lambda:not driver.visible(drawer),'shared savings goal saved');ready();driver.wait_text(active+' .household-content','$33.33','shared savings contribution cents');driver.wait_text(active+' .household-content','$33.34','deterministic leftover cent in shared savings')
+    section('Shared Expenses');driver.click_button('Create revision');driver.replace_text(drawer+' input[data-field="amount"]','2600.00');driver.wait_text(drawer+' .household-preview','$650.00','hypothetical revised rent share');driver.click(drawer+' details > summary');driver.fill(drawer+' input[data-field="scenario-name"]','Future rent option');driver.click_button('Save expense scenario');driver.wait(lambda:not driver.visible(drawer),'hypothetical scenario saved');ready();section('Goals & Scenarios');driver.click_button('Preview impact');driver.wait_text(active+' .household-preview','$650.00','saved hypothetical impact preview');section('Overview');driver.wait_text(active+' .household-stats','$2,400.00','hypothetical proposal does not change active spending');driver.wait_text(active+' .household-content','Shared emergency reserve','goal visible on household overview');section('Household Budget')
+    status('household: exact shared goal contributions and non-writing rent scenario preview')
     jordan="[role=tab][aria-label='Jordan Household']";driver.click(jordan);driver.client_section('Monthly budget');driver.wait_text('.budget-panel','$600.00','individual receives only agreed household share')
     driver.click(f'[role=tab][data-client-tab={json.dumps(tab)}]');ready();driver.wait_text(active+' h1','Household Budget','household last section remembered')
     section('Members & Permissions');driver.click_button('Add member');driver.fill(drawer+' input[data-field="member-name"]','Private retained household draft')
@@ -2093,7 +2096,7 @@ def check_households(driver: WebDriver, artifacts: Path, data_root: Path,
     content=pdf.read_bytes()
     if not content.startswith(b'%PDF-'):raise SmokeFailure('Household report is not a PDF')
     text=subprocess.run(['pdftotext',str(pdf),'-'],check=True,capture_output=True,text=True).stdout
-    if '600.00' not in text or '2400.00' not in text:raise SmokeFailure('Household PDF lacks independently expected amounts')
+    if '600.00' not in text or '2400.00' not in text or 'Shared emergency reserve' not in text:raise SmokeFailure('Household PDF lacks independently expected amounts or shared goal')
     driver.click_button('Export saved household PDF');driver.wait_text(active+' [role=alert]','already exists','household export refuses overwriting')
     if pdf.read_bytes()!=content:raise SmokeFailure('Household PDF bytes changed after refused overwrite')
     status('household: controlled budget handoff, tab sections/drafts and immutable no-overwrite PDF')
