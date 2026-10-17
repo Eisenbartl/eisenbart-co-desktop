@@ -1,5 +1,14 @@
 # Development status
 
+## Active assignment — financial health assessment and behavioral insights
+
+Preceding transaction-review acceptance and unchanged source/binary hashes were
+verified before starting. The [reuse map, scoring policy and acceptance checklist](financial-health-assessment.md)
+record the new work and existing service boundaries. Implementation is in progress;
+no health score or native acceptance is claimed yet. Next action: implement the
+scoped read-only projection and test evidence gates and independent financial cases.
+No installer, new household linking or business counseling is authorized.
+
 ## Current stage — unified transaction review (0.50.0, schema 32)
 
 Implemented [the supplied brief](unified-transaction-review-specification.md) for
