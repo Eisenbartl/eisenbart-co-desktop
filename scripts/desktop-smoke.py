@@ -505,7 +505,11 @@ class WebDriver:
             self.element('.financial-facts-editor > summary')
             node=self.find('.financial-facts-editor')
             if not self.command('GET',f'/element/{node}/property/open'):self.click('.financial-facts-editor > summary')
-        if selector=='.imports-panel' and value=='No imported transactions yet':self.client_section('Review & reconciliation')
+        if selector=='.imports-panel' and value=='No imported transactions yet':
+            # This legacy assertion targets the bank queue specifically. The
+            # combined current-history table is now the product default.
+            self.client_section('Review & reconciliation')
+            self.click_button('Review queue')
         self.workflow_for(selector)
         self.wait(lambda: value in self.text(selector), description)
 
@@ -2356,6 +2360,7 @@ def check_statement_extraction(driver: WebDriver, artifacts: Path, data_root: Pa
     driver.client_section('Review & reconciliation');driver.wait_text('.imports-progress','Needs Clarification 2','only checked transactions imported')
     if driver.observe_script("return document.querySelectorAll('.imports-table tbody tr').length")!=2:raise SmokeFailure('Unchecked transaction imported')
     def bank_decide(number:int,kind:str,category:str,purpose:str,reason:str)->None:
+        driver.client_section('Review & reconciliation');driver.click_button('Review queue')
         driver.interactive(f"//button[normalize-space(.)={json.dumps(f'Review {path.name} record {number}')} ]",'xpath');driver.click_button(f'Review {path.name} record {number}');driver.select('#review-kind',kind);driver.fill('#review-category',category);driver.select('#review-status','Approved')
         if purpose:driver.select('#review-spending-role',purpose)
         driver.fill('#review-reason',reason);driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','source and purpose committed');driver.interactive('.imports-table tbody button')
@@ -4024,10 +4029,16 @@ def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:
     count = driver.observe_script("return document.querySelectorAll('nav[aria-label=\"Main navigation\"] button').length")
     if count != 3:
         raise SmokeFailure("Expected Dashboard, Clients and Settings at the application level")
-    for page, heading in [("Financial Review", "Approved financial activity"), ("Transactions", "Transaction review queue"), ("Documents", "Documents and statement accounts")]:
+    for page, heading in [("Financial Review", "Approved financial activity"), ("Transactions", "All transactions"), ("Documents", "Documents and statement accounts")]:
         driver.click(f"nav[aria-label='Main navigation'] button[aria-label='{page}']")
-        driver.wait_text("#imports-title", heading, f"focused {page} page")
-        driver.element(".financial-dashboard" if page=="Financial Review" else ".imports-totals" if page=="Transactions" else "#csv-path")
+        if page == "Transactions":
+            driver.interactive("#unified-search")
+            driver.wait_text(".unified-transactions h2", heading, "focused unified Transactions page")
+            driver.wait_text(".section-navigation button[aria-current=page]", "All transactions", "default unified review tab")
+            driver.element(".unified-table")
+        else:
+            driver.wait_text("#imports-title", heading, f"focused {page} page")
+            driver.element(".financial-dashboard" if page=="Financial Review" else "#csv-path")
         if page != "Documents" and driver.visible("#csv-path"):
             raise SmokeFailure(f"Document import controls leaked into {page}")
     driver.click(".imports-sources > summary")

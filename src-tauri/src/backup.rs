@@ -97,7 +97,10 @@ pub(super) fn staging(root: &Path) -> Result<PrivateDirectory, String> {
     let parent = root.join("recovery-generations");
     private_directory(&parent)?;
     let path = parent.join(Uuid::new_v4().to_string());
+    #[cfg(unix)]
     let mut builder = fs::DirBuilder::new();
+    #[cfg(not(unix))]
+    let builder = fs::DirBuilder::new();
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
