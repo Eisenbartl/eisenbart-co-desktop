@@ -140,7 +140,7 @@ class WebDriver:
     def scroll_element(self, element: str, block: str = "center") -> None:
         # Narrow viewport movement only: no arbitrary script, focus, typing,
         # clicks, application commands or financial writes can enter this retry.
-        if block not in ("center", "start"):
+        if block not in ("center", "start", "nearest"):
             raise ValueError("Unsupported viewport alignment")
         for attempt in range(2):
             try:
