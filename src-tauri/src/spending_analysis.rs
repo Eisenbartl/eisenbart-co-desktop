@@ -946,6 +946,57 @@ impl Workspace {
     }
 }
 
+/// Household adapters reuse the same live approvals, duplicate exclusions and purpose bindings.
+pub(super) fn household_rows(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    id: &str,
+    month: &str,
+) -> Result<Vec<Row>, String> {
+    let (start, end) = crate::households::bounds(month)?;
+    let context = context(c, w, id)?;
+    let (all, _, _) = rows(&context)?;
+    Ok(all
+        .into_iter()
+        .filter(|r| {
+            r.date >= start.to_string()
+                && r.date <= end.to_string()
+                && (r.card.is_some()
+                    || context
+                        .bank
+                        .records
+                        .iter()
+                        .find(|b| b.id == r.record_id)
+                        .is_some_and(|b| b.duplicate_ids.is_empty()))
+        })
+        .collect())
+}
+pub(super) fn household_subscription_rows(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    id: &str,
+    month: &str,
+) -> Result<std::collections::BTreeSet<String>, String> {
+    let q = Input {
+        from_month: month.into(),
+        through_month: month.into(),
+        account_id: None,
+        search: String::new(),
+        category: None,
+        role: None,
+        page: 0,
+        page_size: 50,
+        compare_previous: false,
+        opportunity: None,
+    };
+    Ok(analyze(&context(c, w, id)?, &q)?
+        .opportunities
+        .into_iter()
+        .filter(|o| o.kind == "subscriptions")
+        .flat_map(|o| o.row_ids)
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1585,19 +1636,4 @@ mod tests {
             .previous
             .is_none());
     }
-}
-
-/// Household adapters reuse the same live approvals, duplicate exclusions and purpose bindings.
-pub(super) fn household_rows(
-    c: &Connection,
-    w: &WorkspaceInfo,
-    id: &str,
-    month: &str,
-) -> Result<Vec<Row>, String> {
-    let (start, end) = crate::households::bounds(month)?;
-    let (all, _, _) = rows(&context(c, w, id)?)?;
-    Ok(all
-        .into_iter()
-        .filter(|r| r.date >= start.to_string() && r.date <= end.to_string())
-        .collect())
 }

@@ -2182,6 +2182,55 @@ pub fn save_bytes(
     })
 }
 
+/// Household reports use the existing offline font, pagination and no-overwrite PDF writer.
+pub fn render_household(
+    name: &str,
+    report: &crate::households::Report,
+    summary: &crate::households::Summary,
+    actual: &str,
+) -> Result<(Vec<u8>, usize), String> {
+    let mut l = Layout::new()?;
+    l.text("Eisenbart & Co. — Household planning", 18.0)?;
+    l.text(name, 16.0)?;
+    l.value("Planning month", &report.month)?;
+    l.value("Agreement revision", &report.revision.to_string())?;
+    l.value("Snapshot recorded", &chicago_time(&report.saved_at)?)?;
+    l.text("Internal household planning record. Reviewed source coverage and authorized information may be incomplete. This is not a final approved client assessment.",9.0)?;
+    l.value("Shared obligations", &format!("${}", summary.total))?;
+    l.value(
+        "Necessary / discretionary",
+        &format!("${} / ${}", summary.necessary, summary.discretionary),
+    )?;
+    l.value(
+        "Confirmed external bill payments",
+        &format!("${}", summary.confirmed_paid),
+    )?;
+    l.value("Approved linked source spending", &format!("${actual}"))?;
+    l.text("Member responsibility and contribution", 13.0)?;
+    for m in &summary.member_totals {
+        l.value(&m.name,&format!("Agreed ${}; paid bills ${}; sent settlements ${}; received ${}; net contribution ${}; remaining ${}.",m.obligation,m.bill_payments,m.settlements_sent,m.settlements_received,m.net_contribution,m.remaining))?;
+    }
+    l.text("Bills and agreement traceability", 13.0)?;
+    for b in &summary.bills {
+        l.value(
+            &format!("{} — {}", b.date, b.name),
+            &format!(
+                "${} | {} | {} | {} | agreement {} / revision {}",
+                b.amount, b.category, b.purpose, b.status, b.agreement_id, b.version_id
+            ),
+        )?;
+    }
+    for warning in &summary.warnings {
+        l.text(warning, 9.0)?;
+    }
+    l.value("Immutable report ID", &report.id)?;
+    l.text("Internal reimbursements and account transfers do not add household spending. Personal debts and assets are excluded unless explicitly shared.",9.0)?;
+    l.finish_labeled(
+        "HOUSEHOLD PLANNING / INTERNAL",
+        "Household planning snapshot",
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

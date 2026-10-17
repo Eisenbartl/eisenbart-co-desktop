@@ -22,6 +22,20 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  chooseHouseholdReportPdf:(householdId:string,reportId:string)=>command<string|null>('choose_household_report_pdf',{householdId,reportId}),
+  exportHouseholdReportPdf:(householdId:string,reportId:string,path:string)=>command<{path:string;pages:number;recordId:string}>('export_household_report_pdf',{householdId,reportId,path}),
+  householdCashflowPreview:(householdId:string,memberId:string,month:string,accountId:string|null)=>command<import('./householdTypes').HouseholdCashflowPreview>('household_cashflow_preview',{householdId,memberId,month,accountId}),
+  householdCashflowReconcile:(householdId:string,input:{expectedRevision:number;revision:number;memberId:string;month:string;accountId:string;replaceIndices:number[];acknowledge:boolean})=>command<import('./householdTypes').HouseholdRecord>('household_cashflow_reconcile',{householdId,input}),
+  listHouseholds:()=>command<import('./householdTypes').HouseholdDirectoryItem[]>('list_households'),
+  createHousehold:(name:string,month:string)=>command<import('./householdTypes').HouseholdRecord>('create_household',{name,month}),
+  getHousehold:(householdId:string,month:string)=>command<import('./householdTypes').HouseholdRecord>('get_household',{householdId,month}),
+  saveHousehold:(householdId:string,month:string,input:import('./householdTypes').HouseholdInput)=>command<import('./householdTypes').HouseholdRecord>('save_household',{householdId,month,input}),
+  previewHousehold:(householdId:string,month:string,input:import('./householdTypes').HouseholdInput)=>command<import('./householdTypes').Summary>('preview_household',{householdId,month,input}),
+  householdSources:(householdId:string,memberId:string,month:string)=>command<import('./spendingTypes').SpendingRow[]>('household_sources',{householdId,memberId,month}),
+  householdClassify:(householdId:string,memberId:string,input:import('./spendingTypes').SpendingChange)=>command<void>('household_classify',{householdId,memberId,input}),
+  recordHouseholdReport:(householdId:string,month:string,expected:number)=>command<import('./householdTypes').HouseholdRecord>('record_household_report',{householdId,month,expected}),
+  householdBudgetPreview:(householdId:string,memberId:string,month:string)=>command<import('./householdTypes').HouseholdBudgetPreview>('household_budget_preview',{householdId,memberId,month}),
+  householdBudgetReconcile:(householdId:string,input:{expectedRevision:number;budgetRevision:number;memberId:string;month:string;replaceIndices:number[];acknowledge:boolean})=>command<import('./householdTypes').HouseholdRecord>('household_budget_reconcile',{householdId,input}),
   inspectPdfTransactions:(clientId:string,input:{token:string;config:import('./pdfTypes').PdfConfig;choices:import('./pdfTypes').PdfChoice[]})=>command<import('./pdfTypes').PdfInspection>('inspect_pdf_transactions',{clientId,input}),
   getSpendingAnalysis:(clientId:string,input:import('./spendingTypes').SpendingQuery)=>command<import('./spendingTypes').SpendingResult>('get_spending_analysis',{clientId,input}),
   changeSpendingClassification:(clientId:string,input:import('./spendingTypes').SpendingChange)=>command<void>('change_spending_classification',{clientId,input}),

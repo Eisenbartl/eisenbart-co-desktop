@@ -2019,8 +2019,100 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_client_history(driver, artifacts, data_root, password, binary, restart_driver)
     check_spending_analysis(driver, artifacts, data_root, password, binary, restart_driver)
     check_statement_extraction(driver, artifacts, data_root, password, binary, restart_driver)
+    check_households(driver, artifacts, data_root, password, binary, restart_driver)
     check_inactivity_policy(driver, artifacts, data_root, password, binary, restart_driver)
     check_password_change(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_households(driver: WebDriver, artifacts: Path, data_root: Path,
+                     password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """Native three-person allocations, payments, controlled handoff, tabs and encrypted recovery."""
+    active = '[data-household-active="true"]'
+    drawer = active + ' .household-drawer'
+    def ready() -> None:
+        driver.wait(lambda:driver.observe_script("return document.querySelector(arguments[0])?.getAttribute('aria-busy')",[active]) == 'false', 'household calculations ready')
+    def section(label: str) -> None:
+        driver.click(f"//*[@data-household-active='true']//nav[@aria-label='Household sections']//button[normalize-space(.)={json.dumps(label)}]", 'xpath')
+        ready()
+    def save_member(name: str, linked: bool, planning: bool = False) -> None:
+        driver.click_button('Add member')
+        if linked:
+            label=driver.observe_script("return Array.from(document.querySelector(arguments[0]).options).find(o=>o.textContent.startsWith(arguments[1]+' ·'))?.textContent",[drawer+' select[data-field="linked-client"]',name])
+            if not isinstance(label,str):raise SmokeFailure('Dedicated synthetic client is missing from member selector')
+            driver.select(drawer+' select[data-field="linked-client"]',label)
+        else:driver.fill(drawer+' input[data-field="member-name"]',name)
+        if planning:
+            driver.click(drawer+' input[data-consent="planning"]')
+            driver.fill(drawer+' textarea','Synthetic household budget authorization only. No income, balances or private statements shared.')
+        driver.click_button('Save member & permissions')
+        driver.wait(lambda:not driver.visible(drawer),'member editor closed after successful save');ready()
+        driver.wait_text(active+' .household-content',name,'saved household member')
+    driver.command('POST','/window/rect',{'width':1536,'height':1024})
+    for first in ['Jordan','Nora']:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+        driver.click_button('Add client');driver.fill('#first-name',first);driver.fill('#last-name','Household');driver.click_button('Create client')
+        driver.wait_text('.client-workspace-header h1',first+' Household','dedicated synthetic household client')
+    driver.click('button[aria-label="Create a household workspace"]')
+    driver.fill('.household-create input','Oak Native Household');driver.click_button('Save household')
+    driver.wait_text(active+' .household-identity h2','Oak Native Household','household opened in top tab');ready()
+    tab=driver.observe_script("return document.querySelector('.household-app-tab.active [role=tab]')?.dataset.clientTab")
+    if not isinstance(tab,str):raise SmokeFailure('Household tab has no stable identifier')
+    section('Members & Permissions');save_member('Jordan Household',True,True);save_member('Nora Household',True);save_member('Michael Demo',False)
+    status('household: two stable client links, limited member and explicit permissions')
+    section('Shared Expenses');driver.click_button('Add expense')
+    driver.fill(drawer+' input[data-field="expense-name"]','Rent');driver.fill(drawer+' input[data-field="amount"]','2400.00')
+    driver.select(drawer+' select[data-field="allocation-method"]','Custom percentage remainder')
+    for person,percent in [('Jordan Household','25'),('Nora Household','37.5'),('Michael Demo','37.5')]:
+        driver.fill(drawer+f' input[aria-label="Remainder weight for {person}"]',percent)
+    driver.wait_text(drawer+' .household-preview','$600.00','exact Jordan responsibility preview')
+    driver.wait_text(drawer+' .household-preview','$900.00','exact remaining member shares')
+    driver.click_button('Save expense agreement');driver.wait(lambda:not driver.visible(drawer),'agreement saved');ready()
+    section('Payments & Settlements');driver.click_button('Record payment')
+    driver.select(drawer+' select[data-field="payment-expense"]','Rent');driver.fill(drawer+' input[data-field="amount"]','2400.00');driver.select(drawer+' select[data-field="payment-state"]','Confirmed by counselor / source');driver.click_button('Save payment record');driver.wait(lambda:not driver.visible(drawer),'external payment saved');ready()
+    driver.wait_text(active+' .household-content','$900.00','outstanding reimbursement suggestions')
+    section('Overview');driver.wait_text(active+' .household-stats','$2,400.00','fronted payment is not duplicated spending')
+    if '$4,200.00' in driver.text(active):raise SmokeFailure('Household double-counted the external payment and reimbursements')
+    driver.scroll_to(active+' .household-page-heading','start');driver.screenshot(artifacts/'native-household-overview.png')
+    section('Payments & Settlements');driver.click_button('Record payment')
+    driver.select(drawer+' select[data-field="movement-kind"]','settlement');driver.select(drawer+' select[data-field="paying-member"]','Nora Household');driver.select(drawer+' select[data-field="receiving-member"]','Jordan Household');driver.fill(drawer+' input[data-field="amount"]','900.00');driver.select(drawer+' select[data-field="payment-state"]','Confirmed by counselor / source');driver.click_button('Save payment record');driver.wait(lambda:not driver.visible(drawer),'settlement saved');ready()
+    section('Overview');driver.wait_text(active+' .household-stats','$2,400.00','internal settlement does not add spending')
+    status('household: exact $600/$900/$900 agreement, fronted bill and confirmed internal settlement')
+    section('Household Budget');driver.select(active+' .household-toolbar select','Jordan Household');driver.click_button('Preview budget reconciliation');driver.wait_text(active+' .household-content','Household shares to add','controlled budget preview');driver.wait_text(active+' .household-content','$600.00','only member share proposed')
+    driver.click(active+' input[data-field="budget-ack"]');driver.click_button('Save reconciled individual budget');ready();driver.wait_text(active+' .household-notice','Individual budget saved','explicit budget revision')
+    jordan="[role=tab][aria-label='Jordan Household']";driver.click(jordan);driver.client_section('Monthly budget');driver.wait_text('.budget-panel','$600.00','individual receives only agreed household share')
+    driver.click(f'[role=tab][data-client-tab={json.dumps(tab)}]');ready();driver.wait_text(active+' h1','Household Budget','household last section remembered')
+    section('Members & Permissions');driver.click_button('Add member');driver.fill(drawer+' input[data-field="member-name"]','Private retained household draft')
+    driver.click(jordan);driver.wait_text('.budget-panel','$600.00','individual tab kept its working section')
+    driver.click(f'[role=tab][data-client-tab={json.dumps(tab)}]');driver.wait_value(drawer+' input[data-field="member-name"]','Private retained household draft','household draft retained between tabs')
+    driver.click(drawer+' button[aria-label="Close household editor"]');driver.click_button('Keep editing');driver.wait_value(drawer+' input[data-field="member-name"]','Private retained household draft','explicit keep draft')
+    driver.click(drawer+' button[aria-label="Close household editor"]');driver.click_button('Discard changes');driver.wait(lambda:not driver.visible(drawer),'explicit draft discard')
+    section('Reports & History');driver.click_button('Record report snapshot');ready();driver.wait_text(active+' .household-notice','snapshot recorded','immutable historical report')
+    report_option=driver.observe_script("return Array.from(document.querySelector(arguments[0]).options).find(o=>o.value)?.textContent",[active+' .household-panel select'])
+    driver.select(active+' .household-panel select',str(report_option));driver.element(active+' .household-report')
+    pdf=artifacts/'household-native.pdf';driver.fill(active+' input[data-field="household-pdf-path"]',str(pdf));driver.click_button('Export saved household PDF');driver.wait_text(active+' .household-notice','Household PDF saved','offline household PDF export')
+    content=pdf.read_bytes()
+    if not content.startswith(b'%PDF-'):raise SmokeFailure('Household report is not a PDF')
+    text=subprocess.run(['pdftotext',str(pdf),'-'],check=True,capture_output=True,text=True).stdout
+    if '600.00' not in text or '2400.00' not in text:raise SmokeFailure('Household PDF lacks independently expected amounts')
+    driver.click_button('Export saved household PDF');driver.wait_text(active+' [role=alert]','already exists','household export refuses overwriting')
+    if pdf.read_bytes()!=content:raise SmokeFailure('Household PDF bytes changed after refused overwrite')
+    status('household: controlled budget handoff, tab sections/drafts and immutable no-overwrite PDF')
+    driver.command('POST','/window/rect',{'width':800,'height':960});driver.scroll_to(active+' h1','start');driver.screenshot(artifacts/'native-household-narrow.png')
+    if driver.observe_script('return document.documentElement.scrollWidth>document.documentElement.clientWidth'):raise SmokeFailure('Household screen overflows the native window')
+    driver.command('POST','/window/rect',{'width':1536,'height':1024})
+    driver.click_button('Lock workspace');driver.element('#password')
+    if driver.visible(active):raise SmokeFailure('Household data remained visible after locking')
+    restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace')
+    def reopen() -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']");driver.click_button('Households')
+        driver.click("//button[contains(@class,'household-directory-card')][strong[normalize-space(.)='Oak Native Household']]",'xpath');ready()
+        driver.wait_text(active+' .household-stats','$2,400.00','persisted household expenses')
+        driver.wait_text(active+' .household-content','$600.00','persisted allocation shares')
+    reopen();folder=data_root/'household-backup';folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','household journal backed up');backup=driver.text('.backup-file-path')
+    driver.click_button('Lock workspace');driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review','Verified backup','household history verified before recovery');driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored.','household backup activated');driver.fill('#password',password);driver.click_button('Unlock workspace');reopen()
+    status('household: narrow layout, lock privacy, complete restart and encrypted recovery')
+    driver.open_client('Alex Fictional')
 
 
 def check_statement_extraction(driver: WebDriver, artifacts: Path, data_root: Path,

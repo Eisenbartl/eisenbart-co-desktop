@@ -1,11 +1,11 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {api} from './api';
 import type {ClientHistoryKind,ClientHistoryPage,ClientHistoryQuery} from './types';
 const kinds:[ClientHistoryKind,string][]=[['profile','Profile'],['note','Session notes'],['intake','Intake & follow-ups'],['document','Documents'],['scenario','Saved scenarios'],['report','Counselor reports'],['actionPlan','Client action plans']];
 const empty:ClientHistoryQuery={text:'',kind:null,fromDate:'',throughDate:'',offset:0,expectedSnapshot:null};
 export default function ClientHistory({clientId,disabled,onBusy,onOpen}:{clientId:string;disabled:boolean;onBusy:(v:boolean)=>void;onOpen:(kind:ClientHistoryKind)=>void}){
  const [query,setQuery]=useState(empty),[page,setPage]=useState<ClientHistoryPage|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');const generation=useRef(0),applied=useRef(empty);
- useEffect(()=>{onBusy(busy);return()=>onBusy(false);},[busy,onBusy]);
+ useLayoutEffect(()=>{onBusy(busy);return()=>onBusy(false);},[busy,onBusy]);
  async function load(q:ClientHistoryQuery){const g=++generation.current;setBusy(true);setError('');setPage(null);try{const p=await api.getClientHistory(clientId,q);if(g!==generation.current)return;if(p.clientId!==clientId||p.offset!==q.offset)throw new Error('Client history did not match this client or page.');setPage(p);applied.current=q;}catch(e){if(g===generation.current)setError(e instanceof Error?e.message:String(e));}finally{if(g===generation.current)setBusy(false);}}
  useEffect(()=>{setQuery(empty);applied.current=empty;void load(empty);return()=>{generation.current++;};},[clientId]);
  const current=page?.clientId===clientId?page:null;

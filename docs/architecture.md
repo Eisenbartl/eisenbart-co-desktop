@@ -327,3 +327,21 @@ financial-facts or card-facts version, and audit failure rolls back both writes.
 Card saves validate source, facts and profile revisions and clear inventory review.
 Live analysis consumes existing authoritative facts; no parallel financial ledger
 or frontend money arithmetic is introduced. Import and approval remain distinct.
+
+### Household workspaces (schema 31)
+
+`households.rs` owns exact allocations, due-date agreement selection, responsibilities
+and settlement suggestions. `households_store.rs` replays a counselor/organization
+scoped append-only event journal, validates canonical payloads/digest chaining,
+enforces consent and source identity, and composes the existing budget, cash-flow,
+savings and spending-analysis services. Approved-source links retain original
+client/account/document ownership; live invalidations never rewrite prior events.
+Controlled individual plan handoffs commit their new revision and retained
+before/after journal/audit data atomically. Backup recovery validates household
+journals before activation. PDFs reuse `assessment_pdf`'s offline renderer/writer.
+
+React household components retain drafts/section/filter state in mounted inactive
+tabs, hide inactive views, and unmount all private state on workspace lock.
+`HouseholdWorkspace` collects inputs and renders authoritative Rust amounts/scales;
+it does not implement a second financial engine. See `household-management.md`
+for allocation rounding, consent, timing, report semantics and operational limits.

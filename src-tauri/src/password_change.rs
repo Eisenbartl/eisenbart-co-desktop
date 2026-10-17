@@ -409,7 +409,7 @@ mod tests {
         w.session()
             .unwrap()
             .connection
-            .execute_batch("DROP TABLE workspace_security_history;")
+            .execute_batch("DROP TABLE household_events; DROP TABLE workspace_security_history;")
             .unwrap();
         let before = contents(&w.session.as_ref().unwrap().connection);
         let c = &mut w.session.as_mut().unwrap().connection;
@@ -432,7 +432,9 @@ mod tests {
         assert_eq!(
             contents(c)
                 .into_iter()
-                .filter(|(name, _)| name != "workspace_security_history")
+                .filter(
+                    |(name, _)| name != "workspace_security_history" && name != "household_events"
+                )
                 .collect::<Vec<_>>(),
             before
         );

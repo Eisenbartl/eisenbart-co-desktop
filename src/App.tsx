@@ -1,3 +1,5 @@
+import HouseholdWorkspace from './HouseholdWorkspace';
+import HouseholdDirectory from './HouseholdDirectory';
 import ConfirmationDialog,{confirmDiscard} from './ConfirmationDialog';
 import ClientDirectory,{clientName} from './ClientDirectory';
 import ClientWorkspaceLayout from './ClientWorkspaceLayout';
@@ -23,7 +25,7 @@ import ClientCare from './ClientCare';
 import ImportsEditor from './ImportsEditor';
 import {RestorePanel} from './RecoveryPanel';
 import CashflowEditor from './CashflowEditor';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import SavingsEditor from './SavingsEditor';
 import DebtEditor from './DebtEditor';
 import BudgetEditor from './BudgetEditor';
@@ -126,6 +128,7 @@ function AuthForm({ setup, busy, error, notice, onSubmit, onRestored }: {
         </form>
         <RestorePanel onRestored={onRestored}/>
         <p className="auth-storage"><Icon name="lock" size={14} />Your workspace data stays on this computer.</p>
+
       </div>
       <DevelopmentNotice />
     </main>
@@ -164,8 +167,8 @@ function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy, f
   const [saved, setSaved] = useState(false);
   const mounted = useRef(true);
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline) || noteDirty || budgetDirty || debtDirty || savingsDirty || cashflowDirty || importsDirty || careDirty;
-  useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
-  useEffect(() => { onBusy(saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy || careBusy); }, [saving, noteSaving, budgetSaving, debtSaving, savingsSaving, cashflowSaving, importsBusy, scenarioBusy, careBusy, onBusy]);
+  useLayoutEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
+  useLayoutEffect(() => { onBusy(saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy || careBusy); }, [saving, noteSaving, budgetSaving, debtSaving, savingsSaving, cashflowSaving, importsBusy, scenarioBusy, careBusy, onBusy]);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; onDirty(false); onBusy(false); };
@@ -343,6 +346,12 @@ export default function App() {
     else if(target&&selected?.id===target&&clientPage){document.getElementById(`client-tab-${target}`)?.focus({preventScroll:true});requestedFocus.current=null;}
   },[view,clientSection,moduleArea,phase,selected?.id,editing]);
 
+  const [householdTabs,setHouseholdTabs]=useState<{id:string;name:string}[]>([]);
+  const [activeHousehold,setActiveHousehold]=useState<string|null>(null);
+  const [householdCreateRequest,setHouseholdCreateRequest]=useState(0);
+  const householdStates=useRef<Record<string,{dirty:boolean;busy:boolean}>>({});
+  const householdState=useRef((id:string,dirty:boolean,busy:boolean)=>{householdStates.current[id]={dirty,busy};}).current;
+  const householdName=useRef((id:string,name:string)=>setHouseholdTabs(t=>t.map(x=>x.id===id?{...x,name}:x))).current;
   const session = useRef(0);
   const selectionRequest = useRef(0);
   const dirty = useRef(false);
@@ -408,6 +417,7 @@ export default function App() {
     resetApiSession();requestedFocus.current=null;
     session.current += 1;
     selectionRequest.current += 1;
+    setHouseholdTabs([]);setActiveHousehold(null);setHouseholdCreateRequest(0);householdStates.current={};
     setWorkspace(null);
     setClients([]);
     setClientsError('');
@@ -472,6 +482,8 @@ export default function App() {
   }
 
   function canLeave(resume:()=>void): boolean {
+    if(Object.values(householdStates.current).some(s=>s.busy))return false;
+
     if (editorBusy.current) return false;
     if(!dirty.current)return true;
     const generation=session.current,request=selectionRequest.current;
@@ -497,6 +509,7 @@ export default function App() {
 
   function navigate(next: View, section?:ClientSection) {
     if (!canLeave(()=>navigate(next,section))) return;
+    setActiveHousehold(null);
     selectionRequest.current++;setSelectionLoading(false);setSelectionError('');
     dirty.current=false;editorBusy.current=false;setTargetFollowUp(undefined);
     if(next==='Clients'&&section){setView('Clients');setClientSection(section);setEditing(Boolean(selected));}
@@ -506,7 +519,7 @@ export default function App() {
 
   function createClient() {
     if (!canLeave(createClient)) return;
-    requestedFocus.current='create';clearSelection();setView('Clients');setClientSection('profile');setEditing(true);
+    setActiveHousehold(null);requestedFocus.current='create';clearSelection();setView('Clients');setClientSection('profile');setEditing(true);
   }
 
   async function openClient(id: string, followUpId?:string, targetView?:View) {
@@ -514,6 +527,7 @@ export default function App() {
       document.getElementById(`client-tab-${id}`)?.focus();return;
     }
     if (!canLeave(()=>void openClient(id,followUpId,targetView))) return;
+    setActiveHousehold(null);
     const existing=tabs.find(t=>t.id===id);
     clearSelection();
     const request = selectionRequest.current;
@@ -547,13 +561,25 @@ export default function App() {
 
   function tabKeys(event:import('react').KeyboardEvent<HTMLDivElement>){
     if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!(event.target instanceof HTMLElement)||event.target.getAttribute('role')!=='tab')return;
-    const ids=['directory',...tabs.map(t=>t.id)];const active=event.target.dataset.clientTab??'directory';const index=ids.indexOf(active);
+    const ids=['directory',...tabs.map(t=>t.id),...householdTabs.map(t=>`household:${t.id}`)];const active=event.target.dataset.clientTab??'directory';const index=ids.indexOf(active);
     const next=event.key==='Home'?ids[0]:event.key==='End'?ids[ids.length-1]:ids[(index+(event.key==='ArrowRight'?1:-1)+ids.length)%ids.length];
-    event.preventDefault();if(next==='directory'){navigate('Clients');}else void openClient(next);
+    event.preventDefault();if(next==='directory'){navigate('Clients');}else if(next.startsWith('household:')){const h=householdTabs.find(h=>h.id===next.slice(10));if(h)openHousehold(h.id,h.name)}else void openClient(next);
   }
 
+  function openHousehold(id:string,name:string){
+    if(!canLeave(()=>openHousehold(id,name)))return;
+    clearSelection();setView('Clients');setActiveHousehold(id);setHouseholdTabs(t=>t.some(x=>x.id===id)?t:[...t,{id,name}]);
+    window.setTimeout(()=>document.getElementById(`household-tab-${id}`)?.focus(),0);
+  }
+  function closeHousehold(id:string){
+    if(householdStates.current[id]?.busy)return;
+    const close=()=>{delete householdStates.current[id];setHouseholdTabs(t=>t.filter(x=>x.id!==id));if(activeHousehold===id){setActiveHousehold(null);setView('Clients');requestedFocus.current='directory';document.getElementById('directory-tab')?.focus();}};
+    if(householdStates.current[id]?.dirty)confirmDiscard('Discard the unsaved household draft and close this tab?',close);else close();
+  }
+  function createHousehold(){if(!canLeave(createHousehold))return;navigate('Clients');setHouseholdCreateRequest(v=>v+1);}
   async function lock() {
     if (!canLeave(()=>void lock())) return;
+    if(Object.values(householdStates.current).some(s=>s.dirty)){confirmDiscard('Discard unsaved household drafts and lock the workspace?',()=>{householdStates.current={};void lock()});return;}
     clearWorkspace();
     setPhase('locked');
     setAuthBusy(true);
@@ -562,6 +588,7 @@ export default function App() {
   }
 
   function savedClient(client: Client) {
+    dirty.current=false;editorBusy.current=false;
     setClients(previous => [client, ...previous.filter(item => item.id !== client.id)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
     if(!selected){setClientSection('overview');setView('Clients');}
     setSelected(client);setEditing(true);
@@ -589,14 +616,16 @@ export default function App() {
       <div className="sidebar-bottom"><div className="local-indicator"><span aria-hidden="true" />Local workspace</div><div className="counselor"><div className="counselor-avatar" aria-hidden="true">{workspace.counselorName.slice(0, 1)}</div><div><strong title={workspace.counselorName}>{workspace.counselorName}</strong><span>Counselor</span></div></div><button className="lock-button" onClick={lock}><Icon name="lock" size={16} />Lock workspace</button></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><div className="breadcrumbs">Workspace<Icon name="arrow" size={13} /><strong>{selected&&view!=='Dashboard'&&view!=='Settings'?clientName(selected):view}</strong></div><div className="offline-status"><Icon name="shield" size={15} />Offline-first · Local storage</div></header>
+      <header className="topbar"><div className="breadcrumbs">Workspace<Icon name="arrow" size={13} /><strong>{activeHousehold?householdTabs.find(t=>t.id===activeHousehold)?.name:selected&&view!=='Dashboard'&&view!=='Settings'?clientName(selected):view}</strong></div><div className="offline-status"><Icon name="shield" size={15} />Offline-first · Local storage</div></header>
       <div className="workspace-tabbar" role="tablist" aria-label="Open workspace tabs" onKeyDown={tabKeys}>
-        <div className={`workspace-app-tab ${view==='Clients'&&!selected&&!selectionLoading?'active':''}`}><button id="directory-tab" role="tab" data-client-tab="directory" aria-selected={view==='Clients'&&!selected&&!selectionLoading} aria-controls="workspace-page" tabIndex={!selected||view==='Dashboard'||view==='Settings'?0:-1} onClick={()=>navigate('Clients')}><Icon name="clients" size={15}/>All clients</button></div>
+        <div className={`workspace-app-tab ${view==='Clients'&&!selected&&!selectionLoading&&!activeHousehold?'active':''}`}><button id="directory-tab" role="tab" data-client-tab="directory" aria-selected={view==='Clients'&&!selected&&!selectionLoading&&!activeHousehold} aria-controls="workspace-page" tabIndex={(!selected&&!activeHousehold)||view==='Dashboard'||view==='Settings'?0:-1} onClick={()=>navigate('Clients')}><Icon name="clients" size={15}/>All clients</button></div>
         {tabs.map(tab=>{const active=selected?.id===tab.id&&view!=='Dashboard'&&view!=='Settings';return <div className={`workspace-app-tab ${active?'active':''}`} key={tab.id}><button id={`client-tab-${tab.id}`} role="tab" aria-label={tabLabel(tab.client)} data-client-tab={tab.id} aria-selected={active} aria-controls="workspace-page" tabIndex={active?0:-1} onClick={()=>void openClient(tab.id)} title={`${clientName(tab.client)} · ${tab.id}`}><Icon name="clients" size={14}/><span>{clientName(tab.client)}</span></button><button className="workspace-tab-close" aria-label={`Close workspace for ${tabLabel(tab.client)}`} onClick={()=>closeClientTab(tab.id)}>×</button></div>;})}
+        {householdTabs.map(tab=><div className={`workspace-app-tab household-app-tab ${activeHousehold===tab.id?'active':''}`} key={tab.id}><button id={`household-tab-${tab.id}`} data-client-tab={`household:${tab.id}`} role="tab" aria-selected={activeHousehold===tab.id} aria-controls="workspace-page" tabIndex={activeHousehold===tab.id?0:-1} onClick={()=>openHousehold(tab.id,tab.name)}><Icon name="household" size={16}/><span>{tab.name}</span></button><button className="workspace-tab-close" aria-label={`Close household ${tab.name}`} onClick={()=>closeHousehold(tab.id)}>×</button></div>)}
+        <button className="household-tab-add" aria-label="Create a household workspace" title="Create household" onClick={createHousehold}><Icon name="plus"/></button>
       </div>
       <DevelopmentNotice />
-      <main className="main-content"><div id="workspace-page" role={view==='Dashboard'||view==='Settings'?undefined:'tabpanel'} aria-labelledby={view==='Dashboard'||view==='Settings'?undefined:selected?`client-tab-${selected.id}`:'directory-tab'}>
-        {(!selected||view==='Dashboard'||view==='Settings')&&<div className="page-heading"><div><p className="eyebrow">{view==='Dashboard'?'YOUR COUNSELING WORKSPACE':view==='Settings'?'WORKSPACE ADMINISTRATION':'CLIENT WORKSPACE'}</p><h1 ref={pageHeading} tabIndex={-1}>{view==='Dashboard'?'A clear view of your practice.':workspacePages.find(p=>p.id===view)?.title}</h1><p className="muted">{workspacePages.find(p=>p.id===view)?.description}</p></div>{(view==='Dashboard'||view==='Clients')&&<button className="button primary" onClick={createClient} disabled={clientsLoading}><Icon name="plus" size={18}/>Add client</button>}</div>}
+      <main className={`main-content ${activeHousehold?'household-main':''}`}><div id="workspace-page" role={view==='Dashboard'||view==='Settings'?undefined:'tabpanel'} aria-labelledby={view==='Dashboard'||view==='Settings'?undefined:activeHousehold?`household-tab-${activeHousehold}`:selected?`client-tab-${selected.id}`:'directory-tab'}>
+        {(!activeHousehold&&(!selected||view==='Dashboard'||view==='Settings'))&&<div className="page-heading"><div><p className="eyebrow">{view==='Dashboard'?'YOUR COUNSELING WORKSPACE':view==='Settings'?'WORKSPACE ADMINISTRATION':'CLIENT WORKSPACE'}</p><h1 ref={pageHeading} tabIndex={-1}>{view==='Dashboard'?'A clear view of your practice.':workspacePages.find(p=>p.id===view)?.title}</h1><p className="muted">{workspacePages.find(p=>p.id===view)?.description}</p></div>{(view==='Dashboard'||view==='Clients')&&<button className="button primary" onClick={createClient} disabled={clientsLoading}><Icon name="plus" size={18}/>Add client</button>}</div>}
         {clientsError && <div className="load-error"><ErrorMessage>{clientsError}</ErrorMessage><button className="button secondary" onClick={loadClients} disabled={clientsLoading}>{clientsLoading ? 'Loading…' : 'Retry loading clients'}</button></div>}
         {view === 'Dashboard' && <>
           <div className="stats-grid">{[{ label: 'Active clients', value: activeClients.length, caption: 'Clients currently in your care', icon: 'clients' }, { label: 'New intakes', value: newIntakes.length, caption: 'At the start of their journey', icon: 'file' }, { label: 'Follow-up stage', value: followUps.length, caption: 'Clients marked for follow-up', icon: 'check' }].map(stat => <div className="stat-card" key={stat.label}><div className="stat-header"><span>{stat.label}</span><div className="stat-icon"><Icon name={stat.icon} size={18} /></div></div><strong className="stat-value">{clientsLoading || clientsError ? '—' : stat.value}</strong><p>{stat.caption}</p></div>)}</div>
@@ -605,7 +634,7 @@ export default function App() {
           <aside className="practice-card"><div className="practice-icon"><Icon name="shield" size={24} /></div><p className="eyebrow">BUILT FOR FOCUSED WORK</p><h2>Your workspace.<br />On your computer.</h2><p>Client records and notes are saved locally, so you can continue your work without an internet connection.</p><div className="practice-divider" /><h3>A working foundation</h3><p>Client intake, counseling status, notes, monthly budgets, debt payoff comparisons, savings goals, cash-flow calendars, CSV and selectable-text PDF transaction review, merchant/recurring-payment review, and statement running-balance checks are available.</p><button className="text-button" onClick={() => navigate('Settings')}>View workspace details<Icon name="arrow" size={15} /></button></aside></div>
           <section className="panel progress-panel"><div><h2>Counseling progress</h2><p className="muted small">Client counts by their current counseling stage.</p></div><div className="stage-grid">{CLIENT_STATUSES.filter(status => status !== 'Archived').map(status => <div className="stage-item" key={status}><span>{status}</span><strong>{clientsLoading || clientsError ? '—' : clients.filter(client => client.status === status).length}</strong></div>)}</div></section>
         </>}
-        {view==='Clients'&&!selected&&!selectionLoading&&<ClientDirectory clients={clients} loading={clientsLoading} error={clientsError} search={search} setSearch={setSearch} status={statusFilter} setStatus={setStatusFilter} onOpen={id=>void openClient(id)} onAdd={createClient}/>}
+        {view==='Clients'&&!selected&&!selectionLoading&&!activeHousehold&&<><ClientDirectory clients={clients} loading={clientsLoading} error={clientsError} search={search} setSearch={setSearch} status={statusFilter} setStatus={setStatusFilter} onOpen={id=>void openClient(id)} onAdd={createClient}/><HouseholdDirectory onOpen={openHousehold} createRequest={householdCreateRequest}/></>}
         {selectionLoading&&<div className="panel selection-loading" role="status">Opening client record…</div>}
         {selectionError&&<div className="panel selection-loading"><ErrorMessage>{selectionError}</ErrorMessage><button className="button secondary" onClick={()=>navigate('Clients')}>Return to all clients</button></div>}
         {view==='Clients'&&editing&&!selected&&!selectionLoading&&<div className="client-modal-backdrop"><div className="client-create-modal" role="dialog" aria-modal="true" aria-label="Add a new client" onKeyDown={e=>{if(e.key==='Escape')cancelClient();if(e.key==='Tab'){const controls=[...e.currentTarget.querySelectorAll<HTMLElement>('button,input,select,textarea')].filter(el=>!el.matches(':disabled'));if(e.shiftKey&&document.activeElement===controls[0]){e.preventDefault();controls.at(-1)?.focus();}else if(!e.shiftKey&&document.activeElement===controls.at(-1)){e.preventDefault();controls[0]?.focus();}}}}><ClientEditor section="profile" client={null} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onNavigate={navigate} onCancel={cancelClient}/></div></div>}
@@ -626,6 +655,7 @@ export default function App() {
         </ClientWorkspaceLayout>}
         {view==='Settings'&&<AdministrationPages onPasswordChanged={passwordChanged} workspace={workspace} onLock={()=>void lock()} onBusy={onBusy} onDirty={onDirty} onWorkspaceChanged={name=>setWorkspace(w=>w?{...w,organizationName:name}:w)}/>}
 
+        {householdTabs.map(tab=><div key={tab.id} hidden={activeHousehold!==tab.id}><HouseholdWorkspace id={tab.id} active={activeHousehold===tab.id} clients={clients} onState={householdState} onName={householdName} onOpenClient={id=>void openClient(id)}/></div>)}
       </div></main>
       <footer className="app-footer"><span>Eisenbart & Co. Financial Counseling Suite</span><span>Financial planning · Development build</span></footer>
     </div>

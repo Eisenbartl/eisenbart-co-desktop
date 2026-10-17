@@ -22,7 +22,7 @@ model!(Share {
     fixed: String,
     weight: String
 });
-model!(Allocation { method:String, shares:Vec<Share> });
+model!(Allocation { method:String, shares:Vec<Share>, income_basis:Option<Vec<String>> });
 model!(Rule { id:String, category:String, effective:String, until:Option<String>, allocation:Allocation, note:String });
 model!(Expense { id:String, agreement_id:String, name:String, category:String, amount:String, frequency:String, due:String, until:Option<String>, effective:String, status:String, purpose:String, payer:String, account_id:Option<String>, reimbursement_date:Option<String>, allocation:Option<Allocation>, note:String });
 model!(Account { id:String, label:String, owners:Vec<String>, opening_balance:Option<String>, balance_date:String, verified:bool });
@@ -88,6 +88,13 @@ pub enum Action {
     Proposal(Proposal),
     AcceptProposal(String),
     Report(Report),
+    CashflowReconciled {
+        client_id: String,
+        before: String,
+        after: String,
+        revision: i64,
+        month: String,
+    },
     BudgetReconciled {
         client_id: String,
         before: String,
@@ -109,7 +116,9 @@ model!(MemberTotal {
     settlements_received: String,
     net_contribution: String,
     remaining: String,
-    percent: u16
+    percent: u16,
+    known_income:Option<String>,
+    after_obligations:Option<String>
 });
 model!(Portion {
     member_id: String,
@@ -127,7 +136,7 @@ model!(Settlement {
     to_member: String,
     amount: String
 });
-model!(Summary { month:String, total:String, necessary:String, discretionary:String, confirmed_paid:String, known_income:Option<String>, income_complete:bool, unpaid_bills:String, member_totals:Vec<MemberTotal>, categories:Vec<Category>, bills:Vec<Bill>, settlements:Vec<Settlement>, warnings:Vec<String> });
+model!(Summary { month:String, total:String, necessary:String, discretionary:String, confirmed_paid:String, known_income:Option<String>, income_complete:bool, active_members:usize, unpaid_bills:String, member_totals:Vec<MemberTotal>, categories:Vec<Category>, bills:Vec<Bill>, settlements:Vec<Settlement>, invalid_allocations:usize, warnings:Vec<String> });
 
 pub fn text(s: &str, label: &str, max: usize) -> Result<String, String> {
     let v = s.trim();
@@ -216,7 +225,8 @@ pub fn split(total: i64, a: &Allocation, d: &Data, on: &str) -> Result<Vec<Porti
     let mut parts = vec![];
     let mut fixed = 0_i64;
     let mut weights = 0_i64;
-    for s in &a.shares {
+    for (share_index, s) in a.shares.iter().enumerate() {
+        weight(&s.weight)?;
         let m = member(d, &s.member_id)?;
         if !active(m, on) {
             return Err(format!("{} is not a member on {on}.", m.name));
@@ -234,7 +244,16 @@ pub fn split(total: i64, a: &Allocation, d: &Data, on: &str) -> Result<Vec<Porti
             "percentage" => weight(&s.weight)?,
             "fixed" => 0,
             "income" => {
-                if s.weight == "0" || s.weight == "0.00" {
+                if let Some(basis) = &a.income_basis {
+                    if basis.len() != a.shares.len() {
+                        return Err("Invalid approved income basis.".into());
+                    }
+                    basis[share_index]
+                        .parse::<i64>()
+                        .ok()
+                        .filter(|w| *w >= 0 && *w <= 100_000_000_000)
+                        .ok_or("Invalid approved income basis.")?
+                } else if s.weight == "0" || s.weight == "0.00" {
                     0
                 } else {
                     if !m.consent.income {
@@ -296,6 +315,47 @@ pub fn split(total: i64, a: &Allocation, d: &Data, on: &str) -> Result<Vec<Porti
             },
         })
         .collect())
+}
+fn freeze_income(a: &mut Allocation, d: &Data) -> Result<(), String> {
+    if a.method != "income" {
+        a.income_basis = None;
+        return Ok(());
+    }
+    let mut basis = vec![];
+    for s in &a.shares {
+        let m = member(d, &s.member_id)?;
+        let value = if s.weight == "0" || s.weight == "0.00" {
+            0
+        } else {
+            if !m.consent.income {
+                return Err(
+                    "Income-proportional approval needs current income authorization.".into(),
+                );
+            }
+            parse_money(
+                m.monthly_income
+                    .as_deref()
+                    .ok_or("Authorized income is unknown.")?,
+            )?
+        };
+        basis.push(value);
+    }
+    fn gcd(mut a: i64, mut b: i64) -> i64 {
+        while b != 0 {
+            let c = a % b;
+            a = b;
+            b = c
+        }
+        a
+    }
+    let divisor = basis.iter().copied().fold(0, gcd).max(1);
+    a.income_basis = Some(
+        basis
+            .into_iter()
+            .map(|n| (n / divisor).to_string())
+            .collect(),
+    );
+    Ok(())
 }
 fn validate_allocation(a: &Allocation, d: &Data, on: &str, total: i64) -> Result<(), String> {
     split(total, a, d, on).map(|_| ())
@@ -417,7 +477,28 @@ pub fn apply(d: &mut Data, action: &mut Action) -> Result<(), String> {
             if e.note.len() > 2000 {
                 return Err("Expense notes exceed 2,000 characters.".into());
             }
+            if let Some(a) = &mut e.allocation {
+                freeze_income(a, d)?;
+            }
             validate_allocation(allocation_for(d, e, &e.effective)?, d, &e.effective, total)?;
+            let start = date(&e.effective)?;
+            if e.status == "confirmed" {
+                for n in 0..=366 {
+                    let on = start + Duration::days(n);
+                    if e.until.as_ref().is_some_and(|end| on.to_string() > *end) {
+                        break;
+                    }
+                    if occurrence(e, on)? {
+                        validate_allocation(
+                            allocation_for(d, e, &on.to_string())?,
+                            d,
+                            &on.to_string(),
+                            total,
+                        )?;
+                        break;
+                    }
+                }
+            }
             d.expenses.push(e.clone());
         }
         Action::Rule(r) => {
@@ -436,6 +517,18 @@ pub fn apply(d: &mut Data, action: &mut Action) -> Result<(), String> {
             for s in &r.allocation.shares {
                 member(d, &s.member_id)?;
             }
+            freeze_income(&mut r.allocation, d)?;
+            let fixed = r
+                .allocation
+                .shares
+                .iter()
+                .try_fold(0_i64, |sum, s| parse_money(&s.fixed).map(|c| sum + c))?;
+            let nominal = if r.allocation.method == "fixed" {
+                fixed
+            } else {
+                fixed.checked_add(10000).ok_or("Allocation is too large.")?
+            };
+            validate_allocation(&r.allocation, d, &r.effective, nominal)?;
             d.rules.push(r.clone());
         }
         Action::Account(a) => {
@@ -456,7 +549,8 @@ pub fn apply(d: &mut Data, action: &mut Action) -> Result<(), String> {
             }
             if let Some(v) = &mut a.opening_balance {
                 let negative = v.trim().starts_with('-');
-                let c = parse_money(v.trim().trim_start_matches('-'))?;
+                let text = v.trim();
+                let c = parse_money(if negative { &text[1..] } else { text })?;
                 *v = money(if negative { -c } else { c });
             }
             if d.accounts.len() >= 100 && !d.accounts.iter().any(|x| x.id == a.id) {
@@ -484,7 +578,7 @@ pub fn apply(d: &mut Data, action: &mut Action) -> Result<(), String> {
             }
             if let Some(to) = &p.to_member {
                 member(d, to)?;
-                if to == &p.from_member {
+                if to == &p.from_member && p.kind != "transfer" {
                     return Err("Choose a different receiving member.".into());
                 }
             }
@@ -519,6 +613,13 @@ pub fn apply(d: &mut Data, action: &mut Action) -> Result<(), String> {
             {
                 return Err("Choose the receiving member for an internal movement.".into());
             }
+            if p.kind == "transfer"
+                && (p.account_id.is_none()
+                    || p.destination_account.is_none()
+                    || p.account_id == p.destination_account)
+            {
+                return Err("Account transfers require two distinct shared accounts.".into());
+            }
             for a in [&p.account_id, &p.destination_account]
                 .into_iter()
                 .flatten()
@@ -550,6 +651,7 @@ pub fn apply(d: &mut Data, action: &mut Action) -> Result<(), String> {
             if g.note.len() > 2000 {
                 return Err("Goal notes exceed 2,000 characters.".into());
             }
+            freeze_income(&mut g.allocation, d)?;
             let on = d
                 .members
                 .iter()
@@ -609,6 +711,17 @@ pub fn apply(d: &mut Data, action: &mut Action) -> Result<(), String> {
             }
             d.reports.push(r.clone());
         }
+        Action::CashflowReconciled {
+            client_id,
+            before,
+            after,
+            ..
+        } => {
+            id(client_id)?;
+            if before.len() > 262144 || after.len() > 262144 {
+                return Err("Cash-flow history exceeds its record limit.".into());
+            }
+        }
         Action::BudgetReconciled {
             client_id,
             before,
@@ -665,6 +778,7 @@ fn occurrence(e: &Expense, on: NaiveDate) -> Result<bool, String> {
 /// Midmonth changes affect later due dates; no implicit daily proration of an already due bill.
 pub fn summary(d: &Data, month: &str) -> Result<Summary, String> {
     let (start, end) = bounds(month)?;
+    let mut invalid_allocations = 0;
     let mut bills = vec![];
     let mut warnings = vec![];
     let ids: BTreeSet<_> = d.expenses.iter().map(|e| e.agreement_id.as_str()).collect();
@@ -702,7 +816,10 @@ pub fn summary(d: &Data, month: &str) -> Result<Summary, String> {
                     reimbursement_date: e.reimbursement_date.clone(),
                     shares,
                 }),
-                Err(err) => warnings.push(format!("{} on {day}: {err}", e.name)),
+                Err(err) => {
+                    invalid_allocations += 1;
+                    warnings.push(format!("{} on {day}: {err}", e.name))
+                }
             }
         }
     }
@@ -762,7 +879,21 @@ pub fn summary(d: &Data, month: &str) -> Result<Summary, String> {
     let mut debtors = vec![];
     let mut creditors = vec![];
     let mut known_income = 0;
-    let mut income_complete = true;
+    let active_members = d
+        .members
+        .iter()
+        .filter(|m| active(m, &end.to_string()))
+        .count();
+    let mut income_complete = active_members > 0;
+    if d.members.iter().any(|m| {
+        m.start >= start.to_string() && m.start <= end.to_string()
+            || m.end
+                .as_ref()
+                .is_some_and(|v| v >= &start.to_string() && v <= &end.to_string())
+    }) {
+        warnings.push("Membership changes during this month. Known monthly income is the authorized run rate at month end; bills use their due-date agreements, with no implicit income or bill proration.".into())
+    }
+
     for m in &d.members {
         if active(m, &end.to_string()) && m.start <= end.to_string() {
             if m.consent.income {
@@ -795,6 +926,19 @@ pub fn summary(d: &Data, month: &str) -> Result<Summary, String> {
             settlements_received: money(r),
             net_contribution: money(net),
             remaining: money(balance),
+            known_income: if m.consent.income {
+                m.monthly_income.clone()
+            } else {
+                None
+            },
+            after_obligations: if m.consent.income {
+                m.monthly_income
+                    .as_ref()
+                    .map(|v| parse_money(v).map(|income| money(income - o)))
+                    .transpose()?
+            } else {
+                None
+            },
             percent: if total == 0 {
                 0
             } else {
@@ -842,6 +986,7 @@ pub fn summary(d: &Data, month: &str) -> Result<Summary, String> {
         .sum();
     Ok(Summary {
         month: month.into(),
+        invalid_allocations,
         total: money(total),
         necessary: money(necessary),
         discretionary: money(discretionary),
@@ -852,6 +997,7 @@ pub fn summary(d: &Data, month: &str) -> Result<Summary, String> {
             Some(money(known_income))
         },
         income_complete,
+        active_members,
         unpaid_bills: money(unpaid),
         member_totals: totals,
         categories: cats
@@ -901,6 +1047,7 @@ pub(crate) mod tests {
     pub fn allocation(d: &Data, method: &str, weights: &[&str]) -> Allocation {
         Allocation {
             method: method.into(),
+            income_basis: None,
             shares: d
                 .members
                 .iter()
@@ -1116,5 +1263,87 @@ pub(crate) mod tests {
         apply(&mut d, &mut Action::AcceptProposal(pid.clone())).unwrap();
         assert_eq!(summary(&d, "2026-10").unwrap().total, "2600.00");
         assert!(apply(&mut d, &mut Action::AcceptProposal(pid)).is_err());
+    }
+}
+#[cfg(test)]
+mod agreement_tests {
+    use super::tests::{allocation, data, expense};
+    use super::*;
+    #[test]
+    fn effective_category_defaults_overrides_and_temporary_rules() {
+        let mut d = data();
+        let rule = Rule {
+            id: uuid::Uuid::new_v4().to_string(),
+            category: "Housing".into(),
+            effective: "2026-10-01".into(),
+            until: None,
+            allocation: allocation(&d, "equal", &["1", "1", "1"]),
+            note: String::new(),
+        };
+        apply(&mut d, &mut Action::Rule(rule)).unwrap();
+        let mut e = expense(&d);
+        e.allocation = None;
+        apply(&mut d, &mut Action::Expense(e)).unwrap();
+        let rule = Rule {
+            id: uuid::Uuid::new_v4().to_string(),
+            category: "Housing".into(),
+            effective: "2026-10-15".into(),
+            until: Some("2026-11-30".into()),
+            allocation: allocation(&d, "percentage", &["25", "37.5", "37.5"]),
+            note: String::new(),
+        };
+        apply(&mut d, &mut Action::Rule(rule)).unwrap();
+        assert_eq!(
+            summary(&d, "2026-10").unwrap().member_totals[0].obligation,
+            "800.00"
+        );
+        assert_eq!(
+            summary(&d, "2026-11").unwrap().member_totals[0].obligation,
+            "600.00"
+        );
+        assert_eq!(
+            summary(&d, "2026-12").unwrap().member_totals[0].obligation,
+            "800.00"
+        );
+        let e = expense(&d);
+        apply(&mut d, &mut Action::Expense(e)).unwrap();
+        assert_eq!(
+            summary(&d, "2026-10").unwrap().member_totals[0].obligation,
+            "1400.00"
+        );
+    }
+    #[test]
+    fn individual_responsibility_and_invalid_weights() {
+        let d = data();
+        let a = allocation(&d, "individual", &["1"]);
+        assert_eq!(
+            split(12345, &a, &d, "2026-10-01").unwrap()[0].amount,
+            "123.45"
+        );
+        let bad = allocation(&d, "equal", &["abc", "1", "1"]);
+        assert!(split(12345, &bad, &d, "2026-10-01").is_err());
+    }
+    #[test]
+    fn departed_member_can_be_replaced_prospectively_without_changing_previous_due_bills() {
+        let mut d = data();
+        let e = expense(&d);
+        apply(&mut d, &mut Action::Expense(e.clone())).unwrap();
+        let mut m = d.members[2].clone();
+        m.end = Some("2026-10-15".into());
+        apply(&mut d, &mut Action::Member(m)).unwrap();
+        let mut future = e;
+        future.id = uuid::Uuid::new_v4().to_string();
+        future.effective = "2026-11-01".into();
+        future.allocation = Some(allocation(&d, "equal", &["1", "1"]));
+        apply(&mut d, &mut Action::Expense(future)).unwrap();
+        assert_eq!(
+            summary(&d, "2026-10").unwrap().member_totals[2].obligation,
+            "900.00"
+        );
+        let s = summary(&d, "2026-11").unwrap();
+        assert_eq!(s.active_members, 2);
+        assert_eq!(s.member_totals[0].obligation, "1200.00");
+        assert_eq!(s.member_totals[2].obligation, "0.00");
+        assert_eq!(s.invalid_allocations, 0);
     }
 }

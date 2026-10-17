@@ -1,6 +1,7 @@
 import type {ReactNode} from 'react';
 export default function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const paths: Record<string, ReactNode> = {
+    household: <><path d="m3 10 9-7 9 7M5 9v12h5v-7h4v7h5V9"/></>,
     spending: <><path d="M21 12a9 9 0 1 1-9-9v9Z"/><path d="M15 3.6V9h5.4"/></>,
     dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
     clients: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,

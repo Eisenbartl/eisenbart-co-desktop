@@ -20,6 +20,8 @@ pub struct Record {
     pub revision: i64,
     pub data: Data,
     pub summary: h::Summary,
+    pub upcoming: Vec<h::Bill>,
+    pub upcoming_as_of: String,
     pub history: Vec<h::History>,
     pub cashflow: Option<cashflow::Summary>,
     pub cashflow_warnings: Vec<String>,
@@ -27,9 +29,24 @@ pub struct Record {
     pub goal_shares: Vec<Vec<h::Portion>>,
     pub source_rows: Vec<LinkedRow>,
     pub actual_mix: Vec<h::Category>,
+    pub discretionary_mix: Vec<h::Category>,
+    pub member_mix: Vec<h::Category>,
     pub actual_total: String,
     pub actual_necessary: String,
     pub actual_discretionary: String,
+    pub actual_refunds: String,
+    pub actual_net: String,
+    pub actual_debt_payments: String,
+    pub trends: Vec<h::Category>,
+    pub opportunities: Vec<HouseholdOpportunity>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HouseholdOpportunity {
+    pub title: String,
+    pub amount: String,
+    pub count: usize,
+    pub detail: String,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,10 +61,17 @@ pub struct LinkedRow {
 pub struct BudgetPreview {
     pub client_id: String,
     pub household_revision: i64,
-    pub budget: ClientBudget,
+    pub budget: PreviewBudget,
     pub proposed_lines: Vec<BudgetLine>,
     pub suggested_replacements: Vec<usize>,
     pub warnings: Vec<String>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewBudget {
+    pub client_id: String,
+    pub revision: i64,
+    pub lines: Vec<BudgetLine>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -236,6 +260,7 @@ fn authorized_source(
                 && signed < 0
         }
         "refund" => row.role == "reimbursement" && signed > 0,
+        "income" => m.consent.income && row.role == "income" && signed > 0,
         _ => row.role == "transfer" && signed < 0,
     };
     if !kind_ok || signed.abs() != expected || row.date != p.date {
@@ -276,6 +301,25 @@ fn live(
                     p.state = "recorded".into();
                     warnings.push("A linked payment has restricted or changed source evidence. Reconcile it before counting it as confirmed.".into())
                 }
+            }
+        }
+    }
+    live.payments.retain(|p| {
+        p.kind != "income"
+            || d.members
+                .iter()
+                .find(|m| m.id == p.from_member)
+                .is_some_and(|m| m.consent.income)
+    });
+    for p in &mut live.proposals {
+        for m in &mut p.members {
+            if !d
+                .members
+                .iter()
+                .find(|existing| existing.id == m.id)
+                .is_some_and(|m| m.consent.income)
+            {
+                m.monthly_income = None;
             }
         }
     }
@@ -347,6 +391,60 @@ fn cashflow(d: &Data, s: &h::Summary) -> Result<(Option<cashflow::Summary>, Vec<
             }
         }
     }
+    // Explicit reimbursement dates create estimates, never completed settlements.
+    // Use a single explicitly owned account; multiple possible accounts remain unknown.
+    let mut consumed = std::collections::BTreeMap::<(String, String), i64>::new();
+    for bill in &s.bills {
+        if let (Some(due), Some(destination)) = (&bill.reimbursement_date, &bill.account_id) {
+            for share in bill
+                .shares
+                .iter()
+                .filter(|share| share.member_id != bill.payer)
+            {
+                let key = (share.member_id.clone(), bill.payer.clone());
+                let prior = consumed.entry(key.clone()).or_default();
+                let recorded: i64 = d
+                    .payments
+                    .iter()
+                    .filter(|p| {
+                        !d.voids.contains(&p.id)
+                            && p.period == s.month
+                            && p.from_member == key.0
+                            && p.to_member.as_ref() == Some(&key.1)
+                            && ["settlement", "contribution"].contains(&p.kind.as_str())
+                    })
+                    .map(|p| budget::parse_money(&p.amount).unwrap_or(0))
+                    .sum();
+                let obligation = budget::parse_money(&share.amount)?;
+                let remaining = (obligation - (recorded - *prior).max(0)).max(0);
+                *prior += obligation;
+                if remaining == 0 {
+                    continue;
+                }
+                let accounts: Vec<_> = d
+                    .accounts
+                    .iter()
+                    .filter(|a| a.owners == [share.member_id.clone()])
+                    .collect();
+                if accounts.len() == 1 && accounts[0].id != *destination {
+                    schedules.push(cashflow::Schedule {
+                        label: format!("{} · expected reimbursement", bill.name),
+                        account_id: accounts[0].id.clone(),
+                        destination_id: Some(destination.clone()),
+                        kind: cashflow::Kind::Transfer,
+                        amount: Some(budget::money(remaining)),
+                        first_date: due.clone(),
+                        frequency: cashflow::Frequency::Once,
+                        second_day: None,
+                        until_date: None,
+                        certainty: cashflow::Certainty::Estimated,
+                    });
+                } else {
+                    warnings.push(format!("{}: expected reimbursement from {} on {} needs an explicit source account. Record a planned settlement to model its timing.",bill.name,share.member_id,due))
+                }
+            }
+        }
+    }
     for p in d.payments.iter().filter(|p| {
         !d.voids.contains(&p.id) && p.date >= start.to_string() && p.date <= end.to_string()
     }) {
@@ -406,6 +504,36 @@ fn record(c: &Connection, w: &WorkspaceInfo, id: &str, month: &str) -> Result<Re
     let (mut display, rows, warnings) = live(c, w, &d)?;
     let mut summary = h::summary(&display, month)?;
     summary.warnings.extend(warnings);
+    let today = Utc::now()
+        .with_timezone(&chrono_tz::America::Chicago)
+        .date_naive();
+    let (start, end) = h::bounds(month)?;
+    let as_of = if today >= start && today <= end {
+        today
+    } else {
+        start
+    };
+    let through = as_of + chrono::Duration::days(30);
+    let mut upcoming = summary
+        .bills
+        .iter()
+        .filter(|b| b.date >= as_of.to_string() && b.date <= through.to_string())
+        .cloned()
+        .collect::<Vec<_>>();
+    if through > end {
+        if let Some(next) = start.checked_add_months(chrono::Months::new(1)) {
+            if let Ok(next) = h::summary(&display, &next.format("%Y-%m").to_string()) {
+                if next.invalid_allocations > 0 {
+                    summary.warnings.push("Some upcoming bills have unresolved allocations; upcoming totals are incomplete.".into())
+                }
+                upcoming.extend(
+                    next.bills
+                        .into_iter()
+                        .filter(|b| b.date <= through.to_string()),
+                );
+            }
+        }
+    }
     let (cf, cfw) = cashflow(&display, &summary)?;
     let goal_data = savings::PlanData {
         start_month: month.into(),
@@ -457,33 +585,144 @@ fn record(c: &Connection, w: &WorkspaceInfo, id: &str, month: &str) -> Result<Re
             report.body = String::new();
         }
     }
+    let mut discretionary_categories = std::collections::BTreeMap::<String, i64>::new();
+    let mut member_spending = std::collections::BTreeMap::<String, i64>::new();
     let mut categories = std::collections::BTreeMap::<String, i64>::new();
-    let (mut total, mut necessary, mut discretionary) = (0, 0, 0);
-    for linked in rows.iter().filter(|r| r.row.date.starts_with(month)) {
+    let mut trends = std::collections::BTreeMap::<String, i64>::new();
+    let (mut total, mut necessary, mut discretionary, mut refunds, mut debt) = (0, 0, 0, 0, 0);
+    let mut small = vec![];
+    let mut subscriptions = vec![];
+    let mut subscription_keys = BTreeSet::new();
+    for client in d
+        .members
+        .iter()
+        .filter(|m| m.consent.transactions)
+        .filter_map(|m| m.client_id.as_ref())
+    {
+        for row in spending_analysis::household_subscription_rows(c, w, client, month)? {
+            subscription_keys.insert((client.clone(), row));
+        }
+    }
+    for linked in &rows {
         let p = d
             .payments
             .iter()
             .find(|p| p.id == linked.payment_id)
             .ok_or("Payment unavailable.")?;
-        if !["bill", "refund"].contains(&p.kind.as_str()) {
+        let amount = budget::parse_money(&p.amount)?;
+        if p.kind == "bill"
+            && ["necessary", "discretionary", "unclassified"].contains(&linked.row.role.as_str())
+        {
+            *trends.entry(linked.row.date[..7].into()).or_default() += amount;
+        }
+        if !linked.row.date.starts_with(month) {
             continue;
         }
-        let c = budget::parse_money(&p.amount)? * if p.kind == "refund" { -1 } else { 1 };
-        total += c;
-        *categories.entry(linked.row.category.clone()).or_default() += c;
+        if p.kind == "refund" {
+            refunds += amount;
+            continue;
+        }
+        if p.kind != "bill" {
+            continue;
+        }
+        if linked.row.role == "debtPayment" {
+            debt += amount;
+            continue;
+        }
+        total += amount;
+        *member_spending.entry(linked.member_id.clone()).or_default() += amount;
+        *categories.entry(linked.row.category.clone()).or_default() += amount;
         if linked.row.role == "necessary" {
-            necessary += c
+            necessary += amount
         } else if linked.row.role == "discretionary" {
-            discretionary += c
+            discretionary += amount;
+            *discretionary_categories
+                .entry(linked.row.category.clone())
+                .or_default() += amount;
+            if amount < 1500 {
+                small.push(amount)
+            }
+            if subscription_keys.contains(&(linked.client_id.clone(), linked.row.id.clone())) {
+                subscriptions.push(amount)
+            }
         }
     }
+    let mut opportunities = vec![];
+    if small.len() >= 5 {
+        opportunities.push(HouseholdOpportunity {
+            title: "Frequent small discretionary purchases".into(),
+            amount: budget::money(small.iter().sum()),
+            count: small.len(),
+            detail:
+                "Reviewed linked purchases under $15. Discuss whether any routine can be adjusted."
+                    .into(),
+        })
+    }
+    if !subscriptions.is_empty() {
+        opportunities.push(HouseholdOpportunity{title:"Reviewed shared subscriptions".into(),amount:budget::money(subscriptions.iter().sum()),count:subscriptions.len(),detail:"Supported by current counselor-confirmed subscription reviews in the original client workspace.".into()})
+    }
+    let target = budget::parse_money(&summary.discretionary)?;
+    if discretionary > target {
+        opportunities.push(HouseholdOpportunity{title:"Discretionary spending above the household plan".into(),amount:budget::money(discretionary-target),count:1,detail:"Approved linked transactions compared with this month's discretionary agreements. Coverage may be incomplete.".into()})
+    }
+    if rows
+        .iter()
+        .any(|r| r.row.date.starts_with(month) && r.row.role == "unclassified")
+    {
+        summary.warnings.push("Some approved linked spending has no reviewed necessary/discretionary purpose. Those type totals are incomplete.".into())
+    }
+    let discretionary_mix = discretionary_categories
+        .into_iter()
+        .map(|(label, c)| h::Category {
+            label,
+            amount: budget::money(c),
+            percent: if discretionary > 0 {
+                ((i128::from(c) * 10000) / i128::from(discretionary)) as u16
+            } else {
+                0
+            },
+        })
+        .collect();
+    let member_mix = member_spending
+        .into_iter()
+        .map(|(member, c)| h::Category {
+            label: format!(
+                "{} · {}",
+                d.members
+                    .iter()
+                    .find(|m| m.id == member)
+                    .map(|m| m.name.as_str())
+                    .unwrap_or("Unknown"),
+                &member[..8]
+            ),
+            amount: budget::money(c),
+            percent: if total > 0 {
+                ((i128::from(c) * 10000) / i128::from(total)) as u16
+            } else {
+                0
+            },
+        })
+        .collect();
+    let trend_max = trends.values().copied().max().unwrap_or(0);
     let actual_mix = categories
         .into_iter()
         .map(|(label, c)| h::Category {
             label,
             amount: budget::money(c),
-            percent: if total > 0 && c > 0 {
-                ((i128::from(c) * 10000) / i128::from(total)).min(10000) as u16
+            percent: if total > 0 {
+                ((i128::from(c) * 10000) / i128::from(total)) as u16
+            } else {
+                0
+            },
+        })
+        .collect();
+    let trends = trends
+        .into_iter()
+        .map(|(label, c)| h::Category {
+            label,
+            amount: budget::money(c),
+            percent: if trend_max > 0 {
+                ((i128::from(c) * 10000) / i128::from(trend_max)) as u16
             } else {
                 0
             },
@@ -494,6 +733,8 @@ fn record(c: &Connection, w: &WorkspaceInfo, id: &str, month: &str) -> Result<Re
         revision,
         data: display,
         summary,
+        upcoming,
+        upcoming_as_of: as_of.to_string(),
         history,
         cashflow: cf,
         cashflow_warnings: cfw,
@@ -504,9 +745,16 @@ fn record(c: &Connection, w: &WorkspaceInfo, id: &str, month: &str) -> Result<Re
             .filter(|r| r.row.date.starts_with(month))
             .collect(),
         actual_mix,
+        discretionary_mix,
+        member_mix,
         actual_total: budget::money(total),
         actual_necessary: budget::money(necessary),
         actual_discretionary: budget::money(discretionary),
+        actual_refunds: budget::money(refunds),
+        actual_net: budget::money(total - refunds),
+        actual_debt_payments: budget::money(debt),
+        trends,
+        opportunities,
     })
 }
 impl Workspace {
@@ -560,7 +808,10 @@ impl Workspace {
         h::bounds(month)?;
         if matches!(
             input.action,
-            Action::Create(_) | Action::Report(_) | Action::BudgetReconciled { .. }
+            Action::Create(_)
+                | Action::Report(_)
+                | Action::BudgetReconciled { .. }
+                | Action::CashflowReconciled { .. }
         ) {
             return Err("Use the dedicated creation, report or budget workflow.".into());
         }
@@ -606,7 +857,26 @@ impl Workspace {
                 scoped_client(&tx, &s.info, c)?;
             }
         }
-        h::summary(&d, month)?;
+        let checked = h::summary(&d, month)?;
+        if checked.invalid_allocations > 0
+            && matches!(
+                input.action,
+                Action::Expense(_) | Action::Rule(_) | Action::AcceptProposal(_)
+            )
+        {
+            return Err("This agreement would leave invalid or unallocated household bills. Correct the allocation before finalizing.".into());
+        }
+        if let Action::Rule(rule) = &input.action {
+            let (start, _) = h::bounds(&rule.effective[..7])?;
+            for n in 0..=2 {
+                let on = start
+                    .checked_add_months(chrono::Months::new(n))
+                    .ok_or("Invalid effective month.")?;
+                if h::summary(&d, &on.format("%Y-%m").to_string())?.invalid_allocations > 0 {
+                    return Err("This rule would leave an upcoming bill unallocated. Revise the participants or fixed contributions first.".into());
+                }
+            }
+        }
         append(&tx, &s.info, id, revision + 1, &previous, &input.action)?;
         let result = record(&tx, &s.info, id, month)?;
         tx.commit().map_err(storage_error)?;
@@ -648,14 +918,18 @@ impl Workspace {
         let s = self.session()?;
         let (d, _, _, _) = read(&s.connection, &s.info, id, None)?;
         let m = consent_member(&d, member_id, "transactions")?;
-        spending_analysis::household_rows(
+        let rows = spending_analysis::household_rows(
             &s.connection,
             &s.info,
             m.client_id
                 .as_deref()
                 .ok_or("Link an individual client to browse approved sources.")?,
             month,
-        )
+        )?;
+        Ok(rows
+            .into_iter()
+            .filter(|row| row.role != "income" || m.consent.income)
+            .collect())
     }
     pub fn household_classify(
         &mut self,
@@ -727,6 +1001,11 @@ fn budget_preview(
     scoped_client(c, w, client)?;
     let budget = read_budget(c, w, client)?;
     let summary = h::summary(&d, month)?;
+    if summary.invalid_allocations > 0 {
+        return Err(
+            "Resolve unallocated household bills before reconciling an individual budget.".into(),
+        );
+    }
     let prefix = format!("HH:{}:", &id[..8]);
     let mut grouped = std::collections::BTreeMap::<(String, String, String), i64>::new();
     for b in &summary.bills {
@@ -739,7 +1018,7 @@ fn budget_preview(
                 .or_default() += budget::parse_money(&p.amount)?;
         }
     }
-    let proposed_lines: Vec<BudgetLine> = grouped
+    let mut proposed_lines: Vec<BudgetLine> = grouped
         .into_iter()
         .map(|((agreement, name, purpose), c)| BudgetLine {
             label: format!(
@@ -757,6 +1036,28 @@ fn budget_preview(
             estimated: false,
         })
         .collect();
+    for goal in &d.goals {
+        if let Ok(shares) = h::split(
+            budget::parse_money(&goal.monthly)?,
+            &goal.allocation,
+            &d,
+            &format!("{month}-01"),
+        ) {
+            if let Some(share) = shares.into_iter().find(|s| s.member_id == member) {
+                proposed_lines.push(BudgetLine {
+                    label: format!(
+                        "{prefix}{} {}",
+                        &goal.id[..8],
+                        goal.label.chars().take(80).collect::<String>()
+                    ),
+                    kind: budget::Kind::Savings,
+                    amount: Some(share.amount),
+                    frequency: budget::Frequency::Monthly,
+                    estimated: false,
+                });
+            }
+        }
+    }
     let mut warnings=vec!["Only confirmed agreements in the selected month are included. Review existing personal lines and other households to prevent duplication. Full bill payments and reimbursements are not additional budget expenses.".into()];
     let suggested_replacements = budget
         .lines
@@ -771,7 +1072,21 @@ fn budget_preview(
     Ok(BudgetPreview {
         client_id: client.into(),
         household_revision: revision,
-        budget,
+        budget: PreviewBudget {
+            client_id: budget.client_id,
+            revision: budget.revision,
+            lines: budget
+                .lines
+                .into_iter()
+                .map(|mut line| {
+                    if line.kind == budget::Kind::Income && !m.consent.income {
+                        line.label = "Restricted income line".into();
+                        line.amount = None;
+                    }
+                    line
+                })
+                .collect(),
+        },
         proposed_lines,
         suggested_replacements,
         warnings,
@@ -820,7 +1135,10 @@ impl Workspace {
                         budget::Kind::Necessary
                             | budget::Kind::Discretionary
                             | budget::Kind::DebtPayment
-                    )
+                    ) && !(preview.budget.lines[*i].kind == budget::Kind::Savings
+                        && preview.budget.lines[*i]
+                            .label
+                            .starts_with(&format!("HH:{}:", &id[..8])))
             })
         {
             return Err("Choose distinct existing expense rows to replace; income and savings cannot be removed here.".into());
@@ -835,9 +1153,9 @@ impl Workspace {
         {
             return Err("Select all prior shares from this household for replacement to prevent double counting.".into());
         }
-        let before = serde_json::to_string(&preview.budget).map_err(|_| STORAGE_ERROR)?;
-        let mut lines: Vec<_> = preview
-            .budget
+        let original = read_budget(&tx, &s.info, &preview.client_id)?;
+        let before = serde_json::to_string(&original).map_err(|_| STORAGE_ERROR)?;
+        let mut lines: Vec<_> = original
             .lines
             .into_iter()
             .enumerate()
@@ -869,6 +1187,749 @@ impl Workspace {
         Ok(result)
     }
 }
+impl Workspace {
+    pub fn household_report(
+        &mut self,
+        id: &str,
+        report_id: &str,
+    ) -> Result<(String, h::Report, h::Summary, String), String> {
+        let s = self.session()?;
+        let (d, _, _, _) = read(&s.connection, &s.info, id, None)?;
+        let report = d
+            .reports
+            .iter()
+            .find(|r| r.id == report_id)
+            .ok_or("Household report unavailable.")?
+            .clone();
+        if report.permissions != permissions(&d) {
+            return Err(
+                "Sharing authorization changed; this historical report is restricted.".into(),
+            );
+        }
+        let body: serde_json::Value =
+            serde_json::from_str(&report.body).map_err(|_| STORAGE_ERROR)?;
+        let summary = serde_json::from_value(body["summary"].clone()).map_err(|_| STORAGE_ERROR)?;
+        Ok((
+            body["name"].as_str().ok_or(STORAGE_ERROR)?.into(),
+            report,
+            summary,
+            body["actualTotal"].as_str().ok_or(STORAGE_ERROR)?.into(),
+        ))
+    }
+    pub fn export_household_report_pdf(
+        &mut self,
+        id: &str,
+        report_id: &str,
+        path: &str,
+    ) -> Result<crate::assessment_pdf::Export, String> {
+        let (name, report, summary, actual) = self.household_report(id, report_id)?;
+        let (bytes, pages) =
+            crate::assessment_pdf::render_household(&name, &report, &summary, &actual)?;
+        crate::assessment_pdf::save_bytes(report_id, bytes, pages, path, &self.data_dir)
+    }
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CashflowPreview {
+    pub client_id: String,
+    pub household_revision: i64,
+    pub revision: i64,
+    pub accounts: Vec<(String, String)>,
+    pub existing: Vec<cashflow::Schedule>,
+    pub proposed: Vec<cashflow::Schedule>,
+    pub suggested_replacements: Vec<usize>,
+    pub warnings: Vec<String>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CashflowChange {
+    pub expected_revision: i64,
+    pub revision: i64,
+    pub member_id: String,
+    pub month: String,
+    pub account_id: String,
+    pub replace_indices: Vec<usize>,
+    pub acknowledge: bool,
+}
+fn cashflow_preview(
+    c: &Connection,
+    w: &WorkspaceInfo,
+    id: &str,
+    member_id: &str,
+    month: &str,
+    account_id: Option<&str>,
+) -> Result<CashflowPreview, String> {
+    let (d, revision, _, _) = read(c, w, id, None)?;
+    let m = consent_member(&d, member_id, "planning")?;
+    let client = m
+        .client_id
+        .as_deref()
+        .ok_or("Link an individual client before cash-flow reconciliation.")?;
+    let current = read_cashflow_plan(c, w, client)?;
+    let plan=current.data.ok_or("Save an individual cash-flow plan with accounts and a date range before reconciling household movements.")?;
+    let (start, end) = h::bounds(month)?;
+    if plan.start_date > start.to_string() || plan.end_date < end.to_string() {
+        return Err("The individual cash-flow date range must cover the selected household month. Review its dates in the individual workspace first.".into());
+    }
+    let (live, _, mut warnings) = live(c, w, &d)?;
+    let summary = h::summary(&live, month)?;
+    if summary.invalid_allocations > 0 {
+        return Err(
+            "Resolve unallocated household bills before reconciling individual cash flow.".into(),
+        );
+    }
+    let prefix = format!("HH:{}:{month} ", &id[..8]);
+    let mut proposed = vec![];
+    let mut add = |label: String, date: String, amount: String, inflow: bool, confirmed: bool| {
+        proposed.push(cashflow::Schedule {
+            label: format!("{prefix}{}", label.chars().take(90).collect::<String>()),
+            account_id: account_id.unwrap_or("").into(),
+            destination_id: None,
+            kind: if inflow {
+                cashflow::Kind::OtherInflow
+            } else {
+                cashflow::Kind::OtherOutflow
+            },
+            amount: Some(amount),
+            first_date: date,
+            frequency: cashflow::Frequency::Once,
+            second_day: None,
+            until_date: None,
+            certainty: if confirmed {
+                cashflow::Certainty::Confirmed
+            } else {
+                cashflow::Certainty::Estimated
+            },
+        });
+    };
+    if let Some(account) = account_id {
+        if !plan.accounts.iter().any(|a| a.id == account) {
+            return Err("Choose an existing individual cash-flow account.".into());
+        }
+        for bill in &summary.bills {
+            if bill.payer == member_id {
+                let paid: i64 = live
+                    .payments
+                    .iter()
+                    .filter(|p| {
+                        !live.voids.contains(&p.id)
+                            && p.period == month
+                            && p.expense_id.as_ref() == Some(&bill.agreement_id)
+                            && p.kind == "bill"
+                    })
+                    .map(|p| budget::parse_money(&p.amount).unwrap_or(0))
+                    .sum();
+                let prior: i64 = summary
+                    .bills
+                    .iter()
+                    .take_while(|x| !std::ptr::eq(*x, bill))
+                    .filter(|x| x.agreement_id == bill.agreement_id)
+                    .map(|x| budget::parse_money(&x.amount).unwrap_or(0))
+                    .sum();
+                let remaining = (budget::parse_money(&bill.amount)? - (paid - prior).max(0)).max(0);
+                if remaining > 0 {
+                    add(
+                        format!("{} external bill", bill.name),
+                        bill.date.clone(),
+                        budget::money(remaining),
+                        false,
+                        false,
+                    );
+                }
+            }
+        }
+        for p in live.payments.iter().filter(|p| {
+            !live.voids.contains(&p.id) && p.date >= start.to_string() && p.date <= end.to_string()
+        }) {
+            if p.from_member == member_id {
+                add(
+                    p.kind.clone(),
+                    p.date.clone(),
+                    p.amount.clone(),
+                    ["refund", "income"].contains(&p.kind.as_str()),
+                    p.state == "confirmed",
+                );
+            }
+            if p.to_member.as_deref() == Some(member_id) {
+                add(
+                    format!("{} received", p.kind),
+                    p.date.clone(),
+                    p.amount.clone(),
+                    true,
+                    p.state == "confirmed",
+                );
+            }
+        }
+        let mut consumed = std::collections::BTreeMap::<(String, String), i64>::new();
+        for bill in &summary.bills {
+            for share in bill.shares.iter().filter(|s| s.member_id != bill.payer) {
+                if share.member_id != member_id && bill.payer != member_id {
+                    continue;
+                }
+                let key = (share.member_id.clone(), bill.payer.clone());
+                let prior = consumed.entry(key.clone()).or_default();
+                let recorded: i64 = live
+                    .payments
+                    .iter()
+                    .filter(|p| {
+                        !live.voids.contains(&p.id)
+                            && p.period == month
+                            && p.from_member == key.0
+                            && p.to_member.as_ref() == Some(&key.1)
+                            && ["settlement", "contribution"].contains(&p.kind.as_str())
+                    })
+                    .map(|p| budget::parse_money(&p.amount).unwrap_or(0))
+                    .sum();
+                let obligation = budget::parse_money(&share.amount)?;
+                let remaining = (obligation - (recorded - *prior).max(0)).max(0);
+                *prior += obligation;
+                if remaining > 0 {
+                    if let Some(date) = &bill.reimbursement_date {
+                        add(
+                            format!("{} expected reimbursement", bill.name),
+                            date.clone(),
+                            budget::money(remaining),
+                            bill.payer == member_id,
+                            false,
+                        )
+                    } else {
+                        warnings.push(format!(
+                            "{} needs an agreed reimbursement date. No date was invented.",
+                            bill.name
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    let suggested_replacements = plan
+        .schedules
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.label.starts_with(&prefix))
+        .map(|(i, _)| i)
+        .collect();
+    let mut existing = plan.schedules;
+    for s in &mut existing {
+        if matches!(
+            s.kind,
+            cashflow::Kind::Paycheck | cashflow::Kind::OtherInflow
+        ) && !s.label.starts_with(&format!("HH:{}:", &id[..8]))
+            && !m.consent.income
+        {
+            s.amount = None;
+            s.label = "Restricted income schedule".into();
+            s.first_date = start.to_string();
+            s.until_date = None;
+            s.frequency = cashflow::Frequency::Once;
+            s.second_day = None;
+        }
+    }
+    warnings.push("Review existing schedules for overlap. The payer's full external bill and dated reimbursements are separate; cash flow is not the same as their budget share. Goal deposits require an explicitly dated savings schedule in the individual plan.".into());
+    Ok(CashflowPreview {
+        client_id: client.into(),
+        household_revision: revision,
+        revision: current.revision,
+        accounts: plan.accounts.into_iter().map(|a| (a.id, a.label)).collect(),
+        existing,
+        proposed,
+        suggested_replacements,
+        warnings,
+    })
+}
+impl Workspace {
+    pub fn household_cashflow_preview(
+        &mut self,
+        id: &str,
+        member: &str,
+        month: &str,
+        account: Option<&str>,
+    ) -> Result<CashflowPreview, String> {
+        let s = self.session()?;
+        cashflow_preview(&s.connection, &s.info, id, member, month, account)
+    }
+    pub fn household_cashflow_reconcile(
+        &mut self,
+        id: &str,
+        input: CashflowChange,
+    ) -> Result<Record, String> {
+        if !input.acknowledge {
+            return Err("Review and approve the dated cash-flow reconciliation first.".into());
+        }
+        let s = self.session()?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(storage_error)?;
+        let (d, revision, _, previous) = read(&tx, &s.info, id, None)?;
+        if d.archived {
+            return Err("Reopen the household before changing individual plans.".into());
+        }
+        let preview = cashflow_preview(
+            &tx,
+            &s.info,
+            id,
+            &input.member_id,
+            &input.month,
+            Some(&input.account_id),
+        )?;
+        if preview.household_revision != input.expected_revision
+            || preview.revision != input.revision
+        {
+            return Err("Household or individual cash-flow plan changed. Preview again; nothing was changed.".into());
+        }
+        let selected: BTreeSet<_> = input.replace_indices.iter().copied().collect();
+        if selected.len() != input.replace_indices.len()
+            || selected.iter().any(|i| *i >= preview.existing.len())
+            || preview
+                .suggested_replacements
+                .iter()
+                .any(|i| !selected.contains(i))
+        {
+            return Err("Select valid existing schedules, including all prior household schedules for this month, to prevent duplicates.".into());
+        }
+        let current = read_cashflow_plan(&tx, &s.info, &preview.client_id)?;
+        let mut plan = current
+            .data
+            .ok_or("Individual cash-flow plan unavailable.")?;
+        if selected
+            .iter()
+            .any(|i| matches!(plan.schedules[*i].kind, cashflow::Kind::Paycheck))
+        {
+            return Err("Income schedules cannot be removed by household reconciliation.".into());
+        }
+        let before = serde_json::to_string(&plan).map_err(|_| STORAGE_ERROR)?;
+        plan.schedules = plan
+            .schedules
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| !selected.contains(i))
+            .map(|(_, s)| s)
+            .collect();
+        plan.schedules.extend(preview.proposed);
+        let (plan, _) = cashflow::calculate(plan)?;
+        let after = serde_json::to_string(&plan).map_err(|_| STORAGE_ERROR)?;
+        let next = input.revision + 1;
+        tx.execute("INSERT INTO client_cashflow_plans(client_id,organization_id,counselor_id,revision,plan_json,updated_at) VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(client_id) DO UPDATE SET revision=excluded.revision,plan_json=excluded.plan_json,updated_at=excluded.updated_at WHERE client_cashflow_plans.organization_id=excluded.organization_id AND client_cashflow_plans.counselor_id=excluded.counselor_id",params![preview.client_id,s.info.organization_id,s.info.counselor_id,next,after,timestamp()]).map_err(storage_error)?;
+        audit(
+            &tx,
+            &s.info,
+            "cashflow_plan_saved",
+            Some(&preview.client_id),
+        )?;
+        append(
+            &tx,
+            &s.info,
+            id,
+            revision + 1,
+            &previous,
+            &Action::CashflowReconciled {
+                client_id: preview.client_id,
+                before,
+                after,
+                revision: next,
+                month: input.month.clone(),
+            },
+        )?;
+        let result = record(&tx, &s.info, id, &input.month)?;
+        tx.commit().map_err(storage_error)?;
+        Ok(result)
+    }
+}
+#[cfg(test)]
+mod integration_tests {
+    use super::super::tests::{client_input, configured, PASSWORD};
+    use super::*;
+    use crate::households::tests::{expense, member, payment};
+    fn save(w: &mut Workspace, r: Record, action: Action, month: &str) -> Record {
+        w.save_household(
+            &r.id,
+            month,
+            h::Input {
+                expected_revision: r.revision,
+                action,
+            },
+        )
+        .unwrap()
+    }
+    fn family(w: &mut Workspace, client: &str, month: &str) -> Record {
+        let mut r = w
+            .create_household("Synthetic Household".into(), month.into())
+            .unwrap();
+        for n in 1..=3 {
+            let mut m = member(n);
+            if n == 1 {
+                m.client_id = Some(client.into());
+                m.consent.transactions = true;
+                m.consent.planning = true;
+                m.consent.evidence =
+                    "Synthetic authorization for household transactions and budget expenses.".into()
+            }
+            r = save(w, r, Action::Member(m), month)
+        }
+        r
+    }
+    #[test]
+    fn approved_source_live_classification_revocation_duplicate_link_and_original_preservation() {
+        let (dir, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let mut r = family(&mut w, &client.id, "2026-09");
+        let mut e = expense(&r.data);
+        e.amount = "1200.00".into();
+        e.effective = "2026-09-01".into();
+        e.due = e.effective.clone();
+        r = save(&mut w, r, Action::Expense(e.clone()), "2026-09");
+        let s=imports_store::tests::stage(&mut w,&client.id,dir.path(),"household.csv","Date,Description,Amount,Category,Type\n2026-09-02,Synthetic rent,-1200,Housing,expense\n2026-09-03,Synthetic salary,2000,Wages,income\n",imports_store::tests::doc("Synthetic checking"));
+        let source = s
+            .records
+            .iter()
+            .find(|r| r.fields.kind == crate::imports::Kind::Expense)
+            .unwrap();
+        assert!(w
+            .household_sources(&r.id, &r.data.members[0].id, "2026-09")
+            .unwrap()
+            .is_empty());
+        w.review_transaction(
+            &client.id,
+            crate::imports::ReviewInput {
+                expected_revision: s.revision,
+                record_id: source.id.clone(),
+                status: crate::imports::Status::Approved,
+                fields: source.fields.clone(),
+                reason: "Verified synthetic source".into(),
+                acknowledge_warnings: true,
+            },
+        )
+        .unwrap();
+        let rows = w
+            .household_sources(&r.id, &r.data.members[0].id, "2026-09")
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        let mut p = payment(&r.data, &e, 0, "1200.00", "bill", None);
+        p.period = "2026-09".into();
+        p.date = "2026-09-02".into();
+        p.source = Some(h::Source {
+            client_id: client.id.clone(),
+            row_id: row.id.clone(),
+            approval_id: row.approval_id.clone(),
+        });
+        r = save(&mut w, r, Action::Payment(p.clone()), "2026-09");
+        assert_eq!(r.actual_total, "1200.00");
+        assert_eq!(r.summary.confirmed_paid, "1200.00");
+        let mut duplicate = p;
+        duplicate.id = Uuid::new_v4().to_string();
+        assert!(w
+            .save_household(
+                &r.id,
+                "2026-09",
+                h::Input {
+                    expected_revision: r.revision,
+                    action: Action::Payment(duplicate)
+                }
+            )
+            .is_err());
+        let q = spending_analysis::Input {
+            from_month: "2026-09".into(),
+            through_month: "2026-09".into(),
+            account_id: None,
+            search: String::new(),
+            category: None,
+            role: None,
+            page: 0,
+            page_size: 50,
+            compare_previous: false,
+            opportunity: None,
+        };
+        let view = w.get_spending_analysis(&client.id, q.clone()).unwrap();
+        let original = serde_json::to_string(
+            &w.get_client_imports(&client.id)
+                .unwrap()
+                .records
+                .iter()
+                .find(|r| r.id == source.id)
+                .unwrap()
+                .raw,
+        )
+        .unwrap();
+        w.household_classify(
+            &r.id,
+            &r.data.members[0].id,
+            spending_analysis::Change {
+                context: view.context,
+                query: q.clone(),
+                row_id: row.id.clone(),
+                approval_id: row.approval_id.clone(),
+                role: spending_analysis::Role::Necessary,
+                reason: "Discussed necessary shared rent".into(),
+                acknowledge: true,
+            },
+        )
+        .unwrap();
+        let now = w.get_household(&r.id, "2026-09").unwrap();
+        assert_eq!(now.actual_necessary, "1200.00");
+        assert_eq!(
+            w.get_spending_analysis(&client.id, q)
+                .unwrap()
+                .totals
+                .necessary,
+            "1200.00"
+        );
+        assert_eq!(
+            serde_json::to_string(
+                &w.get_client_imports(&client.id)
+                    .unwrap()
+                    .records
+                    .iter()
+                    .find(|r| r.id == source.id)
+                    .unwrap()
+                    .raw
+            )
+            .unwrap(),
+            original
+        );
+        let mut m = now.data.members[0].clone();
+        m.consent.transactions = false;
+        let restricted = save(&mut w, now, Action::Member(m), "2026-09");
+        assert_eq!(restricted.actual_total, "0.00");
+        assert_eq!(restricted.summary.confirmed_paid, "0.00");
+        assert!(restricted.source_rows.is_empty());
+        assert!(restricted
+            .summary
+            .warnings
+            .iter()
+            .any(|w| w.contains("restricted")));
+    }
+    #[test]
+    fn restricted_income_is_not_in_budget_preview_or_overwritten_by_reconciliation() {
+        let (_dir, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        w.save_client_budget(
+            &client.id,
+            budget::BudgetInput {
+                expected_revision: 0,
+                lines: vec![BudgetLine {
+                    label: "Private salary".into(),
+                    kind: budget::Kind::Income,
+                    amount: Some("5678.90".into()),
+                    frequency: budget::Frequency::Monthly,
+                    estimated: false,
+                }],
+            },
+        )
+        .unwrap();
+        let mut r = family(&mut w, &client.id, "2026-10");
+        let e = expense(&r.data);
+        r = save(&mut w, r, Action::Expense(e), "2026-10");
+        let preview = w
+            .household_budget_preview(&r.id, &r.data.members[0].id, "2026-10")
+            .unwrap();
+        let json = serde_json::to_string(&preview).unwrap();
+        assert!(!json.contains("5678.90"));
+        assert!(!json.contains("Private salary"));
+        w.household_budget_reconcile(
+            &r.id,
+            BudgetChange {
+                expected_revision: r.revision,
+                budget_revision: 1,
+                member_id: r.data.members[0].id.clone(),
+                month: "2026-10".into(),
+                replace_indices: vec![],
+                acknowledge: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            w.get_client_budget(&client.id).unwrap().lines[0]
+                .amount
+                .as_deref(),
+            Some("5678.90")
+        );
+    }
+    #[test]
+    fn frozen_income_agreements_survive_income_changes_and_journal_replay() {
+        let (dir, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let mut r = family(&mut w, &client.id, "2026-10");
+        for i in 0..3 {
+            let mut m = r.data.members[i].clone();
+            m.consent.income = true;
+            m.monthly_income = Some(if i == 0 { "1000" } else { "2000" }.into());
+            m.consent.evidence = "Synthetic income-sharing consent".into();
+            r = save(&mut w, r, Action::Member(m), "2026-10")
+        }
+        let mut e = expense(&r.data);
+        e.allocation = Some(crate::households::tests::allocation(
+            &r.data,
+            "income",
+            &["1", "1", "1"],
+        ));
+        r = save(&mut w, r, Action::Expense(e), "2026-10");
+        assert_eq!(r.summary.member_totals[0].obligation, "480.00");
+        let mut m = r.data.members[0].clone();
+        m.monthly_income = Some("5000".into());
+        r = save(&mut w, r, Action::Member(m), "2026-10");
+        assert_eq!(r.summary.member_totals[0].obligation, "480.00");
+        let id = r.id.clone();
+        drop(w);
+        let mut reopened = Workspace::new(dir.path().to_path_buf());
+        reopened.unlock_workspace(PASSWORD.into()).unwrap();
+        let r = reopened.get_household(&id, "2026-10").unwrap();
+        assert_eq!(r.summary.member_totals[0].obligation, "480.00");
+    }
+    #[test]
+    fn individual_cashflow_reconciles_full_payer_and_later_reimbursements_transactionally() {
+        let (_dir, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let mut r = family(&mut w, &client.id, "2026-10");
+        let e = expense(&r.data);
+        r = save(&mut w, r, Action::Expense(e), "2026-10");
+        let account = Uuid::new_v4().to_string();
+        w.save_client_cashflow_plan(
+            &client.id,
+            cashflow::PlanInput {
+                expected_revision: 0,
+                data: cashflow::PlanData {
+                    start_date: "2026-10-01".into(),
+                    end_date: "2026-10-31".into(),
+                    accounts: vec![cashflow::Account {
+                        id: account.clone(),
+                        label: "Personal checking".into(),
+                        opening_balance: Some("1000".into()),
+                    }],
+                    schedules: vec![],
+                    notes: String::new(),
+                },
+            },
+        )
+        .unwrap();
+        let preview = w
+            .household_cashflow_preview(&r.id, &r.data.members[0].id, "2026-10", Some(&account))
+            .unwrap();
+        assert_eq!(preview.proposed.len(), 3);
+        assert_eq!(preview.proposed[0].amount.as_deref(), Some("2400.00"));
+        assert_eq!(preview.proposed[1].first_date, "2026-10-05");
+        let change = || CashflowChange {
+            expected_revision: r.revision,
+            revision: 1,
+            member_id: r.data.members[0].id.clone(),
+            month: "2026-10".into(),
+            account_id: account.clone(),
+            replace_indices: vec![],
+            acknowledge: true,
+        };
+        w.household_cashflow_reconcile(&r.id, change()).unwrap();
+        assert!(w.household_cashflow_reconcile(&r.id, change()).is_err());
+        let plan = w.get_client_cashflow_plan(&client.id).unwrap();
+        assert_eq!(plan.revision, 2);
+        let s = plan.summary.unwrap();
+        assert_eq!(s.ledger[0].source_balance.as_deref(), Some("-1400.00"));
+        assert_eq!(s.combined_closing.as_deref(), Some("400.00"));
+    }
+    #[test]
+    fn report_pdf_and_backup_preserve_household_history_without_overwriting() {
+        let (dir, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let r = family(&mut w, &client.id, "2026-10");
+        let r = save(
+            &mut w,
+            r,
+            Action::Expense(expense(&crate::households::tests::data())),
+            "2026-10",
+        );
+        let r = w
+            .record_household_report(&r.id, "2026-10", r.revision)
+            .unwrap();
+        let output = tempfile::tempdir().unwrap();
+        let path = output
+            .path()
+            .join("household.pdf")
+            .to_string_lossy()
+            .into_owned();
+        let pdf = w
+            .export_household_report_pdf(&r.id, &r.data.reports[0].id, &path)
+            .unwrap();
+        assert!(pdf.pages >= 1);
+        assert!(fs::read(&path).unwrap().starts_with(b"%PDF-"));
+        assert!(w
+            .export_household_report_pdf(&r.id, &r.data.reports[0].id, &path)
+            .is_err());
+        let backup = w
+            .create_backup(output.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        let review = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(review.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            w.get_household(&r.id, "2026-10").unwrap().revision,
+            r.revision
+        );
+        assert!(dir.path().exists());
+    }
+}
+#[cfg(test)]
+mod migration_tests {
+    use super::super::tests::{client_input, configured, PASSWORD};
+    use super::*;
+    #[test]
+    fn schema30_upgrade_rolls_back_atomically_and_retains_notes() {
+        let (_root, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let note = w
+            .add_client_note(&client.id, "Synthetic legacy household upgrade note")
+            .unwrap();
+        let c = &mut w.session.as_mut().unwrap().connection;
+        c.execute_batch("DROP TABLE household_events; PRAGMA user_version=30; CREATE TABLE audit_events_v31(collision TEXT);").unwrap();
+        assert!(migrate(c, false).is_err());
+        assert_eq!(
+            c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            30
+        );
+        assert_eq!(
+            c.query_row(
+                "SELECT count(*) FROM sqlite_master WHERE name='household_events'",
+                [],
+                |r| r.get::<_, i32>(0)
+            )
+            .unwrap(),
+            0
+        );
+        c.execute_batch("DROP TABLE audit_events_v31;").unwrap();
+        migrate(c, false).unwrap();
+        assert_eq!(w.list_client_notes(&client.id).unwrap(), vec![note]);
+        assert!(w.list_households().unwrap().is_empty());
+    }
+    #[test]
+    fn corrupt_household_history_blocks_recovery_activation() {
+        let (root, mut w, _) = configured();
+        let r = w
+            .create_household("Synthetic recovery household".into(), "2026-10".into())
+            .unwrap();
+        w.session
+            .as_ref()
+            .unwrap()
+            .connection
+            .execute_batch(
+                "DROP TRIGGER household_no_update;UPDATE household_events SET digest='corrupt';",
+            )
+            .unwrap();
+        let output = tempfile::tempdir().unwrap();
+        let backup = w
+            .create_backup(output.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        let pointer = fs::read(root.path().join("workspace-active.json")).ok();
+        w.lock_workspace();
+        assert!(w.prepare_restore(backup.path, PASSWORD.into()).is_err());
+        assert_eq!(
+            fs::read(root.path().join("workspace-active.json")).ok(),
+            pointer
+        );
+        assert!(w.get_household(&r.id, "2026-10").is_err());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::tests::{client_input, configured, PASSWORD};

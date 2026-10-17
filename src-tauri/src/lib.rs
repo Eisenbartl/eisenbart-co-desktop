@@ -71,6 +71,82 @@ fn access<T>(
 }
 
 #[tauri::command]
+async fn household_cashflow_preview(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    member_id: String,
+    month: String,
+    account_id: Option<String>,
+) -> Result<storage::households_store::CashflowPreview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_cashflow_preview(&household_id, &member_id, &month, account_id.as_deref())
+        })
+    })
+    .await
+    .map_err(|_| "Cash-flow preview could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn household_cashflow_reconcile(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    input: storage::households_store::CashflowChange,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_cashflow_reconcile(&household_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "Cash-flow save could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn choose_household_report_pdf(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    report_id: String,
+) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.household_report(&household_id, &report_id))?;
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("Household report PDF", &["pdf"])
+            .set_file_name("household-planning.pdf")
+            .blocking_save_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local PDF path.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "PDF destination selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn export_household_report_pdf(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    report_id: String,
+    path: String,
+) -> Result<assessment_pdf::Export, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.export_household_report_pdf(&household_id, &report_id, &path)
+        })
+    })
+    .await
+    .map_err(|_| {
+        "PDF export could not be confirmed. Inspect the destination before retrying.".to_owned()
+    })?
+}
+#[tauri::command]
 async fn list_households(
     state: State<'_, DesktopState>,
 ) -> Result<Vec<storage::households_store::DirectoryItem>, String> {
@@ -1576,6 +1652,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            household_cashflow_preview,
+            household_cashflow_reconcile,
+            choose_household_report_pdf,
+            export_household_report_pdf,
             list_households,
             create_household,
             get_household,

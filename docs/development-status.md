@@ -1,6 +1,33 @@
 # Development status
 
-## Current stage — transaction-focused statement extraction and review (0.48.0, schema 30)
+## Current stage — household management (0.49.0, schema 31; native verification in progress)
+
+Implemented household directory/tabs and the ten-section navy/white/slate/gold
+workspace from the supplied reference. Exact allocations, effective agreements,
+consent, source matching, payments/settlements, individual budget/cash-flow
+reconciliation, shared goals/scenarios, immutable report snapshots and offline PDF
+exports are functional. [Workflow and limits](household-management.md); original
+[household brief](household-management-specification.md).
+
+The allocation/journal milestone was committed as `bb519a2`. The integration
+milestone now includes source-purpose reuse, restricted-income previews,
+frozen approved income ratios, account timing, retained budget/cash-flow values,
+no-overwrite PDFs and encrypted-recovery validation. Household draft/section state
+survives tab changes; lock removes it. Saving a client and opening its history
+also synchronizes navigation guards before enabling further navigation.
+
+Executed so far: production frontend build; all 298 UI tests (41 files); current
+58 focused UI/navigation tests. All 24 new household Rust tests have passed in
+the ongoing 288-test library run; full-suite completion, Clippy, standalone build
+and focused/full native acceptance are still pending. Synthetic legacy migration
+fixtures now remove the newly introduced household table when constructing an
+older schema, retaining all rollback/source-preservation assertions.
+
+This stage creates no installer. The user explicitly prohibited another installer
+until requested. Native verification is the next step; Windows installed
+acceptance and commercial readiness remain separate.
+
+## Previous stage — transaction-focused statement extraction and review (0.48.0, schema 30)
 
 Implemented offline transaction candidate detection for checking/savings and card
 PDF statements, filtered fine print/pages/balances, editable confident preselection,
@@ -3422,17 +3449,3 @@ checkpoints. A stage count is not a percentage or a reliable calendar estimate.
 The complete specified application remains substantial work; the development
 installer is suitable for evaluating the implemented foundation.
 
-## Household management — allocation and journal milestone (in development)
-
-The user-provided [household specification](household-management-specification.md)
-now guides the next stage. The first milestone adds an exact-cent allocation
-engine and counselor-scoped, encrypted append-only household journal (schema 31).
-It preserves immutable expense/rule revisions, payment corrections, consent
-history, scenario proposals and report snapshots. Approved-source adapters reuse
-individual spending approvals/classifications. Budget reconciliation is explicit,
-revision-checked, transactional and retains before/after values in the journal.
-
-Validation so far: 14 focused Rust tests pass, including the $2,400 rent example,
-rounding, effective dates, restricted income, partial payments/refunds, revision
-conflicts, joint-account timing and reopening. Household interface and complete
-integration verification are still in progress. No installer was created.

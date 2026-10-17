@@ -287,3 +287,25 @@ Discussion-bound Necessary/Discretionary changes reuse existing immutable purpos
 stores, preserve source evidence and captured reports, recalculate current results
 and require renewed card completeness review. Schema 29 remains unchanged.
 See [scope and limits](spending-analysis.md) and [executed validation](development-status.md).
+
+## Household workspaces — working in 0.49.0
+
+Implemented the supplied household-management stage as an extension of Clients:
+Household directory and top tabs, ten-section collapsible household rail, exact
+shared allocation previews and effective revisions, member linking/consent,
+separate payment/settlement ledger, authorized source matching and shared purpose
+history, controlled individual budget/cash-flow reconciliation, shared goals,
+proposals and internal historical PDF reports. The navy/white/slate/gold reference
+informs the compact overview cards, donut, contribution bars and tables.
+
+See [workflow, calculation basis and bounded limitations](household-management.md)
+and the [original household brief](household-management-specification.md).
+Household state survives tab changes; saved records survive restart and encrypted
+recovery. Monthly responsibilities use applicable due-date agreements; no daily
+proration, private income/account import or personal debt merging is inferred.
+
+Acceptance requires exact $600/$900/$900 shares for $2,400 rent, no spending
+inflation from internal reimbursements, explicit individual reconciliation,
+source/consent revocation handling, preserved history, tab/draft privacy on lock,
+native desktop/narrow layout, restart and recovery. Execution results belong in
+`development-status.md`, separately from this functionality map. No installer.

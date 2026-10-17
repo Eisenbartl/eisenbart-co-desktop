@@ -1,10 +1,13 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import {householdFixture} from './test-fixtures/household';
+import {currentMonth} from './HouseholdDirectory';
 import {spendingFixture} from './test-fixtures/spending';
 import type { Client, ClientNote, WorkspaceInfo } from './types';
 
 const mocks = vi.hoisted(() => ({
+  getHousehold:vi.fn(),listHouseholds:vi.fn(),createHousehold:vi.fn(),saveHousehold:vi.fn(),previewHousehold:vi.fn(),
   getSpendingAnalysis:vi.fn(),changeSpendingClassification:vi.fn(),getSpendingClassificationHistory:vi.fn(),getClientWorkspaceOverview:vi.fn(),getSecurityPolicy:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
   getReportPresentation:vi.fn(),chooseReportPresentationPdf:vi.fn(),exportReportPresentation:vi.fn(),
   getCategoryRules:vi.fn(),saveCategoryRule:vi.fn(),reviewRuleCategory:vi.fn(),queryCategorySuggestions:vi.fn(),prepareCategoryDraft:vi.fn(),queryTransactionActivity:vi.fn(),
@@ -47,7 +50,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-beforeEach(() => {mocks.getSpendingAnalysis.mockImplementation(async(clientId:string)=>spendingFixture(clientId));mocks.getClientWorkspaceOverview.mockImplementation(async(clientId:string)=>({clientId,monthlyIncome:null,necessaryExpenses:null,unallocated:null,enteredDebt:null,debtMonthlyPayment:null,budgetDebtPayment:null,emergencyTarget:null,accessibleSavings:null,restrictedSavings:null,payoffMonth:null,warnings:[]}));mocks.getSecurityPolicy.mockResolvedValue({revision:0,idleMinutes:15,totalChanges:0,history:[]});mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
+beforeEach(() => {mocks.getHousehold.mockImplementation(async(id:string,month:string)=>householdFixture(id,month));mocks.listHouseholds.mockResolvedValue([]);mocks.createHousehold.mockResolvedValue(householdFixture('household-a',currentMonth()));mocks.getSpendingAnalysis.mockImplementation(async(clientId:string)=>spendingFixture(clientId));mocks.getClientWorkspaceOverview.mockImplementation(async(clientId:string)=>({clientId,monthlyIncome:null,necessaryExpenses:null,unallocated:null,enteredDebt:null,debtMonthlyPayment:null,budgetDebtPayment:null,emergencyTarget:null,accessibleSavings:null,restrictedSavings:null,payoffMonth:null,warnings:[]}));mocks.getSecurityPolicy.mockResolvedValue({revision:0,idleMinutes:15,totalChanges:0,history:[]});mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
   mocks.getStatementAccounts.mockImplementation(async(clientId:string)=>({clientId,importRevision:0,accounts:[]}));
   vi.clearAllMocks();
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
@@ -573,4 +576,11 @@ it('guards unsaved Spending Analysis changes across client tabs and clears analy
  vi.mocked(window.confirm).mockReturnValueOnce(true);go('Import statements');await screen.findByText('Documents and statement accounts');expect(mocks.changeSpendingClassification).not.toHaveBeenCalled();
  go('Spending Analysis');await screen.findByRole('table',{name:'Approved categorized transactions'});expect(screen.queryByLabelText('Discussion and reason')).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'Lock workspace'}));await screen.findByRole('heading',{name:'Welcome back'});expect(screen.queryByText('Fictional Dining')).not.toBeInTheDocument();expect(screen.queryByRole('table',{name:'Spending mix amounts and percentages'})).not.toBeInTheDocument();
+});
+
+it('keeps individual and household tabs open, preserves household drafts across switches and clears them on lock',async()=>{
+ render(<App/>);await unlock();await selectClient('Alice Able','');fireEvent.click(screen.getByRole('button',{name:'Create a household workspace'}));fireEvent.change(await screen.findByLabelText('Household name'),{target:{value:'Oak Street Household'}});fireEvent.click(screen.getByRole('button',{name:'Save household'}));await screen.findByText('Shared household expenses');expect(screen.getByRole('tab',{name:'Alice Able'})).toBeInTheDocument();expect(screen.getByRole('tab',{name:'Oak Street Household'})).toHaveAttribute('aria-selected','true');
+ fireEvent.click(within(screen.getByRole('navigation',{name:'Household sections'})).getByRole('button',{name:'Members & Permissions'}));fireEvent.click(screen.getByRole('button',{name:'Add member'}));fireEvent.change(screen.getByLabelText('Member name'),{target:{value:'Private household draft'}});
+ fireEvent.click(screen.getByRole('tab',{name:'Alice Able'}));await screen.findByRole('heading',{name:'Alice Able'});expect(screen.queryByRole('dialog',{name:'Member & permissions'})).not.toBeInTheDocument();fireEvent.click(screen.getByRole('tab',{name:'Oak Street Household'}));expect(screen.getByLabelText('Member name')).toHaveValue('Private household draft');expect(mocks.getHousehold).toHaveBeenCalledOnce();
+ vi.mocked(window.confirm).mockReturnValue(false);fireEvent.click(screen.getByRole('button',{name:'Close household Oak Street Household'}));expect(screen.getByLabelText('Member name')).toHaveValue('Private household draft');vi.mocked(window.confirm).mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:'Lock workspace'}));await screen.findByRole('heading',{name:'Welcome back'});expect(document.documentElement.outerHTML).not.toContain('Private household draft');expect(screen.queryByRole('tab',{name:'Oak Street Household'})).not.toBeInTheDocument();
 });
