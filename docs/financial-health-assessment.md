@@ -120,5 +120,6 @@ The frontend production build passed. Initial complete UI verification reached
 322 tests; one assertion needed to distinguish unavailable component points from
 an unavailable balance payment, after which all 322 passed. The additional final
 UI pass also passed all 322 tests, including period handoff and renewed acknowledgment.
-The full Rust matrix, final Clippy/standalone build and new native acceptance are
-still running/pending. No completed acceptance is claimed until those finish.
+The full Rust matrix passed all 316 library tests and both actual supervised
+PDF-worker integration tests in one sequential run. Final Clippy and the embedded
+standalone no-bundle build passed. New native health/unified acceptance is pending. No completed acceptance is claimed until those finish.

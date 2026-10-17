@@ -10,8 +10,9 @@ The existing Financial dashboard hosts the interface; classification edits reuse
 Spending Analysis with the assessment months carried into its filters.
 
 All 11 new Rust health tests passed. The production frontend built and all 322 UI tests passed, including the final
-assessment-period handoff and renewed acknowledgment when assumptions change. The full Rust matrix, final Clippy/embedded standalone
-build and native health/unified acceptance are pending. This is tested working
+assessment-period handoff and renewed acknowledgment when assumptions change. The complete Rust run passed all 316 library tests and both actual PDF-worker
+integration tests. Final Clippy with warnings denied and the embedded standalone
+no-bundle debug build passed. Native health/unified acceptance is pending. This is tested working
 progress, not completed acceptance. Next action: finish those checks and record
 actual results/limitations. No installer, household linking, business counseling,
 duplicate transaction store or new schema was introduced.
