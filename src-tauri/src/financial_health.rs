@@ -2008,6 +2008,410 @@ mod tests {
         assert_eq!(serde_json::to_value(preserved.payload).unwrap(), before);
     }
     #[test]
+    fn workflow_handoffs_refresh_current_results_and_preserve_reviewed_plans_and_reports() {
+        let (dir, mut w, _) = configured();
+        let client = w.save_client(client_input()).unwrap();
+        let id = &client.id;
+        let other = w.save_client(client_input()).unwrap();
+        let care = crate::client_care::Data {
+            intake: crate::client_care::Intake {
+                employment: "employed".into(),
+                employer: "Fictional original employer".into(),
+                income_notes: "Discussed irregular pay; this text is not verified income".into(),
+                ..Default::default()
+            },
+            follow_ups: vec![],
+        };
+        w.save_client_care(
+            id,
+            crate::client_care::Input {
+                expected_revision: 0,
+                data: care.clone(),
+            },
+        )
+        .unwrap();
+        plans(&mut w, id);
+        let json = |v: &planning::Plans| serde_json::to_value(v).unwrap();
+        let original_plans = w.get_assessment_planning(id).unwrap();
+        let other_plans = json(&w.get_assessment_planning(&other.id).unwrap());
+        let mut document = bank::doc("Fictional workflow checking");
+        document.closing_balance = Some("2000".into());
+        document.retain_source = true;
+        let csv = "Date,Description,Amount,Category,Type\n2026-09-01,Salary,3000,Wages,income\n2026-09-02,Rent,-1500,Housing,expense\n2026-09-03,Dining discussion,-300,Dining,expense\n2026-09-04,Service charge,-20,Fees,fee\n2026-09-05,Interest cost,-30,Interest,interest\n2026-09-06,Returned purchase,50,Dining,refund\n2026-09-07,Loan payment,-200,Debt,balanceMovement\n";
+        let staged = bank::stage(&mut w, id, dir.path(), "workflow.csv", csv, document);
+        let raw = serde_json::to_value(staged.records.iter().map(|r| &r.raw).collect::<Vec<_>>())
+            .unwrap();
+        assert!(staged.records.iter().all(|r| r.status == Status::Pending));
+        assert_eq!(
+            w.get_client_dashboard(id, query().dashboard())
+                .unwrap()
+                .totals
+                .spending,
+            "0.00"
+        );
+        assert_eq!(
+            w.get_spending_analysis(id, query().spending())
+                .unwrap()
+                .totals
+                .spending,
+            "0.00"
+        );
+        assert!(view(&mut w, id, query()).score.is_none());
+        for row in &staged.records {
+            decide(&mut w, id, &row.id, Status::Approved);
+        }
+        facts(&mut w, id);
+        coverage(&mut w, id, &query());
+        let current = view(&mut w, id, query());
+        assert_eq!(current.score, Some(95));
+        let dashboard = w.get_client_dashboard(id, query().dashboard()).unwrap();
+        let spending = w.get_spending_analysis(id, query().spending()).unwrap();
+        assert_eq!(dashboard.totals.net_spending, "1800.00");
+        assert_eq!(spending.totals.net_spending, "1800.00");
+        assert_eq!(
+            measure(&current, "netSpending").amount.as_deref(),
+            Some("1800.00")
+        );
+        assert_eq!(spending.totals.necessary, "1550.00");
+        assert_eq!(spending.totals.discretionary, "300.00");
+        assert_eq!(dashboard.operating_cashflow, "1200.00");
+        assert_eq!(
+            json(&w.get_assessment_planning(id).unwrap()),
+            json(&original_plans)
+        );
+
+        let proposal = |versions: planning::Revisions| scenarios::Input {
+            expected_revisions: versions,
+            label: "Discussed workflow proposal".into(),
+            assumptions: "Fictional agreed assumptions; dated schedules remain independent".into(),
+            baseline_strategy: planning::Strategy::Snowball,
+            proposed_strategy: planning::Strategy::Avalanche,
+            budget_changes: vec![scenarios::BudgetChange {
+                index: 2,
+                amount: Some("250".into()),
+            }],
+            debt_payment: None,
+            emergency_contribution: None,
+            cash_changes: vec![],
+            debt_extras: vec![],
+            goal_contributions: vec![],
+            recurring_expenses: vec![],
+            income_reductions: vec![],
+        };
+        let scenario = w
+            .save_client_scenario(
+                id,
+                crate::saved_scenarios::Input {
+                    expected_count: 0,
+                    proposal: proposal(original_plans.revisions()),
+                },
+            )
+            .unwrap();
+        let scenario_bytes = serde_json::to_vec(&scenario.payload).unwrap();
+        let report_input = |w: &mut Workspace, care_revision: i64| {
+            let source = w.get_client_imports(id).unwrap();
+            let mut input = bank::assessment_input(&source, &client);
+            input.selected_scenario = Some(crate::saved_scenarios::Selection {
+                id: scenario.payload.id.clone(),
+                digest: scenario.digest.clone(),
+            });
+            input.intake = Some(crate::report_intake::Selection {
+                expected_revision: care_revision,
+                sections: vec!["employment".into()],
+            });
+            input
+        };
+        let input = report_input(&mut w, 1);
+        let report = w.save_assessment_record(id, input).unwrap();
+        let report_bytes = serde_json::to_vec(&report.payload).unwrap();
+        assert!(!report.needs_review);
+        assert_eq!(report.payload.assessment.operating_cashflow, "1200.00");
+        let stale_input = report_input(&mut w, 1);
+
+        // A purpose discussion changes live analysis, never historical amounts or plans.
+        let row = spending
+            .rows
+            .iter()
+            .find(|r| r.category == "Dining" && r.editable)
+            .unwrap();
+        w.change_spending_classification(
+            id,
+            sa::Change {
+                context: spending.context,
+                query: query().spending(),
+                row_id: row.id.clone(),
+                approval_id: row.approval_id.clone(),
+                role: sa::Role::Necessary,
+                reason: "Discussed necessary cost with the fictional client".into(),
+                acknowledge: true,
+            },
+        )
+        .unwrap();
+        let revised = w.get_spending_analysis(id, query().spending()).unwrap();
+        assert_eq!(revised.totals.necessary, "1850.00");
+        assert_eq!(revised.totals.discretionary, "0.00");
+        assert_eq!(revised.totals.net_spending, "1800.00");
+        assert_eq!(
+            w.get_client_dashboard(id, query().dashboard())
+                .unwrap()
+                .operating_cashflow,
+            "1200.00"
+        );
+        assert!(view(&mut w, id, query()).score.is_none()); // Renew evidence, not an automatic approval.
+        coverage(&mut w, id, &query());
+        assert_eq!(
+            measure(&view(&mut w, id, query()), "necessary")
+                .amount
+                .as_deref(),
+            Some("1850.00")
+        );
+        assert!(w.save_assessment_record(id, stale_input).is_err());
+        assert!(
+            w.get_assessment_record(id, &report.payload.id)
+                .unwrap()
+                .needs_review
+        );
+        assert!(w.list_assessment_records(id).unwrap().records[0].needs_review);
+        assert_eq!(
+            json(&w.get_assessment_planning(id).unwrap()),
+            json(&original_plans)
+        );
+        // A plan-only scenario is still its unchanged hypothetical baseline, not actual evidence.
+        assert!(
+            !w.get_client_scenario(id, &scenario.payload.id)
+                .unwrap()
+                .needs_review
+        );
+
+        // Reversals remove the transaction from every finalized live projection.
+        let dining = staged
+            .records
+            .iter()
+            .find(|r| r.fields.description == "Dining discussion")
+            .unwrap();
+        decide(&mut w, id, &dining.id, Status::Rejected);
+        assert_eq!(
+            w.get_client_dashboard(id, query().dashboard())
+                .unwrap()
+                .totals
+                .net_spending,
+            "1500.00"
+        );
+        let health = view(&mut w, id, query());
+        assert!(health.score.is_none());
+        assert!(health
+            .evidence
+            .iter()
+            .all(|e| e.description != "Dining discussion"));
+        let live = w.get_spending_analysis(id, query().spending()).unwrap();
+        assert!(live.rows.iter().all(|r| r.id != row.id));
+        let unified = w
+            .query_unified_transactions(id, unified_review::Query::default())
+            .unwrap();
+        assert!(unified
+            .rows
+            .iter()
+            .any(|r| r.record_id == dining.id && r.status == Status::Rejected));
+        decide(&mut w, id, &dining.id, Status::Approved);
+        assert!(view(&mut w, id, query()).score.is_none());
+        // Amount corrections use the same approval service and invalidate old bindings.
+        for (amount, net) in [("-325.00", "1825.00"), ("-300.00", "1800.00")] {
+            let source = w.get_client_imports(id).unwrap();
+            let mut fields = source
+                .records
+                .iter()
+                .find(|r| r.id == dining.id)
+                .unwrap()
+                .fields
+                .clone();
+            fields.amount = Some(amount.into());
+            w.review_transaction(
+                id,
+                imports::ReviewInput {
+                    expected_revision: source.revision,
+                    record_id: dining.id.clone(),
+                    status: Status::Approved,
+                    fields,
+                    reason: "Corrected amount after inspecting the retained synthetic source"
+                        .into(),
+                    acknowledge_warnings: true,
+                },
+            )
+            .unwrap();
+            assert_eq!(
+                w.get_client_dashboard(id, query().dashboard())
+                    .unwrap()
+                    .totals
+                    .net_spending,
+                net
+            );
+            assert!(view(&mut w, id, query()).score.is_none());
+            assert_eq!(
+                json(&w.get_assessment_planning(id).unwrap()),
+                json(&original_plans)
+            );
+        }
+        facts(&mut w, id);
+        coverage(&mut w, id, &query());
+        assert_eq!(view(&mut w, id, query()).score, Some(95));
+        let source = w.get_client_imports(id).unwrap();
+        assert_eq!(
+            serde_json::to_value(source.records.iter().map(|r| &r.raw).collect::<Vec<_>>())
+                .unwrap(),
+            raw
+        );
+
+        // Only an explicit counselor save changes plan assumptions; existing engines refresh contexts.
+        let source_revision = source.revision;
+        let mut lines = original_plans.budget.lines.clone();
+        lines[0].amount = Some("2800".into());
+        lines[1].amount = Some("1850".into());
+        lines[2].amount = Some("0".into());
+        w.save_client_budget(
+            id,
+            budget::BudgetInput {
+                expected_revision: 1,
+                lines,
+            },
+        )
+        .unwrap();
+        let changed = w.get_assessment_planning(id).unwrap();
+        assert_eq!(changed.budget.summary.monthly_income, "2800.00");
+        assert_eq!(changed.debt.budget_context.revision, 2);
+        assert_eq!(changed.debt.budget_context.monthly_capacity, "750.00");
+        assert_eq!(
+            changed
+                .savings
+                .summary
+                .as_ref()
+                .unwrap()
+                .emergency_target
+                .as_deref(),
+            Some("11100.00")
+        );
+        assert_eq!(changed.cashflow.context.budget_revision, 2);
+        assert_eq!(changed.debt.data, original_plans.debt.data);
+        assert_eq!(changed.savings.data, original_plans.savings.data);
+        assert_eq!(changed.cashflow.data, original_plans.cashflow.data);
+        assert_eq!(changed.cashflow.summary, original_plans.cashflow.summary);
+        assert_eq!(changed.debt.revision, 1);
+        assert_eq!(changed.savings.revision, 1);
+        assert_eq!(changed.cashflow.revision, 1);
+        assert_eq!(w.get_client_imports(id).unwrap().revision, source_revision);
+        assert_eq!(
+            w.get_client_dashboard(id, query().dashboard())
+                .unwrap()
+                .totals
+                .income,
+            "3000.00"
+        );
+        assert!(w
+            .compare_financial_scenarios(id, proposal(original_plans.revisions()))
+            .is_err());
+        let historical = w.get_client_scenario(id, &scenario.payload.id).unwrap();
+        assert!(historical.needs_review);
+        assert_eq!(
+            serde_json::to_vec(&historical.payload).unwrap(),
+            scenario_bytes
+        );
+        let invalid = report_input(&mut w, 1);
+        assert!(w.save_assessment_record(id, invalid).is_err());
+        assert_eq!(w.list_assessment_records(id).unwrap().records.len(), 1);
+        assert_eq!(
+            serde_json::to_vec(
+                &w.get_assessment_record(id, &report.payload.id)
+                    .unwrap()
+                    .payload
+            )
+            .unwrap(),
+            report_bytes
+        );
+
+        let mut care_changed = care;
+        care_changed.intake.employer = "Fictional later employer".into();
+        w.save_client_care(
+            id,
+            crate::client_care::Input {
+                expected_revision: 1,
+                data: care_changed,
+            },
+        )
+        .unwrap();
+        let historic = w.get_assessment_record(id, &report.payload.id).unwrap();
+        assert!(historic
+            .review_reasons
+            .iter()
+            .any(|r| r.contains("Selected intake")));
+        let export_dir = tempfile::tempdir().unwrap();
+        let target = export_dir.path().join("workflow-audit.pdf");
+        let pdf = w
+            .export_assessment_pdf(id, &report.payload.id, target.to_str().unwrap())
+            .unwrap();
+        let pdf = lopdf::Document::load(pdf.path).unwrap();
+        let text = pdf
+            .extract_text(&pdf.get_pages().keys().copied().collect::<Vec<_>>())
+            .unwrap();
+        assert!(text.contains("Fictional original employer"));
+        assert!(!text.contains("Fictional later employer"));
+        assert_eq!(
+            json(&w.get_assessment_planning(&other.id).unwrap()),
+            other_plans
+        );
+        assert!(w.get_client_imports(&other.id).unwrap().records.is_empty());
+        assert!(w
+            .get_assessment_record(&other.id, &report.payload.id)
+            .is_err());
+        assert!(w
+            .get_client_scenario(&other.id, &scenario.payload.id)
+            .is_err());
+        assert!(w
+            .get_spending_classification_history(&other.id, &row.id)
+            .is_err());
+
+        let backup_dir = tempfile::tempdir().unwrap();
+        let backup = w
+            .create_backup(backup_dir.path().to_string_lossy().into(), PASSWORD.into())
+            .unwrap();
+        w.lock_workspace();
+        drop(w);
+        let mut w = Workspace::new(dir.path().into());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            json(&w.get_assessment_planning(id).unwrap()),
+            json(&changed)
+        );
+        w.lock_workspace();
+        let restore = w.prepare_restore(backup.path, PASSWORD.into()).unwrap();
+        w.confirm_restore(restore.token, "RESTORE".into()).unwrap();
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(
+            json(&w.get_assessment_planning(id).unwrap()),
+            json(&changed)
+        );
+        assert_eq!(
+            serde_json::to_vec(
+                &w.get_assessment_record(id, &report.payload.id)
+                    .unwrap()
+                    .payload
+            )
+            .unwrap(),
+            report_bytes
+        );
+        assert_eq!(
+            serde_json::to_vec(
+                &w.get_client_scenario(id, &scenario.payload.id)
+                    .unwrap()
+                    .payload
+            )
+            .unwrap(),
+            scenario_bytes
+        );
+        assert_eq!(
+            json(&w.get_assessment_planning(&other.id).unwrap()),
+            other_plans
+        );
+    }
+    #[test]
     fn authenticated_client_scope_context_revisions_lock_and_encrypted_recovery_preserve_results() {
         let (dir, mut w, id) = fixture();
         let other = w.save_client(client_input()).unwrap();

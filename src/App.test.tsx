@@ -598,6 +598,54 @@ it('opens unified review for the current client, guards its detail draft and rem
 });
 
 
+it('refreshes downstream client sections after a classification save without saving plans or overwriting reports',async()=>{
+ let revised=false;
+ const importRead=mocks.getClientImports.getMockImplementation()!;
+ mocks.getClientImports.mockImplementation(async(clientId:string)=>({...await importRead(clientId),revision:revised?1:0}));
+ mocks.changeSpendingClassification.mockImplementation(async()=>{revised=true;});
+ mocks.getSpendingAnalysis.mockImplementation(async(clientId:string)=>{
+  const value=spendingFixture(clientId);
+  return revised?{...value,context:'new-source-context',rows:value.rows.map(r=>r.editable?{...r,role:'necessary'}:r),totals:{...value.totals,necessary:'1200.01',discretionary:'0.00'}}:value;
+ });
+ mocks.getFinancialHealth.mockImplementation(async(clientId:string)=>({...healthFixture,clientId,revision:revised?1:0,score:revised?null:95}));
+ mocks.getClientDashboard.mockImplementation(async(clientId:string)=>({clientId,revision:revised?1:0,periodStart:'2026-09-01',periodEnd:'2026-09-30',calculatedOnUtc:'2026-10-17',latestApprovedDate:'2026-09-07',outdated:false,totals:{pending:0,needsClarification:0,approved:7,rejected:0,income:'3000.00',spending:'1850.00',refunds:'50.00',netSpending:'1800.00',netCash:'1000.00',accountNet:[],warnings:[]},operatingCashflow:'1200.00',months:[],categories:[],undatedRecords:0,reviewedPercent:100,documentIds:[],warnings:[]}));
+ const plans={clientId:alice.id,budget:await mocks.getClientBudget(alice.id),debt:await mocks.getClientDebtPlan(alice.id),savings:await mocks.getClientSavingsPlan(alice.id),cashflow:await mocks.getClientCashflowPlan(alice.id)};
+ mocks.getAssessmentPlanning.mockResolvedValue(plans);
+ mocks.listAssessmentRecords.mockImplementation(async(clientId:string)=>({clientId,records:[{id:'original-report',title:'Original reviewed report',createdAt:'2026-10-16T00:00:00Z',periodStart:'2026-09-01',periodEnd:'2026-09-30',sourceRevision:0,needsReview:revised}]}));
+ const apply=async()=>{
+  fireEvent.change(await screen.findByLabelText('Assessment from month'),{target:{value:'2026-09'}});
+  fireEvent.change(screen.getByLabelText('Assessment through month'),{target:{value:'2026-09'}});
+  fireEvent.click(screen.getByRole('button',{name:'View financial dashboard'}));
+ };
+ render(<App/>);await unlock();await selectClient('Alice Able','Financial dashboard');await apply();await screen.findByText('95 / 100');
+ fireEvent.click(screen.getByRole('button',{name:'Discuss and edit expense classifications'}));
+ const type=await screen.findByRole('combobox',{name:'Type for Fictional Dining on 2026-09-03'});
+ await waitFor(()=>expect(type).toBeEnabled());
+ fireEvent.change(type,{target:{value:'necessary'}});
+ fireEvent.change(screen.getByLabelText('Discussion and reason'),{target:{value:'Discussed the necessary cost with Alice'}});
+ fireEvent.click(screen.getByLabelText('I discussed and verified this spending purpose with the client.'));
+ fireEvent.click(screen.getByRole('button',{name:'Save spending type'}));
+ await waitFor(()=>expect(screen.getByRole('combobox',{name:'Type for Fictional Dining on 2026-09-03'})).toBeEnabled());
+ expect(screen.getByRole('combobox',{name:'Type for Fictional Dining on 2026-09-03'})).toHaveValue('necessary');
+ expect(screen.getByRole('status')).toHaveTextContent('Review and explicitly save any agreed changes');
+ go('Financial dashboard');await apply();
+ await screen.findByRole('region',{name:'Financial health assessment and behavioral insights'});
+ await waitFor(()=>expect(mocks.getFinancialHealth).toHaveBeenCalledTimes(2));
+ expect(screen.queryByText('95 / 100')).not.toBeInTheDocument();
+ expect(mocks.getFinancialHealth).toHaveBeenLastCalledWith(alice.id,{fromMonth:'2026-09',throughMonth:'2026-09'});
+ for(const [section,read] of [['Monthly budget',mocks.getClientBudget],['Debt payoff',mocks.getClientDebtPlan],['Savings & sinking funds',mocks.getClientSavingsPlan],['Cash-flow calendar',mocks.getClientCashflowPlan]] as const){
+  const before=read.mock.calls.length;go(section);await waitFor(()=>expect(read).toHaveBeenCalledTimes(before+1));
+  expect(read).toHaveBeenLastCalledWith(alice.id);
+ }
+ go('Scenario comparisons');fireEvent.click(await screen.findByText('Compare combined financial scenarios'));
+ fireEvent.click(screen.getByRole('button',{name:'Reload saved scenario baseline'}));await screen.findByLabelText('Proposal label');
+ expect(mocks.getAssessmentPlanning).toHaveBeenCalledWith(alice.id);
+ go('Assessments & reports');fireEvent.click(await screen.findByText('Saved counselor assessments'));
+ expect(await screen.findByRole('option',{name:/Original reviewed report.*Needs review/})).toBeInTheDocument();
+ for(const save of [mocks.saveClientBudget,mocks.saveClientDebtPlan,mocks.saveClientSavingsPlan,mocks.saveClientCashflowPlan,mocks.approveFinalReport])expect(save).not.toHaveBeenCalled();
+ expect(mocks.changeSpendingClassification).toHaveBeenCalledTimes(1);
+});
+
 it('integrates health evidence, existing classification routes, draft guards and lock privacy in the client workspace',async()=>{
  const totals={pending:0,needsClarification:0,approved:7,rejected:0,income:'3000.00',spending:'1850.00',refunds:'50.00',netSpending:'1800.00',netCash:'1000.00',accountNet:[],warnings:[]};
  mocks.getClientDashboard.mockImplementation(async(clientId)=>({clientId,revision:0,periodStart:'2026-09-01',periodEnd:'2026-09-30',calculatedOnUtc:'2026-10-17',latestApprovedDate:'2026-09-07',outdated:false,totals,operatingCashflow:'1200.00',months:[],categories:[],undatedRecords:0,reviewedPercent:100,documentIds:[],warnings:[]}));

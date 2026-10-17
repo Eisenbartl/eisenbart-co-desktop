@@ -31,7 +31,7 @@ function Session({client,onDirty,onBusy,onOpenExisting}:Props){
   setEditor(false);clearDraft();setChildBusy(false);setBusy(true);setPage(null);setInspection(null);setNotice('Saved. Refreshing current transactions and evidence…');
   try{const [p,e]=await Promise.all([api.queryUnifiedTransactions(client.id,q),id?api.getTransactionInspection(client.id,id):Promise.resolve(null)]);
    if(ticket!==generation.current)return;if(p.clientId!==client.id||e&&(e.clientId!==client.id||e.row.id!==id||e.context!==p.context))throw Error('Transaction context changed during refresh. Refresh transactions before continuing.');
-   setPage(p);setChoices(p);setInspection(e);setNotice('Saved through the existing review service. Current totals and evidence have refreshed.');
+   setPage(p);setChoices(p);setInspection(e);setNotice('Saved through the existing review service. Current totals and evidence have refreshed. Review saved planning assumptions before relying on them; change plans only through an explicit counselor save. Earlier reports retain their original figures.');
   }catch(e){if(ticket===generation.current)setError(text(e));}finally{if(ticket===generation.current)setBusy(false);}
  }
 

@@ -1,5 +1,28 @@
 # Development status
 
+## Current task — end-to-end workflow integration audit (0.51.0, schema 32)
+
+The [handoff matrix and acceptance record](workflow-integration-audit.md) trace
+intake, statement import, canonical approvals, spending/health, saved plans,
+scenarios and immutable assessments/reports. Reproduced and fixed an intake
+review-status gap in the assessment directory using the existing selected-field
+history check; opened records already had the correct safeguard. Unrelated edits
+do not invalidate selected intake, while changes and reversions stay flagged.
+
+Decision messages now request explicit counselor review/save for agreed planning
+changes, and obsolete card-report guidance points to existing card-inclusive
+completeness/approval. No calculator, store, schema or report format was added.
+A new real-service workflow regression checks exact live totals, corrections,
+reversals, unchanged plans, refreshed plan contexts, stale-save rejection, original
+PDF evidence, client isolation, restart and encrypted recovery. A new App regression
+checks the section handoffs and zero implicit plan/approval writes. Both focused
+Rust regressions and all 96 affected UI tests pass. Full suites and the complete
+native workflow are in progress; this task is not yet marked complete.
+
+No installer or merge. The preceding branch-consolidation outcome below remains
+historical evidence for its own validated head; audit changes require their own
+checks before review.
+
 ## Branch consolidation — 0.51.0 validated source, unmerged for review
 
 [PR #1](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1) prepares the

@@ -192,9 +192,9 @@ pub(super) fn record(
         }
     } else if payload.cards.is_some() || cards_store::has_cards(c, w, client)? {
         if payload.cards.is_some() {
-            review_reasons.push("A bank/card review supplement is captured below. It remains provisional; card-inclusive completeness and final approval are not implemented. Bank dashboard and planning figures retain their original basis.".into());
+            review_reasons.push("A bank/card review supplement is captured below. This older supplement remains provisional. For supported card-inclusive final approval, record a new assessment with reviewed card completeness. Bank dashboard and planning figures retain their original basis.".into());
         } else {
-            review_reasons.push("Credit-card evidence is stored separately and is not included in this bank-based assessment. Review the card statements; final bank-report approval is blocked until integrated liability reporting is implemented.".into());
+            review_reasons.push("Credit-card evidence is stored separately and is not included in this bank-based assessment. Review and capture the bank/card supplement and card completeness in a new assessment before requesting card-inclusive final approval.".into());
         }
     }
     if let Some(s) = &payload.card_facts {
@@ -310,6 +310,18 @@ impl Workspace {
                 Some(r) => coverage_review_store::revision(&s.connection, &s.info, client)? != r,
                 None => false,
             };
+            let intake_json: Option<String> = s.connection.query_row(
+                "SELECT json_extract(payload_json,'$.intake') FROM client_assessment_records WHERE id=?1",
+                [&id], |r| r.get(0),
+            ).map_err(storage_error)?;
+            let intake_changed = intake_json
+                .map(|json| {
+                    let intake: crate::report_intake::Snapshot =
+                        serde_json::from_str(&json).map_err(|_| STORAGE_ERROR.to_owned())?;
+                    report_intake_store::changed_since(&s.connection, &s.info, client, &intake)
+                })
+                .transpose()?
+                .unwrap_or(false);
             let branding_changed =
                 branding_store::revision(&s.connection, &s.info)? != brand_revision.unwrap_or(0);
             let card_capture:bool=s.connection.query_row("SELECT COALESCE(json_type(payload_json,'$.cards')='object',0) FROM client_assessment_records WHERE id=?1",[&id],|r|r.get(0)).map_err(storage_error)?;
@@ -330,6 +342,7 @@ impl Workspace {
                 period_end,
                 source_revision,
                 needs_review: cards_changed
+                    || intake_changed
                     || coverage_changed
                     || branding_changed
                     || source_revision != source.revision

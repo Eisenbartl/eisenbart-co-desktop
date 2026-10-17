@@ -1431,6 +1431,7 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.wait_text(".client-care .success-message", "saved locally", "unselected care changes saved")
     driver.interactive("#record-title")
     driver.wait_text(".saved-assessment-status", "Recorded context matches", "unselected care changes do not invalidate report")
+    driver.wait(lambda: driver.observe_script("const option=document.querySelector('#saved-assessment option:checked');return Boolean(option && option.value && !option.textContent.includes('Needs review'));"), "assessment directory ignores unrelated intake edits")
     save_client_action_plan(driver, artifacts)
     if driver.command("GET", f"/element/{driver.element('.client-care')}/property/open") is not True:
         driver.click(".client-care > summary")
@@ -1438,6 +1439,7 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.wait_value("#intake-employer", "Alex changed employer", "selected employer replacement")
     driver.click_button("Save intake and follow-ups")
     driver.wait_text(".saved-assessment-status", "Needs review", "selected intake change flags report")
+    driver.wait(lambda: driver.observe_script("return document.querySelector('#saved-assessment option:checked')?.textContent.includes('Needs review')"), "assessment directory also flags selected intake changes")
     if driver.command("GET", f"/element/{driver.element('.client-care')}/property/open") is not True:
         driver.click(".client-care > summary")
     driver.interactive("#intake-employer")
@@ -1446,6 +1448,7 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.click_button("Save intake and follow-ups")
     driver.interactive("#record-title")
     driver.wait_text(".saved-assessment-status", "Needs review", "selected intake reversion never reactivates historical report")
+    driver.wait(lambda: driver.observe_script("return document.querySelector('#saved-assessment option:checked')?.textContent.includes('Needs review')"), "assessment directory retains review flag after selected intake reversion")
     driver.scroll_to(".saved-assessment-view .report-intake-context", "start")
     driver.command("POST", "/execute/async", {"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));", "args":[]})
     driver.screenshot(artifacts / "native-selected-report-intake.png")
