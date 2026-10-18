@@ -30,7 +30,9 @@ original immediate paired-transfer calculation. Explicit delayed transfers have
 a departure debit and a destination receipt credit. In-transit money is excluded
 from combined settled cash until receipt. Incoming/outgoing account shortages
 and reserve-floor violations are checked independently; another account's money
-does not automatically cover a deficit.
+does not automatically cover a deficit. Opening and intermediate positive balances
+below a declared reserve are flagged, even if a later same-day paycheck restores
+the closing balance. Negative balances already carry the stronger overdraft flag.
 
 An entered first availability date supplies an explicit calendar-day lag for
 recurrences (0–366 days). No bank/holiday/business-day adjustment is inferred.

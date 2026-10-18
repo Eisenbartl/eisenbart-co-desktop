@@ -397,6 +397,15 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
         warnings.push("Estimated activity is included in projections. Confirmed means a entered schedule, not a posted or bank-verified transaction.".to_owned());
     }
     for (a, v) in data.accounts.iter().zip(&values) {
+        if a.reserve
+            .as_deref()
+            .map(parse_money)
+            .transpose()?
+            .zip(*v)
+            .is_some_and(|(reserve, value)| value >= 0 && value < reserve)
+        {
+            warnings.push(format!("{} starts below the entered reserve; review protected funds before first-day activity.",a.label));
+        }
         if v.is_some_and(|v| v < 0) {
             warnings.push(format!(
                 "{} starts below zero; review immediate funding.",
@@ -439,6 +448,29 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
                 }
             }
             let mut entry_warnings = Vec::new();
+            // Only accounts moved by this leg can create an intermediate floor warning.
+            for affected in [
+                (!receipt).then_some(source),
+                dest.filter(|_| receipt || s.settlement.is_none()),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if data.accounts[affected]
+                    .reserve
+                    .as_deref()
+                    .map(parse_money)
+                    .transpose()?
+                    .zip(values[affected])
+                    .is_some_and(|(reserve, value)| value >= 0 && value < reserve)
+                {
+                    entry_warnings.push(format!("{}: balance is below the entered reserve, including conservative same-day ordering.",data.accounts[affected].label));
+                    day_warnings.push(format!(
+                        "{}: balance below the entered reserve during the day.",
+                        data.accounts[affected].label
+                    ));
+                }
+            }
             if values[source].is_some_and(|v| v < 0) {
                 entry_warnings.push("Potential insufficient funds / overdraft in this account, including conservative same-day ordering.".to_owned());
             }
@@ -860,7 +892,10 @@ mod settlement_tests {
         assert_eq!(s.ledger[0].in_transit.as_deref(), Some("200.00"));
         assert_eq!(
             s.days[6].warnings,
-            vec!["Synthetic checking: available balance is below the entered reserve."]
+            vec![
+                "Synthetic checking: available balance is below the entered reserve.",
+                "Synthetic checking: balance below the entered reserve during the day."
+            ]
         );
         assert_eq!(s.ledger[1].date, "2026-11-10");
         assert_eq!(s.ledger[1].transfer_leg.as_deref(), Some("receipt"));
@@ -918,5 +953,43 @@ mod settlement_tests {
         assert_eq!(s.combined_closing.as_deref(), Some("1500.00"));
         d.schedules[0].amount = None;
         assert!(calculate(d).unwrap().1.combined_closing.is_none());
+    }
+}
+
+#[cfg(test)]
+mod reserve_timing_tests {
+    use super::*;
+    #[test]
+    fn same_day_reserve_breach_stays_visible_after_later_paycheck_restores_the_floor() {
+        let mut data = tests::fixture();
+        data.accounts[0].reserve = Some("400".into());
+        data.schedules.truncate(2);
+        data.schedules[0].amount = Some("300".into());
+        data.schedules[0].first_date = "2026-11-06".into();
+        data.schedules[1].amount = Some("500".into());
+        data.schedules[1].frequency = Frequency::Once;
+        let result = calculate(data).unwrap().1;
+        assert_eq!(result.ledger[0].source_balance.as_deref(), Some("200.00"));
+        assert!(result.ledger[0]
+            .warnings
+            .iter()
+            .any(|w| w.contains("below the entered reserve")));
+        assert_eq!(result.ledger[1].source_balance.as_deref(), Some("700.00"));
+        let day = result.days.iter().find(|d| d.date == "2026-11-06").unwrap();
+        assert!(day.warnings.iter().any(|w| w.contains("reserve")));
+        assert_eq!(result.combined_closing.as_deref(), Some("1700.00"));
+        let mut data = tests::fixture();
+        data.accounts[0].opening_balance = Some("300".into());
+        data.accounts[0].reserve = Some("400".into());
+        data.schedules.retain(|s| s.kind == Kind::Paycheck);
+        data.schedules[0].first_date = "2026-11-01".into();
+        data.schedules[0].frequency = Frequency::Once;
+        data.schedules[0].amount = Some("500".into());
+        let result = calculate(data).unwrap().1;
+        assert_eq!(result.combined_closing.as_deref(), Some("1800.00"));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| w.contains("starts below the entered reserve")));
     }
 }

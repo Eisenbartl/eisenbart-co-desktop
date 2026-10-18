@@ -21,8 +21,14 @@ The first native attempt was intentionally interrupted after initial setup/budge
 checks to apply that correction. Only its identified synthetic runner was stopped;
 its private driver group/ports closed, and its evidence remains retained. A fresh
 corrected native run includes the missing-pool goal case and 800px scenario view.
-Current-head full Windows CI and final native acceptance remain required before
-marking this assignment complete. No merge or installer is authorized.
+A second reproduced edge case now flags intermediate and opening reserve-floor
+breaches even when a later same-day deposit restores the closing balance. Its
+regression failed before the correction; all 18 affected cash-flow/integration
+tests and the linked scenario/report/recovery regression pass afterward. Money
+balances, v1 results and explicit save boundaries stay unchanged. The earlier
+native attempt was again stopped only in its synthetic workspace; corrected
+full native and current-head Windows acceptance remain required before marking
+this assignment complete. No merge or installer is authorized.
 
 ## End-to-end workflow integration audit — verified source (0.51.0, schema 32)
 
