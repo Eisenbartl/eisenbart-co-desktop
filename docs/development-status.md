@@ -1,5 +1,21 @@
 # Development status
 
+## Financial planning subpages — 0.52.0 / schema 33, in progress
+
+The user requested completion of the six documented planning subpages. The first
+source milestone extends existing engines with exact paycheck earmarks, delayed
+transfer settlement/reserve floors, advanced debt terms, savings funding and
+drawdowns, and verified savings progress. See [model rules and examples](financial-planning-subpages.md).
+The engine milestone passed 329 initial library regressions (before the final v2
+scenario additions), focused calculation cases, and the extended real-service
+scenario/report/PDF/encrypted-recovery test. Current all-target Clippy with
+warnings denied and frontend production build pass. Interface wiring and native
+acceptance are in progress. A combined UI run exposed whole-test time limits in
+existing long App workflows under load; retain their assertions/deadlines and
+rerun with one DOM worker. Final full 0.52.0 tests, native acceptance, documentation
+and Windows CI remain required. Do not treat this stage as complete or build an installer.
+
+
 ## End-to-end workflow integration audit — verified source (0.51.0, schema 32)
 
 The [handoff matrix and acceptance record](workflow-integration-audit.md) trace

@@ -380,6 +380,7 @@ fn cashflow(d: &Data, s: &h::Summary) -> Result<(Option<cashflow::Summary>, Vec<
         if remaining > 0 {
             if let Some(account) = &b.account_id {
                 schedules.push(cashflow::Schedule {
+                    settlement: None,
                     label: format!("{} · planned remainder", b.name),
                     account_id: account.clone(),
                     destination_id: None,
@@ -436,6 +437,7 @@ fn cashflow(d: &Data, s: &h::Summary) -> Result<(Option<cashflow::Summary>, Vec<
                     .collect();
                 if accounts.len() == 1 && accounts[0].id != *destination {
                     schedules.push(cashflow::Schedule {
+                        settlement: None,
                         label: format!("{} · expected reimbursement", bill.name),
                         account_id: accounts[0].id.clone(),
                         destination_id: Some(destination.clone()),
@@ -460,6 +462,7 @@ fn cashflow(d: &Data, s: &h::Summary) -> Result<(Option<cashflow::Summary>, Vec<
             let transfer = ["settlement", "contribution", "transfer"].contains(&p.kind.as_str())
                 && p.destination_account.is_some();
             schedules.push(cashflow::Schedule {
+                settlement: None,
                 label: format!("{} · {}", p.kind, p.state),
                 account_id: account.clone(),
                 destination_id: if transfer {
@@ -491,7 +494,7 @@ fn cashflow(d: &Data, s: &h::Summary) -> Result<(Option<cashflow::Summary>, Vec<
             warnings.push(format!("A {} on {} has no source account.", p.kind, p.date))
         }
     }
-    let accounts=d.accounts.iter().map(|a|{if a.balance_date!=start.to_string(){warnings.push(format!("{} needs an opening balance dated {}. Its balance is unknown in this projection.",a.label,start))}cashflow::Account{id:a.id.clone(),label:a.label.clone(),opening_balance:if a.balance_date==start.to_string(){a.opening_balance.clone()}else{None}}}).collect();
+    let accounts=d.accounts.iter().map(|a|{if a.balance_date!=start.to_string(){warnings.push(format!("{} needs an opening balance dated {}. Its balance is unknown in this projection.",a.label,start))}cashflow::Account{ reserve: None,id:a.id.clone(),label:a.label.clone(),opening_balance:if a.balance_date==start.to_string(){a.opening_balance.clone()}else{None}}}).collect();
     let plan = cashflow::PlanData {
         start_date: start.to_string(),
         end_date: end.to_string(),
@@ -569,6 +572,7 @@ fn record(c: &Connection, w: &WorkspaceInfo, id: &str, month: &str) -> Result<Re
             })
             .collect(),
         priorities_note: String::new(),
+        funding: None,
     };
     let context=savings::Context{budget_revision:revision,debt_revision:0,necessary_expenses:Some(summary.necessary.clone()),monthly_surplus:None,budget_savings:None,budget_debt_payments:None,debt_start_month:None,debt_monthly_payment:None,debt_changes:vec![],debt_extras:vec![],warnings:vec!["Only explicitly shared household goals are included. Personal assets and debts remain separate.".into()]};
     let (_, goals) = savings::calculate(goal_data, &context)?;
@@ -1330,6 +1334,7 @@ fn cashflow_preview(
     let mut proposed = vec![];
     let mut add = |label: String, date: String, amount: String, inflow: bool, confirmed: bool| {
         proposed.push(cashflow::Schedule {
+            settlement: None,
             label: format!("{prefix}{}", label.chars().take(64).collect::<String>()),
             account_id: account_id.unwrap_or("").into(),
             destination_id: None,
@@ -1841,6 +1846,7 @@ mod integration_tests {
                     start_date: "2026-10-01".into(),
                     end_date: "2026-10-31".into(),
                     accounts: vec![cashflow::Account {
+                        reserve: None,
                         id: account.clone(),
                         label: "Personal checking".into(),
                         opening_balance: Some("1000".into()),
@@ -2130,6 +2136,7 @@ mod tests {
             label: "Joint checking".into(),
             owners: vec![r.data.members[0].id.clone(), r.data.members[1].id.clone()],
             opening_balance: Some("1000".into()),
+
             balance_date: "2026-10-01".into(),
             verified: true,
         };

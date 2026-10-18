@@ -935,6 +935,7 @@ fn reduce(current: Computed, input: ReductionInput) -> Result<Reduction, String>
                 return Err("The reduction exceeds the mapped dated expense.".into());
             }
             cash_changes.push(scenarios::CashChange {
+                settlement_change: None,
                 index,
                 amount: Some(money(original - amount)),
                 first_date: schedule.first_date.clone(),
@@ -955,7 +956,7 @@ fn reduce(current: Computed, input: ReductionInput) -> Result<Reduction, String>
         } else {
             planning::Strategy::None
         };
-        let proposal=scenarios::Input{expected_revisions:plans.revisions(),label:format!("Discussed reduction: {}",category.label),assumptions:format!("Health source context {}; {}% of observed net category {} over {} months. Monthly {} / annual {} are conditional assumptions. Explicit budget line {}. Originals preserved.",a.context,input.reduction_percent,category.net_spending,months,money(amount),money(annual),line.label),baseline_strategy:strategy.clone(),proposed_strategy:strategy,budget_changes:changes,debt_payment,emergency_contribution,cash_changes,debt_extras:vec![],goal_contributions:vec![],recurring_expenses:vec![],income_reductions:vec![]};
+        let proposal=scenarios::Input{new_goals:vec![],targeted_extras:vec![],savings_funding:None,expected_revisions:plans.revisions(),label:format!("Discussed reduction: {}",category.label),assumptions:format!("Health source context {}; {}% of observed net category {} over {} months. Monthly {} / annual {} are conditional assumptions. Explicit budget line {}. Originals preserved.",a.context,input.reduction_percent,category.net_spending,months,money(amount),money(annual),line.label),baseline_strategy:strategy.clone(),proposed_strategy:strategy,budget_changes:changes,debt_payment,emergency_contribution,cash_changes,debt_extras:vec![],goal_contributions:vec![],recurring_expenses:vec![],income_reductions:vec![]};
         Some(scenarios::compare(plans, proposal)?)
     } else {
         if input.destination != "unallocated"
@@ -1718,6 +1719,8 @@ mod tests {
                     }],
                     extras: vec![],
                     payment_changes: vec![],
+                    advanced: None,
+                    targeted_extras: vec![],
                 },
             },
         )
@@ -1736,6 +1739,7 @@ mod tests {
                     alternative_contributions: vec![],
                     goals: vec![],
                     priorities_note: "Discussed explicit synthetic reserve goal".into(),
+                    funding: None,
                 },
             },
         )
@@ -1748,11 +1752,13 @@ mod tests {
                     start_date: "2026-10-01".into(),
                     end_date: "2026-12-31".into(),
                     accounts: vec![crate::cashflow::Account {
+                        reserve: None,
                         id: "checking".into(),
                         label: "Plan checking".into(),
                         opening_balance: Some("2000".into()),
                     }],
                     schedules: vec![crate::cashflow::Schedule {
+                        settlement: None,
                         label: "Dining dates".into(),
                         account_id: "checking".into(),
                         destination_id: None,
@@ -2097,6 +2103,9 @@ mod tests {
             goal_contributions: vec![],
             recurring_expenses: vec![],
             income_reductions: vec![],
+            new_goals: vec![],
+            targeted_extras: vec![],
+            savings_funding: None,
         };
         let scenario = w
             .save_client_scenario(

@@ -52,7 +52,12 @@ pub fn copy<T: Serialize + serde::de::DeserializeOwned>(v: &T) -> Result<T, Stri
         .map_err(|_| "Invalid captured scenario.".into())
 }
 fn stored(mut c: scenarios::Comparison, created: &str) -> scenarios::Comparison {
-    c.calculator = "combined-scenario-v1".into();
+    c.calculator = if c.calculator == "combined-preview-v2" {
+        "combined-scenario-v2"
+    } else {
+        "combined-scenario-v1"
+    }
+    .into();
     c.created_at = created.into();
     c.warnings[0]="Saved hypothetical proposal only. Saving or selecting this record does not change live plans, approved history or client agreements. Later model edits flag this baseline for review without rewriting it.".into();
     c
@@ -80,7 +85,10 @@ pub fn validate(p: &Payload, client: &str) -> Result<(), String> {
         || p.app_version.is_empty()
         || uuid::Uuid::parse_str(&p.id).is_err()
         || p.comparison.client_id != client
-        || p.comparison.calculator != "combined-scenario-v1"
+        || !matches!(
+            p.comparison.calculator.as_str(),
+            "combined-scenario-v1" | "combined-scenario-v2"
+        )
         || serde_json::to_vec(p).map_err(|_| bad())?.len() > MAX_PAYLOAD
     {
         return Err(bad());

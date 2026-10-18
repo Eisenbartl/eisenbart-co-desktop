@@ -591,6 +591,58 @@ fn planning_pdf(l: &mut Layout, s: &crate::planning::Snapshot) -> Result<(), Str
                 &format!("{} / {}", x.month, usd(&x.amount)),
             )?;
         }
+        for extra in &data.targeted_extras {
+            l.value(
+                "Account-targeted extra",
+                &format!(
+                    "{} / {} / {}",
+                    data.accounts[extra.account_index].label,
+                    extra.month,
+                    usd(&extra.amount)
+                ),
+            )?;
+        }
+        if let Some(advanced) = &data.advanced {
+            if let Some(payments) = &advanced.payments {
+                l.value(
+                    "Entered repayment cadence",
+                    &format!(
+                        "{} from {}, second day {}",
+                        plan_term(&payments.frequency),
+                        payments.first_date,
+                        payments
+                            .second_day
+                            .map(|d| d.to_string())
+                            .unwrap_or_else(|| "Not applicable".into())
+                    ),
+                )?;
+            }
+            for terms in &advanced.accounts {
+                l.value(
+                    "Advanced terms account",
+                    &data.accounts[terms.account_index].label,
+                )?;
+                l.value(
+                    "Daily day basis",
+                    &terms
+                        .day_basis
+                        .map(|d| format!("Actual days / {d}"))
+                        .unwrap_or_else(|| "Monthly / unspecified".into()),
+                )?;
+                for rate in &terms.rate_changes {
+                    l.value(
+                        "Known APR change",
+                        &format!("{} / {}%", rate.month, rate.apr),
+                    )?;
+                }
+                for fee in &terms.fees {
+                    l.value(
+                        "Month-level additional fee",
+                        &format!("{} / {}", fee.month, usd(&fee.amount)),
+                    )?;
+                }
+            }
+        }
         for x in &data.payment_changes {
             l.value(
                 "Changed monthly payment",
@@ -635,7 +687,7 @@ fn planning_pdf(l: &mut Layout, s: &crate::planning::Snapshot) -> Result<(), Str
         for w in &result.warnings {
             l.text(w, 10.0)?;
         }
-        l.text("The supported repayment projection uses fixed monthly interest. Missing lender dates and daily, variable or promotional terms are not inferred.",10.0)?;
+        l.text(if d.data.as_ref().is_some_and(|d|d.advanced.is_some()){"This projection uses the explicitly captured advanced accrual, rate, fee and payment assumptions. Verify lender applicability; projected dates are estimates."}else{"The supported repayment projection uses fixed monthly interest. Missing lender dates and daily, variable or promotional terms are not inferred."},10.0)?;
     }
     l.section("Captured savings targets / primary contribution")?;
     if let (Some(data), Some(result)) = (&v.data, &v.summary) {
@@ -729,6 +781,57 @@ fn planning_pdf(l: &mut Layout, s: &crate::planning::Snapshot) -> Result<(), Str
                 l.text(w, 10.0)?;
             }
         }
+        if let Some(funding) = &data.funding {
+            for source in &funding.sources {
+                l.value(
+                    "Separate one-time savings source",
+                    &format!(
+                        "{} [{}] / {}",
+                        source.label,
+                        source.id,
+                        optional(&source.available)
+                    ),
+                )?;
+            }
+            let bucket = |index: Option<usize>| {
+                index
+                    .map(|i| data.goals[i].label.clone())
+                    .unwrap_or_else(|| "Emergency reserve".into())
+            };
+            for (i, event) in funding.events.iter().enumerate() {
+                l.value(
+                    "Dated savings movement",
+                    &format!(
+                        "{} / {} / {} / {} / {}",
+                        event.date,
+                        plan_term(&event.kind),
+                        bucket(event.bucket),
+                        optional(&event.amount),
+                        event.note
+                    ),
+                )?;
+                if event.kind == crate::savings::funding::Kind::Reallocate {
+                    l.value("Receiving savings bucket", &bucket(event.destination))?;
+                }
+                if let Some(id) = &event.source_id {
+                    l.value("Funding source ID", id)?;
+                }
+                if let Some(outcome) = result
+                    .funding
+                    .as_ref()
+                    .and_then(|f| f.events.iter().find(|e| e.index == i))
+                {
+                    l.value(
+                        "Applied / unfunded shortfall",
+                        &format!(
+                            "{} / {}",
+                            optional(&outcome.applied),
+                            optional(&outcome.shortfall)
+                        ),
+                    )?;
+                }
+            }
+        }
         for w in &result.warnings {
             l.text(w, 10.0)?;
         }
@@ -769,6 +872,14 @@ fn planning_pdf(l: &mut Layout, s: &crate::planning::Snapshot) -> Result<(), Str
                 ),
             )?;
         }
+        for account in &data.accounts {
+            if account.reserve.is_some() {
+                l.value(
+                    "Cash account reserve floor",
+                    &format!("{} / {}", account.label, optional(&account.reserve)),
+                )?;
+            }
+        }
         for x in &data.schedules {
             l.value(
                 &x.label,
@@ -780,6 +891,15 @@ fn planning_pdf(l: &mut Layout, s: &crate::planning::Snapshot) -> Result<(), Str
                     plan_term(&x.certainty)
                 ),
             )?;
+            if let Some(settlement) = &x.settlement {
+                l.value(
+                    "First transfer destination availability",
+                    settlement
+                        .first_available_date
+                        .as_deref()
+                        .unwrap_or("Unknown; affected forecasts unavailable"),
+                )?;
+            }
             l.value(
                 "First / second day / until",
                 &format!(
@@ -806,6 +926,12 @@ fn planning_pdf(l: &mut Layout, s: &crate::planning::Snapshot) -> Result<(), Str
                         .map(|a| a.label.as_str())
                         .unwrap_or("None")
                 ),
+            )?;
+        }
+        if data.schedules.iter().any(|s| s.settlement.is_some()) {
+            l.value(
+                "In transit / excluded from settled cash",
+                &optional(&result.in_transit),
             )?;
         }
         l.value(
@@ -1641,6 +1767,30 @@ fn render_report(
             l.value(
                 "Additional proposed debt payment",
                 &format!("{} / {}", extra.month, usd(&extra.amount)),
+            )?;
+        }
+        for goal in &c.input.new_goals {
+            l.value(
+                "New proposed goal ID",
+                &format!("{} / {}", goal.id, goal.label),
+            )?;
+        }
+        for extra in &c.input.targeted_extras {
+            l.value(
+                "Proposed account-targeted extra",
+                &format!(
+                    "{} / {} / {}",
+                    c.baseline
+                        .plans
+                        .debt
+                        .data
+                        .as_ref()
+                        .ok_or("Missing captured debt baseline.")?
+                        .accounts[extra.account_index]
+                        .label,
+                    extra.month,
+                    usd(&extra.amount)
+                ),
             )?;
         }
         for change in &c.input.goal_contributions {

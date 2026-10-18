@@ -25,6 +25,7 @@ mod households;
 mod imports;
 mod income_periods;
 mod models;
+mod paycheck;
 mod pdf;
 #[cfg(test)]
 mod pdf_fixture;
@@ -39,6 +40,7 @@ mod report_presentation;
 mod report_viewer;
 mod saved_scenarios;
 mod savings;
+mod savings_progress;
 mod scenarios;
 mod statement_pdf;
 mod storage;
@@ -492,6 +494,33 @@ async fn choose_action_plan_pdf(
     })
     .await
     .map_err(|_| "Client PDF destination selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn get_savings_progress(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: dashboard::Input,
+) -> Result<savings_progress::Progress, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_savings_progress(&client_id, &input))
+    })
+    .await
+    .map_err(|_| "Savings progress could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn get_paycheck_allocation(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<paycheck::Allocation, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            paycheck::allocate(&w.get_assessment_planning(&client_id)?)
+        })
+    })
+    .await
+    .map_err(|_| "Paycheck allocation could not be loaded.".to_owned())?
 }
 #[tauri::command]
 async fn get_assessment_planning(
@@ -1762,6 +1791,8 @@ pub fn run() {
             review_financial_facts,
             list_assessment_records,
             get_assessment_planning,
+            get_paycheck_allocation,
+            get_savings_progress,
             get_client_workspace_overview,
             get_spending_analysis,
             get_financial_health,

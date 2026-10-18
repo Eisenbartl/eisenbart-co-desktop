@@ -58,6 +58,9 @@ pub(super) fn input() -> Input {
         goal_contributions: vec![],
         recurring_expenses: vec![],
         income_reductions: vec![],
+        new_goals: vec![],
+        targeted_extras: vec![],
+        savings_funding: None,
     }
 }
 fn json<T: Serialize>(v: &T) -> serde_json::Value {
@@ -230,6 +233,7 @@ fn income_periods_reject_overlap_forgery_invalid_ranges_and_conflicting_or_exces
     let mut i = input();
     i.income_reductions.push(income_reduction());
     i.cash_changes.push(CashChange {
+        settlement_change: None,
         index: 1,
         amount: Some("1".into()),
         first_date: "2026-11-06".into(),
@@ -888,6 +892,7 @@ fn combines_exact_budget_debt_savings_and_explicit_dated_changes_without_writes(
     let mut i = input();
     let row = &baseline.cashflow.data.as_ref().unwrap().schedules[0];
     i.cash_changes.push(CashChange {
+        settlement_change: None,
         index: 0,
         amount: row.amount.clone(),
         first_date: "2026-11-08".into(),
@@ -996,6 +1001,7 @@ fn rejects_stale_scoped_invalid_and_excessive_assumptions_without_audit_or_plan_
     assert!(w.compare_financial_scenarios(&id, i).is_err());
     let mut i = input();
     i.cash_changes.push(CashChange {
+        settlement_change: None,
         index: 0,
         amount: Some("1".into()),
         first_date: "2026-02-30".into(),
@@ -1012,11 +1018,13 @@ fn rejects_stale_scoped_invalid_and_excessive_assumptions_without_audit_or_plan_
     let mut i = input();
     i.cash_changes = vec![
         CashChange {
+            settlement_change: None,
             index: 0,
             amount: None,
             first_date: "2026-11-08".into(),
         },
         CashChange {
+            settlement_change: None,
             index: 0,
             amount: None,
             first_date: "2026-11-09".into(),
@@ -1118,6 +1126,7 @@ fn optional_absent_models_are_unavailable_and_cannot_receive_unbound_changes() {
                 })
             }
             _ => i.cash_changes.push(CashChange {
+                settlement_change: None,
                 index: 0,
                 amount: Some("10".into()),
                 first_date: "2026-11-08".into(),
@@ -1184,4 +1193,130 @@ fn combined_buffer_keeps_the_higher_budget_debt_reserve_until_both_inputs_change
             "400.00"
         );
     }
+}
+
+#[test]
+fn paycheck_earmarks_use_saved_monthly_priorities_exactly_and_never_write() {
+    let (_dir, mut w, client) = fixture();
+    let mut p = w.get_assessment_planning(&client).unwrap();
+    p.budget.lines[1].amount = Some("1000.01".into());
+    let (lines, summary) = budget::calculate(p.budget.lines).unwrap();
+    p.budget.lines = lines;
+    p.budget.summary = summary;
+    let original = serde_json::to_vec(&p).unwrap();
+    let a = crate::paycheck::allocate(&p).unwrap();
+    assert_eq!(a.rows.len(), 2);
+    assert_eq!(a.rows[0].allocations[0].as_deref(), Some("500.01"));
+    assert_eq!(a.rows[1].allocations[0].as_deref(), Some("500.00"));
+    assert_eq!(a.rows[0].dated_commitments.as_deref(), Some("200.00"));
+    assert_eq!(serde_json::to_vec(&p).unwrap(), original);
+    let data = p.cashflow.data.as_mut().unwrap();
+    data.start_date = "2026-11-02".into();
+    p.cashflow.summary = Some(crate::cashflow::calculate(data.clone()).unwrap().1);
+    let a = crate::paycheck::allocate(&p).unwrap();
+    assert!(a.rows[0].total.is_none());
+    assert!(a.rows[0]
+        .warnings
+        .iter()
+        .any(|w| w.contains("Partial month")));
+}
+
+#[test]
+fn new_goal_and_funding_control_validation_never_writes_or_invents_opening_reserves() {
+    let (_dir, mut w, client) = fixture();
+    let original = json(&w.get_assessment_planning(&client).unwrap());
+    let count = audit_count(&w);
+    let make = || crate::scenarios::NewGoal {
+        id: "new-goal".into(),
+        label: "Fictional repairs".into(),
+        target_amount: None,
+        target_date: None,
+        monthly_contribution: None,
+    };
+    let mut proposal = input();
+    proposal.new_goals = vec![make(), make()];
+    assert!(w.compare_financial_scenarios(&client, proposal).is_err());
+    let mut proposal = input();
+    proposal.new_goals = vec![make()];
+    let r = w.compare_financial_scenarios(&client, proposal).unwrap();
+    assert_eq!(r.calculator, "combined-preview-v2");
+    let savings = r.proposed.plans.savings;
+    assert_eq!(
+        savings.data.unwrap().goals[1].reserved_amount.as_deref(),
+        Some("0.00")
+    );
+    assert_eq!(
+        savings.summary.unwrap().goals[1].forecast.status,
+        crate::savings::ForecastStatus::Unknown
+    );
+    let mut proposal = input();
+    proposal.savings_funding = Some(crate::savings::funding::Plan {
+        sources: vec![],
+        events: vec![crate::savings::funding::Event {
+            date: "2026-11-10".into(),
+            kind: crate::savings::funding::Kind::Fund,
+            bucket: None,
+            destination: None,
+            source_id: Some("missing-source".into()),
+            amount: Some("100".into()),
+            note: "Fictional amount is not funded".into(),
+        }],
+    });
+    assert!(w.compare_financial_scenarios(&client, proposal).is_err());
+    assert_eq!(json(&w.get_assessment_planning(&client).unwrap()), original);
+    assert_eq!(audit_count(&w), count);
+}
+
+#[test]
+fn scenario_transfer_availability_is_explicit_and_never_borrows_in_transit_funds() {
+    let (_dir, mut w, id) = fixture();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let change = |date: Option<&str>| CashChange {
+        index: 2,
+        amount: Some("200".into()),
+        first_date: "2026-11-07".into(),
+        settlement_change: Some(crate::scenarios::SettlementChange {
+            delayed: true,
+            first_available_date: date.map(Into::into),
+        }),
+    };
+    let mut i = input();
+    i.cash_changes = vec![change(Some("2026-11-10"))];
+    let r = w.compare_financial_scenarios(&id, i).unwrap();
+    assert_eq!(r.calculator, "combined-preview-v2");
+    let c = r.proposed.plans.cashflow.summary.unwrap();
+    assert_eq!(c.ledger[2].combined_balance.as_deref(), Some("1600.00"));
+    assert_eq!(c.ledger[2].destination_balance.as_deref(), Some("1000.00"));
+    assert_eq!(c.ledger[3].date, "2026-11-10");
+    assert_eq!(c.combined_closing.as_deref(), Some("3300.00"));
+    let mut i = input();
+    i.cash_changes = vec![change(None)];
+    assert!(w
+        .compare_financial_scenarios(&id, i)
+        .unwrap()
+        .proposed
+        .plans
+        .cashflow
+        .summary
+        .unwrap()
+        .combined_closing
+        .is_none());
+    let mut i = input();
+    i.cash_changes = vec![change(Some("2026-12-05"))];
+    let c = w
+        .compare_financial_scenarios(&id, i)
+        .unwrap()
+        .proposed
+        .plans
+        .cashflow
+        .summary
+        .unwrap();
+    assert_eq!(c.combined_closing.as_deref(), Some("3100.00"));
+    assert_eq!(c.in_transit.as_deref(), Some("200.00"));
+    let mut i = input();
+    let mut wrong = change(Some("2026-11-10"));
+    wrong.index = 0;
+    i.cash_changes = vec![wrong];
+    assert!(w.compare_financial_scenarios(&id, i).is_err());
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
 }

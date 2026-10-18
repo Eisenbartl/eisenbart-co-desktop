@@ -846,3 +846,266 @@ fn history_limits_and_missing_projection_terms_do_not_create_false_report_outcom
         .unwrap();
     assert_eq!(count, 50);
 }
+
+#[test]
+fn extended_planning_goals_funding_targeted_payments_and_settlement_survive_reports_and_recovery() {
+    use crate::{cashflow, debt, savings};
+    let (root, mut w, id) = fixture();
+    let legacy = save(&mut w, &id);
+    let original = serde_json::to_vec(&legacy.payload).unwrap();
+    let mut data = w.get_client_debt_plan(&id).unwrap().data.unwrap();
+    data.accounts[0].interest_model = debt::InterestModel::Daily;
+    data.advanced = Some(debt::Advanced {
+        accounts: vec![debt::AdvancedAccount {
+            account_index: 0,
+            day_basis: Some(365),
+            rate_changes: vec![],
+            fees: vec![],
+        }],
+        payments: None,
+    });
+    w.save_client_debt_plan(
+        &id,
+        debt::PlanInput {
+            expected_revision: 1,
+            data,
+        },
+    )
+    .unwrap();
+    let mut data = w.get_client_savings_plan(&id).unwrap().data.unwrap();
+    data.funding = Some(savings::funding::Plan {
+        sources: vec![],
+        events: vec![savings::funding::Event {
+            date: "2026-11-10".into(),
+            kind: savings::funding::Kind::Drawdown,
+            bucket: None,
+            destination: None,
+            source_id: None,
+            amount: Some("100".into()),
+            note: "Fictional repair reserve drawdown".into(),
+        }],
+    });
+    w.save_client_savings_plan(
+        &id,
+        savings::PlanInput {
+            expected_revision: 1,
+            data,
+        },
+    )
+    .unwrap();
+    let mut data = w.get_client_cashflow_plan(&id).unwrap().data.unwrap();
+    data.accounts[0].reserve = Some("400".into());
+    data.schedules[2].settlement = Some(cashflow::Settlement {
+        first_available_date: Some("2026-11-10".into()),
+    });
+    w.save_client_cashflow_plan(
+        &id,
+        cashflow::PlanInput {
+            expected_revision: 1,
+            data,
+        },
+    )
+    .unwrap();
+    let before = json(&w.get_assessment_planning(&id).unwrap());
+    let plans = w.get_assessment_planning(&id).unwrap();
+    let mut proposal = input();
+    proposal.expected_revisions = plans.revisions();
+    proposal.label = "Reviewed goal and targeted payment".into();
+    proposal.new_goals = vec![scenarios::NewGoal {
+        id: "repair-goal".into(),
+        label: "Proposed repairs".into(),
+        target_amount: Some("300".into()),
+        target_date: Some("2027-01-31".into()),
+        monthly_contribution: Some("100".into()),
+    }];
+    proposal.targeted_extras = vec![debt::TargetExtra {
+        account_index: 0,
+        month: "2026-11".into(),
+        amount: "150".into(),
+    }];
+    proposal.savings_funding = Some(savings::funding::Plan {
+        sources: vec![savings::funding::Source {
+            id: "separate-gift".into(),
+            label: "Separate fictional gift".into(),
+            available: Some("100".into()),
+        }],
+        events: vec![savings::funding::Event {
+            date: "2026-11-15".into(),
+            kind: savings::funding::Kind::Fund,
+            bucket: Some(1),
+            destination: None,
+            source_id: Some("separate-gift".into()),
+            amount: Some("100".into()),
+            note: "Explicit gift for new repair goal".into(),
+        }],
+    });
+    let record = w
+        .save_client_scenario(
+            &id,
+            Input {
+                expected_count: 1,
+                proposal,
+            },
+        )
+        .unwrap();
+    let c = &record.payload.comparison;
+    assert_eq!(c.calculator, "combined-scenario-v2");
+    let s = c.proposed.plans.savings.summary.as_ref().unwrap();
+    assert_eq!(s.schedule[0].debt_reserved.as_deref(), Some("250.00"));
+    assert_eq!(s.schedule[0].total_savings, "350.00");
+    assert_eq!(c.proposed.first_month_buffer.as_deref(), Some("1450.00"));
+    assert_eq!(
+        s.goals[1].forecast.completion_date.as_deref(),
+        Some("2026-12-31")
+    );
+    assert_eq!(
+        c.proposed.plans.savings.data.as_ref().unwrap().goals[1]
+            .reserved_amount
+            .as_deref(),
+        Some("0.00")
+    );
+    let debt = c
+        .proposed
+        .plans
+        .debt
+        .comparison
+        .as_ref()
+        .unwrap()
+        .avalanche
+        .as_ref()
+        .unwrap();
+    assert_eq!(debt.schedule[0].payments, vec!["100.00", "90.00"]);
+    assert_eq!(debt.schedule[0].total_payment, "190.00");
+    assert_eq!(
+        c.proposed
+            .plans
+            .cashflow
+            .summary
+            .as_ref()
+            .unwrap()
+            .combined_closing
+            .as_deref(),
+        Some("3300.00")
+    );
+    assert_eq!(json(&w.get_assessment_planning(&id).unwrap()), before);
+    let request = report(&mut w, &id, &record);
+    let assessment = w.save_assessment_record(&id, request).unwrap();
+    assert_eq!(
+        assessment.payload.planning.as_ref().unwrap().calculator,
+        "entered-plans-v2"
+    );
+    assert!(w
+        .review_client_action_plan(&id, &assessment.payload.id)
+        .err()
+        .unwrap()
+        .contains("separate monthly agreement"));
+    let out = tempfile::tempdir().unwrap();
+    let pdf = w
+        .export_assessment_pdf(
+            &id,
+            &assessment.payload.id,
+            out.path().join("extended.pdf").to_str().unwrap(),
+        )
+        .unwrap();
+    let doc = lopdf::Document::load(pdf.path).unwrap();
+    let text = doc
+        .extract_text(&doc.get_pages().keys().copied().collect::<Vec<_>>())
+        .unwrap()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    for value in [
+        "New proposed goal ID",
+        "repair-goal",
+        "Proposed repairs",
+        "Account-targeted extra",
+        "Separate fictional gift",
+        "First transfer destination availability",
+        "2026-11-10",
+        "Daily day basis",
+        "Actual days / 365",
+    ] {
+        assert!(text.contains(value), "Missing {value}");
+    }
+    let old = w.get_client_scenario(&id, &legacy.payload.id).unwrap();
+    assert!(old.needs_review);
+    assert_eq!(serde_json::to_vec(&old.payload).unwrap(), original);
+    let other = w.save_client(client_input()).unwrap();
+    assert!(w
+        .get_client_scenario(&other.id, &record.payload.id)
+        .is_err());
+    assert!(w
+        .get_assessment_record(&other.id, &assessment.payload.id)
+        .is_err());
+    assert!(w.get_client_savings_plan(&other.id).unwrap().data.is_none());
+    let frozen = serde_json::to_vec(&record.payload).unwrap();
+    for field in ["funding", "target", "date"] {
+        let mut fake = json(&record.payload);
+        match field {
+            "funding" => {
+                fake["comparison"]["proposed"]["plans"]["savings"]["summary"]["funding"]
+                    ["remainingSources"][0] = "999.00".into()
+            }
+            "target" => fake["comparison"]["input"]["targetedExtras"][0]["accountIndex"] = 1.into(),
+            _ => {
+                fake["comparison"]["proposed"]["plans"]["cashflow"]["data"]["schedules"][2]
+                    ["settlement"]["firstAvailableDate"] = "2026-11-07".into()
+            }
+        };
+        let fake: Payload = serde_json::from_value(fake).unwrap();
+        assert!(saved_scenarios::validate(&fake, &id).is_err());
+    }
+    let backup = w
+        .create_backup(out.path().to_string_lossy().into(), PASSWORD.into())
+        .unwrap();
+    w.lock_workspace();
+    let mut reopened = Workspace::new(root.path().into());
+    reopened.unlock_workspace(PASSWORD.into()).unwrap();
+    assert_eq!(
+        serde_json::to_vec(
+            &reopened
+                .get_client_scenario(&id, &record.payload.id)
+                .unwrap()
+                .payload
+        )
+        .unwrap(),
+        frozen
+    );
+    reopened.lock_workspace();
+    let review = reopened
+        .prepare_restore(backup.path, PASSWORD.into())
+        .unwrap();
+    reopened
+        .confirm_restore(review.token, "RESTORE".into())
+        .unwrap();
+    reopened.unlock_workspace(PASSWORD.into()).unwrap();
+    assert_eq!(
+        reopened
+            .get_assessment_record(&id, &assessment.payload.id)
+            .unwrap()
+            .digest,
+        assessment.digest
+    );
+    assert_eq!(
+        json(&reopened.get_assessment_planning(&id).unwrap()),
+        before
+    );
+    let mut data = reopened.get_client_savings_plan(&id).unwrap().data.unwrap();
+    data.emergency_contribution = Some("201".into());
+    reopened
+        .save_client_savings_plan(
+            &id,
+            savings::PlanInput {
+                expected_revision: 2,
+                data,
+            },
+        )
+        .unwrap();
+    let old = reopened
+        .get_client_scenario(&id, &record.payload.id)
+        .unwrap();
+    assert!(old.needs_review);
+    assert_eq!(serde_json::to_vec(&old.payload).unwrap(), frozen);
+    let request = report(&mut reopened, &id, &record);
+    assert!(reopened.save_assessment_record(&id, request).is_err());
+}

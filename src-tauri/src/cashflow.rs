@@ -10,6 +10,8 @@ pub struct Account {
     pub id: String,
     pub label: String,
     pub opening_balance: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserve: Option<String>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -44,6 +46,12 @@ pub enum Certainty {
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Settlement {
+    /// First receipt date; null explicitly means settlement is unknown.
+    pub first_available_date: Option<String>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Schedule {
     pub label: String,
     pub account_id: String,
@@ -55,6 +63,8 @@ pub struct Schedule {
     pub second_day: Option<u32>,
     pub until_date: Option<String>,
     pub certainty: Certainty,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement: Option<Settlement>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -105,6 +115,10 @@ pub struct Entry {
     pub combined_balance: Option<String>,
     pub next_paycheck: Option<String>,
     pub warnings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transfer_leg: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub in_transit: Option<String>,
 }
 #[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -114,6 +128,8 @@ pub struct Day {
     pub combined_balance: Option<String>,
     pub entry_indices: Vec<usize>,
     pub warnings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub in_transit: Option<String>,
 }
 #[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -123,6 +139,8 @@ pub struct Summary {
     pub closing_balances: Vec<Balance>,
     pub combined_closing: Option<String>,
     pub warnings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub in_transit: Option<String>,
 }
 #[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -135,7 +153,7 @@ pub struct ClientCashflowPlan {
     pub context: Context,
 }
 
-fn date(value: &str) -> Result<NaiveDate, String> {
+pub(crate) fn date(value: &str) -> Result<NaiveDate, String> {
     if value.len() != 10
         || !value.is_ascii()
         || value.as_bytes()[4] != b'-'
@@ -186,7 +204,7 @@ fn clamped_day(year: i32, month: u32, day: u32) -> u32 {
     .expect("bounded year");
     day.min(next.pred_opt().expect("bounded date").day())
 }
-fn occurs(schedule: &Schedule, first: NaiveDate, day: NaiveDate) -> bool {
+pub(crate) fn occurs(schedule: &Schedule, first: NaiveDate, day: NaiveDate) -> bool {
     if day < first {
         return false;
     }
@@ -261,6 +279,7 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
         }
         label(&mut account.label)?;
         values.push(cents(&mut account.opening_balance, true)?);
+        cents(&mut account.reserve, false)?;
     }
     let mut terms = Vec::new();
     for s in &mut data.schedules {
@@ -303,22 +322,55 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
         } else if s.second_day.is_some() {
             return Err("A second day applies only to semimonthly schedules.".to_owned());
         }
+        if let Some(settlement) = &s.settlement {
+            if s.kind != Kind::Transfer {
+                return Err("Settlement dates apply only to internal transfers.".into());
+            }
+            if let Some(receipt) = &settlement.first_available_date {
+                let lag = (date(receipt)? - first).num_days();
+                if !(0..=366).contains(&lag) {
+                    return Err("Transfer availability must be on or within 366 calendar days after departure.".into());
+                }
+            }
+        }
         let amount = cents(&mut s.amount, false)?;
         terms.push((source, dest, first, until, amount));
     }
+    let delayed = data.schedules.iter().any(|s| s.settlement.is_some());
+    let mut transit = Some(0_i64);
     let mut events = Vec::new();
-    let mut day = start;
+    let mut day = start - Duration::days(366);
     loop {
         for (index, s) in data.schedules.iter().enumerate() {
-            let (_, _, first, until, _) = terms[index];
-            if !until.is_some_and(|v| day > v) && occurs(s, first, day) {
-                events.push((day, index));
+            let (_, _, first, until, amount) = terms[index];
+            if until.is_some_and(|v| day > v) || !occurs(s, first, day) {
+                continue;
+            }
+            if day >= start {
+                events.push((day, index, false));
+            }
+            if let Some(settlement) = &s.settlement {
+                if let Some(receipt) = &settlement.first_available_date {
+                    let available = day + (date(receipt)? - first);
+                    if day < start && available >= start {
+                        transit = transit.zip(amount).map(|(t, a)| t + a);
+                    }
+                    if (start..=end).contains(&available) {
+                        events.push((available, index, true));
+                    }
+                } else if day < start {
+                    // Opening account balances do not establish whether an earlier unknown transfer settled.
+                    transit = None;
+                    if let Some(dest) = terms[index].1 {
+                        values[dest] = None;
+                    }
+                }
             }
         }
         if events.len() > 5000 {
             return Err(
                 "The period generates more than 5,000 entries. Shorten it or reduce schedules."
-                    .to_owned(),
+                    .into(),
             );
         }
         if day == end {
@@ -326,9 +378,14 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
         }
         day += Duration::days(1);
     }
-    // Debits before credits on the same day: deposit availability is unverified.
-    events.sort_by_key(|(date, i)| (*date, data.schedules[*i].kind.inflow(), *i));
+    // Separate receipts are credits; every debit remains before same-day credits.
+    events.sort_by_key(|(date, i, receipt)| {
+        (*date, *receipt || data.schedules[*i].kind.inflow(), *i)
+    });
     let mut warnings=vec!["Only entered activity is included. Monthly budgets and debt/savings forecasts supply references, never invented dates or automatic transactions. Confirm that every bill, payment, transfer, and account is included.".to_owned(),"Balances are before the first day's activity. Same-day debits precede credits; transfers settle immediately as one paired event. Bank processing, holds, holidays, interest, overdraft fees, and credit limits are not modeled.".to_owned()];
+    if delayed {
+        warnings[1] = "Same-day debits precede credits. Delayed transfers leave spendable cash at departure and enter the destination only on the entered availability date. Recurring transfers use the same entered calendar-day lag; no bank/holiday adjustment is inferred. In-transit funds are excluded from combined spendable cash. Unknown settlement prevents a complete destination forecast.".into();
+    }
     if values.iter().any(Option::is_none) || terms.iter().any(|t| t.4.is_none()) {
         warnings.push("Unknown balances or amounts stay unknown; an unknown activity makes both affected account balances unknown for the rest of the period. Known accounts can still have shortfall warnings.".to_owned());
     }
@@ -358,10 +415,28 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
             let index = events[cursor].1;
             let s = &data.schedules[index];
             let (source, dest, _, _, amount) = terms[index];
-            let signed_amount = amount.map(|v| if s.kind.inflow() { v } else { -v });
-            values[source] = values[source].zip(signed_amount).map(|(v, a)| v + a);
-            if let Some(dest) = dest {
+            let receipt = events[cursor].2;
+            if receipt {
+                let dest = dest.expect("validated transfer");
                 values[dest] = values[dest].zip(amount).map(|(v, a)| v + a);
+                transit = transit.zip(amount).map(|(v, a)| v - a);
+            } else {
+                let signed_amount = amount.map(|v| if s.kind.inflow() { v } else { -v });
+                values[source] = values[source].zip(signed_amount).map(|(v, a)| v + a);
+                if let Some(dest) = dest {
+                    if s.settlement.is_none() {
+                        values[dest] = values[dest].zip(amount).map(|(v, a)| v + a);
+                    } else {
+                        transit = transit.zip(amount).map(|(v, a)| v + a);
+                        if s.settlement
+                            .as_ref()
+                            .is_some_and(|v| v.first_available_date.is_none())
+                        {
+                            values[dest] = None;
+                            transit = None;
+                        }
+                    }
+                }
             }
             let mut entry_warnings = Vec::new();
             if values[source].is_some_and(|v| v < 0) {
@@ -373,11 +448,12 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
             let next = events
                 .iter()
                 .skip(cursor + 1)
-                .find(|(_, i)| {
-                    data.schedules[*i].kind == Kind::Paycheck
+                .find(|(_, i, receipt)| {
+                    !receipt
+                        && data.schedules[*i].kind == Kind::Paycheck
                         && data.schedules[*i].account_id == s.account_id
                 })
-                .map(|(d, _)| d.to_string());
+                .map(|(d, _, _)| d.to_string());
             if matches!(s.kind, Kind::Bill | Kind::Loan) {
                 entry_warnings.push(match &next {Some(d)=>format!("Payment occurs before the next entered paycheck ({d}); review available funds and ask the payee whether a date adjustment is allowed."),None=>"No later paycheck is entered for this account in the period; confirm funding for this payment.".to_owned()});
             }
@@ -410,10 +486,24 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
                 combined_balance: combined(&values),
                 next_paycheck: next,
                 warnings: entry_warnings,
+                transfer_leg: s
+                    .settlement
+                    .as_ref()
+                    .map(|_| if receipt { "receipt" } else { "departure" }.into()),
+                in_transit: if delayed { transit.map(money) } else { None },
             });
             cursor += 1;
         }
         for (a, v) in data.accounts.iter().zip(&values) {
+            if a.reserve
+                .as_ref()
+                .is_some_and(|r| v.is_some_and(|v| v < parse_money(r).expect("validated reserve")))
+            {
+                day_warnings.push(format!(
+                    "{}: available balance is below the entered reserve.",
+                    a.label
+                ));
+            }
             if v.is_some_and(|v| v < 0) {
                 day_warnings.push(format!("{}: closing balance below zero.", a.label));
             }
@@ -442,6 +532,7 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
             combined_balance: combined(&values),
             entry_indices: indices,
             warnings: day_warnings,
+            in_transit: if delayed { transit.map(money) } else { None },
         });
         if day == end {
             break;
@@ -456,6 +547,7 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Summary), String> {
         days,
         closing_balances: balances(&data, &values),
         combined_closing: combined(&values),
+        in_transit: if delayed { transit.map(money) } else { None },
         warnings,
     };
     Ok((data, summary))
@@ -470,11 +562,13 @@ pub(crate) mod tests {
             end_date: "2026-11-30".into(),
             accounts: vec![
                 Account {
+                    reserve: None,
                     id: "checking".into(),
                     label: "Synthetic checking".into(),
                     opening_balance: Some("500".into()),
                 },
                 Account {
+                    reserve: None,
                     id: "reserve".into(),
                     label: "Synthetic reserve".into(),
                     opening_balance: Some("1000".into()),
@@ -498,6 +592,7 @@ pub(crate) mod tests {
                     Frequency::Biweekly,
                 ),
                 Schedule {
+                    settlement: None,
                     destination_id: Some("reserve".into()),
                     ..schedule(
                         "Reserve transfer",
@@ -521,6 +616,7 @@ pub(crate) mod tests {
         frequency: Frequency,
     ) -> Schedule {
         Schedule {
+            settlement: None,
             label: name.into(),
             kind,
             account_id: account.into(),
@@ -742,5 +838,85 @@ pub(crate) mod tests {
             .iter()
             .all(|d| !d.warnings.iter().any(|w| w.contains("shortfall"))));
         assert_eq!(original.schedules[0].first_date, "2026-11-03");
+    }
+}
+
+#[cfg(test)]
+mod settlement_tests {
+    use super::*;
+    #[test]
+    fn delayed_transfer_preserves_funds_but_not_premature_liquidity_and_reserves() {
+        let mut d = tests::fixture();
+        d.schedules.retain(|s| s.kind == Kind::Transfer);
+        d.accounts[0].reserve = Some("400".into());
+        d.schedules[0].settlement = Some(Settlement {
+            first_available_date: Some("2026-11-10".into()),
+        });
+        let (_, s) = calculate(d.clone()).unwrap();
+        assert_eq!(s.ledger.len(), 2);
+        assert_eq!(s.ledger[0].source_balance.as_deref(), Some("300.00"));
+        assert_eq!(s.ledger[0].destination_balance.as_deref(), Some("1000.00"));
+        assert_eq!(s.ledger[0].combined_balance.as_deref(), Some("1300.00"));
+        assert_eq!(s.ledger[0].in_transit.as_deref(), Some("200.00"));
+        assert_eq!(
+            s.days[6].warnings,
+            vec!["Synthetic checking: available balance is below the entered reserve."]
+        );
+        assert_eq!(s.ledger[1].date, "2026-11-10");
+        assert_eq!(s.ledger[1].transfer_leg.as_deref(), Some("receipt"));
+        assert_eq!(s.ledger[1].source_balance.as_deref(), Some("300.00"));
+        assert_eq!(s.combined_closing.as_deref(), Some("1500.00"));
+        assert_eq!(s.in_transit.as_deref(), Some("0.00"));
+        d.end_date = "2026-11-08".into();
+        assert_eq!(
+            calculate(d.clone()).unwrap().1.in_transit.as_deref(),
+            Some("200.00")
+        );
+        d.start_date = "2026-11-08".into();
+        d.end_date = "2026-11-12".into();
+        d.accounts[0].opening_balance = Some("300".into());
+        let s = calculate(d.clone()).unwrap().1;
+        assert_eq!(s.ledger.len(), 1);
+        assert_eq!(s.combined_closing.as_deref(), Some("1500.00"));
+        d.schedules[0]
+            .settlement
+            .as_mut()
+            .unwrap()
+            .first_available_date = None;
+        let s = calculate(d.clone()).unwrap().1;
+        assert!(s.combined_closing.is_none());
+        d.schedules[0]
+            .settlement
+            .as_mut()
+            .unwrap()
+            .first_available_date = Some("2026-11-06".into());
+        assert!(calculate(d).is_err());
+    }
+    #[test]
+    fn recurring_receipts_remain_distinct_and_same_day_debits_precede_them() {
+        let mut d = tests::fixture();
+        d.schedules.retain(|s| s.kind == Kind::Transfer);
+        d.schedules[0].frequency = Frequency::Weekly;
+        d.schedules[0].settlement = Some(Settlement {
+            first_available_date: Some("2026-11-09".into()),
+        });
+        let s = calculate(d.clone()).unwrap().1;
+        assert_eq!(
+            s.ledger
+                .iter()
+                .filter(|e| e.transfer_leg.as_deref() == Some("departure"))
+                .count(),
+            4
+        );
+        assert_eq!(
+            s.ledger
+                .iter()
+                .filter(|e| e.transfer_leg.as_deref() == Some("receipt"))
+                .count(),
+            4
+        );
+        assert_eq!(s.combined_closing.as_deref(), Some("1500.00"));
+        d.schedules[0].amount = None;
+        assert!(calculate(d).unwrap().1.combined_closing.is_none());
     }
 }

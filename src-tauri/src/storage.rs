@@ -78,7 +78,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 32;
+const SCHEMA_VERSION: i32 = 33;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -564,6 +564,28 @@ impl Workspace {
         })
     }
 
+    pub fn get_savings_progress(
+        &mut self,
+        client: &str,
+        input: &crate::dashboard::Input,
+    ) -> Result<crate::savings_progress::Progress, String> {
+        let s = self.session()?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)
+            .map_err(storage_error)?;
+        scoped_client(&tx, &s.info, client)?;
+        crate::dashboard::period(input)?;
+        let source = imports_store::read_imports(&tx, &s.info, client)?;
+        let result = crate::savings_progress::project(
+            client,
+            &source.financial_facts,
+            &source.documents,
+            input,
+        )?;
+        tx.commit().map_err(storage_error)?;
+        Ok(result)
+    }
     pub fn get_client_debt_plan(&mut self, client_id: &str) -> Result<ClientDebtPlan, String> {
         let session = self.session()?;
         scoped_client(&session.connection, &session.info, client_id)?;
@@ -1260,6 +1282,13 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
     if version == 31 {
         transaction
             .execute_batch(include_str!("transaction-inspection-schema.sql"))
+            .map_err(storage_error)?;
+        version = 32;
+    }
+    if version == 32 {
+        // Planning extensions are optional; prohibit older writers from discarding them.
+        transaction
+            .execute_batch("PRAGMA user_version=33;")
             .map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;
@@ -3327,3 +3356,7 @@ mod scenario_tests;
 #[cfg(test)]
 #[path = "card_final_policy_tests.rs"]
 mod card_final_policy_tests;
+
+#[cfg(test)]
+#[path = "planning_extension_tests.rs"]
+mod planning_extension_tests;

@@ -4,6 +4,8 @@ use crate::debt::{month_number, DatedAmount};
 use chrono::{Datelike, NaiveDate};
 use serde::{Deserialize, Serialize};
 
+#[path = "savings_funding.rs"]
+pub mod funding;
 const HORIZON: i32 = 600;
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -26,6 +28,8 @@ pub struct PlanData {
     pub alternative_contributions: Vec<String>,
     pub goals: Vec<Goal>,
     pub priorities_note: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub funding: Option<funding::Plan>,
 }
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -107,6 +111,8 @@ pub struct Summary {
     pub requested_monthly_savings: Option<String>,
     pub warnings: Vec<String>,
     pub schedule: Vec<Month>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub funding: Option<funding::Result>,
 }
 #[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -217,7 +223,7 @@ pub(crate) fn debt_reserved(context: &Context, number: i32) -> Result<Option<i64
     let mut planned = parse_money(base)?;
     for extra in &context.debt_extras {
         if month_number(&extra.month)? == number {
-            planned += parse_money(&extra.amount)?;
+            planned += crate::budget::parse_total(&extra.amount)?;
         }
     }
     // Reserve the higher of the budget allocation and the saved debt plan,
@@ -225,26 +231,55 @@ pub(crate) fn debt_reserved(context: &Context, number: i32) -> Result<Option<i64
     Ok(Some(budget_debt.max(planned)))
 }
 
+struct FundingSchedule<'a> {
+    state: Option<funding::State>,
+    target: Option<i64>,
+    goal_targets: &'a [Option<i64>],
+}
 fn schedule(
     remaining: Option<i64>,
     contribution: Option<i64>,
     goals: &[GoalTerms],
     start: i32,
     context: &Context,
-) -> Result<Vec<Month>, String> {
+    funding: FundingSchedule<'_>,
+) -> Result<(Vec<Month>, Option<funding::Result>), String> {
+    let FundingSchedule {
+        mut state,
+        target,
+        goal_targets,
+    } = funding;
     let (Some(mut emergency), Some(contribution)) = (remaining, contribution) else {
-        return Ok(vec![]);
+        return Ok((vec![], state.map(funding::State::finish)));
     };
     if goals
         .iter()
         .any(|g| g.remaining.is_none() || g.contribution.is_none())
     {
-        return Ok(vec![]);
+        return Ok((vec![], state.map(funding::State::finish)));
     }
     let mut left: Vec<i64> = goals.iter().map(|g| g.remaining.unwrap_or(0)).collect();
     let surplus = aggregate(&context.monthly_surplus)?;
     let mut rows = Vec::new();
     for number in start..start + HORIZON {
+        if let Some(state) = &mut state {
+            state.apply(end_date(number))?;
+            let balances = state.goals.iter().copied().collect::<Option<Vec<_>>>();
+            let Some((current, targets)) = state
+                .emergency
+                .zip(target)
+                .zip(balances.zip(goal_targets.iter().copied().collect::<Option<Vec<_>>>()))
+            else {
+                break;
+            };
+            emergency = (current.1 - current.0).max(0);
+            left = targets
+                .0
+                .iter()
+                .zip(&targets.1)
+                .map(|(v, t)| (t - v).max(0))
+                .collect();
+        }
         let transferred = emergency.min(contribution);
         emergency -= transferred;
         let goal_transfers: Vec<i64> = goals
@@ -256,6 +291,13 @@ fn schedule(
                 amount
             })
             .collect();
+        if let Some(state) = &mut state {
+            state.emergency = state.emergency.map(|v| v + transferred);
+            for (v, amount) in state.goals.iter_mut().zip(&goal_transfers) {
+                *v = v.map(|v| v + amount);
+            }
+            state.point(&end_date(number).to_string());
+        }
         let total = transferred + goal_transfers.iter().sum::<i64>();
         let debt = debt_reserved(context, number)?;
         let unallocated = surplus
@@ -269,11 +311,12 @@ fn schedule(
             debt_reserved: debt.map(money),
             unallocated: unallocated.map(money),
         });
-        let future = context
-            .debt_changes
-            .iter()
-            .chain(context.debt_extras.iter())
-            .any(|e| month_number(&e.month).is_ok_and(|m| m > number && m < start + HORIZON));
+        let future = state.as_ref().is_some_and(funding::State::future)
+            || context
+                .debt_changes
+                .iter()
+                .chain(context.debt_extras.iter())
+                .any(|e| month_number(&e.month).is_ok_and(|m| m > number && m < start + HORIZON));
         if emergency == 0 && left.iter().all(|v| *v == 0) && !future {
             break;
         }
@@ -283,7 +326,7 @@ fn schedule(
             break;
         }
     }
-    Ok(rows)
+    Ok((rows, state.map(funding::State::finish)))
 }
 
 /// Shared exact emergency target arithmetic for saved plans and verified facts.
@@ -294,6 +337,9 @@ pub(crate) fn reserve_target(necessary: Option<i64>, months: u32) -> Option<i64>
 }
 pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Summary), String> {
     let start = month_number(&data.start_month)?;
+    if let Some(funding) = &mut data.funding {
+        funding::normalize(funding, data.goals.len(), start)?;
+    }
     if !(1..=60).contains(&data.target_months) {
         return Err("Emergency coverage targets must be 1–60 whole months.".to_owned());
     }
@@ -315,6 +361,10 @@ pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Sum
     let contribution = optional_money(&mut data.emergency_contribution)?;
     let mut warnings = context.warnings.clone();
     warnings.push("Estimates assume month-end contributions, no interest/returns, withdrawals, inflation, or changes in expenses. Dates are not guarantees of affordability.".to_owned());
+    if data.funding.is_some() {
+        let i = context.warnings.len();
+        warnings[i]="Estimates use explicit dated reserve movements and month-end contributions, without interest/returns, inflation or inferred changes in expenses. Dates do not guarantee affordability.".into();
+    }
     if restricted.is_none() {
         warnings.push(
             "Restricted savings are unknown and are excluded from emergency coverage.".to_owned(),
@@ -451,8 +501,52 @@ pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Sum
     let coverage = accessible.zip(expense).map(|(available, expense)| {
         money(((i128::from(available) * 100) / i128::from(expense)) as i64)
     });
-    let emergency = forecast(remaining, contribution, start);
-    let rows = schedule(remaining, contribution, &terms, start, context)?;
+    let mut emergency = forecast(remaining, contribution, start);
+    let goal_targets = data
+        .goals
+        .iter()
+        .map(|g| g.target_amount.as_deref().map(parse_money).transpose())
+        .collect::<Result<Vec<_>, _>>()?;
+    let (rows, funding_result) = schedule(
+        remaining,
+        contribution,
+        &terms,
+        start,
+        context,
+        FundingSchedule {
+            state: funding::State::new(&data, accessible)?,
+            target,
+            goal_targets: &goal_targets,
+        },
+    )?;
+    if let Some(funding) = &funding_result {
+        emergency = funding::forecast_from_points(emergency, target, None, &funding.points, start);
+        for (i, result) in results.iter_mut().enumerate() {
+            let original = forecast(terms[i].remaining, terms[i].contribution, start);
+            result.forecast = funding::forecast_from_points(
+                original,
+                goal_targets[i],
+                Some(i),
+                &funding.points,
+                start,
+            );
+            result.suggested_contribution = None;
+            result.on_track = data.goals[i]
+                .target_date
+                .as_ref()
+                .and_then(|deadline| funding.points.iter().rev().find(|p| &p.date <= deadline))
+                .and_then(|p| p.goals[i].as_deref())
+                .map(crate::budget::parse_total)
+                .transpose()?
+                .zip(goal_targets[i])
+                .map(|(v, t)| v >= t);
+            result.warnings.push("Funding/drawdown events change the reserve path. Review the dated projection; the constant-contribution suggestion is unavailable.".into());
+        }
+        warnings.extend(funding.warnings.iter().cloned());
+        if funding.points.is_empty() {
+            warnings.push("Funding projection is unavailable because savings amounts, targets or contributions are incomplete.".into());
+        }
+    }
     let mut requested = contribution;
     for goal in &terms {
         requested = requested
@@ -484,12 +578,30 @@ pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Sum
         warnings.push("A complete monthly affordability check is unavailable. Review missing savings, budget, or debt inputs.".to_owned());
     }
     let mut alternatives = Vec::new();
-    for amount in &mut data.alternative_contributions {
+    for index in 0..data.alternative_contributions.len() {
+        let amount = &mut data.alternative_contributions[index];
         let cents = parse_money(amount.trim())?;
         *amount = money(cents);
-        let alternative_rows = schedule(remaining, Some(cents), &terms, start, context)?;
+        let (alternative_rows, alternative_funding) = schedule(
+            remaining,
+            Some(cents),
+            &terms,
+            start,
+            context,
+            FundingSchedule {
+                state: funding::State::new(&data, accessible)?,
+                target,
+                goal_targets: &goal_targets,
+            },
+        )?;
+        let alternative_forecast = forecast(remaining, Some(cents), start);
+        let alternative_forecast = if let Some(f) = alternative_funding {
+            funding::forecast_from_points(alternative_forecast, target, None, &f.points, start)
+        } else {
+            alternative_forecast
+        };
         alternatives.push(Scenario {
-            forecast: forecast(remaining, Some(cents), start),
+            forecast: alternative_forecast,
             allocation_warning: if alternative_rows.is_empty()
                 || alternative_rows.iter().any(|r| r.unallocated.is_none())
             {
@@ -518,6 +630,7 @@ pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Sum
             requested_monthly_savings: requested.map(money),
             warnings,
             schedule: rows,
+            funding: funding_result,
         },
     ))
 }
@@ -541,6 +654,7 @@ pub(crate) mod tests {
                 reserved_amount: Some("1000".to_owned()),
                 monthly_contribution: Some("50".to_owned()),
             }],
+            funding: None,
             priorities_note: "Protect bills and debt payments while building emergency coverage."
                 .to_owned(),
         }
@@ -761,5 +875,156 @@ pub(crate) mod tests {
             calculate(data, &c).unwrap().1.emergency_target.as_deref(),
             Some("25999999999980.00")
         );
+    }
+}
+
+#[cfg(test)]
+mod funding_tests {
+    use super::*;
+    fn fixture() -> (PlanData, Context) {
+        let mut d = tests::fixture();
+        d.liquid_savings = Some("300".into());
+        d.obligations_reserved = Some("100".into());
+        d.emergency_contribution = Some("50".into());
+        d.alternative_contributions = vec!["100".into()];
+        d.goals[0].reserved_amount = Some("50".into());
+        d.goals[0].target_amount = Some("100".into());
+        d.goals[0].monthly_contribution = Some("25".into());
+        d.goals[0].target_date = Some("2027-03-31".into());
+        let context = Context {
+            budget_revision: 1,
+            debt_revision: 0,
+            necessary_expenses: Some("100.00".into()),
+            monthly_surplus: Some("500.00".into()),
+            budget_savings: Some("75.00".into()),
+            budget_debt_payments: Some("0.00".into()),
+            debt_start_month: None,
+            debt_monthly_payment: None,
+            debt_changes: vec![],
+            debt_extras: vec![],
+            warnings: vec![],
+        };
+        d.funding = Some(funding::Plan {
+            sources: vec![funding::Source {
+                id: "separate-gift".into(),
+                label: "Separate fictional gift".into(),
+                available: Some("120".into()),
+            }],
+            events: vec![
+                event(
+                    "2026-11-10",
+                    funding::Kind::Drawdown,
+                    None,
+                    None,
+                    None,
+                    "100",
+                ),
+                event(
+                    "2026-11-20",
+                    funding::Kind::Fund,
+                    None,
+                    None,
+                    Some("separate-gift"),
+                    "200",
+                ),
+                event(
+                    "2026-11-25",
+                    funding::Kind::Reallocate,
+                    Some(0),
+                    None,
+                    None,
+                    "30",
+                ),
+                event(
+                    "2026-12-05",
+                    funding::Kind::Drawdown,
+                    Some(0),
+                    None,
+                    None,
+                    "60",
+                ),
+            ],
+        });
+        (d, context)
+    }
+    fn event(
+        date: &str,
+        kind: funding::Kind,
+        bucket: Option<usize>,
+        destination: Option<usize>,
+        source: Option<&str>,
+        amount: &str,
+    ) -> funding::Event {
+        funding::Event {
+            date: date.into(),
+            kind,
+            bucket,
+            destination,
+            source_id: source.map(Into::into),
+            amount: Some(amount.into()),
+            note: "Fictional planned reserve movement".into(),
+        }
+    }
+    #[test]
+    fn funding_drawdowns_refill_and_conservation_match_independent_accounting() {
+        let (d, c) = fixture();
+        let (_, s) = calculate(d, &c).unwrap();
+        let f = s.funding.as_ref().unwrap();
+        assert_eq!(f.events[1].applied.as_deref(), Some("120.00"));
+        assert_eq!(f.events[1].shortfall.as_deref(), Some("80.00"));
+        assert_eq!(f.events[3].applied.as_deref(), Some("45.00"));
+        assert_eq!(f.events[3].shortfall.as_deref(), Some("15.00"));
+        let nov = f.points.iter().find(|p| p.date == "2026-11-30").unwrap();
+        assert_eq!(nov.emergency.as_deref(), Some("250.00"));
+        assert_eq!(nov.goals[0].as_deref(), Some("45.00"));
+        assert_eq!(nov.liquid.as_deref(), Some("395.00"));
+        let dec = f.points.iter().find(|p| p.date == "2026-12-31").unwrap();
+        assert_eq!(dec.liquid.as_deref(), Some("425.00"));
+        assert_eq!(s.emergency.completion_date.as_deref(), Some("2026-12-31"));
+        assert_eq!(
+            s.goals[0].forecast.completion_date.as_deref(),
+            Some("2027-03-31")
+        );
+        assert_eq!(s.goals[0].on_track, Some(true));
+        assert!(s.goals[0].suggested_contribution.is_none());
+        assert_eq!(s.schedule[0].unallocated.as_deref(), Some("425.00"));
+        assert_eq!(f.remaining_sources, vec![Some("0.00".into())]);
+    }
+    #[test]
+    fn future_drawdown_after_initial_funding_requires_refill_and_same_day_uses_no_future_contribution(
+    ) {
+        let (mut d, c) = fixture();
+        d.goals.clear();
+        d.liquid_savings = Some("400".into());
+        d.funding.as_mut().unwrap().events = vec![event(
+            "2027-02-28",
+            funding::Kind::Drawdown,
+            None,
+            None,
+            None,
+            "350",
+        )];
+        let s = calculate(d, &c).unwrap().1;
+        let f = s.funding.unwrap();
+        assert_eq!(f.events[0].applied.as_deref(), Some("300.00"));
+        assert_eq!(f.events[0].shortfall.as_deref(), Some("50.00"));
+        assert_eq!(s.emergency.completion_date.as_deref(), Some("2027-07-31"));
+    }
+    #[test]
+    fn unknown_funding_dates_ids_and_duplicate_sources_never_create_money() {
+        let (mut d, c) = fixture();
+        d.funding.as_mut().unwrap().sources[0].available = None;
+        let s = calculate(d.clone(), &c).unwrap().1;
+        assert_eq!(s.emergency.status, ForecastStatus::Unknown);
+        assert!(s.emergency.completion_date.is_none());
+        d.funding.as_mut().unwrap().events[0].date = "2026-10-31".into();
+        assert!(calculate(d, &c).is_err());
+        let (mut d, c) = fixture();
+        let source = d.funding.as_ref().unwrap().sources[0].clone();
+        d.funding.as_mut().unwrap().sources.push(source);
+        assert!(calculate(d, &c).is_err());
+        let (mut d, c) = fixture();
+        d.funding.as_mut().unwrap().events[0].bucket = Some(1);
+        assert!(calculate(d, &c).is_err());
     }
 }

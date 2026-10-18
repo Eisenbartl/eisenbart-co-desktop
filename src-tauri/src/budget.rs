@@ -79,6 +79,32 @@ pub fn money(cents: i64) -> String {
     )
 }
 
+/// Parse a canonical calculated total without the per-entered-line ceiling.
+/// Authoritative engines can aggregate many individually bounded input amounts.
+pub(crate) fn parse_total(value: &str) -> Result<i64, String> {
+    let text = value.strip_prefix('-').unwrap_or(value);
+    let (whole, fraction) = text.split_once('.').ok_or("Invalid calculated amount.")?;
+    if whole.is_empty()
+        || !whole.bytes().all(|b| b.is_ascii_digit())
+        || fraction.len() != 2
+        || !fraction.bytes().all(|b| b.is_ascii_digit())
+    {
+        return Err("Invalid calculated amount.".into());
+    }
+    let number = whole
+        .parse::<i128>()
+        .map_err(|_| "Calculated amount exceeds its safety limit.")?
+        .checked_mul(100)
+        .and_then(|n| n.checked_add(fraction.parse::<i128>().ok()?))
+        .ok_or("Calculated amount exceeds its safety limit.")?;
+    i64::try_from(if value.starts_with('-') {
+        -number
+    } else {
+        number
+    })
+    .map_err(|_| "Calculated amount exceeds its safety limit.".into())
+}
+
 pub(crate) fn parse_money(value: &str) -> Result<i64, String> {
     let invalid = || {
         "Enter a nonnegative USD amount with at most two decimal places (for example, 1250.50); no commas or currency symbols.".to_owned()
