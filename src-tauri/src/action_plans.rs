@@ -164,6 +164,20 @@ pub fn allocations(a: &assessments::Payload) -> Result<Allocations, String> {
         .planning
         .as_ref()
         .ok_or("Choose a saved assessment with a captured planning scenario.")?;
+    if s.plans
+        .debt
+        .data
+        .as_ref()
+        .is_some_and(|d| !d.targeted_extras.is_empty())
+        || s.plans
+            .savings
+            .data
+            .as_ref()
+            .and_then(|d| d.funding.as_ref())
+            .is_some_and(|f| !f.events.is_empty())
+    {
+        return Err("This captured proposal contains dated targeted payments or savings reserve movements. Review the dated funding and explicitly save a separate monthly agreement before creating a client action plan; a single recurring allocation cannot represent these commitments.".into());
+    }
     let b = &s.plans.budget;
     if b.summary.missing_count > 0
         || !b

@@ -1,45 +1,39 @@
-# Prototype structure and development map — 0.43.0 source
+# Prototype structure and development map — 0.52.0 development source (schema 33)
 
-The user has prioritized a coherent CRUD application structure before further
-advanced financial features. This checkpoint exposes all twelve main sections
-from specification section 5, using existing persistent workflows. The original
-[product specification](product-specification.md) remains governing scope.
-A page being present does not mean every capability on it is implemented.
+The user requested the [client workspace redesign](client-workspace-redesign.md)
+using a supplied layout reference. The global sidebar now contains Dashboard,
+Clients and Settings. A directory-only Clients page opens stable-ID in-app client
+tabs. Each client workspace exposes thirteen focused sections in a local rail:
+Overview, Profile & intake, Session notes, Monthly budget, Debt payoff, Savings &
+sinking funds, Cash-flow calendar, Scenario comparisons, Import statements,
+Review & reconciliation, Spending Analysis, Financial dashboard and Assessments & reports.
 
-## Navigation and implementation entry points
+`App.tsx` owns scoped active-tab navigation and draft/busy guards;
+`ClientDirectory.tsx`, `ClientWorkspaceLayout.tsx`, `ClientOverview.tsx` and
+`client-workspace.css` compose the redesign. Existing client editors and financial
+components remain the implementation entry points. `ImportsEditor.tsx` now also
+exposes separately mounted review subtabs. `client_workspace.rs` supplies a
+read-only summary from the existing saved-plan engines. Schema 30 added the versioned PDF evidence compatibility gate; schema 31 stores
+household planning history, and schema 32 stores scoped transaction-inspection
+details. Version 0.51.0 adds no migration. Original report formats remain unchanged.
 
-`src/workspaceNavigation.ts` defines main sections and client subsections.
-`src/App.tsx` owns unlocked navigation, selected-client context and draft/busy
-checks. `ClientEditor` selects existing components for focused pages; **Complete
-record** retains the integrated workflow. `src/ImportsEditor.tsx` has explicit
-all/documents/transactions/review/reports presentations over the same scoped
-Rust-backed data. Do not add another persistence layer or copy the calculators.
-`src/PlannedWorkspaceAreas.tsx` distinguishes working subpages from named future areas, and
-`src/AdministrationPages.tsx` hosts working/read-only/planned settings pages.
+Only the selected section is mounted. Tabs retain per-client section metadata,
+require explicit draft discard and close to the most recently used remaining tab.
+Locking clears all client tabs and private UI. Directory counts/statuses/profile
+update dates come from real saved records. Future sections below retain their
+existing working/planned boundaries; their former global-page names now refer to
+local sections and subtabs. See the [complete mapping and limits](client-workspace-redesign.md).
 
-| Main section | Working parts / current entry point |
-|---|---|
-| Dashboard | Scoped practice counts, recent clients, appointments and follow-ups (`FollowUpOverview.tsx`) |
-| Clients | Directory/search/filter, create/edit/status/archive; Profile, Intake & follow-ups, Session notes, History & records, Complete record (`App.tsx`, `ClientCare.tsx`) |
-| Financial Review | Approved-data dashboard, explicit financial facts, running-balance checks, recurring-payment review and live completeness diagnostics and versioned reviews (`ImportsEditor.tsx`, `CompletenessReview.tsx`, `SavedCoverageReviews.tsx`) |
-| Transactions | Filterable review queue, source correction/approval/rejection/reversal/history, matched transfers; client-wide searchable bank/card history and local category suggestions, reusable rule CRUD/history and unsaved review drafts (`ImportsEditor.tsx`, `TransactionActivity.tsx`, `ClassificationAssistance.tsx`) |
-| Documents | Bank CSV/selectable-text PDF import, separate signed-card CSV review, statement account management, source documents/checks and versioned collection checklist (`ImportsEditor.tsx`, `DocumentCollection.tsx`, `StatementAccounts.tsx`) |
-| Budget Planner | Saved income/expenses/allocations, remove/edit rows, optional budget method comparisons (`BudgetEditor.tsx`) |
-| Debt Planner | Saved debts, payment changes/extras and monthly snowball/avalanche projections (`DebtEditor.tsx`) |
-| Savings Planner | Saved reserves, emergency targets, sinking-fund goals and contribution comparisons (`SavingsEditor.tsx`) |
-| Cash-Flow Calendar | Saved account balances, dated schedules/transfers, calendar/ledger and non-writing previews (`CashflowEditor.tsx`) |
-| Financial Scenarios | Temporary comparisons, explicitly saved scenarios and historical review (`ScenarioComparisons.tsx`) |
-| Reports | Immutable internal assessments, selected intake/evidence/scenarios, client action plans, summary-first/detailed PDF exports, captured-source final-report checklists and audited counselor approval (`AssessmentRecords.tsx`, `ClientActionPlans.tsx`, `CompletenessReview.tsx`, `ReportPresentation.tsx`) |
-| Settings and Administration | Workspace identity, security/lock, encrypted backup, lock-to-restore route, help; working firm/report branding and named future roles/data/licensing pages (`AdministrationPages.tsx`) |
+## Statement extraction and review dispositions — working in 0.48.0
 
-Client pages require a selected client and display that context. Switching a
-page/client ignores late responses and checks unsaved persistent-record drafts
-or ongoing writes. Explicitly accepting discard remounts the workflow. Temporary
-scenario previews are intentionally unsaved and reset on leaving; save a reviewed
-scenario to retain it. Lock/unlock clears selected clients and page state.
-Main navigation is keyboard reachable, identifies the current page and focuses
-the heading on page/area changes. Sidebar navigation scrolls in short windows.
-No workspace or confidential data is stored in browser local storage or a URL.
+Checking/savings and card PDF inspection uses `statement_pdf.rs` and shared
+`PdfTransactionInspection.tsx`: transaction candidates, editable confident
+preselection, exact draft totals, minimal replayable evidence and immutable
+source locators. Card imports remain in Import statements; **Card transactions**
+in Review & reconciliation owns decisions. Bank/card source approvals can save an
+explicit necessary/discretionary purpose atomically into existing facts histories.
+Current analysis recalculates; saved plans/reports keep their documented basis.
+[Usage, supported layouts and limits](pdf-import-review.md). No installer requested.
 
 ## CRUD coverage and retained history
 
@@ -54,11 +48,43 @@ No workspace or confidential data is stored in browser local storage or a URL.
 | Transactions | Import, inspect, correct fields and change review decisions | Reject/reverse with retained decision history; no silent destruction of source evidence |
 | Category rules | Create/read/edit explicit client/account/type/text rules, with immutable versions and original-decision application history | Archive/reactivate; no automatic approval or financial writes. Cross-account/card/bulk rules remain future work |
 | Scenarios/reports/client plans | Explicitly record, reopen and export immutable snapshots | Retained history; amend by recording a new reviewed version, not editing old financial claims |
-| Organization/admin | Versioned firm name/contact/PNG/disclosure editing and report capture; password access, lock, backup/verified recovery | Counselor/role CRUD, password changes, categories/templates, portable export/deletion and licensing remain planned |
+| Organization/admin | Versioned firm name/contact/PNG/disclosure editing and report capture; password access/change, lock, backup/verified recovery | Counselor/role CRUD, categories/templates, portable export/deletion and licensing remain planned |
 
 A CRUD-oriented interface does not justify deleting audit evidence or rewriting
 an assessment already given to a client. Destructive lifecycle work needs explicit
 retention policy, source dependency checks, audit and recovery acceptance.
+
+## Spending Analysis — working, focused and complete native acceptance passed
+
+The client workspace has a thirteenth section, **Spending Analysis**. It reuses
+approved bank/card sources and existing purpose-review histories, with exact
+summary cards, donut/bars, table filtering and discussion-bound Type edits.
+Import and approval stay in their own sections. [Calculation rules, opportunities
+and safeguards](spending-analysis.md). Current validation is recorded in
+[development status](development-status.md).
+
+## Unified review and household workspaces — existing supported workflows
+
+**Review & reconciliation → All transactions** is the default combined chronological
+bank/card history, with existing financial decision forms and optional retained PDF
+inspection. Dollar shares, purchase-count shares, averages and unknown methods use
+the same eligible purchase rows. See [workflow and limits](unified-transaction-review.md).
+
+Existing household tabs expose explicit members, shared expenses, allocations,
+settlements and reviewed planning handoffs. They do not infer client relationships
+or alter individual records on opening. See [household workflow](household-management.md).
+No new linking or household/business functionality is part of consolidation.
+
+## Financial health assessment — completed and verified in 0.51.0
+
+The existing **Financial dashboard** now hosts the explainable health score,
+essential-evidence gates, approved income-relative measures, behavioral observations,
+source/balance provenance and counselor-selected reduction previews. Existing
+Spending Analysis owns purpose edits; the existing scenario/debt/savings/calendar
+engines own hypothetical projections. No new workspace section or financial store
+was added. [Policy, reuse and acceptance](financial-health-assessment.md); executed
+checks, final focused native acceptance and remaining platform/adapter limits are
+in development status.
 
 ## Future feature areas: return here before implementing
 
@@ -71,25 +97,25 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | UI home | Next implementation files / dependencies | Acceptance before marking working |
 |---|---|---|
 | Documents → Collection checklist — working in 0.28.0 | `DocumentCollection.tsx`, `document_collection.rs`, `document_collection_store.rs`, schema 18; see [usage and limits](document-collection.md) | Implemented create/reopen/edit/archive/reactivate, explicit receipt and scoped source links, history, stale-save/audit rollback, restart/recovery checks; expand limits and usability only with evidence |
-| Documents → Credit-card statements — signed CSV review working | `cards.rs`, `cards_store.rs`, `CardStatements.tsx`, schema 23 | Scoped encrypted sources, explicit signed mapping, individual decisions/history, exact liability/spending/payment checks, bank-report guard and restart/recovery. [Limits and integration work](credit-card-review.md) |
-| Documents → Additional document types | `pdf.rs`, `imports.rs`, supervised parser adapters and import UI | Synthetic card/loan/paystub/institution fixtures, bounded parse, original locators, individual review, duplicate/sign/balance controls |
+| Import statements → Credit-card statements; Review & reconciliation → Card transactions — CSV/PDF working in 0.48.0 | `cards.rs`, `cards_store.rs`, `statement_pdf.rs`, `CardStatements.tsx`, `PdfTransactionInspection.tsx`, schema 30 | Scoped encrypted sources, explicit CSV mappings, editable PDF preselection and exact selected totals, separate individual review, atomic necessary/discretionary dispositions, immutable evidence/history, exact liability/spending/payment checks and restart/recovery. [Usage and limits](credit-card-review.md) |
+| Documents → Additional document types | `pdf.rs`, `imports.rs`, supervised parser adapters and import UI | Broader card/loan/paystub/institution fixtures, bounded parse, original locators, individual review, duplicate/sign/balance controls |
 | Documents → Scanned documents / OCR | Extend supervised `pdf_process.rs`; vetted offline OCR assets/dependencies | Scanned/mixed/rotated/low-quality fixtures, time/memory/page limits, no guessed facts, explicit review, offline/license checks |
 | Transactions → Classification assistance — suggestions and rule CRUD working through 0.42.0 | `classification.rs`, `classification_store.rs`, `ClassificationAssistance.tsx`, existing `ImportsEditor.tsx` review | Scoped 25-record pages, exact current approvals, unresolved conflicts/unknowns, fingerprint-bound unsaved category drafts, explicit audited decisions, reversal, restart/recovery and client isolation. Scoped rule create/edit/archive/reactivate, exact original-version application, conflict/stale/rollback/recovery checks and no automatic approval. [Rules](local-category-rules.md) and [suggestions](classification-assistance.md) |
 | Transactions → Activity history — working in 0.38.0 | `activity_store.rs`, `TransactionActivity.tsx`; existing schema 25 | Scoped 25-event pages, literal/date/account/source/status filters, original/corrected decision evidence, both transfer legs, exact current/obsolete repayment locators, stale-token rejection, ownership, read-only failure and recovery. [Limits](transaction-activity-history.md) |
 | Financial Review → Completeness & final validation — working review/history | `completeness.rs`, `coverage_review.rs`, `coverage_review_store.rs`, `SavedCoverageReviews.tsx` | Declared coverage plus scoped schema-21 expected inventory, dates, source choices, missing information and exceptions; stale/audit/recovery controls and immutable format-7 capture. [Review history and constraints](saved-completeness-reviews.md) |
-| Financial Review → Savings progress | Dated verified balance facts and `FactMetricsView.tsx` | Real approved/verified sources, explicit period, unknown data, independent expected points and no estimates masquerading as facts |
-| Budget Planner → Paycheck allocation | Reuse `budget.rs` and `cashflow.rs`; define period allocations first | Exact frequency/rounding examples, unknown dates, insufficient funding and no automatic double-counted schedules |
-| Debt Planner → Advanced debt terms | Extend Rust debt models/versioned capture, not React math | Independent daily/variable/promotional/fee schedules, payment-order assumptions, unknown terms, comparable strategies and legacy payload compatibility |
-| Savings Planner → Funding & drawdown | Extend `savings.rs` and shared `planning.rs` contexts | No duplicate reserves or invented funds, bounded drawdown dates, independently checked deficits/recovery and transfers excluded from expenses |
-| Cash-Flow Calendar → Transfer settlement | Extend per-account `cashflow.rs` events and persisted assumptions | Outgoing/incoming dates, both account shortfalls, reserves, same-day order, no premature combined liquidity or invented settlement dates |
-| Financial Scenarios → New goals & funding sources | `scenarios.rs` / `scenarios_store` and control components | Explicit new goal/funding/account IDs, baseline remains unchanged, exact affordability/milestones, immutable linked report/recovery validation |
+| Financial Review → Savings progress — implemented in 0.52.0 | `savings_progress.rs`, existing verified fact history and `SavingsProgress.tsx` | Real approved/verified sources, explicit period, unknown data, independent expected points and no estimates masquerading as facts |
+| Budget Planner → Paycheck allocation — implemented in 0.52.0 | `paycheck.rs` derives saved budget earmarks from existing calendar occurrences | Exact frequency/rounding examples, unknown dates, insufficient funding and no automatic double-counted schedules |
+| Debt Planner → Advanced debt terms — implemented in 0.52.0 | Extended `debt.rs` and versioned v2 planning capture; shared debt editor | Independent daily/variable/promotional/fee schedules, payment-order assumptions, unknown terms, comparable strategies and legacy payload compatibility |
+| Savings Planner → Funding & drawdown — implemented in 0.52.0 | Existing `savings.rs` schedule with bounded `savings_funding.rs` state and shared contexts | No duplicate reserves or invented funds, bounded drawdown dates, independently checked deficits/recovery and transfers excluded from expenses |
+| Cash-Flow Calendar → Transfer settlement — implemented in 0.52.0 | Existing per-account `cashflow.rs` schedules with departure/receipt events and reserve floors | Outgoing/incoming dates, both account shortfalls, reserves, same-day order, no premature combined liquidity or invented settlement dates |
+| Financial Scenarios → New goals & funding sources — implemented in 0.52.0 | Existing `scenarios.rs` / `scenarios_store`, shared funding/targeted payment controls | Explicit new goal/funding/account IDs, baseline remains unchanged, exact affordability/milestones, immutable linked report/recovery validation |
 | Reports → Final report checklist — approval working | `final_reports.rs`, `final_reports_store.rs`, `FinalReportApproval.tsx`, report PDF | Schema-22 scoped immutable counselor approval, current evidence gates, account/scenario decisions, exact parent binding, atomic audit, final PDF and restart/recovery. [Policy limits and future work](final-report-approval.md) |
 | Reports → Print & presentation — PDF layouts / Windows viewer handoff working in 0.40.0 | `ReportPresentation.tsx`, `report_presentation.rs`, `report_presentation_store.rs`, `assessment_pdf.rs`; schema 25 unchanged | Summary-first page, complete evidence appendix, original detailed option, distinct internal/v1/v2 bases, exact figures/unknowns, stale/scoped/no-overwrite export, restart/recovery. Explicit unchanged-file Windows viewer handoff with consent/expiry/session checks; choose Print in that viewer. In-app job submission and installed Windows viewer/printer acceptance remain open. [Usage](windows-pdf-print-workflow.md) |
 | Clients → History & records — working in 0.43.0 | `ClientHistory.tsx`, `NoteCorrection.tsx`, `client_history_store.rs`, schema 27; original note/report formats unchanged | Scoped 25-event pages, literal/type/Chicago-date filters, source-section navigation, explicit correction reasons/history, stale/audit/recovery controls, original report bytes retained and current-head report selection. [Usage and limits](client-history.md) |
 | Documents → Statement accounts (working) | `StatementAccounts.tsx`, `statement_accounts_store`, schema 19 | Scoped standalone create/rename/archive/reactivate, revision/audit/recovery checks; original source/report associations preserved; no destructive deletion |
 | Settings → Branding — working in 0.30.0 | `FirmBranding.tsx`, `branding.rs`, `branding_store.rs`, schema 20, format-6 assessments | Implemented bounded normalized local PNG/contact/disclosure, guarded revision/audit saves, exact immutable capture, old payload/digest preservation and recovery; see [limits and future work](firm-report-branding.md) |
 | Settings → Counselors & roles | Auth/session/storage ownership and role model before UI CRUD | Explicit account lifecycle and permissions for reads/writes/approvals/reports/admin, fail-closed access, isolation and recovery drills |
-| Settings → Security | Existing password/key/session model | Password rekey/rollback/recovery, inactivity settings, no password disclosure and independent security acceptance |
+| Settings → Security — password change and configurable inactivity working through 0.45.0 | `PasswordChange.tsx`, `password_change.rs`, `InactivitySettings.tsx`, `security_policy.rs`, generation activation and command operation lock; schema 29 | Current-password authentication, new confirmation, retained-copy disclosure, verified copy-before-switch, failure rollback, interrupted processes, stale instances, old/new backup passwords and private UI clearing. Versioned 1–60 minute inactivity settings now preserve the legacy 15-minute default, use no-refresh background reads, enforce other-instance shortening, and survive restart/recovery; independent/installed Windows acceptance remains open. [Usage](workspace-password-change.md) |
 | Settings → Backup & recovery | `backup.rs`; current verified recovery flow already works | Scheduled backups/retained-copy selection need bounded local scheduling, failures, durable restore and clean Windows offline drills |
 | Settings → Data management | Authorized client export/retention/deletion services | Reviewable scope/dependencies, encryption/disclosure, audit, no cross-client data loss, cancellation and recovery tests |
 | Settings → Licensing | Offline license/update architecture and distribution metadata | Offline grace/expiry rules, signed updates/installers, third-party license inventory, support/legal review; no certification claims |
@@ -100,24 +126,29 @@ installed workflows, realistic volume tests, accessibility/usability, signing,
 security/privacy review, documentation and commercial/legal acceptance. Page
 structure does not complete these requirements.
 
-## Next implementation priority
+## Current priority and retained implementation history
 
-Implement **local workspace password change and recovery safeguards** in Settings → Security, reusing existing authentication/encrypted storage and durable recovery activation. Preserve source/report bytes, handle interrupted rekey safely, and retain old-backup password semantics. See [next-stage notes](workspace-password-next-stage.md).
+Complete and validate the user-requested [financial planning subpages](financial-planning-subpages.md).
+All six subpages are now connected to their existing homes and engines, including
+new goals, named sources, targeted extras and explicit scenario settlement changes.
+Final full/native/CI acceptance is in progress. The previous audit
+review remains historical context; no merge or installer is authorized.
 
-Client history and reviewed note corrections are implemented in 0.43.0; see [usage and limits](client-history.md).
 
-Reusable local category-rule CRUD is implemented in 0.42.0, including archive/reactivation and exact original-version application history; do not rebuild it.
+The [end-to-end workflow integration audit](workflow-integration-audit.md) now
+verifies the consolidated 0.51.0 source. Its review remains open; the newly requested 0.52.0 planning completion is now the
+active task, followed by human review and counselor evaluation with fictional records.
+Unified review (0.50.0) and financial
+health (0.51.0) are implemented; their current validation belongs in development
+status. Do not restart them as future projects. Broader adapters/OCR, retained-copy
+selection, lender-specific financial terms and installed Windows acceptance remain separate
+priorities requiring explicit scope. No new installer without a request.
 
-The bounded Windows saved-PDF handoff is implemented in 0.40.0. Printing is chosen
-in the external viewer; direct job submission and actual installed Windows
-viewer/printer acceptance remain separate. Do not redo report layouts or approvals.
-
-Card account CRUD, assignments, repayments, completeness/roles/debt mappings and
-bounded versioned final approval are implemented through 0.37.0 below. Build on
-them. Other loan obligations, unsupported refund roles, credits, early closure
-and split/cross-period repayments stay blocked until modeled and tested. Broader
-adapters/OCR/printing/advanced models, security/commercial review and installed
-Windows acceptance remain separate original requirements.
+Existing password changes/inactivity policy, client history, category-rule CRUD,
+report presentation and final approval must be reused. The 0.47.0 download is a
+historical package rather than a current source delivery. The milestone sections
+below retain original sequencing and acceptance context; their former “next” steps
+are superseded by later implemented milestones and the current priority above.
 
 ### 0.35.0 — integrated provisional bank/card review
 
@@ -240,3 +271,74 @@ Session notes support explicit append-only corrections, optimistic fingerprints
 and retained original/reason history. New reports select current note heads; old
 report bytes and IDs remain original and changed context requires renewed review.
 See [usage](client-history.md) and [executed checks](development-status.md).
+
+### 0.44.0 — workspace password change and recovery safeguards
+
+Settings → Security creates a verified new encrypted generation, atomically
+activates it and locks the workspace. Whole-command serialization prevents
+cooperating stale instances from writing to a retired generation. Older backups
+and retained copies keep their original passwords; no forgotten-password reset
+is introduced. Schema 28 only extends immutable audit events. See
+[design and limits](workspace-password-change.md) and executed development status.
+
+### 0.45.0 — encrypted configurable inactivity policy
+
+Settings → Security saves immutable revisioned 1–60 minute policy changes with
+atomic audit. Rust uses the latest policy for every authenticated access and
+background expiry; observation does not refresh activity and corruption locks
+access. Existing workspaces/older backups retain the 15-minute default. Recovery
+validates history, password changes preserve it and UI locking clears private
+state. Pending review/preview expiry remains fixed. See
+[design and validation scope](inactivity-locking.md).
+
+### 0.47.0 — approved spending analysis and reviewed Type changes
+
+`SpendingAnalysis.tsx` and `spending_analysis.rs` supply exact live bank/card
+spending, category charts, table filters, comparison and supported opportunities.
+Discussion-bound Necessary/Discretionary changes reuse existing immutable purpose
+stores, preserve source evidence and captured reports, recalculate current results
+and require renewed card completeness review. Schema 29 remains unchanged.
+See [scope and limits](spending-analysis.md) and [executed validation](development-status.md).
+
+## Household workspaces — working in 0.49.0
+
+Implemented the supplied household-management stage as an extension of Clients:
+Household directory and top tabs, ten-section collapsible household rail, exact
+shared allocation previews and effective revisions, member linking/consent,
+separate payment/settlement ledger, authorized source matching and shared purpose
+history, controlled individual budget/cash-flow reconciliation, shared goals,
+proposals and internal historical PDF reports. The navy/white/slate/gold reference
+informs the compact overview cards, donut, contribution bars and tables.
+
+See [workflow, calculation basis and bounded limitations](household-management.md)
+and the [original household brief](household-management-specification.md).
+Household state survives tab changes; saved records survive restart and encrypted
+recovery. Monthly responsibilities use applicable due-date agreements; no daily
+proration, private income/account import or personal debt merging is inferred.
+
+Acceptance requires exact $600/$900/$900 shares for $2,400 rent, no spending
+inflation from internal reimbursements, explicit individual reconciliation,
+source/consent revocation handling, preserved history, tab/draft privacy on lock,
+native desktop/narrow layout, restart and recovery. Execution results belong in
+`development-status.md`, separately from this functionality map. No installer.
+
+## Unified transaction review — working in 0.50.0, native acceptance passed
+
+**Review & reconciliation → All transactions** combines one current row per bank
+or card record, sorted by transaction date with stable same-day IDs. Combined
+filters/search, posting-date basis, bounded pages, original/history access and
+optional PDF inspection extend existing intake/review rather than duplicate it.
+Focused bank/card forms retain their original audited approval/purpose APIs.
+Source-bound method/posting details and reviewed institution/masked account
+metadata use an encrypted append-only schema-32 journal. Suspected duplicates and
+explicitly confirmed rejected duplicates remain distinct; reapproval invalidates
+old detail bindings. Reconciled approved purchase-method figures include unknown
+coverage and exclude payments/transfers/refunds/fees/interest/duplicates.
+
+[Baseline reuse checklist](unified-transaction-review-checklist.md), [brief](unified-transaction-review-specification.md)
+and [workflow/limits](unified-transaction-review.md) define the feature. Loan,
+mortgage and credit-line transaction adapters remain unavailable; plans/balances
+are not invented transaction sources. Native original rendering, focused financial
+decisions, exact totals, narrow layout, lock/restart and recovery passed. The full
+regression and final localized channel refinement are recorded separately in
+`development-status.md`. No installer without an explicit request.

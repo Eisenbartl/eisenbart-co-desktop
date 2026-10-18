@@ -1,7 +1,17 @@
+import HouseholdWorkspace from './HouseholdWorkspace';
+import HouseholdDirectory from './HouseholdDirectory';
+import ConfirmationDialog,{confirmDiscard} from './ConfirmationDialog';
+import ClientDirectory,{clientName} from './ClientDirectory';
+import ClientWorkspaceLayout from './ClientWorkspaceLayout';
+import ClientOverview from './ClientOverview';
+import SpendingAnalysis from './SpendingAnalysis';
+import './client-workspace.css';
+import Icon from './Icons';
 import ClientHistory from './ClientHistory';
 import NoteCorrection from './NoteCorrection';
 import ReportPresentation from './ReportPresentation';
 import TransactionActivity from './TransactionActivity';
+import UnifiedTransactions from './UnifiedTransactions';
 import CardCompleteness from './CardCompleteness';
 import CardFinancialReview from './CardFinancialReview';
 import CardStatements from './CardStatements';
@@ -10,13 +20,15 @@ import StatementAccounts from './StatementAccounts';
 import DocumentCollection from './DocumentCollection';
 import AdministrationPages from './AdministrationPages';
 import PlannedWorkspaceArea,{plannedAreas,workingAreas} from './PlannedWorkspaceAreas';
-import {workspacePages,clientSections,isModule,type View,type ClientSection} from './workspaceNavigation';
+import {workspacePages,isModule,type View,type ClientSection} from './workspaceNavigation';
 import FollowUpOverview from './FollowUpOverview';
 import ClientCare from './ClientCare';
 import ImportsEditor from './ImportsEditor';
 import {RestorePanel} from './RecoveryPanel';
 import CashflowEditor from './CashflowEditor';
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import PaycheckAllocation from './PaycheckAllocation';
+import SavingsProgress from './SavingsProgress';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import SavingsEditor from './SavingsEditor';
 import DebtEditor from './DebtEditor';
 import BudgetEditor from './BudgetEditor';
@@ -25,30 +37,10 @@ import { listen } from '@tauri-apps/api/event';
 import { api, desktopAvailable, resetApiSession } from './api';
 import { CLIENT_STATUSES, type Client, type ClientInput, type ClientNote, type SetupInput, type RestoreResult, type WorkspaceInfo } from './types';
 
+const defaultModuleArea=(view:View)=>view==='Transactions'?'All transactions':'Working tools';
+
 type Phase = 'checking' | 'setup' | 'locked' | 'unlocked' | 'error';
 
-function Icon({ name, size = 20 }: { name: string; size?: number }) {
-  const paths: Record<string, ReactNode> = {
-    dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
-    clients: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
-    settings: <><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6 2.1-2.1" /><circle cx="12" cy="12" r="5" /></>,
-    review: <><path d="M9 3H5v18h14V3h-4M9 3v4h6V3Z"/><path d="m8 14 2 2 5-5"/></>,
-    transactions: <><path d="M3 7h17m-4-4 4 4-4 4M21 17H4m4-4-4 4 4 4"/></>,
-    budget: <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h2m4 0h2M8 17h2m4 0h2"/></>,
-    debt: <><path d="M4 4v16h16M7 8l4 4 4-2 5 7"/></>,
-    savings: <><circle cx="12" cy="12" r="9"/><path d="M15 8h-4a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4H9m3-10v12"/></>,
-    calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-13 4h3m3 0h3m-9 4h3"/></>,
-    scenarios: <><path d="M4 3v18m0-10h8l7-7M12 11l7 7m-4-14h4v4m-4 10h4v-4"/></>,
-    lock: <><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /><path d="M12 14v3" /></>,
-    plus: <path d="M12 5v14M5 12h14" />,
-    search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" /></>,
-    arrow: <path d="m9 5 7 7-7 7" />,
-    check: <path d="m5 12 4 4L19 6" />,
-    file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6M8 13h8M8 17h5" /></>,
-    shield: <><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z" /><path d="m8 12 3 3 5-6" /></>,
-  };
-  return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name] ?? paths.file}</svg>;
-}
 
 function message(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -141,6 +133,7 @@ function AuthForm({ setup, busy, error, notice, onSubmit, onRestored }: {
         </form>
         <RestorePanel onRestored={onRestored}/>
         <p className="auth-storage"><Icon name="lock" size={14} />Your workspace data stays on this computer.</p>
+
       </div>
       <DevelopmentNotice />
     </main>
@@ -153,7 +146,7 @@ function clientInput(client: Client): ClientInput {
   return { id: client.id, firstName: client.firstName, lastName: client.lastName, email: client.email, phone: client.phone, householdSize: client.householdSize, status: client.status, goals: client.goals };
 }
 
-function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy, followUpId, section='record', onNavigate, onClientSection }: {
+function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy, followUpId, section='profile', onNavigate, onClientSection }: {
   client: Client | null; workspace: WorkspaceInfo; followUpId?:string; section?:ClientSection; onNavigate:(view:View)=>void; onClientSection?:(section:ClientSection)=>void;
   onSaved: (client: Client) => void; onCancel: () => void;
   onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void;
@@ -179,8 +172,8 @@ function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy, f
   const [saved, setSaved] = useState(false);
   const mounted = useRef(true);
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline) || noteDirty || budgetDirty || debtDirty || savingsDirty || cashflowDirty || importsDirty || careDirty;
-  useEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
-  useEffect(() => { onBusy(saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy || careBusy); }, [saving, noteSaving, budgetSaving, debtSaving, savingsSaving, cashflowSaving, importsBusy, scenarioBusy, careBusy, onBusy]);
+  useLayoutEffect(() => { onDirty(dirty); }, [dirty, onDirty]);
+  useLayoutEffect(() => { onBusy(saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy || careBusy); }, [saving, noteSaving, budgetSaving, debtSaving, savingsSaving, cashflowSaving, importsBusy, scenarioBusy, careBusy, onBusy]);
   useEffect(() => {
     mounted.current = true;
     return () => { mounted.current = false; onDirty(false); onBusy(false); };
@@ -214,10 +207,10 @@ function ClientEditor({ client, workspace, onSaved, onCancel, onDirty, onBusy, f
     }
   }
 
-  const shows=(...sections:ClientSection[])=>section==='record'||sections.includes(section);
+  const shows=(...sections:ClientSection[])=>sections.includes(section);
   return <div className="client-editor">
     {shows('profile')&&<div className="panel editor-panel">
-      <div className="panel-heading"><div><p className="eyebrow">{client ? 'CLIENT RECORD' : 'CLIENT INTAKE'}</p><h2>{client ? `${client.firstName} ${client.lastName}` : 'Add a new client'}</h2></div>{client && <Status status={client.status} />}</div>
+      <div className="panel-heading"><div><p className="eyebrow">{client ? 'CLIENT RECORD' : 'CLIENT INTAKE'}</p><h2>{client ? 'Client profile' : 'Add a new client'}</h2></div>{client && <Status status={client.status} />}</div>
       <form onSubmit={save} noValidate>
         <fieldset disabled={saving || noteSaving || budgetSaving || debtSaving || savingsSaving || cashflowSaving || importsBusy || scenarioBusy || careBusy}>
           <div className="form-section"><h3>Personal information</h3><p className="muted small">Start with the essentials. You can add details as counseling progresses.</p></div>
@@ -319,6 +312,10 @@ function Initials({ client }: { client: Client }) {
   return <span className="avatar" aria-hidden="true">{client.firstName.slice(0, 1)}{client.lastName.slice(0, 1)}</span>;
 }
 
+function passwordNotice(durabilityWarning:boolean):string {
+  return `Workspace password changed. Unlock with the new password. Older backups and retained copies still require their original passwords.${durabilityWarning?' The disk did not confirm directory synchronization. Keep both passwords and your backups until restart verifies the active workspace.':''}`;
+}
+
 export default function App() {
   const [phase, setPhase] = useState<Phase>('checking');
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
@@ -327,7 +324,10 @@ export default function App() {
   const [recoveryNotice,setRecoveryNotice]=useState('');
   const [statusAttempt, setStatusAttempt] = useState(0);
   const [view, setView] = useState<View>('Dashboard');
-  const [clientSection,setClientSection]=useState<ClientSection>('record');
+  const [clientSection,setClientSection]=useState<ClientSection>('overview');
+  const [tabs,setTabs]=useState<{id:string;client:Client;view:View;section:ClientSection;area:string}[]>([]);
+  const [recentTabs,setRecentTabs]=useState<string[]>([]);
+  const [healthSpendingPeriod,setHealthSpendingPeriod]=useState<{clientId:string;query:import('./healthTypes').HealthQuery}|null>(null);
   const [moduleArea,setModuleArea]=useState('Working tools');
   const [clients, setClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
@@ -340,7 +340,24 @@ export default function App() {
   const [selectionLoading, setSelectionLoading] = useState(false);
   const [selectionError, setSelectionError] = useState('');
   const pageHeading=useRef<HTMLHeadingElement>(null);
-  useEffect(()=>{if(phase==='unlocked'){pageHeading.current?.focus({preventScroll:true});pageHeading.current?.scrollIntoView?.({block:'start'});}},[view,clientSection,moduleArea,phase]);
+  const requestedFocus=useRef<string|null>(null);
+  useEffect(()=>{
+    if(phase!=='unlocked')return;
+    const clientPage=selected&&view!=='Dashboard'&&view!=='Settings';
+    const heading=clientPage?document.getElementById('client-workspace-heading'):pageHeading.current;
+    heading?.focus({preventScroll:true});(clientPage?document.querySelector('.client-workspace-header'):heading?.closest('.page-heading'))?.scrollIntoView?.({block:'start'});
+    const target=requestedFocus.current;
+    if(target==='create'&&editing&&!selected){document.getElementById('first-name')?.focus();requestedFocus.current=null;}
+    else if(target==='directory'&&view==='Clients'&&!selected){document.getElementById('directory-tab')?.focus({preventScroll:true});requestedFocus.current=null;}
+    else if(target&&selected?.id===target&&clientPage){document.getElementById(`client-tab-${target}`)?.focus({preventScroll:true});requestedFocus.current=null;}
+  },[view,clientSection,moduleArea,phase,selected?.id,editing]);
+
+  const [householdTabs,setHouseholdTabs]=useState<{id:string;name:string}[]>([]);
+  const [activeHousehold,setActiveHousehold]=useState<string|null>(null);
+  const [householdCreateRequest,setHouseholdCreateRequest]=useState(0);
+  const householdStates=useRef<Record<string,{dirty:boolean;busy:boolean}>>({});
+  const householdState=useRef((id:string,dirty:boolean,busy:boolean)=>{householdStates.current[id]={dirty,busy};}).current;
+  const householdName=useRef((id:string,name:string)=>setHouseholdTabs(t=>t.map(x=>x.id===id?{...x,name}:x))).current;
   const session = useRef(0);
   const selectionRequest = useRef(0);
   const dirty = useRef(false);
@@ -358,7 +375,14 @@ export default function App() {
       setAuthError('');
     };
     window.addEventListener('workspace-access-expired', expire);
-    listen('workspace-locked', expire).then(remove => { if (cancelled) remove(); else unlisten = remove; }).catch(() => {
+    const locked = (event?: {payload?: unknown}) => {
+      expire();
+      const payload = event?.payload;
+      if (payload && typeof payload === 'object' && 'reason' in payload && payload.reason === 'password_changed' && 'durabilityWarning' in payload && typeof payload.durabilityWarning === 'boolean') {
+        setRecoveryNotice(passwordNotice(payload.durabilityWarning));
+      }
+    };
+    listen('workspace-locked', locked).then(remove => { if (cancelled) remove(); else unlisten = remove; }).catch(() => {
       // The command layer still enforces locking if event delivery is unavailable.
     });
     return () => { cancelled = true; unlisten?.(); window.removeEventListener('workspace-access-expired', expire); };
@@ -396,9 +420,10 @@ export default function App() {
   }, [statusAttempt]);
 
   function clearWorkspace() {
-    resetApiSession();
+    resetApiSession();requestedFocus.current=null;
     session.current += 1;
     selectionRequest.current += 1;
+    setHouseholdTabs([]);setActiveHousehold(null);setHouseholdCreateRequest(0);householdStates.current={};
     setWorkspace(null);
     setClients([]);
     setClientsError('');
@@ -411,10 +436,15 @@ export default function App() {
     setSearch('');
     setStatusFilter('All statuses');
     setView('Dashboard');
-    setClientSection('record');setModuleArea('Working tools');
+    setHealthSpendingPeriod(null);setClientSection('overview');setModuleArea('Working tools');setTabs([]);setRecentTabs([]);
     dirty.current = false;
     editorBusy.current = false;
   }
+
+  useEffect(()=>{
+    if(!selected||view==='Dashboard'||view==='Settings')return;
+    setTabs(previous=>previous.map(t=>t.id===selected.id?{...t,client:selected,view,section:clientSection,area:moduleArea}:t));
+  },[selected,view,clientSection,moduleArea]);
 
   async function loadClients() {
     const currentSession = session.current;
@@ -447,15 +477,31 @@ export default function App() {
     }
   }
 
+  function passwordChanged(result:import('./types').PasswordChangeResult) {
+    clearWorkspace();setAuthError('');setAuthBusy(false);setPhase('locked');
+    setRecoveryNotice(passwordNotice(result.durabilityWarning));
+  }
+
   function restored(result:RestoreResult) {
     clearWorkspace();setAuthError('');setAuthBusy(false);setPhase('locked');
     setRecoveryNotice(`Workspace restored. Unlock it using the password from this backup.${result.durabilityWarning?' The disk did not confirm directory synchronization; keep your backup available.':''}`);
   }
 
-  function canLeave(): boolean {
+  function canLeave(resume:()=>void): boolean {
+    if(Object.values(householdStates.current).some(s=>s.busy))return false;
+
     if (editorBusy.current) return false;
-    return !dirty.current || window.confirm('You have unsaved client changes. Discard them and continue?');
+    if(!dirty.current)return true;
+    const generation=session.current,request=selectionRequest.current;
+    confirmDiscard('You have unsaved client changes. Discard them and continue?',()=>{
+      if(generation!==session.current||request!==selectionRequest.current||editorBusy.current)return;
+      dirty.current=false;resume();
+    });
+    return false;
   }
+
+  function cancelClient(){if(canLeave(cancelClient)){requestedFocus.current='directory';clearSelection();document.getElementById('directory-tab')?.focus();}}
+  function selectArea(area:string){if(moduleArea!==area&&canLeave(()=>selectArea(area))){setModuleArea(area);dirty.current=false;}}
 
   function clearSelection() {
     selectionRequest.current += 1;
@@ -467,36 +513,51 @@ export default function App() {
     dirty.current = false;
   }
 
-  function navigate(next: View) {
-    if (view === next || !canLeave()) return;
+  function navigate(next: View, section?:ClientSection) {
+    if (!canLeave(()=>navigate(next,section))) return;
+    setHealthSpendingPeriod(null);setActiveHousehold(null);
     selectionRequest.current++;setSelectionLoading(false);setSelectionError('');
-    setEditing(Boolean(selected));setTargetFollowUp(undefined);
-    dirty.current=false;setModuleArea('Working tools');
-    setView(next);
+    dirty.current=false;editorBusy.current=false;setTargetFollowUp(undefined);
+    if(next==='Clients'&&section){setView('Clients');setClientSection(section);setEditing(Boolean(selected));}
+    else if(next==='Clients'){requestedFocus.current='directory';clearSelection();setView('Clients');document.getElementById('directory-tab')?.focus();}
+    else {setView(next);setEditing(Boolean(selected));setModuleArea(defaultModuleArea(next));}
+  }
+
+  function openHealthArea(area:import('./healthTypes').HealthArea,period?:import('./healthTypes').HealthQuery) {
+    if(!canLeave(()=>openHealthArea(area,period)))return;
+    const view=({classifications:'Spending Analysis',transactions:'Transactions',facts:'Transactions',coverage:'Transactions',cards:'Transactions',debt:'Debt Planner',savings:'Savings Planner',cashflow:'Cash-Flow Calendar',scenarios:'Financial Scenarios'} as const)[area];
+    navigate(view);
+    if(area==='classifications'&&selected&&period)setHealthSpendingPeriod({clientId:selected.id,query:period});
+    const section=({facts:'Verified figures',coverage:'Completeness & final validation',cards:'Card completeness'} as Partial<Record<import('./healthTypes').HealthArea,string>>)[area];
+    if(section)setModuleArea(section);
   }
 
   function createClient() {
-    if (!canLeave()) return;
-    clearSelection();
-    setView('Clients');setClientSection('record');
-    setEditing(true);
+    if (!canLeave(createClient)) return;
+    setActiveHousehold(null);requestedFocus.current='create';clearSelection();setView('Clients');setClientSection('profile');setEditing(true);
   }
 
-  async function openClient(id: string, followUpId?:string, targetView:View='Clients') {
-    if (!canLeave()) return;
+  async function openClient(id: string, followUpId?:string, targetView?:View) {
+    if(selected?.id===id&&!followUpId&&!targetView&&view!=='Dashboard'&&view!=='Settings'){
+      document.getElementById(`client-tab-${id}`)?.focus();return;
+    }
+    if (!canLeave(()=>void openClient(id,followUpId,targetView))) return;
+    setActiveHousehold(null);
+    const existing=tabs.find(t=>t.id===id);
     clearSelection();
     const request = selectionRequest.current;
     const currentSession = session.current;
-    setView(targetView);if(targetView!==view)setModuleArea('Working tools');
-    if(followUpId)setClientSection('record');
+    const nextView=followUpId?'Clients':targetView??existing?.view??'Clients';
+    setView(nextView);setModuleArea(targetView?defaultModuleArea(nextView):existing?.area??defaultModuleArea(nextView));
+    setClientSection(followUpId?'intake':targetView?'overview':existing?.section??'overview');
     setSelectionLoading(true);
     try {
       const result = await api.getClient(id);
       if (request === selectionRequest.current && currentSession === session.current) {
         if(result.id!==id)throw new Error('The client response did not match the selected record.');
-        setTargetFollowUp(followUpId);
-        setSelected(result);
-        setEditing(true);
+        requestedFocus.current=id;setTargetFollowUp(followUpId);setSelected(result);setEditing(true);
+        setTabs(previous=>previous.some(t=>t.id===id)?previous: [...previous,{id,client:result,view:nextView,section:followUpId?'intake':'overview',area:defaultModuleArea(nextView)}]);
+        setRecentTabs(previous=>[...previous.filter(t=>t!==id),id]);
       }
     } catch (caught) {
       if (request === selectionRequest.current && currentSession === session.current) setSelectionError(message(caught));
@@ -505,8 +566,35 @@ export default function App() {
     }
   }
 
+  function closeClientTab(id:string){
+    const active=selected?.id===id&&view!=='Dashboard'&&view!=='Settings';
+    if(active&&!canLeave(()=>closeClientTab(id)))return;
+    setTabs(previous=>previous.filter(t=>t.id!==id));setRecentTabs(previous=>previous.filter(t=>t!==id));
+    if(active){dirty.current=false;editorBusy.current=false;clearSelection();const next=[...recentTabs].reverse().find(t=>t!==id&&tabs.some(tab=>tab.id===t));if(next)void openClient(next);else{requestedFocus.current='directory';setView('Clients');}}
+    else document.getElementById(selected&&selected.id!==id?`client-tab-${selected.id}`:'directory-tab')?.focus();
+  }
+
+  function tabKeys(event:import('react').KeyboardEvent<HTMLDivElement>){
+    if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!(event.target instanceof HTMLElement)||event.target.getAttribute('role')!=='tab')return;
+    const ids=['directory',...tabs.map(t=>t.id),...householdTabs.map(t=>`household:${t.id}`)];const active=event.target.dataset.clientTab??'directory';const index=ids.indexOf(active);
+    const next=event.key==='Home'?ids[0]:event.key==='End'?ids[ids.length-1]:ids[(index+(event.key==='ArrowRight'?1:-1)+ids.length)%ids.length];
+    event.preventDefault();if(next==='directory'){navigate('Clients');}else if(next.startsWith('household:')){const h=householdTabs.find(h=>h.id===next.slice(10));if(h)openHousehold(h.id,h.name)}else void openClient(next);
+  }
+
+  function openHousehold(id:string,name:string){
+    if(!canLeave(()=>openHousehold(id,name)))return;
+    clearSelection();setView('Clients');setActiveHousehold(id);setHouseholdTabs(t=>t.some(x=>x.id===id)?t:[...t,{id,name}]);
+    window.setTimeout(()=>document.getElementById(`household-tab-${id}`)?.focus(),0);
+  }
+  function closeHousehold(id:string){
+    if(householdStates.current[id]?.busy)return;
+    const close=()=>{delete householdStates.current[id];setHouseholdTabs(t=>t.filter(x=>x.id!==id));if(activeHousehold===id){setActiveHousehold(null);setView('Clients');requestedFocus.current='directory';document.getElementById('directory-tab')?.focus();}};
+    if(householdStates.current[id]?.dirty)confirmDiscard('Discard the unsaved household draft and close this tab?',close);else close();
+  }
+  function createHousehold(){if(!canLeave(createHousehold))return;navigate('Clients');setHouseholdCreateRequest(v=>v+1);}
   async function lock() {
-    if (!canLeave()) return;
+    if (!canLeave(()=>void lock())) return;
+    if(Object.values(householdStates.current).some(s=>s.dirty)){confirmDiscard('Discard unsaved household drafts and lock the workspace?',()=>{householdStates.current={};void lock()});return;}
     clearWorkspace();
     setPhase('locked');
     setAuthBusy(true);
@@ -515,9 +603,12 @@ export default function App() {
   }
 
   function savedClient(client: Client) {
+    dirty.current=false;editorBusy.current=false;
     setClients(previous => [client, ...previous.filter(item => item.id !== client.id)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
-    setSelected(client);
-    setEditing(true);
+    if(!selected){setClientSection('overview');setView('Clients');}
+    setSelected(client);setEditing(true);
+    setTabs(previous=>previous.some(t=>t.id===client.id)?previous.map(t=>t.id===client.id?{...t,client}:t):[...previous,{id:client.id,client,view:'Clients',section:'overview',area:'Working tools'}]);
+    setRecentTabs(previous=>[...previous.filter(id=>id!==client.id),client.id]);
   }
 
   if (!desktopAvailable()) return <main className="standalone"><Brand /><div className="panel standalone-panel"><Icon name="lock" size={32} /><h1>Open the desktop application</h1><p className="muted">This workspace runs inside the Eisenbart & Co. desktop application. A browser preview cannot access your local database.</p></div><DevelopmentNotice /></main>;
@@ -528,21 +619,28 @@ export default function App() {
   const newIntakes = clients.filter(client => client.status === 'New Intake');
   const followUps = clients.filter(client => client.status === 'Follow-Up');
   const recentClients = [...clients].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);
-  const query = search.trim().toLocaleLowerCase();
-  const visibleClients = clients.filter(client => (statusFilter === 'All statuses' || client.status === statusFilter) && `${client.firstName} ${client.lastName} ${client.email} ${client.phone}`.toLocaleLowerCase().includes(query));
+
+
+  const tabLabel=(client:Client)=>tabs.some(t=>t.id!==client.id&&clientName(t.client)===clientName(client))?`${clientName(client)} · ${client.id}`:clientName(client);
 
   return <div className="app-shell">
     <aside className="sidebar">
       <Brand compact />
       <div className="workspace-label"><span>WORKSPACE</span><strong title={workspace.organizationName}>{workspace.organizationName}</strong></div>
-      <nav aria-label="Main navigation">{workspacePages.map(item=><button key={item.id} title={item.title} className={`nav-item ${view===item.id?'active':''}`} aria-label={item.id} aria-current={view===item.id?'page':undefined} onClick={()=>navigate(item.id)}><Icon name={item.icon}/><span>{item.title}</span>{item.id==='Clients'&&<span className="nav-count">{clients.length}</span>}</button>)}</nav>
+      <nav aria-label="Main navigation">{workspacePages.filter(item=>['Dashboard','Clients','Settings'].includes(item.id)).map(item=><button key={item.id} title={item.title} className={`nav-item ${(view===item.id||(item.id==='Clients'&&isModule(view)))?'active':''}`} aria-label={item.id} aria-current={view===item.id||(item.id==='Clients'&&isModule(view))?'page':undefined} onClick={()=>navigate(item.id)}><Icon name={item.icon}/><span>{item.title}</span>{item.id==='Clients'&&<span className="nav-count">{clients.length}</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="local-indicator"><span aria-hidden="true" />Local workspace</div><div className="counselor"><div className="counselor-avatar" aria-hidden="true">{workspace.counselorName.slice(0, 1)}</div><div><strong title={workspace.counselorName}>{workspace.counselorName}</strong><span>Counselor</span></div></div><button className="lock-button" onClick={lock}><Icon name="lock" size={16} />Lock workspace</button></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><div className="breadcrumbs">Workspace<Icon name="arrow" size={13} /><strong>{view}</strong></div><div className="offline-status"><Icon name="shield" size={15} />Offline-first · Local storage</div></header>
+      <header className="topbar"><div className="breadcrumbs">Workspace<Icon name="arrow" size={13} /><strong>{activeHousehold?householdTabs.find(t=>t.id===activeHousehold)?.name:selected&&view!=='Dashboard'&&view!=='Settings'?clientName(selected):view}</strong></div><div className="offline-status"><Icon name="shield" size={15} />Offline-first · Local storage</div></header>
+      <div className="workspace-tabbar" role="tablist" aria-label="Open workspace tabs" onKeyDown={tabKeys}><div className="workspace-tab-scroll">
+        <div className={`workspace-app-tab ${view==='Clients'&&!selected&&!selectionLoading&&!activeHousehold?'active':''}`}><button id="directory-tab" role="tab" data-client-tab="directory" aria-selected={view==='Clients'&&!selected&&!selectionLoading&&!activeHousehold} aria-controls="workspace-page" tabIndex={(!selected&&!activeHousehold)||view==='Dashboard'||view==='Settings'?0:-1} onClick={()=>navigate('Clients')}><Icon name="clients" size={15}/>All clients</button></div>
+        {tabs.map(tab=>{const active=selected?.id===tab.id&&view!=='Dashboard'&&view!=='Settings';return <div className={`workspace-app-tab ${active?'active':''}`} key={tab.id}><button id={`client-tab-${tab.id}`} role="tab" aria-label={tabLabel(tab.client)} data-client-tab={tab.id} aria-selected={active} aria-controls="workspace-page" tabIndex={active?0:-1} onClick={()=>void openClient(tab.id)} title={`${clientName(tab.client)} · ${tab.id}`}><Icon name="clients" size={14}/><span>{clientName(tab.client)}</span></button><button className="workspace-tab-close" aria-label={`Close workspace for ${tabLabel(tab.client)}`} onClick={()=>closeClientTab(tab.id)}>×</button></div>;})}
+        {householdTabs.map(tab=><div className={`workspace-app-tab household-app-tab ${activeHousehold===tab.id?'active':''}`} key={tab.id}><button id={`household-tab-${tab.id}`} data-client-tab={`household:${tab.id}`} role="tab" aria-selected={activeHousehold===tab.id} aria-controls="workspace-page" tabIndex={activeHousehold===tab.id?0:-1} onClick={()=>openHousehold(tab.id,tab.name)}><Icon name="household" size={16}/><span>{tab.name}</span></button><button className="workspace-tab-close" aria-label={`Close household ${tab.name}`} onClick={()=>closeHousehold(tab.id)}>×</button></div>)}
+        <button className="household-tab-add" aria-label="Create a household workspace" title="Create household" onClick={createHousehold}><Icon name="plus"/></button>
+      </div></div>
       <DevelopmentNotice />
-      <main className="main-content">
-        <div className="page-heading"><div><p className="eyebrow">{view==='Dashboard'?'YOUR COUNSELING WORKSPACE':view==='Settings'?'WORKSPACE ADMINISTRATION':'CLIENT WORKSPACE'}</p><h1 ref={pageHeading} tabIndex={-1}>{view==='Dashboard'?'A clear view of your practice.':workspacePages.find(p=>p.id===view)?.title}</h1><p className="muted">{workspacePages.find(p=>p.id===view)?.description}</p></div>{view!=='Settings'&&<button className="button primary" onClick={createClient} disabled={clientsLoading}><Icon name="plus" size={18}/>Add client</button>}</div>
+      <main className={`main-content ${activeHousehold?'household-main':''}`}><div id="workspace-page" role={view==='Dashboard'||view==='Settings'?undefined:'tabpanel'} aria-labelledby={view==='Dashboard'||view==='Settings'?undefined:activeHousehold?`household-tab-${activeHousehold}`:selected?`client-tab-${selected.id}`:'directory-tab'}>
+        {(!activeHousehold&&(!selected||view==='Dashboard'||view==='Settings'))&&<div className="page-heading"><div><p className="eyebrow">{view==='Dashboard'?'YOUR COUNSELING WORKSPACE':view==='Settings'?'WORKSPACE ADMINISTRATION':'CLIENT WORKSPACE'}</p><h1 ref={pageHeading} tabIndex={-1}>{view==='Dashboard'?'A clear view of your practice.':workspacePages.find(p=>p.id===view)?.title}</h1><p className="muted">{workspacePages.find(p=>p.id===view)?.description}</p></div>{(view==='Dashboard'||view==='Clients')&&<button className="button primary" onClick={createClient} disabled={clientsLoading}><Icon name="plus" size={18}/>Add client</button>}</div>}
         {clientsError && <div className="load-error"><ErrorMessage>{clientsError}</ErrorMessage><button className="button secondary" onClick={loadClients} disabled={clientsLoading}>{clientsLoading ? 'Loading…' : 'Retry loading clients'}</button></div>}
         {view === 'Dashboard' && <>
           <div className="stats-grid">{[{ label: 'Active clients', value: activeClients.length, caption: 'Clients currently in your care', icon: 'clients' }, { label: 'New intakes', value: newIntakes.length, caption: 'At the start of their journey', icon: 'file' }, { label: 'Follow-up stage', value: followUps.length, caption: 'Clients marked for follow-up', icon: 'check' }].map(stat => <div className="stat-card" key={stat.label}><div className="stat-header"><span>{stat.label}</span><div className="stat-icon"><Icon name={stat.icon} size={18} /></div></div><strong className="stat-value">{clientsLoading || clientsError ? '—' : stat.value}</strong><p>{stat.caption}</p></div>)}</div>
@@ -551,25 +649,31 @@ export default function App() {
           <aside className="practice-card"><div className="practice-icon"><Icon name="shield" size={24} /></div><p className="eyebrow">BUILT FOR FOCUSED WORK</p><h2>Your workspace.<br />On your computer.</h2><p>Client records and notes are saved locally, so you can continue your work without an internet connection.</p><div className="practice-divider" /><h3>A working foundation</h3><p>Client intake, counseling status, notes, monthly budgets, debt payoff comparisons, savings goals, cash-flow calendars, CSV and selectable-text PDF transaction review, merchant/recurring-payment review, and statement running-balance checks are available.</p><button className="text-button" onClick={() => navigate('Settings')}>View workspace details<Icon name="arrow" size={15} /></button></aside></div>
           <section className="panel progress-panel"><div><h2>Counseling progress</h2><p className="muted small">Client counts by their current counseling stage.</p></div><div className="stage-grid">{CLIENT_STATUSES.filter(status => status !== 'Archived').map(status => <div className="stage-item" key={status}><span>{status}</span><strong>{clientsLoading || clientsError ? '—' : clients.filter(client => client.status === status).length}</strong></div>)}</div></section>
         </>}
-        {view === 'Clients' && <><nav className="section-navigation" aria-label="Client record sections">{clientSections.map(([id,label])=><button key={id} type="button" aria-current={clientSection===id?'page':undefined} onClick={()=>{if(clientSection!==id&&canLeave()){setClientSection(id);dirty.current=false;}}}>{label}</button>)}</nav><div className={`clients-layout ${editing || selectionLoading ? 'with-editor' : ''}`}>
-          <section className="panel client-list-panel" aria-label="Client directory"><div className="directory-heading"><h2>Client directory <span className="count-badge">{clients.length}</span></h2></div><div className="directory-controls"><div className="search-input"><Icon name="search" size={17} /><label htmlFor="search-clients" className="sr-only">Search clients</label><input id="search-clients" type="search" placeholder="Search name, email, or phone" value={search} onChange={e => setSearch(e.target.value)} /></div><label htmlFor="filter-status" className="sr-only">Filter by status</label><select id="filter-status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option>All statuses</option>{CLIENT_STATUSES.map(status => <option key={status}>{status}</option>)}</select></div>
-            {clientsLoading ? <div className="empty-state" role="status">Loading clients…</div> : clientsError ? <div className="empty-state">Use Retry loading clients to recover the directory.</div> : visibleClients.length ? <div className="client-list">{visibleClients.map(client => <button className={`client-row ${selected?.id === client.id ? 'selected' : ''}`} key={client.id} onClick={() => openClient(client.id)} aria-pressed={selected?.id === client.id}><Initials client={client} /><div className="client-row-text"><strong>{client.firstName} {client.lastName}</strong><span>{client.email || client.phone || 'No contact details added'}</span><Status status={client.status} /></div><Icon name="arrow" size={15} /></button>)}</div> : <div className="empty-state"><Icon name={clients.length ? 'search' : 'clients'} size={28} /><h3>{clients.length ? 'No matching clients' : 'Your client directory starts here.'}</h3><p>{clients.length ? 'Try a different search or status filter.' : 'Add a fictional client to create your first record.'}</p>{!clients.length && <button className="button secondary" onClick={createClient}>Add client</button>}</div>}
-            <div className="directory-footer">{visibleClients.length} {visibleClients.length === 1 ? 'client' : 'clients'}{query || statusFilter !== 'All statuses' ? ` of ${clients.length}` : ''}</div>
-          </section>
-          {selectionLoading ? <div className="panel selection-loading" role="status">Opening client record…</div> : editing ? <ClientEditor key={`${selected?.id??'new'}:${clientSection}`} section={selected?clientSection:'profile'} onClientSection={next=>{if(canLeave()){setClientSection(next);dirty.current=false;}}} onNavigate={navigate} client={selected} workspace={workspace} followUpId={targetFollowUp} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onCancel={() => { if (canLeave()) clearSelection(); }} /> : clients.length > 0 && <div className="panel client-selection-hint"><Icon name="file" size={34} /><h2>A complete client picture</h2><p className="muted">Select a client to review intake details, update their counseling stage, and add a session note.</p></div>}
-          {selectionError && <ErrorMessage>{selectionError}</ErrorMessage>}
-        </div></>}
-        {isModule(view)&&<>
+        {view==='Clients'&&!selected&&!selectionLoading&&!activeHousehold&&<><ClientDirectory clients={clients} loading={clientsLoading} error={clientsError} search={search} setSearch={setSearch} status={statusFilter} setStatus={setStatusFilter} onOpen={id=>void openClient(id)} onAdd={createClient}/><HouseholdDirectory onOpen={openHousehold} createRequest={householdCreateRequest}/></>}
+        {selectionLoading&&<div className="panel selection-loading" role="status">Opening client record…</div>}
+        {selectionError&&<div className="panel selection-loading"><ErrorMessage>{selectionError}</ErrorMessage><button className="button secondary" onClick={()=>navigate('Clients')}>Return to all clients</button></div>}
+        {view==='Clients'&&editing&&!selected&&!selectionLoading&&<div className="client-modal-backdrop"><div className="client-create-modal" role="dialog" aria-modal="true" aria-label="Add a new client" onKeyDown={e=>{if(e.key==='Escape')cancelClient();if(e.key==='Tab'){const controls=[...e.currentTarget.querySelectorAll<HTMLElement>('button,input,select,textarea')].filter(el=>!el.matches(':disabled'));if(e.shiftKey&&document.activeElement===controls[0]){e.preventDefault();controls.at(-1)?.focus();}else if(!e.shiftKey&&document.activeElement===controls.at(-1)){e.preventDefault();controls[0]?.focus();}}}}><ClientEditor section="profile" client={null} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onNavigate={navigate} onCancel={cancelClient}/></div></div>}
+        {selected&&view==='Clients'&&<ClientWorkspaceLayout client={selected} view={view} section={clientSection} onNavigate={navigate}>
+          {clientSection==='overview'?<ClientOverview key={selected.id} client={selected} onNavigate={navigate}/>:<>
+            <nav className="section-navigation client-subtabs" aria-label="Client record sections">{(clientSection==='notes'||clientSection==='history'?[['notes','Session notes'],['history','History & records']]:[['profile','Profile'],['intake','Intake & follow-ups']]).map(([id,label])=><button key={id} type="button" aria-current={clientSection===id?'page':undefined} onClick={()=>{if(clientSection!==id)navigate('Clients',id as ClientSection);}}>{label}</button>)}</nav>
+            <ClientEditor key={`${selected.id}:${clientSection}`} section={clientSection} onClientSection={next=>navigate('Clients',next)} onNavigate={navigate} client={selected} workspace={workspace} followUpId={targetFollowUp} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onCancel={()=>navigate('Clients')}/>
+          </>}
+        </ClientWorkspaceLayout>}
+        {isModule(view)&&selected&&<ClientWorkspaceLayout client={selected} view={view} section={clientSection} onNavigate={navigate}>
+         {view==='Spending Analysis'?<SpendingAnalysis key={selected.id} clientId={selected.id} initialPeriod={healthSpendingPeriod?.clientId===selected.id?healthSpendingPeriod.query:undefined} onDirty={onDirty} onBusy={onBusy} onOpenReview={()=>navigate('Transactions')}/>:<>
          {view==='Financial Scenarios'&&<p className="field-help">Temporary previews reset when leaving this page. Save a reviewed scenario to retain it.</p>}
-         <section className="panel module-context" aria-label="Current client context"><div><label htmlFor="workspace-client">Client for {view}<select id="workspace-client" value={selected?.id??''} disabled={clientsLoading||selectionLoading||Boolean(clientsError)} onChange={e=>{if(e.target.value)void openClient(e.target.value,undefined,view);else if(canLeave())clearSelection();}}><option value="">Choose a client</option>{clients.map(c=><option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.status==='Archived'?' — Archived':''}</option>)}</select></label></div><div>{selected?<><strong>{selected.firstName} {selected.lastName}</strong><Status status={selected.status}/><p className="field-help">Only this client’s records are shown. Save changes before moving to another section.</p></>:<p className="muted small">Choose an existing client or use Add client to start a record.</p>}</div></section>
-         <nav className="section-navigation" aria-label={`${view} sections`}>{['Working tools',...(workingAreas[view]??[]),...plannedAreas[view].map(a=>a.title)].map(area=><button key={area} type="button" aria-current={moduleArea===area?'page':undefined} onClick={()=>{if(moduleArea!==area&&canLeave()){setModuleArea(area);dirty.current=false;}}}>{area}{plannedAreas[view].some(a=>a.title===area)&&<span className="planned-tab-label">Planned</span>}</button>)}</nav>
+         <div className="workspace-module-heading"><p className="eyebrow">{view==='Documents'?'DOCUMENTS & REVIEW':view==='Transactions'?'DOCUMENTS & REVIEW':view==='Reports'?'ASSESSMENTS & REPORTS':'CLIENT TOOLS'}</p><h2>{view==='Documents'?'Import statements':view==='Transactions'?'Review & reconciliation':view==='Financial Review'?'Financial dashboard':view==='Budget Planner'?'Monthly budget':view==='Debt Planner'?'Debt payoff':view==='Savings Planner'?'Savings & sinking funds':view==='Financial Scenarios'?'Scenario comparisons':view}</h2><p>{workspacePages.find(p=>p.id===view)?.description}</p></div>
+         <nav className="section-navigation" aria-label={`${view} sections`}>{[...(view==='Transactions'?['All transactions','Working tools',...(workingAreas[view]??[]).filter(a=>a!=='All transactions')]:['Working tools',...(workingAreas[view]??[])]),...plannedAreas[view].map(a=>a.title)].map(area=><button key={area} type="button" aria-current={moduleArea===area?'page':undefined} onClick={()=>selectArea(area)}>{area==='Working tools'?(view==='Transactions'?'Review queue':view==='Financial Review'?'Approved activity':view==='Reports'?'Assessments & action plans':view==='Documents'?'Import & sources':area):area}{plannedAreas[view].some(a=>a.title===area)&&<span className="planned-tab-label">Planned</span>}</button>)}</nav>
          {selectionError&&<ErrorMessage>{selectionError}</ErrorMessage>}
-         {selectionLoading?<p className="panel settings-panel" role="status">Opening client record…</p>:moduleArea!=='Working tools'&&!workingAreas[view]?.includes(moduleArea)?<PlannedWorkspaceArea view={view} title={moduleArea}/>:selected?view==='Reports'&&moduleArea==='Print & presentation'?<ReportPresentation key={selected.id} clientId={selected.id} onBusy={onBusy}/>:view==='Transactions'&&moduleArea==='Classification assistance'?<ImportsEditor key={`${selected.id}:classification`} client={selected} page="classification" onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:view==='Transactions'&&moduleArea==='Activity history'?<TransactionActivity key={selected.id} clientId={selected.id}/>:view==='Financial Review'&&moduleArea==='Card completeness'?<CardCompleteness key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Financial Review'&&moduleArea==='Bank & card activity'?<CardFinancialReview key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Financial Review'&&moduleArea==='Completeness & final validation'?<CompletenessReview key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Reports'&&moduleArea==='Final report checklist'?<SavedReportChecklist key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Credit-card statements'?<CardStatements key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Statement accounts'?<StatementAccounts key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Collection checklist'?<DocumentCollection key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:<ClientEditor key={`${selected.id}:${view}`} section={view} client={selected} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onNavigate={navigate} onCancel={()=>{if(canLeave())clearSelection();}}/>:<section className="panel module-empty"><Icon name={workspacePages.find(p=>p.id===view)?.icon??'file'} size={32}/><h2>Select a client to open {view}</h2><p className="muted">{clientsLoading?'Loading the client directory…':clientsError?'Reload the client directory using the retry above.':clients.length?'Select a client above. Their saved data will load here.':'No clients yet. Add a fictional client to try this workflow.'}</p></section>}
-        </>}
-        {view==='Settings'&&<AdministrationPages workspace={workspace} onLock={()=>void lock()} onBusy={onBusy} onDirty={onDirty} onWorkspaceChanged={name=>setWorkspace(w=>w?{...w,organizationName:name}:w)}/>}
+         {selectionLoading?<p className="panel settings-panel" role="status">Opening client record…</p>:moduleArea!=='Working tools'&&!workingAreas[view]?.includes(moduleArea)?<PlannedWorkspaceArea view={view} title={moduleArea}/>:selected?view==='Financial Scenarios'&&moduleArea==='New goals & funding sources'?<ScenarioComparisons key={selected.id} clientId={selected.id} disabled={false} onBusy={onBusy} initiallyOpen/>:view==='Financial Review'&&moduleArea==='Savings progress'?<SavingsProgress key={selected.id} clientId={selected.id}/>:view==='Debt Planner'&&moduleArea==='Advanced debt terms'?<DebtEditor focusAdvanced key={selected.id} client={selected} onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:view==='Savings Planner'&&moduleArea==='Funding & drawdown'?<SavingsEditor focusFunding key={selected.id} client={selected} onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:view==='Budget Planner'&&moduleArea==='Paycheck allocation'?<PaycheckAllocation key={selected.id} clientId={selected.id}/>:view==='Cash-Flow Calendar'&&moduleArea==='Transfer settlement'?<CashflowEditor key={selected.id} client={selected} onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:view==='Reports'&&moduleArea==='Print & presentation'?<ReportPresentation key={selected.id} clientId={selected.id} onBusy={onBusy}/>:view==='Transactions'&&moduleArea==='All transactions'?<UnifiedTransactions key={selected.id} client={selected} onDirty={onDirty} onBusy={onBusy} onOpenExisting={area=>area==='Spending Analysis'?navigate('Spending Analysis'):selectArea(area)}/>:view==='Transactions'&&moduleArea==='Classification assistance'?<ImportsEditor key={`${selected.id}:classification`} client={selected} page="classification" onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:view==='Transactions'&&moduleArea==='Activity history'?<TransactionActivity key={selected.id} clientId={selected.id}/>:(view==='Financial Review'||view==='Transactions')&&moduleArea==='Card completeness'?<CardCompleteness key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:(view==='Financial Review'||view==='Transactions')&&moduleArea==='Bank & card activity'?<CardFinancialReview key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:(view==='Financial Review'||view==='Transactions')&&moduleArea==='Completeness & final validation'?<CompletenessReview key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Reports'&&moduleArea==='Final report checklist'?<SavedReportChecklist key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Transactions'&&moduleArea==='Card transactions'?<CardStatements key={selected.id} clientId={selected.id} mode="review" onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Credit-card statements'?<CardStatements key={selected.id} clientId={selected.id} mode="import" onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Statement accounts'?<StatementAccounts key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Documents'&&moduleArea==='Collection checklist'?<DocumentCollection key={selected.id} clientId={selected.id} onDirty={onDirty} onBusy={onBusy}/>:view==='Transactions'?<ImportsEditor key={`${selected.id}:${moduleArea}`} client={selected} page={({"Verified figures":'facts',"Running balances":'balances',"Recurring payments":'recurring',"Transfer matching":'transfers',"Source checks":'sources'} as const)[moduleArea as 'Verified figures']??'transactions'} onDirty={onDirty} onBusy={onBusy} otherSaving={false}/>:view==='Financial Review'?<ImportsEditor key={selected.id} client={selected} page="dashboard" onDirty={onDirty} onBusy={onBusy} otherSaving={false} onOpenHealthArea={openHealthArea}/>:<ClientEditor key={`${selected.id}:${view}`} section={view} client={selected} workspace={workspace} onSaved={savedClient} onDirty={onDirty} onBusy={onBusy} onNavigate={navigate} onCancel={cancelClient}/>:<section className="panel module-empty"><Icon name={workspacePages.find(p=>p.id===view)?.icon??'file'} size={32}/><h2>Select a client to open {view}</h2><p className="muted">{clientsLoading?'Loading the client directory…':clientsError?'Reload the client directory using the retry above.':clients.length?'Select a client above. Their saved data will load here.':'No clients yet. Add a fictional client to try this workflow.'}</p></section>}
+                 </>}
+        </ClientWorkspaceLayout>}
+        {view==='Settings'&&<AdministrationPages onPasswordChanged={passwordChanged} workspace={workspace} onLock={()=>void lock()} onBusy={onBusy} onDirty={onDirty} onWorkspaceChanged={name=>setWorkspace(w=>w?{...w,organizationName:name}:w)}/>}
 
-      </main>
+        {householdTabs.map(tab=><div key={tab.id} hidden={activeHousehold!==tab.id}><HouseholdWorkspace id={tab.id} active={activeHousehold===tab.id} clients={clients} onState={householdState} onName={householdName} onOpenClient={id=>void openClient(id)}/></div>)}
+      </div></main>
       <footer className="app-footer"><span>Eisenbart & Co. Financial Counseling Suite</span><span>Financial planning · Development build</span></footer>
     </div>
+    <ConfirmationDialog/>
   </div>;
 }

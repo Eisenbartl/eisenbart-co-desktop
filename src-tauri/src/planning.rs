@@ -2,6 +2,27 @@
 use crate::{budget, cashflow, debt, savings};
 use serde::{Deserialize, Serialize};
 const CALCULATOR: &str = "entered-plans-v1";
+pub fn calculator(plans: &Plans) -> &'static str {
+    if plans
+        .debt
+        .data
+        .as_ref()
+        .is_some_and(|d| d.advanced.is_some() || !d.targeted_extras.is_empty())
+        || plans
+            .savings
+            .data
+            .as_ref()
+            .is_some_and(|d| d.funding.is_some())
+        || plans.cashflow.data.as_ref().is_some_and(|d| {
+            d.accounts.iter().any(|a| a.reserve.is_some())
+                || d.schedules.iter().any(|s| s.settlement.is_some())
+        })
+    {
+        "entered-plans-v2"
+    } else {
+        CALCULATOR
+    }
+}
 const MAX_BYTES: usize = 4 * 1024 * 1024;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -68,7 +89,7 @@ pub fn capture(plans: Plans, input: Selection) -> Result<Snapshot, String> {
         return Err("Saved planning data changed elsewhere. Review the current saved plans and select the scenario again; nothing was recorded.".into());
     }
     let s = Snapshot {
-        calculator: CALCULATOR.into(),
+        calculator: calculator(&plans).into(),
         label: input.label,
         assumptions: input.assumptions,
         debt_strategy: input.debt_strategy,
@@ -106,7 +127,7 @@ fn metadata(
     Ok(())
 }
 pub fn validate(s: &Snapshot, client: &str) -> Result<(), String> {
-    if s.calculator != CALCULATOR
+    if s.calculator != calculator(&s.plans)
         || s.plans.client_id != client
         || s.revisions != s.plans.revisions()
         || s.label.trim() != s.label
@@ -298,7 +319,7 @@ pub fn savings_context(
             .as_ref()
             .map(|d| d.payment_changes.clone())
             .unwrap_or_default(),
-        debt_extras: debt_data.map(|d| d.extras.clone()).unwrap_or_default(),
+        debt_extras: debt_data.map(debt::all_extras).unwrap_or_default(),
         warnings,
     }
 }

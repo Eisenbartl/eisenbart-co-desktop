@@ -1,5 +1,6 @@
 //! Monthly planning estimates. Never infer missing contractual terms.
 use crate::budget::{money, parse_money};
+use chrono::{Datelike, Duration, NaiveDate};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -47,12 +48,60 @@ pub struct DatedAmount {
 }
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RateChange {
+    pub month: String,
+    pub apr: String,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AdvancedAccount {
+    pub account_index: usize,
+    /// Required for daily accrual; 360 or 365 calendar-day basis.
+    pub day_basis: Option<u32>,
+    pub rate_changes: Vec<RateChange>,
+    pub fees: Vec<DatedAmount>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PaymentSchedule {
+    pub first_date: String,
+    pub frequency: crate::cashflow::Frequency,
+    pub second_day: Option<u32>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Advanced {
+    pub accounts: Vec<AdvancedAccount>,
+    pub payments: Option<PaymentSchedule>,
+}
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Payment {
+    pub date: String,
+    pub payments: Vec<String>,
+    pub interest: Vec<String>,
+    pub fees: Vec<String>,
+    pub balances: Vec<String>,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TargetExtra {
+    pub account_index: usize,
+    pub month: String,
+    pub amount: String,
+}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PlanData {
     pub start_month: String,
     pub monthly_payment: Option<String>,
     pub accounts: Vec<Account>,
     pub extras: Vec<DatedAmount>,
     pub payment_changes: Vec<DatedAmount>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advanced: Option<Advanced>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targeted_extras: Vec<TargetExtra>,
 }
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -93,6 +142,8 @@ pub struct Projection {
     pub negative_amortization_accounts: Vec<usize>,
     pub warnings: Vec<String>,
     pub schedule: Vec<Month>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dated_payments: Vec<Payment>,
 }
 #[derive(Debug, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -210,6 +261,9 @@ struct Terms {
     apr: i64,
     minimum: i64,
     fee: i64,
+    day_basis: Option<u32>,
+    rates: BTreeMap<i32, i64>,
+    fees: BTreeMap<i32, i64>,
 }
 
 pub fn calculate(mut data: PlanData) -> Result<(PlanData, Comparison), String> {
@@ -220,7 +274,96 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Comparison), String> {
     let payment = optional_money(&mut data.monthly_payment)?;
     let extras = dated_amounts(&mut data.extras, start)?;
     let changes = dated_amounts(&mut data.payment_changes, start)?;
+    if data.targeted_extras.len() > 24 {
+        return Err("Use at most 24 account-targeted extra payments.".into());
+    }
+    let mut targets: BTreeMap<i32, Vec<(usize, i64)>> = BTreeMap::new();
+    let mut seen = std::collections::HashSet::new();
+    for t in &mut data.targeted_extras {
+        let month = month_number(&t.month)?;
+        if t.account_index >= data.accounts.len()
+            || !(start..start + MONTHS).contains(&month)
+            || !seen.insert((month, t.account_index))
+        {
+            return Err("Targeted payments need a unique existing account/month within the planning horizon.".into());
+        }
+        let amount = parse_money(t.amount.trim())?;
+        t.amount = money(amount);
+        targets
+            .entry(month)
+            .or_default()
+            .push((t.account_index, amount));
+    }
+    data.targeted_extras.sort_by(|a, b| {
+        a.month
+            .cmp(&b.month)
+            .then(a.account_index.cmp(&b.account_index))
+    });
+
     let mut warnings = vec!["Planning estimate: fixed APR ÷ 12, interest on the opening balance rounded to cents before monthly fees and end-of-month payments. No new borrowing.".to_owned()];
+    let mut advanced_accounts = BTreeMap::new();
+    if let Some(advanced) = &mut data.advanced {
+        if advanced.accounts.len() > 50 {
+            return Err("Use at most 50 advanced debt accounts.".into());
+        }
+        for a in &mut advanced.accounts {
+            if a.account_index >= data.accounts.len()
+                || advanced_accounts.contains_key(&a.account_index)
+            {
+                return Err(
+                    "Advanced terms must identify each existing account at most once.".into(),
+                );
+            }
+            if a.day_basis.is_some_and(|v| v != 360 && v != 365) {
+                return Err("Daily interest needs an explicit 360- or 365-day basis.".into());
+            }
+            if a.rate_changes.len() > 24 {
+                return Err("Use at most 24 known rate changes per account.".into());
+            }
+            let mut rates = BTreeMap::new();
+            for r in &mut a.rate_changes {
+                let month = month_number(&r.month)?;
+                if !(start..start + MONTHS).contains(&month) || rates.contains_key(&month) {
+                    return Err(
+                        "Rate changes need unique months within the planning horizon.".into(),
+                    );
+                }
+                let apr = apr_units(r.apr.trim())?;
+                r.apr = format!("{}.{:04}", apr / 10000, apr % 10000);
+                rates.insert(month, apr);
+            }
+            a.rate_changes.sort_by(|a, b| a.month.cmp(&b.month));
+            advanced_accounts.insert(
+                a.account_index,
+                (a.day_basis, rates, dated_amounts(&mut a.fees, start)?),
+            );
+        }
+        advanced.accounts.sort_by_key(|a| a.account_index);
+        if let Some(payments) = &advanced.payments {
+            let first = crate::cashflow::date(&payments.first_date)?;
+            if month_number(&payments.first_date[..7])? != start
+                || payments.frequency == crate::cashflow::Frequency::Once
+            {
+                return Err(
+                    "Recurring debt payments must begin in the first planning month.".into(),
+                );
+            }
+            if payments.frequency == crate::cashflow::Frequency::Semimonthly {
+                if !payments
+                    .second_day
+                    .is_some_and(|d| (1..=31).contains(&d) && d != first.day())
+                {
+                    return Err(
+                        "Twice-monthly debt payments require a distinct second day from 1–31."
+                            .into(),
+                    );
+                }
+            } else if payments.second_day.is_some() {
+                return Err("Only twice-monthly payments use a second day.".into());
+            }
+        }
+    }
+    let periodic = data.advanced.as_ref().is_some_and(|a| a.payments.is_some());
     let mut terms = Vec::new();
     let mut incomplete = payment.is_none();
     if payment.is_none() {
@@ -261,16 +404,27 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Comparison), String> {
         if let Some(apr) = apr {
             account.apr = Some(format!("{}.{:04}", apr / 10000, apr % 10000));
         }
+        let (day_basis, rates, fees) =
+            advanced_accounts
+                .remove(&index)
+                .unwrap_or((None, BTreeMap::new(), BTreeMap::new()));
+        let supported = match account.interest_model {
+            InterestModel::FixedMonthly => !periodic && day_basis.is_none() && rates.is_empty(),
+            InterestModel::Daily => day_basis.is_some() && rates.is_empty(),
+            InterestModel::Variable => !rates.is_empty(),
+            InterestModel::Promotional => !rates.is_empty(),
+            InterestModel::Unknown => false,
+        } && (!periodic || day_basis.is_some());
         let active = balance != Some(0);
         if active
             && (balance.is_none()
                 || minimum.is_none()
                 || fee.is_none()
                 || apr.is_none()
-                || account.interest_model != InterestModel::FixedMonthly)
+                || !supported)
         {
             incomplete = true;
-            warnings.push(format!("Account {} has missing or unmodeled terms. No payoff comparison is produced until all active accounts have a balance, APR, minimum, monthly fee, and fixed monthly model.", index + 1));
+            warnings.push(if data.advanced.is_none() {format!("Account {} has missing or unmodeled terms. No payoff comparison is produced until all active accounts have a balance, APR, minimum, monthly fee, and fixed monthly model.", index + 1)}else{format!("Account {} has missing or unsupported interest/payment terms. Daily or frequent payments require an entered day basis; variable/promotional terms need explicit known rate changes.",index+1)});
         }
         if active && !account.verified {
             warnings.push(format!("Account {} terms are unverified; check the lender's terms before relying on this estimate.", index + 1));
@@ -280,18 +434,50 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Comparison), String> {
             apr: apr.unwrap_or(0),
             minimum: minimum.unwrap_or(0),
             fee: fee.unwrap_or(0),
+            day_basis,
+            rates,
+            fees,
         });
     }
     if !extras.is_empty() {
         warnings.push("Extra payments require separately verified funding; check cash availability in each event month.".to_owned());
+    }
+    if !data.targeted_extras.is_empty() {
+        warnings.push("Account-targeted extras are additional commitments after required minimums. Unused targeted money is not reassigned, and dated cash-flow is unchanged. Verify funding and explicitly reconcile any agreed live plan.".into());
+    }
+    if data.advanced.is_some() {
+        warnings[0]="Advanced planning estimate with explicit entered rate, fee and payment assumptions; no new borrowing. Review the detailed accrual/rounding rules below.".into();
+        warnings.push("Advanced planning estimate: entered future APR changes take effect at the start of their month; the last known rate continues. Promotional reversion must be entered explicitly; no retroactive deferred interest is modeled. Monthly fees and dated month-level charges apply at the first payment/accrual event while active. Daily simple interest accrues on the interval opening balance using actual calendar days / entered 360 or 365 basis, rounds half up per interval, and capitalizes at payments and month end. Payment budget and minimums are split equally across entered occurrences, with earlier remainder cents; extras apply at the last payment. No holidays, new borrowing or automatic cash-flow writes.".into());
     }
     let (snowball, avalanche) = if incomplete {
         (None, None)
     } else {
         let payment = payment.unwrap_or(0);
         (
-            Some(project(&terms, start, payment, &extras, &changes, false)),
-            Some(project(&terms, start, payment, &extras, &changes, true)),
+            Some(project(
+                &terms,
+                start,
+                payment,
+                PaymentEvents {
+                    extras: &extras,
+                    changes: &changes,
+                    targets: &targets,
+                },
+                false,
+                data.advanced.as_ref(),
+            )),
+            Some(project(
+                &terms,
+                start,
+                payment,
+                PaymentEvents {
+                    extras: &extras,
+                    changes: &changes,
+                    targets: &targets,
+                },
+                true,
+                data.advanced.as_ref(),
+            )),
         )
     };
     Ok((
@@ -304,14 +490,24 @@ pub fn calculate(mut data: PlanData) -> Result<(PlanData, Comparison), String> {
     ))
 }
 
+struct PaymentEvents<'a> {
+    extras: &'a BTreeMap<i32, i64>,
+    changes: &'a BTreeMap<i32, i64>,
+    targets: &'a BTreeMap<i32, Vec<(usize, i64)>>,
+}
 fn project(
     terms: &[Terms],
     start: i32,
     mut payment: i64,
-    extras: &BTreeMap<i32, i64>,
-    changes: &BTreeMap<i32, i64>,
+    events: PaymentEvents<'_>,
     avalanche: bool,
+    advanced: Option<&Advanced>,
 ) -> Projection {
+    let PaymentEvents {
+        extras,
+        changes,
+        targets,
+    } = events;
     let mut balances: Vec<i64> = terms.iter().map(|t| t.balance).collect();
     let mut payoff_months = vec![None; terms.len()];
     let mut schedule = Vec::new();
@@ -321,7 +517,8 @@ fn project(
     let mut negative = vec![false; terms.len()];
     let mut warnings = Vec::new();
     let mut status = Status::HorizonReached;
-    for number in start..start + MONTHS {
+    let mut dated_payments = Vec::new();
+    'months: for number in start..start + MONTHS {
         if balances.iter().all(|b| *b == 0) {
             status = Status::PaidOff;
             break;
@@ -329,92 +526,205 @@ fn project(
         if let Some(changed) = changes.get(&number) {
             payment = *changed;
         }
-        let available = payment + extras.get(&number).copied().unwrap_or(0);
         let month = month_label(number);
-        // Validated balances <= 1e15 cents and APR <= 1e7 units bound each
-        // charge below 8.34e14 cents. i128 multiplication avoids intermediate
-        // overflow. Across all months, total payments <= 600 * 2e11 cents;
-        // total charges are bounded by those payments plus <= 50 * 1e15
-        // ending cents. All subsequent sums therefore fit comfortably in i64.
-        let interest: Vec<i64> = balances
+        let first = NaiveDate::from_ymd_opt(number / 12, (number % 12 + 1) as u32, 1)
+            .expect("bounded month");
+        let next = if first.month() == 12 {
+            NaiveDate::from_ymd_opt(first.year() + 1, 1, 1)
+        } else {
+            NaiveDate::from_ymd_opt(first.year(), first.month() + 1, 1)
+        }
+        .expect("next month");
+        let last = next - Duration::days(1);
+        let payment_dates = if let Some(cadence) = advanced.and_then(|a| a.payments.as_ref()) {
+            let anchor =
+                NaiveDate::parse_from_str(&cadence.first_date, "%Y-%m-%d").expect("validated date");
+            let schedule = crate::cashflow::Schedule {
+                label: String::new(),
+                account_id: String::new(),
+                destination_id: None,
+                kind: crate::cashflow::Kind::Loan,
+                amount: None,
+                first_date: cadence.first_date.clone(),
+                frequency: cadence.frequency.clone(),
+                second_day: cadence.second_day,
+                until_date: None,
+                certainty: crate::cashflow::Certainty::Estimated,
+                settlement: None,
+            };
+            (0..(next - first).num_days())
+                .map(|d| first + Duration::days(d))
+                .filter(|d| crate::cashflow::occurs(&schedule, anchor, *d))
+                .collect::<Vec<_>>()
+        } else {
+            vec![last]
+        };
+        let count = payment_dates.len();
+        let mut dates = payment_dates.clone();
+        if dates.last() != Some(&last) {
+            dates.push(last);
+        }
+        let rates: Vec<_> = terms
             .iter()
-            .zip(terms)
-            .map(|(balance, t)| {
-                ((i128::from(*balance) * i128::from(t.apr) + 6_000_000) / 12_000_000) as i64
+            .map(|t| {
+                t.rates
+                    .range(..=number)
+                    .next_back()
+                    .map_or(t.apr, |(_, r)| *r)
             })
             .collect();
-        let fees: Vec<i64> = balances
-            .iter()
-            .zip(terms)
-            .map(|(balance, t)| if *balance > 0 { t.fee } else { 0 })
-            .collect();
-        let owed: Vec<i64> = balances
-            .iter()
-            .zip(&interest)
-            .zip(&fees)
-            .map(|((b, i), f)| b + i + f)
-            .collect();
-        let mut payments: Vec<i64> = owed
-            .iter()
-            .zip(terms)
-            .map(|(owed, t)| (*owed).min(t.minimum))
-            .collect();
-        let required: i64 = payments.iter().sum();
-        if available < required {
-            status = Status::InsufficientBudget;
-            warnings.push(format!("{month}: available payment {} is below required minimum payments {}. Projection stops before an unaffordable payment; no debt-free date is assigned.", money(available), money(required)));
-            break;
-        }
-        let mut extra = available - required;
-        let mut order: Vec<usize> = (0..terms.len()).filter(|i| balances[*i] > 0).collect();
-        order.sort_by(|a, b| {
-            if avalanche {
-                terms[*b]
-                    .apr
-                    .cmp(&terms[*a].apr)
-                    .then(balances[*a].cmp(&balances[*b]))
-                    .then(a.cmp(b))
+        let opening_month = balances.clone();
+        let mut monthly_payments = vec![0; terms.len()];
+        let mut monthly_interest = vec![0; terms.len()];
+        let mut monthly_fees = vec![0; terms.len()];
+        let mut previous = first - Duration::days(1);
+        for (period, day) in dates.iter().enumerate() {
+            let payment_index = payment_dates.iter().position(|d| d == day);
+            let split = |value: i64, index: usize| {
+                value / count.max(1) as i64
+                    + i64::from((index as i64) < value % count.max(1) as i64)
+            };
+            let target_list = if payment_index.is_some_and(|i| i + 1 == count) {
+                targets.get(&number).map(Vec::as_slice).unwrap_or(&[])
             } else {
-                balances[*a]
-                    .cmp(&balances[*b])
-                    .then(terms[*b].apr.cmp(&terms[*a].apr))
-                    .then(a.cmp(b))
+                &[]
+            };
+            let targeted: i64 = target_list.iter().map(|(_, v)| v).sum();
+            let available = targeted
+                + payment_index.map_or(0, |i| {
+                    split(payment, i)
+                        + if i + 1 == count {
+                            extras.get(&number).copied().unwrap_or(0)
+                        } else {
+                            0
+                        }
+                });
+            let interest: Vec<i64> = balances
+                .iter()
+                .zip(terms)
+                .zip(&rates)
+                .map(|((b, t), r)| {
+                    let (numerator, denominator) = if let Some(basis) = t.day_basis {
+                        (
+                            i128::from(*b)
+                                * i128::from(*r)
+                                * i128::from((*day - previous).num_days()),
+                            i128::from(basis) * 1_000_000,
+                        )
+                    } else {
+                        (i128::from(*b) * i128::from(*r), 12_000_000)
+                    };
+                    ((numerator + denominator / 2) / denominator) as i64
+                })
+                .collect();
+            let fees: Vec<_> = balances
+                .iter()
+                .zip(terms)
+                .map(|(b, t)| {
+                    if *b > 0 && period == 0 {
+                        t.fee + t.fees.get(&number).copied().unwrap_or(0)
+                    } else {
+                        0
+                    }
+                })
+                .collect();
+            let owed: Vec<_> = balances
+                .iter()
+                .zip(&interest)
+                .zip(&fees)
+                .map(|((b, i), f)| b + i + f)
+                .collect();
+            let mut payments: Vec<i64> = owed
+                .iter()
+                .zip(terms)
+                .map(|(o, t)| (*o).min(payment_index.map_or(0, |i| split(t.minimum, i))))
+                .collect();
+            let required: i64 = payments.iter().sum();
+            if available - targeted < required {
+                status = Status::InsufficientBudget;
+                warnings.push(format!("{month}: available payment {} is below required minimum payments {}. Projection stops before an unaffordable payment; no debt-free date is assigned.",money(available-targeted),money(required)));
+                // Monthly results are atomic; do not expose partial payments as a complete month.
+                if period > 0 {
+                    warnings.push("The final simulated month contains only the earlier affordable payment events; review dated payments for the partial month.".into());
+                }
+                break 'months;
             }
-        });
-        for i in order {
-            let added = extra.min(owed[i] - payments[i]);
-            payments[i] += added;
-            extra -= added;
+            let mut extra = available - required;
+            for (i, amount) in target_list {
+                let applied = (*amount).min(owed[*i] - payments[*i]);
+                payments[*i] += applied;
+                // Unused account-specific money is not silently sent to a different lender.
+                extra -= amount;
+            }
+            let mut order: Vec<_> = (0..terms.len()).filter(|i| balances[*i] > 0).collect();
+            order.sort_by(|a, b| {
+                if avalanche {
+                    rates[*b]
+                        .cmp(&rates[*a])
+                        .then(balances[*a].cmp(&balances[*b]))
+                        .then(a.cmp(b))
+                } else {
+                    balances[*a]
+                        .cmp(&balances[*b])
+                        .then(rates[*b].cmp(&rates[*a]))
+                        .then(a.cmp(b))
+                }
+            });
+            for i in order {
+                let added = extra.min(owed[i] - payments[i]);
+                payments[i] += added;
+                extra -= added;
+            }
+            let closing: Vec<_> = owed.iter().zip(&payments).map(|(o, p)| o - p).collect();
+            if closing.iter().any(|b| *b > BALANCE_LIMIT) {
+                status = Status::ModelLimit;
+                warnings.push("Growing balances exceeded the model's safety limit. No debt-free date is assigned.".into());
+                break 'months;
+            }
+            for i in 0..terms.len() {
+                if balances[i] > 0 && closing[i] == 0 {
+                    payoff_months[i] = Some(month.clone());
+                }
+                monthly_payments[i] += payments[i];
+                monthly_interest[i] += interest[i];
+                monthly_fees[i] += fees[i];
+            }
+            paid += payments.iter().sum::<i64>();
+            interest_total += interest.iter().sum::<i64>();
+            fees_total += fees.iter().sum::<i64>();
+            balances = closing;
+            if advanced.is_some() {
+                dated_payments.push(Payment {
+                    date: day.to_string(),
+                    payments: payments.iter().copied().map(money).collect(),
+                    interest: interest.iter().copied().map(money).collect(),
+                    fees: fees.iter().copied().map(money).collect(),
+                    balances: balances.iter().copied().map(money).collect(),
+                });
+            }
+            previous = *day;
         }
-        let closing: Vec<i64> = owed.iter().zip(&payments).map(|(o, p)| o - p).collect();
-        if closing.iter().any(|b| *b > BALANCE_LIMIT) {
-            status = Status::ModelLimit;
-            warnings.push("Growing balances exceeded the model's safety limit. No debt-free date is assigned.".to_owned());
-            break;
-        }
-        for i in 0..terms.len() {
-            if closing[i] > balances[i] {
+        for (i, balance) in balances.iter().enumerate() {
+            if *balance > opening_month[i] {
                 negative[i] = true;
             }
-            if balances[i] > 0 && closing[i] == 0 {
-                payoff_months[i] = Some(month.clone());
-            }
         }
-        let monthly_paid: i64 = payments.iter().sum();
-        paid += monthly_paid;
-        interest_total += interest.iter().sum::<i64>();
-        fees_total += fees.iter().sum::<i64>();
         schedule.push(Month {
             month,
-            available_payment: money(available),
-            payments: payments.iter().map(|v| money(*v)).collect(),
-            interest: interest.iter().map(|v| money(*v)).collect(),
-            fees: fees.iter().map(|v| money(*v)).collect(),
-            balances: closing.iter().map(|v| money(*v)).collect(),
-            total_payment: money(monthly_paid),
-            remaining_balance: money(closing.iter().sum()),
+            available_payment: money(
+                payment
+                    + extras.get(&number).copied().unwrap_or(0)
+                    + targets
+                        .get(&number)
+                        .map_or(0, |v| v.iter().map(|(_, a)| a).sum::<i64>()),
+            ),
+            payments: monthly_payments.iter().copied().map(money).collect(),
+            interest: monthly_interest.iter().copied().map(money).collect(),
+            fees: monthly_fees.iter().copied().map(money).collect(),
+            balances: balances.iter().copied().map(money).collect(),
+            total_payment: money(monthly_payments.iter().sum()),
+            remaining_balance: money(balances.iter().sum()),
         });
-        balances = closing;
     }
     if balances.iter().all(|b| *b == 0) {
         status = Status::PaidOff;
@@ -449,9 +759,31 @@ fn project(
         negative_amortization_accounts: negative_accounts,
         warnings,
         schedule,
+        dated_payments,
     }
 }
 
+pub(crate) fn all_extras(data: &PlanData) -> Vec<DatedAmount> {
+    if data.targeted_extras.is_empty() {
+        return data.extras.clone();
+    }
+    let mut totals: BTreeMap<String, i64> = BTreeMap::new();
+    for extra in &data.extras {
+        *totals.entry(extra.month.clone()).or_default() +=
+            parse_money(&extra.amount).expect("validated extra");
+    }
+    for extra in &data.targeted_extras {
+        *totals.entry(extra.month.clone()).or_default() +=
+            parse_money(&extra.amount).expect("validated targeted extra");
+    }
+    totals
+        .into_iter()
+        .map(|(month, amount)| DatedAmount {
+            month,
+            amount: money(amount),
+        })
+        .collect()
+}
 pub fn apply_budget_context(
     data: &PlanData,
     comparison: &mut Comparison,
@@ -507,6 +839,20 @@ pub fn apply_budget_context(
             exceeded |= parse_money(base)? + parse_money(&extra.amount)? > capacity;
         }
     }
+    if !data.targeted_extras.is_empty() {
+        for extra in all_extras(data) {
+            let base = data
+                .payment_changes
+                .iter()
+                .rfind(|c| c.month <= extra.month)
+                .map(|c| c.amount.as_str())
+                .or(data.monthly_payment.as_deref());
+            if let Some(base) = base {
+                exceeded |=
+                    parse_money(base)? + crate::budget::parse_total(&extra.amount)? > capacity;
+            }
+        }
+    }
     if exceeded {
         comparison.warnings.push("Proposed payments exceed the current saved budget's monthly capacity after savings in one or more months. Confirm additional funding or adjust the plan.".to_owned());
     }
@@ -526,6 +872,8 @@ pub(crate) mod tests {
             ],
             extras: vec![],
             payment_changes: vec![],
+            advanced: None,
+            targeted_extras: vec![],
         }
     }
     fn account(label: &str, balance: &str, apr: &str, minimum: &str) -> Account {
@@ -775,5 +1123,166 @@ pub(crate) mod tests {
         let (data, mut c) = calculate(fixture()).unwrap();
         apply_budget_context(&data, &mut c, &context).unwrap();
         assert!(!c.warnings.iter().any(|w| w.contains("exceed")));
+    }
+}
+
+#[cfg(test)]
+mod advanced_tests {
+    use super::*;
+    fn daily() -> PlanData {
+        let mut d = tests::fixture();
+        d.accounts.truncate(1);
+        let a = &mut d.accounts[0];
+        a.balance = Some("1000".into());
+        a.apr = Some("12".into());
+        a.minimum_payment = Some("10".into());
+        a.interest_model = InterestModel::Daily;
+        d.advanced = Some(Advanced {
+            accounts: vec![AdvancedAccount {
+                account_index: 0,
+                day_basis: Some(365),
+                rate_changes: vec![],
+                fees: vec![],
+            }],
+            payments: None,
+        });
+        d
+    }
+    #[test]
+    fn actual_days_daily_interest_leap_year_and_explicit_unknowns() {
+        let d = daily();
+        let c = calculate(d.clone()).unwrap().1;
+        let p = c.snowball.unwrap();
+        assert_eq!(p.schedule[0].interest, vec!["9.86"]);
+        assert_eq!(p.schedule[0].balances, vec!["909.86"]);
+        let mut leap = d.clone();
+        leap.start_month = "2028-02".into();
+        assert_eq!(
+            calculate(leap).unwrap().1.snowball.unwrap().schedule[0].interest,
+            vec!["9.53"]
+        );
+        let mut unknown = d;
+        unknown.advanced.as_mut().unwrap().accounts[0].day_basis = None;
+        assert!(calculate(unknown).unwrap().1.snowball.is_none());
+    }
+    #[test]
+    fn weekly_payments_split_monthly_budget_and_accrue_between_actual_dates() {
+        let mut d = daily();
+        d.accounts[0].apr = Some("36.5".into());
+        d.monthly_payment = Some("400".into());
+        d.advanced.as_mut().unwrap().payments = Some(PaymentSchedule {
+            first_date: "2026-11-07".into(),
+            frequency: crate::cashflow::Frequency::Weekly,
+            second_day: None,
+        });
+        let p = calculate(d).unwrap().1.snowball.unwrap();
+        assert_eq!(p.schedule[0].total_payment, "400.00");
+        assert_eq!(p.schedule[0].interest, vec!["25.32"]);
+        assert_eq!(p.schedule[0].balances, vec!["625.32"]);
+        assert_eq!(p.dated_payments[0].date, "2026-11-07");
+        assert_eq!(p.dated_payments[0].interest, vec!["7.00"]);
+        assert_eq!(p.dated_payments[4].payments, vec!["0.00"]);
+    }
+    #[test]
+    fn promotional_reversion_known_fees_and_current_rate_priority_are_explicit() {
+        let mut d = daily();
+        d.accounts[0].interest_model = InterestModel::Promotional;
+        d.accounts[0].apr = Some("0".into());
+        let a = &mut d.advanced.as_mut().unwrap().accounts[0];
+        a.day_basis = None;
+        a.rate_changes = vec![RateChange {
+            month: "2026-12".into(),
+            apr: "24".into(),
+        }];
+        a.fees = vec![DatedAmount {
+            month: "2026-12".into(),
+            amount: "20".into(),
+        }];
+        let p = calculate(d.clone()).unwrap().1.avalanche.unwrap();
+        assert_eq!(p.schedule[0].balances, vec!["900.00"]);
+        assert_eq!(p.schedule[1].interest, vec!["18.00"]);
+        assert_eq!(p.schedule[1].fees, vec!["20.00"]);
+        assert_eq!(p.schedule[1].balances, vec!["838.00"]);
+        d.advanced.as_mut().unwrap().accounts[0]
+            .rate_changes
+            .clear();
+        assert!(calculate(d).unwrap().1.avalanche.is_none());
+    }
+    #[test]
+    fn duplicate_out_of_range_and_incompatible_terms_are_rejected_or_withheld() {
+        let mut d = daily();
+        d.advanced.as_mut().unwrap().accounts[0].day_basis = Some(364);
+        assert!(calculate(d).is_err());
+        let mut d = daily();
+        let a = d.advanced.as_ref().unwrap().accounts[0].clone();
+        d.advanced.as_mut().unwrap().accounts.push(a);
+        assert!(calculate(d).is_err());
+        let mut d = daily();
+        d.advanced.as_mut().unwrap().payments = Some(PaymentSchedule {
+            first_date: "2026-12-01".into(),
+            frequency: crate::cashflow::Frequency::Monthly,
+            second_day: None,
+        });
+        assert!(calculate(d).is_err());
+    }
+}
+
+#[cfg(test)]
+mod targeted_tests {
+    use super::*;
+    #[test]
+    fn targeted_extras_keep_unused_money_separate_and_reserve_whole_commitment() {
+        let mut d = tests::fixture();
+        d.targeted_extras = vec![TargetExtra {
+            account_index: 0,
+            month: "2026-11".into(),
+            amount: "150".into(),
+        }];
+        let (d, c) = calculate(d).unwrap();
+        let p = c.avalanche.unwrap();
+        assert_eq!(p.schedule[0].payments, vec!["100.00", "90.00"]);
+        assert_eq!(p.schedule[0].available_payment, "250.00");
+        assert_eq!(p.schedule[0].total_payment, "190.00");
+        assert_eq!(all_extras(&d)[0].amount, "150.00");
+        let mut duplicate = d.clone();
+        duplicate.targeted_extras.push(d.targeted_extras[0].clone());
+        assert!(calculate(duplicate).is_err());
+        let mut wrong = d.clone();
+        wrong.targeted_extras[0].account_index = 2;
+        assert!(calculate(wrong).is_err());
+        let mut short = d;
+        short.monthly_payment = Some("20".into());
+        assert_eq!(
+            calculate(short).unwrap().1.avalanche.unwrap().status,
+            Status::InsufficientBudget
+        );
+    }
+}
+
+#[cfg(test)]
+mod changing_priority_tests {
+    use super::*;
+    #[test]
+    fn avalanche_uses_the_effective_rate_in_each_month_for_both_minima_and_extra_priority() {
+        let mut d = tests::fixture();
+        d.accounts[0].interest_model = InterestModel::Variable;
+        d.advanced = Some(Advanced {
+            accounts: vec![AdvancedAccount {
+                account_index: 0,
+                day_basis: None,
+                rate_changes: vec![RateChange {
+                    month: "2026-12".into(),
+                    apr: "60".into(),
+                }],
+                fees: vec![],
+            }],
+            payments: None,
+        });
+        let c = calculate(d).unwrap().1;
+        let p = c.avalanche.unwrap();
+        assert_eq!(p.schedule[0].payments, vec!["10.00", "90.00"]);
+        assert_eq!(p.schedule[1].interest, vec!["4.50", "8.40"]);
+        assert_eq!(p.schedule[1].payments, vec!["80.00", "20.00"]);
+        assert_eq!(p.schedule[1].balances, vec!["14.50", "408.40"]);
     }
 }

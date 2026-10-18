@@ -24,22 +24,36 @@ pub mod classification_store;
 pub mod client_care_store;
 #[path = "client_history_store.rs"]
 pub mod client_history_store;
+#[path = "client_workspace.rs"]
+pub mod client_workspace;
 #[path = "coverage_review_store.rs"]
 pub mod coverage_review_store;
 #[path = "document_collection_store.rs"]
 pub mod document_collection_store;
 #[path = "final_reports_store.rs"]
 pub mod final_reports_store;
+#[path = "financial_health.rs"]
+pub mod financial_health;
+#[path = "households_store.rs"]
+pub mod households_store;
 #[path = "imports_store.rs"]
 pub mod imports_store;
+#[path = "password_change.rs"]
+pub mod password_change;
 #[path = "report_intake_store.rs"]
 pub mod report_intake_store;
 #[path = "report_presentation_store.rs"]
 pub mod report_presentation_store;
 #[path = "scenarios_store.rs"]
 pub mod scenarios_store;
+#[path = "security_policy.rs"]
+pub mod security_policy;
+#[path = "spending_analysis.rs"]
+pub mod spending_analysis;
 #[path = "statement_accounts_store.rs"]
 pub mod statement_accounts_store;
+#[path = "unified_review.rs"]
+pub mod unified_review;
 
 use crate::budget::{self, BudgetInput, BudgetLine, ClientBudget};
 use crate::cashflow::{self, ClientCashflowPlan};
@@ -64,7 +78,7 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 const METADATA_VERSION: u32 = 1;
-const SCHEMA_VERSION: i32 = 27;
+const SCHEMA_VERSION: i32 = 33;
 const APPLICATION_ID: i32 = 0x45424346;
 const DATABASE_NAME: &str = "workspace.db";
 const METADATA_NAME: &str = "workspace.json";
@@ -95,6 +109,7 @@ pub struct Workspace {
     session: Option<Session>,
     pending_restore: Option<backup::Candidate>,
     pending_csv: Option<imports_store::PendingCsv>,
+    operation_guarded: bool,
 }
 
 impl Workspace {
@@ -105,6 +120,29 @@ impl Workspace {
             session: None,
             pending_restore: None,
             pending_csv: None,
+            operation_guarded: false,
+        }
+    }
+
+    /// Serialize complete IPC operations across managed application instances.
+    /// Recheck session generation only after acquiring this lock. Nested backup,
+    /// setup and password operations reuse it rather than locking twice.
+    pub(crate) fn with_operation<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let _guard = backup::activation_lock(&self.data_dir)?;
+        self.operation_guarded = true;
+        let result = operation(self);
+        self.operation_guarded = false;
+        result
+    }
+
+    fn activation_lock(&self) -> Result<Option<File>, String> {
+        if self.operation_guarded {
+            Ok(None)
+        } else {
+            backup::activation_lock(&self.data_dir).map(Some)
         }
     }
 
@@ -120,14 +158,19 @@ impl Workspace {
             && backup::resolve_directory(&self.data_dir)
                 .map(|p| p != self.active_dir)
                 .unwrap_or(true);
+        // Read current encrypted policy without refreshing last_activity. Any
+        // corrupt/unreadable policy locks rather than silently extending access.
         let expired = changed
-            || self
-                .session
-                .as_ref()
-                .is_some_and(|session| session.last_activity.elapsed() >= AUTO_LOCK_AFTER);
+            || self.session.as_ref().is_some_and(|session| {
+                security_policy::read(&session.connection, &session.info)
+                    .map(|policy| {
+                        session.last_activity.elapsed()
+                            >= Duration::from_secs(u64::from(policy.idle_minutes) * 60)
+                    })
+                    .unwrap_or(true)
+            });
         if expired {
-            self.session = None;
-            self.pending_csv = None;
+            self.lock_workspace();
         }
         expired
     }
@@ -159,7 +202,7 @@ impl Workspace {
 
     pub fn setup_workspace(&mut self, input: SetupWorkspaceInput) -> Result<WorkspaceInfo, String> {
         self.pending_restore = None;
-        let _activation = backup::activation_lock(&self.data_dir)?;
+        let _activation = self.activation_lock()?;
         let password = Zeroizing::new(input.password);
         validate_password(&password)?;
         let organization_name = required_text(&input.organization_name, "Organization name", 120)?;
@@ -285,6 +328,7 @@ impl Workspace {
                 },
             )
             .map_err(|_| OPEN_ERROR.to_owned())?;
+        security_policy::read(&connection, &info)?;
         self.session = Some(Session {
             connection,
             info: info.clone(),
@@ -520,6 +564,28 @@ impl Workspace {
         })
     }
 
+    pub fn get_savings_progress(
+        &mut self,
+        client: &str,
+        input: &crate::dashboard::Input,
+    ) -> Result<crate::savings_progress::Progress, String> {
+        let s = self.session()?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Deferred)
+            .map_err(storage_error)?;
+        scoped_client(&tx, &s.info, client)?;
+        crate::dashboard::period(input)?;
+        let source = imports_store::read_imports(&tx, &s.info, client)?;
+        let result = crate::savings_progress::project(
+            client,
+            &source.financial_facts,
+            &source.documents,
+            input,
+        )?;
+        tx.commit().map_err(storage_error)?;
+        Ok(result)
+    }
     pub fn get_client_debt_plan(&mut self, client_id: &str) -> Result<ClientDebtPlan, String> {
         let session = self.session()?;
         scoped_client(&session.connection, &session.info, client_id)?;
@@ -1184,6 +1250,45 @@ fn migrate(connection: &mut Connection, allow_new: bool) -> Result<(), String> {
     if version == 26 {
         transaction
             .execute_batch(include_str!("client-history-schema.sql"))
+            .map_err(storage_error)?;
+        version = 27;
+    }
+    if version == 27 {
+        transaction
+            .execute_batch(include_str!("password-change-schema.sql"))
+            .map_err(storage_error)?;
+        version = 28;
+    }
+    if version == 28 {
+        transaction
+            .execute_batch(include_str!("security-policy-schema.sql"))
+            .map_err(storage_error)?;
+        version = 29;
+    }
+    if version == 29 {
+        // Compatibility gate: older apps must not write versioned PDF statement evidence.
+        // No existing sources, report payloads or historical bytes are rewritten.
+        transaction
+            .execute_batch("PRAGMA user_version=30;")
+            .map_err(storage_error)?;
+        version = 30;
+    }
+    if version == 30 {
+        transaction
+            .execute_batch(include_str!("households-schema.sql"))
+            .map_err(storage_error)?;
+        version = 31;
+    }
+    if version == 31 {
+        transaction
+            .execute_batch(include_str!("transaction-inspection-schema.sql"))
+            .map_err(storage_error)?;
+        version = 32;
+    }
+    if version == 32 {
+        // Planning extensions are optional; prohibit older writers from discarding them.
+        transaction
+            .execute_batch("PRAGMA user_version=33;")
             .map_err(storage_error)?;
     }
     transaction.commit().map_err(storage_error)?;
@@ -2248,7 +2353,7 @@ mod tests {
         let count: i64 = connection
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        connection.execute_batch("DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices;
+        connection.execute_batch("DROP TABLE IF EXISTS transaction_inspection_details; DROP TABLE IF EXISTS household_events; DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices;
             DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state;
             CREATE TABLE audit_events_old (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
@@ -2333,7 +2438,7 @@ mod tests {
         let count: i64 = connection
             .query_row("SELECT COUNT(*) FROM audit_events", [], |r| r.get(0))
             .unwrap();
-        connection.execute_batch("DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans;
+        connection.execute_batch("DROP TABLE IF EXISTS transaction_inspection_details; DROP TABLE IF EXISTS household_events; DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans;
             CREATE TABLE audit_events_v5 (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved')),
@@ -2543,7 +2648,7 @@ mod tests {
 
     fn restore_version_four_schema(connection: &Connection) {
         connection.execute_batch(
-            "DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans;
+            "DROP TABLE IF EXISTS transaction_inspection_details; DROP TABLE IF EXISTS household_events; DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans;
              CREATE TABLE audit_events_v4 (
                 id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved')),
@@ -2772,7 +2877,7 @@ mod tests {
 
     fn restore_version_three_schema(connection: &Connection) {
         connection.execute_batch(
-            "DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans;
+            "DROP TABLE IF EXISTS transaction_inspection_details; DROP TABLE IF EXISTS household_events; DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans;
              CREATE TABLE audit_events_v3 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added', 'budget_saved')),
@@ -2959,7 +3064,7 @@ mod tests {
     fn restore_version_two_schema(connection: &Connection) {
         // Recreate the actual old audit constraint, not just its version number.
         connection.execute_batch(
-            "DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets;
+            "DROP TABLE IF EXISTS transaction_inspection_details; DROP TABLE IF EXISTS household_events; DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets;
              CREATE TABLE audit_events_v2 (
                 id TEXT PRIMARY KEY NOT NULL, organization_id TEXT NOT NULL, counselor_id TEXT NOT NULL,
                 event TEXT NOT NULL CHECK (event IN ('workspace_created', 'client_created', 'client_updated', 'note_added')),
@@ -3092,7 +3197,7 @@ mod tests {
             .unwrap()
             .connection
             .execute_batch(
-                "DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
+                "DROP TABLE IF EXISTS transaction_inspection_details; DROP TABLE IF EXISTS household_events; DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; DROP TABLE client_cashflow_plans; DROP TABLE client_savings_plans; DROP TABLE client_debt_plans; DROP TABLE client_budgets; DROP TABLE client_notes; DROP TABLE audit_events; PRAGMA user_version = 1;",
             )
             .unwrap();
         workspace.lock_workspace();
@@ -3251,3 +3356,7 @@ mod scenario_tests;
 #[cfg(test)]
 #[path = "card_final_policy_tests.rs"]
 mod card_final_policy_tests;
+
+#[cfg(test)]
+#[path = "planning_extension_tests.rs"]
+mod planning_extension_tests;

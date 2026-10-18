@@ -53,8 +53,8 @@ receipts when extending these rules.
 
 | Work area | Main remaining work |
 |---|---|
-| Financial review and reports | Broader obligation/card-policy support; further comparative measures; dated savings-progress charts; direct desktop printing; final full-product report acceptance. Existing branding and bank-only final validation already work. |
-| Financial models | Savings funding/drawdown, paycheck allocation, proposed new goals and account-targeted extra payments, advanced daily/variable/promotional debt terms and fees, delayed transfer settlement and finer account reserves. Verified gross-income metrics only where their basis exists. |
+| Financial review and reports | Broader obligation/card-policy support; further comparative measures beyond the implemented verified savings-progress history; direct desktop printing; final full-product report acceptance. Existing branding and bank-only final validation already work. |
+| Financial models | The six planning subpages are implemented in 0.52.0 with final acceptance in progress; see [rules and limits](financial-planning-subpages.md). Remaining: lender-specific dynamic minimums, deferred/retroactive interest, bank/business-day settlement guarantees, custom paycheck earmark overrides and period-specific client agreements. Verified gross-income metrics only where their basis exists. |
 | Documents and transactions | Card PDF, loan/paystub and broader institution adapters, scanned PDF/OCR, local category suggestions/reusable rules, all with provenance and explicit review. Transaction activity history is implemented. No universal parser compatibility is claimed. |
 | Client workflow and administration | Configurable time zones, remaining workflow refinements and realistic counselor usability/accessibility acceptance. Client intake, reminders, follow-up overview and account CRUD already exist. |
 | Security/privacy | Configurable password/lock policies, multiple counselor accounts and roles, export/deletion controls and broader audit/recovery options; independent security, privacy and dependency/license reviews. |

@@ -1,4 +1,17 @@
-# Approved transaction financial dashboard — 0.11.0 / 0.12.0 extension
+# Financial dashboard — current 0.51.0 view
+
+The existing Financial dashboard hosts the integrated [Financial Health Assessment
+& Behavioral Insights](financial-health-assessment.md) above a collapsible bank-only
+dashboard appendix. The combined assessment reuses approved checking/savings/card
+records and current review services. Its score, evidence gates, classification
+navigation and existing-plan reduction previews are documented in that guide.
+
+The original bank-only arithmetic and examples below remain valid for the appendix.
+They are not a description of the full combined 0.51.0 assessment. Saved assessments,
+final approvals, client plans and report PDFs are already implemented through their
+existing reviewed workflows; the live health projection does not rewrite them.
+
+## Original bank dashboard basis (historical 0.11–0.12 milestones)
 
 Open a saved client, go to the statement import/review panel, and enter **Assessment
 from month** and **Assessment through month** as YYYY-MM. Select **View financial
@@ -55,8 +68,9 @@ Version 0.12.0 adds explicit source-bound expense/payroll classifications and
 dated counselor-verified balance facts, conditional net worth, coverage/payment
 estimates and a local debt chart. See [verified-financial-facts.md](verified-financial-facts.md).
 Gross-income lender DTI and savings progress remain pending. Existing budget/debt/savings/cash-flow panels are separate entered
-plans, not approved imported facts. Saved immutable assessment snapshots and reporting are the next checkpoint. Saved final assessment snapshots and
-reports belong to later reporting work.
+plans, not approved imported facts. Saved immutable assessment snapshots and final reports now use their existing
+reviewed reporting workflows; see [saved assessments](saved-assessments.md) and
+[final approval](final-report-approval.md).
 
 The original 0.11.0 view required no schema migration and recomputes from schema-12 sources and
 immutable reviews. It writes no financial records, approvals, plans or audit

@@ -1,0 +1,6 @@
+import type {PlanningRevisions} from './types';
+export interface PaycheckAllocation {clientId:string;revisions:PlanningRevisions;labels:string[];warnings:string[];rows:{date:string;label:string;accountId:string;certainty:string;paycheck:string|null;allocations:(string|null)[];total:string|null;remainder:string|null;nextPaycheck:string|null;datedCommitments:string|null;warnings:string[]}[]}
+
+export interface SavingsProgress {clientId:string;fromDate:string;throughDate:string;warnings:string[];points:{date:string;reviewId:string;reviewedAt:string;complete:boolean;accessible:string|null;restricted:string|null;scale:number|null;sources:{label:string;amount:string|null;evidence:string;documentId:string|null;documentName:string|null}[]}[]}
+export interface SavingsFunding {sources:{id:string;label:string;available:string|null}[];events:{date:string;kind:'fund'|'drawdown'|'reallocate';bucket:number|null;destination:number|null;sourceId:string|null;amount:string|null;note:string}[]}
+export interface SavingsFundingResult {events:{index:number;date:string;requested:string|null;applied:string|null;shortfall:string|null}[];points:{date:string;emergency:string|null;goals:(string|null)[];liquid:string|null}[];remainingSources:(string|null)[];warnings:string[]}

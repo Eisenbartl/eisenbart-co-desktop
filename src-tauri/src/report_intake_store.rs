@@ -201,13 +201,25 @@ mod tests {
         unrelated.follow_ups[0].notes = "Later unrelated task outcome".into();
         let unchanged = save(&mut w, &c.id, 1, unrelated);
         assert!(!w.get_assessment_record(&c.id, &id).unwrap().needs_review);
+        let listed = |w: &mut Workspace| {
+            w.list_assessment_records(&c.id)
+                .unwrap()
+                .records
+                .into_iter()
+                .find(|r| r.id == id)
+                .unwrap()
+                .needs_review
+        };
+        assert!(!listed(&mut w));
         let mut changed = unchanged.clone();
         changed.intake.employer = "Later fictional employer".into();
         save(&mut w, &c.id, 2, changed);
         assert!(w.get_assessment_record(&c.id, &id).unwrap().needs_review);
+        assert!(listed(&mut w));
         save(&mut w, &c.id, 3, unchanged.clone());
         let historical = w.get_assessment_record(&c.id, &id).unwrap();
         assert!(historical.needs_review);
+        assert!(listed(&mut w));
         assert_eq!(historical.digest, digest);
         assert_eq!(serde_json::to_vec(&historical.payload).unwrap(), bytes);
         assert_eq!(

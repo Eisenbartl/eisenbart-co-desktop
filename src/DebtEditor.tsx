@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from './api';
+import AdvancedDebtControls from './AdvancedDebtControls';
+import TargetedDebtPayments from './TargetedDebtPayments';
 import { usd } from './BudgetEditor';
 import type { Client, ClientDebtPlan, DebtAccount, DebtPlanData, DebtProjection, DebtType, InterestModel } from './types';
 
 const debtTypes: [DebtType, string][] = [['creditCard','Credit card'],['autoLoan','Auto loan'],['studentLoan','Student loan'],['personalLoan','Personal loan'],['mortgage','Mortgage'],['other','Other installment debt'],['custom','Custom debt']];
-const models: [InterestModel,string][] = [['unknown','Unknown terms'],['fixedMonthly','Fixed monthly APR estimate'],['daily','Daily interest — not modeled'],['variable','Variable rate — not modeled'],['promotional','Promotional rate — not modeled']];
+const models: [InterestModel,string][] = [['unknown','Unknown terms'],['fixedMonthly','Fixed monthly APR estimate'],['daily','Daily interest — enter day basis below'],['variable','Known variable rates — enter schedule below'],['promotional','Promotional APR — enter reversion below']];
 const statuses: Record<DebtProjection['status'], string> = { paidOff: 'Paid off in this model', insufficientBudget: 'Minimum payment shortfall', horizonReached: 'Balance remains after 600 months', modelLimit: 'Model safety limit reached' };
 function emptyPlan(): DebtPlanData {
   const now = new Date();
@@ -12,7 +14,7 @@ function emptyPlan(): DebtPlanData {
 }
 function message(error: unknown) { return error instanceof Error ? error.message : String(error); }
 
-export default function DebtEditor({client, onDirty, onBusy, otherSaving}: {client: Client; onDirty:(value:boolean)=>void; onBusy:(value:boolean)=>void; otherSaving:boolean}) {
+export default function DebtEditor({client, onDirty, onBusy, otherSaving,focusAdvanced=false}: {focusAdvanced?:boolean;client: Client; onDirty:(value:boolean)=>void; onBusy:(value:boolean)=>void; otherSaving:boolean}) {
   const [saved, setSaved] = useState<ClientDebtPlan | null>(null);
   const [data, setData] = useState<DebtPlanData>(emptyPlan);
   const [baseline, setBaseline] = useState<DebtPlanData>(data);
@@ -42,6 +44,7 @@ export default function DebtEditor({client, onDirty, onBusy, otherSaving}: {clie
   function addAccount() {edit({accounts:[...data.accounts,{label:'',debtType:'custom',balance:null,apr:null,minimumPayment:null,monthlyFee:null,interestModel:'unknown',verified:false,termsNote:''}]});}
   async function save(event:FormEvent) {
     event.preventDefault(); if(!saved || saving || otherSaving)return;
+    if(data.targetedExtras?.some(e=>e.accountIndex<0||e.accountIndex>=data.accounts.length)){setError('Choose an existing debt account for each targeted extra payment.');return;}
     setSaving(true);onBusy(true);setError('');setNotice('');
     try {
       const result = await api.saveClientDebtPlan(client.id,{expectedRevision:saved.revision,data});
@@ -58,11 +61,11 @@ export default function DebtEditor({client, onDirty, onBusy, otherSaving}: {clie
       <form onSubmit={save} noValidate><fieldset disabled={saving || otherSaving}>
         <div className="form-grid"><label htmlFor="debt-start-month">First planning month<input id="debt-start-month" value={data.startMonth} maxLength={7} placeholder="YYYY-MM" onChange={e=>edit({startMonth:e.target.value})}/></label>
         <label htmlFor="debt-monthly-payment">Total monthly debt payment (USD)<input id="debt-monthly-payment" inputMode="decimal" value={data.monthlyPayment??''} maxLength={16} placeholder="Unknown" onChange={e=>edit({monthlyPayment:e.target.value===''?null:e.target.value})}/></label></div>
-        <p className="field-help">Enter the entire monthly payment budget, including minimums. Use amounts without commas or currency signs. Blank means unknown; 0 means a known zero. Payments occur at month end in this model; bill due dates and daily interest are not modeled.</p>
+        <p className="field-help">Enter the entire monthly payment budget, including minimums. Use amounts without commas or currency signs. Blank means unknown; 0 means a known zero. Payments occur at month end in this model; use Advanced terms below for daily accrual and scheduled payment frequencies. Bill dates still require separate calendar entries.</p>
         {saved?.budgetContext.revision ? <p className="debt-budget-reference">Budget reference, last checked at revision {saved.budgetContext.revision}: monthly capacity after savings <strong>{usd(saved.budgetContext.monthlyCapacity)}</strong>; planned debt payments <strong>{usd(saved.budgetContext.plannedDebtPayments)}</strong>. Saving this plan checks the latest saved budget; it does not change the budget.</p> : <p className="field-help">No saved budget reference yet. Save a client budget to check repayment capacity.</p>}
         {!data.accounts.length && <p className="empty-note">No debt accounts yet. Add the debts to include in this plan.</p>}
         <div className="debt-accounts">{data.accounts.map((a,index)=><div className="budget-line" key={index}>
-          <div className="budget-line-heading"><span>Debt {index+1}</span><button type="button" className="text-button" aria-label={`Remove debt ${index+1}`} onClick={()=>edit({accounts:data.accounts.filter((_,i)=>i!==index)})}>Remove</button></div>
+          <div className="budget-line-heading"><span>Debt {index+1}</span><button type="button" className="text-button" aria-label={`Remove debt ${index+1}`} disabled={data.targetedExtras?.some(e=>e.accountIndex===index)} onClick={()=>edit({accounts:data.accounts.filter((_,i)=>i!==index),...(data.targetedExtras?{targetedExtras:data.targetedExtras.map(e=>({...e,accountIndex:e.accountIndex>index?e.accountIndex-1:e.accountIndex}))}:{}),...(data.advanced?{advanced:{...data.advanced,accounts:data.advanced.accounts.filter(a=>a.accountIndex!==index).map(a=>({...a,accountIndex:a.accountIndex>index?a.accountIndex-1:a.accountIndex}))}}:{})})}>Remove</button></div>
           <div className="form-grid">
             <label htmlFor={`debt-label-${index}`}>Debt name<input id={`debt-label-${index}`} value={a.label} maxLength={120} onChange={e=>account(index,{label:e.target.value})}/></label>
             <label htmlFor={`debt-type-${index}`}>Debt type<select id={`debt-type-${index}`} value={a.debtType} onChange={e=>account(index,{debtType:e.target.value as DebtType})}>{debtTypes.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
@@ -73,6 +76,7 @@ export default function DebtEditor({client, onDirty, onBusy, otherSaving}: {clie
           <label htmlFor={`debt-note-${index}`}>Source and terms notes<textarea id={`debt-note-${index}`} rows={2} value={a.termsNote} maxLength={500} onChange={e=>account(index,{termsNote:e.target.value})}/></label>
         </div>)}</div>
         <div className="budget-add"><button type="button" className="button secondary" disabled={data.accounts.length>=50} onClick={addAccount}>Add debt</button></div>
+        <AdvancedDebtControls open={focusAdvanced||undefined} data={data} onChange={edit}/>
         <details className="debt-events"><summary>Extra payments and future payment changes</summary><p className="field-help">An extra payment is added once in its month. A payment change replaces the total monthly budget from that month onward. Both strategies use the same events.</p>
           {(['extras','paymentChanges'] as const).map(key=><div key={key}><h3>{key==='extras'?'One-time extra payments':'Monthly payment changes'}</h3>
             {data[key].map((value,index)=><div className="debt-event" key={index}>
@@ -83,6 +87,7 @@ export default function DebtEditor({client, onDirty, onBusy, otherSaving}: {clie
             <button type="button" className="button secondary" disabled={data[key].length>=24} onClick={()=>edit({[key]:[...data[key],{month:data.startMonth,amount:''}]})}>{key==='extras'?'Add extra payment':'Add payment change'}</button>
           </div>)}
         </details>
+        <details className="debt-events"><summary>Target an extra payment to a specific account</summary><TargetedDebtPayments accounts={data.accounts} value={data.targetedExtras??[]} onChange={extras=>edit({targetedExtras:extras.length?extras:undefined})}/></details>
         {error && <div className="error-message" role="alert">{error}</div>}
         <div className="form-actions"><span className="save-status" role="status">{notice||(dirty?'Unsaved debt plan changes':saved?.revision?'Saved debt plan':'No saved debt plan yet')}</span><button className="button primary" type="submit">{saving?'Comparing…':'Save debt plan and compare'}</button></div>
       </fieldset></form>
@@ -95,6 +100,7 @@ export default function DebtEditor({client, onDirty, onBusy, otherSaving}: {clie
             <tr><th scope="row">Estimated debt-free month</th>{[saved.comparison.snowball,saved.comparison.avalanche].map((p,i)=><td key={i}>{p.payoffMonth??(p.status==='paidOff'?'No active starting balance':'Not projected')}</td>)}</tr>
             {([['totalInterest','Interest in simulated months'],['totalFees','Fees in simulated months'],['totalPaid','Payments in simulated months'],['remainingBalance','Remaining balance']] as const).map(([key,label])=><tr key={key}><th scope="row">{label}</th><td>{usd(saved.comparison!.snowball![key])}</td><td>{usd(saved.comparison!.avalanche![key])}</td></tr>)}
           </tbody></table></div>
+          {!!saved.comparison.snowball.datedPayments?.length&&<details><summary>Exact entered payment-date estimates</summary><p className="field-help">Same inputs as the monthly schedule; month-end rows can contain accrual without a payment. No bank payments or calendar entries are created.</p>{(['snowball','avalanche'] as const).map(strategy=><div key={strategy}><h4>{strategy}</h4><div className="budget-table-wrap"><table aria-label={`${strategy} dated debt payments`}><thead><tr><th>Date</th>{saved.data?.accounts.map((a,i)=><th key={i}>{a.label} payment / balance</th>)}</tr></thead><tbody>{saved.comparison![strategy]!.datedPayments!.slice(0,120).map((row,i)=><tr key={i}><th>{row.date}</th>{row.payments.map((v,j)=><td key={j}>{usd(v)} / {usd(row.balances[j])}</td>)}</tr>)}</tbody></table></div><p className="field-help">Showing the first 120 dated events. Monthly schedule includes the full projection horizon.</p></div>)}</details>}
           <DebtSchedule key={`${saved.revision}-${saved.clientId}`} plan={saved}/>
         </> : <p className="empty-note">Comparison unavailable until all active debts have known, supported terms. Incomplete debt records have been saved.</p>}
       </div>}

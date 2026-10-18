@@ -34,6 +34,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
 
       - name: Activate x64 MSVC build tools
         uses: ilammy/msvc-dev-cmd@v1
@@ -66,6 +67,12 @@ jobs:
       - name: Install locked frontend dependencies
         run: npm ci
 
+      - name: Verify application version consistency
+        run: npm run check:version
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
       - name: Build frontend
         run: npm run build
 
@@ -74,6 +81,12 @@ jobs:
 
       - name: Test Rust application and persistence
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Lint Rust application and tests
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Build embedded Windows application without packaging
+        run: npm run tauri -- build --debug --no-bundle --ci -- --locked
 
       - name: Build Windows installer
         if: github.event_name == 'workflow_dispatch' && inputs.package_installer

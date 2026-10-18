@@ -102,6 +102,8 @@ pub struct DocumentInput {
     pub balance_order: Option<crate::reconciliation::Order>,
     #[serde(default)]
     pub pdf_selection: Option<Vec<crate::pdf::Locator>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pdf: Option<crate::statement_pdf::Evidence>,
     pub account_id: Option<String>,
     pub account_label: String,
     pub account_kind: String,
@@ -902,4 +904,13 @@ mod totals_tests {
             (9, 1, 1, 1)
         );
     }
+}
+
+/// Source review and optional source-bound spending purpose are one atomic decision.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Disposition {
+    pub decision: ReviewInput,
+    pub selection: Option<crate::category_rules::Selection>,
+    pub spending_role: Option<crate::financial_facts::Role>,
 }

@@ -82,3 +82,10 @@ describe('client savings editor',()=>{
     view.unmount();await act(async()=>write.resolve({...saved,clientId:next.id}));expect(document.documentElement.outerHTML).not.toContain('Robin private savings priority');
   });
 });
+it('collects separate funding and drawdowns without manufacturing dates or savings',async()=>{
+ mocks.getClientSavingsPlan.mockResolvedValue(saved);open();await screen.findByText('Saved savings plan');fireEvent.click(screen.getByText('Funding sources and dated drawdowns'));
+ fireEvent.click(screen.getByRole('button',{name:'Add separate funding source'}));fireEvent.change(screen.getByLabelText('Funding source 1 name'),{target:{value:'Separate fictional gift'}});fireEvent.change(screen.getByLabelText('Funding source 1 available (USD)'),{target:{value:'120.25'}});
+ fireEvent.click(screen.getByRole('button',{name:'Add dated savings movement'}));expect(screen.getByLabelText('Savings event 1 date')).toHaveValue('');expect(screen.getByLabelText('Savings event 1 amount (USD)')).toHaveValue('');
+ fireEvent.change(screen.getByLabelText('Savings event 1 date'),{target:{value:'2026-11-10'}});fireEvent.change(screen.getByLabelText('Savings event 1 amount (USD)'),{target:{value:'100.01'}});fireEvent.change(screen.getByLabelText('Savings event 1 purpose / source explanation'),{target:{value:'Discussed repair reserve'}});
+ expect(mocks.saveClientSavingsPlan).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Save savings plan and calculate'}));await waitFor(()=>expect(mocks.saveClientSavingsPlan).toHaveBeenCalled());expect(mocks.saveClientSavingsPlan.mock.calls[0][1].data.funding).toMatchObject({sources:[{id:expect.any(String),label:'Separate fictional gift',available:'120.25'}],events:[{date:'2026-11-10',kind:'drawdown',bucket:null,destination:null,sourceId:null,amount:'100.01',note:'Discussed repair reserve'}]});
+});

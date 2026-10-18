@@ -21,9 +21,11 @@ mod document_collection;
 mod final_reports;
 mod financial_facts;
 mod follow_up_overview;
+mod households;
 mod imports;
 mod income_periods;
 mod models;
+mod paycheck;
 mod pdf;
 #[cfg(test)]
 mod pdf_fixture;
@@ -38,7 +40,9 @@ mod report_presentation;
 mod report_viewer;
 mod saved_scenarios;
 mod savings;
+mod savings_progress;
 mod scenarios;
+mod statement_pdf;
 mod storage;
 
 use models::{Client, ClientInput, ClientNote, SetupStatus, SetupWorkspaceInput, WorkspaceInfo};
@@ -65,9 +69,231 @@ fn access<T>(
     if workspace.expire_if_idle() {
         let _ = state.handle.emit("workspace-locked", ());
     }
-    operation(&mut workspace)
+    workspace.with_operation(operation)
 }
 
+#[tauri::command]
+async fn household_cashflow_preview(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    member_id: String,
+    month: String,
+    account_id: Option<String>,
+) -> Result<storage::households_store::CashflowPreview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_cashflow_preview(&household_id, &member_id, &month, account_id.as_deref())
+        })
+    })
+    .await
+    .map_err(|_| "Cash-flow preview could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn household_cashflow_reconcile(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    input: storage::households_store::CashflowChange,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_cashflow_reconcile(&household_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "Cash-flow save could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn choose_household_report_pdf(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    report_id: String,
+) -> Result<Option<String>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.household_report(&household_id, &report_id))?;
+        state
+            .handle
+            .dialog()
+            .file()
+            .add_filter("Household report PDF", &["pdf"])
+            .set_file_name("household-planning.pdf")
+            .blocking_save_file()
+            .map(|p| {
+                p.into_path()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .map_err(|_| "Choose a local PDF path.".to_owned())
+            })
+            .transpose()
+    })
+    .await
+    .map_err(|_| "PDF destination selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn export_household_report_pdf(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    report_id: String,
+    path: String,
+) -> Result<assessment_pdf::Export, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.export_household_report_pdf(&household_id, &report_id, &path)
+        })
+    })
+    .await
+    .map_err(|_| {
+        "PDF export could not be confirmed. Inspect the destination before retrying.".to_owned()
+    })?
+}
+#[tauri::command]
+async fn list_households(
+    state: State<'_, DesktopState>,
+) -> Result<Vec<storage::households_store::DirectoryItem>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || access(&state, |w| w.list_households()))
+        .await
+        .map_err(|_| {
+            "Household operation could not be confirmed. Reload before retrying.".to_owned()
+        })?
+}
+#[tauri::command]
+async fn create_household(
+    state: State<'_, DesktopState>,
+    name: String,
+    month: String,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.create_household(name, month))
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn get_household(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    month: String,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_household(&household_id, &month))
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn save_household(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    month: String,
+    input: households::Input,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_household(&household_id, &month, input))
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn preview_household(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    month: String,
+    input: households::Input,
+) -> Result<households::Summary, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.preview_household(&household_id, &month, input)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn household_sources(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    member_id: String,
+    month: String,
+) -> Result<Vec<storage::spending_analysis::Row>, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_sources(&household_id, &member_id, &month)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn household_classify(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    member_id: String,
+    input: storage::spending_analysis::Change,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_classify(&household_id, &member_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn record_household_report(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    month: String,
+    expected: i64,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.record_household_report(&household_id, &month, expected)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn household_budget_preview(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    member_id: String,
+    month: String,
+) -> Result<storage::households_store::BudgetPreview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_budget_preview(&household_id, &member_id, &month)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
+#[tauri::command]
+async fn household_budget_reconcile(
+    state: State<'_, DesktopState>,
+    household_id: String,
+    input: storage::households_store::BudgetChange,
+) -> Result<storage::households_store::Record, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.household_budget_reconcile(&household_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "Household operation could not be confirmed. Reload before retrying.".to_owned())?
+}
 #[tauri::command]
 async fn choose_client_csv(
     state: State<'_, DesktopState>,
@@ -115,6 +341,19 @@ async fn choose_client_pdf(
     })
     .await
     .map_err(|_| "PDF selection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn inspect_pdf_transactions(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: statement_pdf::Input,
+) -> Result<statement_pdf::Inspection, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.inspect_pdf_transactions(&client_id, input))
+    })
+    .await
+    .map_err(|_| "PDF transaction inspection could not finish.".to_owned())?
 }
 #[tauri::command]
 async fn inspect_client_pdf(
@@ -257,6 +496,33 @@ async fn choose_action_plan_pdf(
     .map_err(|_| "Client PDF destination selection could not finish.".to_owned())?
 }
 #[tauri::command]
+async fn get_savings_progress(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: dashboard::Input,
+) -> Result<savings_progress::Progress, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_savings_progress(&client_id, &input))
+    })
+    .await
+    .map_err(|_| "Savings progress could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn get_paycheck_allocation(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<paycheck::Allocation, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            paycheck::allocate(&w.get_assessment_planning(&client_id)?)
+        })
+    })
+    .await
+    .map_err(|_| "Paycheck allocation could not be loaded.".to_owned())?
+}
+#[tauri::command]
 async fn get_assessment_planning(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -267,6 +533,91 @@ async fn get_assessment_planning(
     })
     .await
     .map_err(|_| "Saved planning context could not be loaded.".to_owned())?
+}
+#[tauri::command]
+async fn get_financial_health(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::financial_health::Input,
+) -> Result<storage::financial_health::Assessment, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_financial_health(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Financial health assessment could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn preview_financial_health_reduction(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::financial_health::ReductionInput,
+) -> Result<storage::financial_health::Reduction, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.preview_financial_health_reduction(&client_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "Financial health preview could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn get_spending_analysis(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::spending_analysis::Input,
+) -> Result<storage::spending_analysis::Analysis, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_spending_analysis(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Spending analysis could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn change_spending_classification(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::spending_analysis::Change,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.change_spending_classification(&client_id, input)
+        })
+    })
+    .await
+    .map_err(|_| {
+        "Classification save could not be confirmed. Reload before trying again.".to_owned()
+    })?
+}
+#[tauri::command]
+async fn get_spending_classification_history(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    row_id: String,
+) -> Result<storage::spending_analysis::History, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.get_spending_classification_history(&client_id, &row_id)
+        })
+    })
+    .await
+    .map_err(|_| "Classification history could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn get_client_workspace_overview(
+    state: State<'_, DesktopState>,
+    client_id: String,
+) -> Result<storage::client_workspace::Overview, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_client_workspace_overview(&client_id))
+    })
+    .await
+    .map_err(|_| "Client planning overview could not be loaded.".to_owned())?
 }
 #[tauri::command]
 async fn list_assessment_records(
@@ -340,6 +691,60 @@ async fn preview_card_review(
     .map_err(|_| "Card review could not finish.".to_owned())?
 }
 #[tauri::command]
+async fn query_unified_transactions(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::unified_review::Query,
+) -> Result<storage::unified_review::Page, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.query_unified_transactions(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Transaction inspection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn get_transaction_inspection(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    row_id: String,
+) -> Result<storage::unified_review::Evidence, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.get_transaction_inspection(&client_id, &row_id)
+        })
+    })
+    .await
+    .map_err(|_| "Transaction inspection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn save_transaction_inspection(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: storage::unified_review::Save,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.save_transaction_inspection(&client_id, input))
+    })
+    .await
+    .map_err(|_| "Transaction inspection could not finish.".to_owned())?
+}
+#[tauri::command]
+async fn get_original_statement(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    source_id: String,
+) -> Result<storage::unified_review::Original, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.get_original_statement(&client_id, &source_id))
+    })
+    .await
+    .map_err(|_| "Transaction inspection could not finish.".to_owned())?
+}
+#[tauri::command]
 async fn query_transaction_activity(
     state: State<'_, DesktopState>,
     client_id: String,
@@ -376,6 +781,34 @@ async fn stage_card_statement(
     })
     .await
     .map_err(|_| "Card operation could not finish. Refresh before another attempt.".to_owned())?
+}
+#[tauri::command]
+async fn review_transaction_disposition(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: imports::Disposition,
+) -> Result<imports::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| {
+            w.review_transaction_disposition(&client_id, input)
+        })
+    })
+    .await
+    .map_err(|_| "The source review task did not complete.".to_owned())?
+}
+#[tauri::command]
+async fn review_card_disposition(
+    state: State<'_, DesktopState>,
+    client_id: String,
+    input: cards::Disposition,
+) -> Result<cards::Snapshot, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        access(&state, |w| w.review_card_disposition(&client_id, input))
+    })
+    .await
+    .map_err(|_| "The card review task did not complete.".to_owned())?
 }
 #[tauri::command]
 async fn review_card_transaction(
@@ -939,6 +1372,45 @@ async fn unlock_workspace(
 }
 
 #[tauri::command]
+fn get_security_policy(
+    state: State<'_, DesktopState>,
+) -> Result<storage::security_policy::Policy, String> {
+    access(&state, Workspace::get_security_policy)
+}
+#[tauri::command]
+fn save_security_policy(
+    state: State<'_, DesktopState>,
+    input: storage::security_policy::Input,
+) -> Result<storage::security_policy::Policy, String> {
+    access(&state, |w| w.save_security_policy(input))
+}
+
+#[tauri::command]
+async fn change_workspace_password(
+    state: State<'_, DesktopState>,
+    input: storage::password_change::PasswordChangeInput,
+) -> Result<storage::password_change::PasswordChangeResult, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = access(&state, |w| w.change_workspace_password(input))?;
+        // Lock notification is independent of command-response delivery. It
+        // carries no credentials and preserves the committed durability status.
+        let _ = state.handle.emit(
+            "workspace-locked",
+            serde_json::json!({
+                "reason": "password_changed", "durabilityWarning": result.durability_warning
+            }),
+        );
+        Ok(result)
+    })
+    .await
+    .map_err(|_| {
+        "Password change could not finish. Restart and check which password opens the workspace."
+            .to_owned()
+    })?
+}
+
+#[tauri::command]
 fn lock_workspace(state: State<'_, DesktopState>) -> Result<(), String> {
     access(&state, |workspace| {
         workspace.lock_workspace();
@@ -1291,9 +1763,24 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            household_cashflow_preview,
+            household_cashflow_reconcile,
+            choose_household_report_pdf,
+            export_household_report_pdf,
+            list_households,
+            create_household,
+            get_household,
+            save_household,
+            preview_household,
+            household_sources,
+            household_classify,
+            record_household_report,
+            household_budget_preview,
+            household_budget_reconcile,
             choose_client_csv,
             choose_client_pdf,
             inspect_client_pdf,
+            inspect_pdf_transactions,
             inspect_client_csv,
             cancel_client_csv,
             get_client_imports,
@@ -1304,6 +1791,14 @@ pub fn run() {
             review_financial_facts,
             list_assessment_records,
             get_assessment_planning,
+            get_paycheck_allocation,
+            get_savings_progress,
+            get_client_workspace_overview,
+            get_spending_analysis,
+            get_financial_health,
+            preview_financial_health_reduction,
+            change_spending_classification,
+            get_spending_classification_history,
             get_assessment_evidence,
             get_assessment_intake,
             review_client_action_plan,
@@ -1318,10 +1813,16 @@ pub fn run() {
             get_card_review,
             save_card_review,
             preview_card_review,
+            query_unified_transactions,
+            get_transaction_inspection,
+            save_transaction_inspection,
+            get_original_statement,
             query_transaction_activity,
             get_card_statements,
             stage_card_statement,
             review_card_transaction,
+            review_transaction_disposition,
+            review_card_disposition,
             save_assessment_record,
             choose_assessment_pdf,
             review_final_report,
@@ -1355,6 +1856,9 @@ pub fn run() {
             setup_workspace,
             unlock_workspace,
             lock_workspace,
+            change_workspace_password,
+            get_security_policy,
+            save_security_policy,
             workspace_info,
             list_clients,
             get_client,

@@ -4,6 +4,10 @@ export interface WorkspaceInfo {
   counselorId: string;
   counselorName: string;
 }
+export interface ClientWorkspaceOverview {
+ clientId:string;monthlyIncome:string|null;necessaryExpenses:string|null;unallocated:string|null;enteredDebt:string|null;
+ debtMonthlyPayment:string|null;budgetDebtPayment:string|null;emergencyTarget:string|null;accessibleSavings:string|null;restrictedSavings:string|null;payoffMonth:string|null;warnings:string[];
+}
 
 export const CLIENT_STATUSES = [
   'New Intake',
@@ -133,6 +137,8 @@ export interface DatedAmount { month: string; amount: string }
 export interface DebtPlanData {
   startMonth: string; monthlyPayment: string | null; accounts: DebtAccount[];
   extras: DatedAmount[]; paymentChanges: DatedAmount[];
+  targetedExtras?:{accountIndex:number;month:string;amount:string}[];
+  advanced?:{accounts:{accountIndex:number;dayBasis:number|null;rateChanges:{month:string;apr:string}[];fees:DatedAmount[]}[];payments:{firstDate:string;frequency:CashflowFrequency;secondDay:number|null}|null};
 }
 export interface DebtPlanInput { expectedRevision: number; data: DebtPlanData }
 export interface DebtMonth {
@@ -144,6 +150,7 @@ export interface DebtProjection {
   payoffMonth: string | null; accountPayoffMonths: (string | null)[];
   totalInterest: string; totalFees: string; totalPaid: string; remainingBalance: string;
   negativeAmortizationAccounts: number[]; warnings: string[]; schedule: DebtMonth[];
+  datedPayments?:{date:string;payments:string[];interest:string[];fees:string[];balances:string[]}[];
 }
 export interface DebtComparison { warnings: string[]; snowball: DebtProjection | null; avalanche: DebtProjection | null }
 export interface DebtBudgetContext { revision: number; monthlyCapacity: string; plannedDebtPayments: string; warnings: string[] }
@@ -161,6 +168,7 @@ export interface SavingsPlanData {
   restrictedSavings: string | null; obligationsReserved: string | null;
   emergencyContribution: string | null; alternativeContributions: string[];
   goals: SavingsGoal[]; prioritiesNote: string;
+  funding?:import('./planningTypes').SavingsFunding;
 }
 export interface SavingsPlanInput { expectedRevision: number; data: SavingsPlanData }
 export interface SavingsContext {
@@ -188,19 +196,21 @@ export interface SavingsSummary {
   alternatives: { forecast: SavingsForecast; allocationWarning: boolean | null }[];
   goals: SavingsGoalResult[]; requestedMonthlySavings: string | null;
   warnings: string[]; schedule: SavingsMonth[];
+  funding?:import('./planningTypes').SavingsFundingResult;
 }
 export interface ClientSavingsPlan {
   clientId: string; revision: number; updatedAt: string | null; data: SavingsPlanData | null;
   summary: SavingsSummary | null; context: SavingsContext;
 }
 
-export interface CashflowAccount { id: string; label: string; openingBalance: string | null }
+export interface CashflowAccount { id: string; label: string; openingBalance: string | null; reserve?:string|null }
 export type CashflowKind = 'paycheck' | 'bill' | 'loan' | 'savings' | 'otherInflow' | 'otherOutflow' | 'transfer';
 export type CashflowFrequency = 'once' | 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 export interface CashflowSchedule {
   label: string; accountId: string; destinationId: string | null; kind: CashflowKind; amount: string | null;
   firstDate: string; frequency: CashflowFrequency; secondDay: number | null; untilDate: string | null;
   certainty: 'confirmed' | 'estimated';
+  settlement?:{firstAvailableDate:string|null};
 }
 export interface CashflowPlanData { startDate: string; endDate: string; accounts: CashflowAccount[]; schedules: CashflowSchedule[]; notes: string }
 export interface CashflowPlanInput { expectedRevision: number; data: CashflowPlanData }
@@ -212,10 +222,10 @@ export interface CashflowBalance { accountId: string; amount: string | null }
 export interface CashflowEntry {
   scheduleIndex: number; date: string; label: string; kind: CashflowKind; certainty: 'confirmed' | 'estimated';
   accountId: string; destinationId: string | null; amount: string | null; sourceBalance: string | null;
-  destinationBalance: string | null; combinedBalance: string | null; nextPaycheck: string | null; warnings: string[];
+  destinationBalance: string | null; combinedBalance: string | null; transferLeg?:string;inTransit?:string; nextPaycheck: string | null; warnings: string[];
 }
-export interface CashflowDay { date: string; balances: CashflowBalance[]; combinedBalance: string | null; entryIndices: number[]; warnings: string[] }
-export interface CashflowSummary { ledger: CashflowEntry[]; days: CashflowDay[]; closingBalances: CashflowBalance[]; combinedClosing: string | null; warnings: string[] }
+export interface CashflowDay { date: string; balances: CashflowBalance[]; combinedBalance: string | null; entryIndices: number[]; warnings: string[]; inTransit?:string }
+export interface CashflowSummary { ledger: CashflowEntry[]; days: CashflowDay[]; closingBalances: CashflowBalance[]; combinedClosing: string | null; warnings: string[]; inTransit?:string }
 export interface ClientCashflowPlan { clientId: string; revision: number; updatedAt: string | null; data: CashflowPlanData | null; summary: CashflowSummary | null; context: CashflowContext }
 
 export interface BackupResult { path: string; createdAt: string; auditRecorded: boolean; durabilityWarning: boolean }
@@ -227,7 +237,7 @@ export type ReviewStatus='Pending'|'Needs Clarification'|'Approved'|'Rejected';
 export interface CsvMapping {date:number;description:number;amountMode:'signed'|'debitCredit';amount:number|null;debit:number|null;credit:number|null;signedIsDebit:boolean;dateFormat:'iso'|'mdy'|'dmy';merchant:number|null;category:number|null;kind:number|null;reference:number|null;balance:number|null}
 export interface TransactionFields {date:string|null;amount:string|null;description:string;merchant:string;category:string;kind:TransactionKind}
 export interface RawCsvRecord {page?:number|null;reportedLine?:string|null;extractionMethod:string;recordNumber:number;line:number;reportedDate:string;reportedAmount:string|null;reportedDebit:string|null;reportedCredit:string|null;reportedDescription:string;reportedMerchant:string|null;reportedCategory:string|null;reportedKind:string|null;reportedReference:string|null;reportedBalance:string|null;extracted:TransactionFields;reference:string|null;balance:string|null;issues:string[]}
-export interface CsvDocumentInput {balanceOrder?:BalanceOrder|null;pdfSelection?:PdfLocator[]|null;accountId:string|null;accountLabel:string;accountKind:string;periodStart:string|null;periodEnd:string|null;openingBalance:string|null;closingBalance:string|null;retainSource:boolean;mapping:CsvMapping}
+export interface CsvDocumentInput {pdf?:import('./pdfTypes').PdfEvidence|null;balanceOrder?:BalanceOrder|null;pdfSelection?:PdfLocator[]|null;accountId:string|null;accountLabel:string;accountKind:string;periodStart:string|null;periodEnd:string|null;openingBalance:string|null;closingBalance:string|null;retainSource:boolean;mapping:CsvMapping}
 export interface CsvPreview {pdfPages?:PdfPage[]|null;clientId:string;token:string;fileName:string;sha256:string;byteCount:number;headers:string[];sampleRows:string[][];rowCount:number}
 export interface StatementAccount {id:string;label:string;kind:string}
 export interface CsvDocument {balanceHistory:StatementBalanceHistory[];balanceReconciliation:StatementBalanceReport|null;id:string;accountId:string;fileName:string;sha256:string;byteCount:number;importedAt:string;sourceRetained:boolean;input:CsvDocumentInput;rowCount:number;sourceExpectedClosing:string|null;sourceDifference:string|null;approvedDifference:string|null;warnings:string[]}
@@ -313,7 +323,7 @@ export interface BudgetMethodComparison {clientId:string;revision:number;calcula
 
 export interface ScenarioAmountChange {amount:string|null}
 export interface ScenarioBudgetChange {index:number;amount:string|null}
-export interface ScenarioCashChange {index:number;amount:string|null;firstDate:string}
+export interface ScenarioCashChange {index:number;amount:string|null;firstDate:string;settlementChange?:{delayed:boolean;firstAvailableDate:string|null}}
 export interface ScenarioExpense {
  label:string;kind:'necessary'|'discretionary';amount:string|null;
  frequency:'weekly'|'biweekly'|'semimonthly'|'monthly'|'annual';
@@ -326,6 +336,9 @@ export interface ScenarioInput {
  emergencyContribution:ScenarioAmountChange|null;cashChanges:ScenarioCashChange[];
  debtExtras?:DatedAmount[];goalContributions?:ScenarioBudgetChange[];
  recurringExpenses?:ScenarioExpense[];
+ newGoals?:{id:string;label:string;targetAmount:string|null;targetDate:string|null;monthlyContribution:string|null}[];
+ targetedExtras?:{accountIndex:number;month:string;amount:string}[];
+ savingsFunding?:import('./planningTypes').SavingsFunding;
  incomeReductions?:{budgetIndex:number;fromMonth:string;throughMonth:string;amount:string|null;cashSchedule:number|null}[];
 }
 export interface ScenarioOutcome {strategy:PlanningDebtStrategy;firstMonthBuffer:string|null;plans:AssessmentPlans}
@@ -381,7 +394,7 @@ export interface FinalReportRecord {clientId:string;digest:string;assessment:Sav
 
 export type CardKind='unclassified'|'purchase'|'refund'|'payment'|'fee'|'interest'|'adjustment';
 export interface CardFields {date:string|null;amount:string|null;description:string;category:string;kind:CardKind}
-export interface CardInput {accountLabel:string;periodStart:string;periodEnd:string;openingOwed:string;closingOwed:string;retainSource:boolean;mapping:CsvMapping}
+export interface CardInput {pdf?:import('./pdfTypes').PdfEvidence|null;accountLabel:string;periodStart:string;periodEnd:string;openingOwed:string;closingOwed:string;retainSource:boolean;mapping:CsvMapping}
 export interface CardSource {format:number;id:string;clientId:string;importedAt:string;importRevision:number;fileName:string;sha256:string;byteCount:number;input:CardInput;rows:RawCsvRecord[]}
 export interface CardRow {row:number;raw:RawCsvRecord;fields:CardFields;status:ReviewStatus}
 export interface CardReview {id:string;row:number;fields:CardFields;status:ReviewStatus;reason:string;reviewedAt:string;counselorName:string;revision:number}
@@ -436,3 +449,8 @@ export type ClientHistoryKind='profile'|'note'|'intake'|'document'|'scenario'|'r
 export interface ClientHistoryQuery {text:string;kind:ClientHistoryKind|null;fromDate:string;throughDate:string;offset:number;expectedSnapshot:string|null}
 export interface ClientHistoryEvent {id:string;sourceId:string;kind:ClientHistoryKind;title:string;detail:string;occurredAt:string;day:string}
 export interface ClientHistoryPage {clientId:string;snapshot:string;offset:number;total:number;events:ClientHistoryEvent[]}
+
+export interface PasswordChangeResult {durabilityWarning:boolean}
+export interface PasswordChangeInput {currentPassword:string;newPassword:string;confirmation:string;acknowledgeRetainedCopies:boolean}
+
+export interface SecurityPolicy {revision:number;idleMinutes:number;totalChanges:number;history:{revision:number;idleMinutes:number;savedAt:string}[]}

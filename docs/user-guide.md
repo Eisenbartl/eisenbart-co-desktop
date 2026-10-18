@@ -1,40 +1,85 @@
 # Windows evaluation guide
 
-The installer below is 0.23.0. Current 0.28.0 source additionally supports optional
-client intake, dated follow-ups, a filtered dashboard overview and selected intake
-in immutable internal reports;
-see [the intake guide](client-intake-followups.md) [overview guide](follow-up-overview.md) and [report intake](report-intake-context.md).
-Those additions require a newer build and are not in the linked 0.23.0 installer.
+This guide describes the **0.51.0 development source (schema 32)**. The
+[Windows guide](windows.md) separates current source validation from the historical
+0.47.0 installer, which lacks newer features and cannot open schema-32 records.
+There is no 0.51.0 installer. Use fictional records while evaluating this
+development build. Independent security review and clean
+installed Windows 11 offline acceptance remain pending. There is no forgotten-
+password reset.
 
-Version 0.23.0 is a Windows x64 evaluation build with encrypted local records,
-client notes, budgets, debt/savings/cash-flow plans, reviewed statement imports,
-approved-data charts, immutable scenarios, counselor reports and client-plan PDF
-export. New temporary-income periods show monthly funding shortfalls and recovery;
-new expenses, debt extras and savings-goal changes can be compared together.
-Use fictional records while evaluating. Scanned-document OCR, advanced terms,
-full intake/follow-up and commercial release requirements remain in development.
-There is no forgotten-password reset or completed independent security review.
+## Current transaction review and health assessment
 
-## Prototype navigation (0.27.0 source)
+In a client workspace, open **Review & reconciliation → All transactions** for
+combined chronological account history. Use the existing filters; **View Source
+Document** opens the retained PDF alongside the table when available. Closing it
+restores the table width. Purchase-method analysis separates dollar shares,
+purchase-count shares and average amounts, with unknown methods visible. Transfers,
+repayments, refunds and other non-purchases do not inflate purchase comparisons.
+Approve or correct transactions through their existing review forms; original
+imports and decision histories remain retained. [Detailed workflow](unified-transaction-review.md).
 
-The sidebar has Dashboard, Clients, Financial Review, Transactions, Documents,
-Budget Planner, Debt Planner, Savings Planner, Cash-Flow Calendar, Financial
-Scenarios, Reports, and Settings and Administration. Choose a client at the top
-of a focused page; their context carries between pages until changed or locked.
-Use Clients for Profile, Intake & follow-ups, Session notes and History & records.
-Complete record retains the integrated workflow. Save editable records before
-leaving, or explicitly confirm discarding edits. Temporary unsaved scenario
-previews reset on leaving; record a reviewed scenario to keep it.
+Open **Financial dashboard**, select the completed assessment months and load the
+integrated health view. Inspect component points and the evidence checklist; missing
+essential information leaves the total unavailable. The score is a counseling aid.
+Income-relative rows distinguish expenses, debt obligations, refunds, savings and
+other transfers. Observations explain their supporting activity and uncertainty.
+Use the existing classification-edit action after discussing necessity with the
+client; renew coverage when source decisions change. Counselor-selected reduction
+previews show conditional monthly/annual impacts and can explicitly map saved
+expense/allocation/calendar lines into existing scenario engines without changing
+saved plans. [Policy, thresholds, evidence and limits](financial-health-assessment.md).
 
-Import statements in Documents, review their rows in Transactions and use
-Financial Review for approved-data charts, facts, balance and payment checks.
-Reports contains assessments and their client action-plan history/PDF controls.
-Settings → Backup & recovery creates backups and routes you to locked-screen
-verification for restore. Other settings areas include security, firm branding,
-accounts/roles, data management, licensing and help. Future areas say **Planned**
-and do not save data. See [the development map](prototype-development-map.md)
-for working CRUD behavior versus remaining features. Archiving preserves history;
-permanent deletion is not implemented.
+Existing household workspaces provide explicit shared-planning workflows separately
+from individual financial records. [Household guide](household-management.md).
+The [0.47.0 installer](windows.md) is historical and lacks these newer source features.
+No 0.51.0 installer is available or requested.
+
+## Spending Analysis
+
+Open a client tab and select **Spending Analysis** for approved, categorized
+spending cards, category charts, transaction details and opportunity prompts.
+Choose the date/account scope. After discussing a spending purpose, select its
+Type, enter the reason, confirm the discussion and save. All current results
+refresh together; original imports and prior classifications stay in History.
+Import/approval controls remain separate. [Usage, exact totals and safeguards](spending-analysis.md).
+
+## Client directory and workspaces
+
+The application sidebar contains Dashboard, Clients and Settings. Clients opens
+only the searchable/filterable directory. Choose **Open workspace** to open that
+client in an in-app tab; reopening the same stable ID focuses the existing tab.
+Close the active tab to return to the most recently used remaining client, or All
+clients. Tabs and private drafts clear when the workspace locks.
+
+A client's first visit opens **Overview**. Choose one of thirteen sections in the
+local rail: Overview, Profile & intake, Session notes, Monthly budget, Debt payoff,
+Savings & sinking funds, Cash-flow calendar, Scenario comparisons, Import
+statements, Review & reconciliation, Spending Analysis, Financial dashboard and Assessments & reports.
+At narrower window sizes the rail scrolls horizontally. Only the selected section
+is shown. Save edits before switching; choose **Keep editing** in a discard dialog
+to return and save, or explicitly choose **Discard changes**. Ongoing writes hold
+navigation. Temporary scenario previews reset when leaving unless recorded.
+
+Profile & intake includes the profile and separate optional intake/follow-up tab.
+Session notes includes note corrections and searchable History & records. Import
+statements includes statement accounts, document requests and signed-card CSV
+review. Review & reconciliation separates the queue, verified figures, running
+balances, recurring payments, transfers, source checks, history, classification
+rules and completeness/bank-card reviews. Financial dashboard shows the integrated health assessment and approved
+period activity, separate from planning inputs. Assessments & reports preserves
+saved evidence, action plans, final approvals and PDF controls.
+
+Overview uses saved Rust results with explicit source labels. Unknown balances
+remain Unknown. A simulated debt payment versus saved budget allocation mismatch
+stays visible until the underlying saved inputs agree; opening Overview never
+changes the plans. Sample mockup figures are not defaults. See the
+[redesign mapping and limits](client-workspace-redesign.md).
+
+Settings retains security/password changes, encrypted backup and verified restore,
+firm branding and explicitly planned areas. Existing guide references to Documents,
+Transactions, Financial Review or Reports mean the corresponding local section or
+subtab above. No independent security or commercial-readiness claim is made.
 
 ## Track requested documents (0.28.0 source)
 
@@ -46,7 +91,7 @@ financial contents. Archive saved requests to keep them out of the active view;
 uncheck Archive to reactivate. Past versions are read-only. See
 [document collection](document-collection.md) for history, limits and recovery.
 
-## Install and open
+## Install and open the historical Windows preview
 
 1. Download the **windows-installer** ZIP from a successful Windows build. See
    the [Windows download instructions](windows.md).
@@ -61,8 +106,8 @@ uncheck Archive to reactivate. Past versions are read-only. See
 ## Create your workspace
 
 On the first launch, enter **Organization name** and **Counselor name**. You may
-replace the initial Eisenbart & Co. organization name. Choose these names
-carefully; changing them later is not available in this build.
+replace the initial Eisenbart & Co. organization name. Firm display name and presentation can be changed later in Settings → Branding.
+Counselor editing remains planned.
 
 Enter a long, unique passphrase in **Workspace password**, with at least 12
 characters, then enter it again in **Confirm password**. Retain it securely
@@ -76,7 +121,7 @@ There is no forgotten-password reset, and reinstalling cannot recover access.
    counseling goals are optional. Use invented details throughout evaluation.
 3. Choose a **Counseling status**, then choose **Create client**. Wait for the
    client's name to appear in the directory and at the top of the saved record.
-4. To edit a saved profile, choose **Clients** and select the client's name.
+4. To edit a saved profile, open the client's workspace and choose **Profile & intake**.
    Change the details or status, choose **Save changes**, and wait for
    **Client saved**.
 
@@ -87,18 +132,18 @@ Approved financial charts appear with the client’s reviewed statement data.
 
 ## Save session notes
 
-Open the intended client and enter text in **New session note**. Choose **Save
+Open the intended client workspace, choose **Session notes**, and enter text in **New session note**. Choose **Save
 session note**, then confirm it appears in the history with the counselor's name
 and date. A client must be created before notes can be added.
 
 Save profile edits and session notes separately before switching records,
 closing, or locking. If a prompt warns about unsaved changes, cancel it to return
-and save your work. Saved notes remain in the history; add another note to record
-a correction or update.
+and save your work. Saved originals remain in history. Choose **Review correction** and enter an
+explicit reason to record a reviewed amendment; original text is retained.
 
 ## Create a client budget
 
-Open a saved client in **Clients** and scroll to **Monthly budget**.
+Open a saved client workspace and choose **Monthly budget**.
 
 1. Choose **Add income**, **Add expense**, or **Add allocation**.
 2. Enter a **Category or source** name, choose the **Type**, and enter an
@@ -170,7 +215,7 @@ Version 0.23.0 uses schema 16; keep using the newer version after upgrading.
 
 ## Plan savings and sinking funds
 
-Savings planning is included in the current installer.
+Savings planning is included in both current source and the historical 0.47.0 installer.
 
 Open a saved client and scroll to **Savings planning**.
 

@@ -400,3 +400,228 @@ before typing. Saved-report IDs are read only after their directory refresh
 finishes and the selector contains the new selection. These are observation/focus
 guards; they do not replay uncertain writes, script application data or remove
 any workflow assertions.
+
+## Workspace password changes (0.44.0 source)
+
+The full native workflow ends with wrong-current-password rejection, empty
+submitted fields, reviewed retained-copy disclosures, successful change/lock,
+old-password rejection, new-password unlock and complete restart. It creates
+backups before and after rotation, rejects each other-generation password,
+restores both using their original passwords and checks original notes and
+unchanged older backup bytes. The backend fixture separately compares exact
+source/report values and digests. No password is included in diagnostics.
+Screenshot: `native-workspace-password-safeguards.png`.
+
+After verifying termination of its own private process group, driver restart
+waits up to 75 seconds for closed TCP ports to be released. Initial occupied-port
+checks still fail before creating test data. This addresses observed WebKit
+TIME_WAIT timing; UI writes, clicks and assertions are never replayed.
+
+## Configurable inactivity (0.45.0 source)
+
+Before the password-change extension, the full harness saves a one-minute
+policy, inspects immutable history and waits for the real Rust timer with only
+read-only DOM observations. No product clock/timeout is overridden. It checks
+private UI clearing, unlock/full restart, encrypted recovery of the originally
+captured one-minute policy after a later change, and original client notes. It
+returns the policy to 15 minutes for the remaining workflow. Screenshot:
+`native-inactivity-policy.png`. The focused wrapper uses a separate synthetic
+workspace and the same visible-control check function.
+
+## Client workspace redesign — 0.46.0
+
+The global navigation now has Dashboard, Clients and Settings; all twelve client
+sections live inside stable-ID in-app tabs. The native page object routes legacy
+financial fixture intents through these actual UI controls and separate review
+subtabs. It never invokes app IPC or scripts financial writes. Negative/locked
+DOM observations remain read-only, and source/report/math assertions are retained.
+
+The focused redesign workflow creates real synthetic records through the app,
+checks the directory and all twelve sections, saves independently expected budget
+and debt inputs, checks the $200/$0 mismatch and unknown balances, cancels and
+accepts the actual in-app discard dialog, verifies isolation/tab deduplication/MRU
+close, inspects an 800px window and tests locking plus a full offline restart.
+Keep WebKit sandboxing enabled. See development status for actual run outcomes.
+
+The 0.47.0 workflow adds a separate Quinn Analysis client with synthetic bank
+statements. It checks pending exclusion, explicit individual approvals, source-
+confirmed subscriptions and a saved discretionary budget. It classifies eight
+expenses via the Spending Analysis Type control, independently checks $1,160 gross,
+$1,140 net, $160 discretionary, six small purchases totaling $60, a $10 reviewed
+subscription and $60 above the real target. A $100 change to Necessary preserves
+gross/net, updates necessary to $1,100 (94.83%) and discretionary to $60 (5.17%),
+removes the discretionary Dining bar and budget flag, and preserves both purposes
+and original imported values in History. It exercises the actual discard dialog,
+table-only filtering, thirteen client sections, desktop/800px page overflow,
+private lock clearing, full process restart, encrypted backup restoration of
+classifications/reasons and second-client isolation. Screenshots:
+`native-spending-desktop.png`, `native-spending-history.png`,
+`native-spending-narrow.png`. Results are recorded only after the run finishes.
+
+
+## Transaction-focused extraction and review (0.48.0)
+
+The complete workflow now also creates Morgan Extraction with fictional savings
+and card PDFs. It excludes contact text, fine-print pages, totals and running
+balances from the checklist; asserts confident preselection and manual exclusion;
+checks exact selected sums and imported row counts; saves source-bound purposes
+in separate bank/card review pages; verifies automatic combined Spending Analysis,
+classification history, process restart, encrypted recovery and client isolation.
+It checks the unclipped inspector and 800px layout. Screenshots are
+`native-extracted-candidates.png` and `native-extracted-spending.png`.
+
+The PDF worker can insert extracted blank lines. The harness locates transactions
+by their actual text and reads their extracted locators, rather than assuming
+printed line positions. Native click failures report read-only geometry and never
+replay a click or financial write. Build using `--debug --no-bundle` for this stage;
+no installer is created unless explicitly requested.
+
+## Household management (0.49.0)
+
+The full driver now also creates two dedicated fictional household clients and a
+limited-information third member. It tests the ten-section household workspace,
+explicit sharing permissions, $2,400 rent split into $600/$900/$900, a full payer
+outlay, internal settlement, exact shared goal contributions, and a saved
+hypothetical rent change that does not alter active agreements. It explicitly
+reconciles a $600 individual budget share and verifies the individual plan.
+Before saving, a hybrid preview also verifies a $500 fixed-only participant
+with a `0.0` remainder weight and $950/$950 equal remainder shares. Overview
+checks distinguish planned necessary/discretionary obligations from source actuals.
+
+Native clicks switch between individual and household tabs while a household
+editor remains open, retain its draft and section, and exercise explicit Keep /
+Discard. Household editors leave global tabs/navigation accessible; keyboard
+users can return to the tab strip from the editor. The report checkpoint exports
+an immutable household PDF with independently expected figures and a shared goal,
+refuses overwrites, checks an 800px layout, clears private state on lock, restarts
+the complete process, and verifies encrypted backup recovery of the household.
+Screenshots include `native-household-overview.png` and
+`native-household-narrow.png`. Fixtures and input gestures are synthetic; typed
+replacements are observed exactly before financial submissions.
+
+The full run reaches households with an already populated, horizontally scrolling
+workspace tab strip. Native tab actions wait for the actual hit target before
+one click; they never retry financial submissions. A separate synthetic probe
+also checks offscreen tab targets with eight clients and a household. The sticky
+tab header contains its own flex-start scrolling row to preserve correct hit
+regions in native WebKit.
+
+Use the same standalone `--debug --no-bundle` build and native driver prerequisites
+above. Do not run Cargo while the native application/driver processes are active.
+These checks create no installer and establish no Windows installed acceptance.
+
+## Unified transaction review and original inspection (0.50.0)
+
+The full driver adds a fictional Taylor Review client after extraction acceptance.
+It imports retained two-page bank/card PDFs through the real bounded parser,
+approves each transaction using existing forms and then checks that opening
+**Review & reconciliation** defaults to **All transactions**.
+It checks one row per record, mixed same-day chronology, oldest-first and combined
+account/type filters. Repayments do not inflate the exact $250 purchase total.
+
+Native inspection uses **View Source Document** to open the bank original on its
+actual recorded page 2, verifies nonblank canvas rendering, navigates pages and zoom, and saves explicit institution,
+last-four, debit-card and posting-date details. Credit/debit/unknown purchase shares
+are independently $100/$100/$50 (40%/40%/20% of dollars), while each method
+supplies one purchase (33.33% of count). Closing the source removes the split
+immediately with the transaction table available. Rejecting a purchase changes
+the now-discrepant bank statement’s eligibility; only the matched card source
+contributes (100% of eligible purchase count) until the bank source is reconciled.
+Financial decisions use the existing embedded bank/card forms and update Spending Analysis. Earlier supplemental
+details become inactive on a new approval and remain visible in original history.
+The script rejects/confirms a synthetic duplicate, filters that confirmation,
+then reapproves after clarification and verifies the restored eligible total.
+
+Screenshots: `native-unified-transactions.png`, `native-unified-original.png`,
+`native-unified-payment-shares.png`, `native-unified-narrow.png`. An 800px check stacks source/evidence without document
+wide overflow. Lock removes private UI, a complete restart preserves saved data,
+and encrypted backup recovery validates source/detail history and displays the
+actual PDF again. A second client has neither rows nor leaked institution data.
+
+Use the same compiled standalone `--debug --no-bundle` build and real Tauri native
+driver as previous stages. Do not run Cargo while the application/driver are active.
+The full prior regression is retained. No installer is produced; Linux checks do
+not establish installed Windows acceptance or certify commercial readiness.
+
+The final focused refinement extends the same scenario to nine current rows by
+adding bank loan proceeds/payment and a refund/fee pair. The unchanged $250
+purchase split excludes them. ACH credit/debit and external/reversal labels must
+preserve movement/refund kinds; they must never require invented income or
+purchases. Inspection clicks wait for the actual unobstructed hit target once;
+a refreshed original canvas must finish painting before subsequent test gestures.
+No financial submission is replayed. Execution results distinguish the complete
+pre-refinement regression from final focused acceptance on the corrected binary.
+
+
+## Financial health and behavioral insights (0.51.0)
+
+The existing native driver now includes `check_financial_health` after unified
+review. A synthetic Morgan Health client imports a retained CSV and approves its
+seven real transactions through existing forms. Missing inventory first withholds
+the score. Verified income/purposes, period-end balances and saved coverage yield
+95/100, $1,800 net spending, 51.66% necessary expenses and preserved refund/principal
+boundaries. The exact balance evidence remains inspectable.
+
+The script enters existing budget/debt/savings/calendar plans, discusses 20% of
+$250 net Dining activity, and verifies $50/month and $600/year impacts. Explicit
+line mapping uses the existing combined scenario table, loan payoff and dated
+calendar calculations, with original saved plan inputs unchanged. The current
+Spending Analysis workflow changes Dining to Necessary; live amounts update,
+the score waits for renewed coverage, then becomes 85/100 with 2.70 reserve months.
+At 800px, components stack and tables scroll within the page. Private health data
+clears on lock; full restart and encrypted recovery recompute the same score,
+while another client has no transaction or balance evidence from this client.
+
+Screenshots: `native-financial-health-score.png`,
+`native-financial-health-reduction.png`, `native-financial-health-narrow.png`,
+`native-financial-health-restored.png`. Final focused health acceptance passed
+with exit 0, all three checkpoints and the completion marker in
+`/workspace/shared/desktop-smoke-financial-health-final`. The score, reduction and
+narrow images were visually inspected; source/binary hashes stayed unchanged.
+The current unified-review checkpoints passed earlier in the combined first run,
+which later stopped on a health-fixture locator error. Final harness fixes cover
+CSV record numbering, existing save-status elements and explicit coverage renewal;
+no uncertain financial write was replayed. The old complete 117-checkpoint native
+regression was not repeated for 0.51.0. Development status and
+[the acceptance record](financial-health-assessment.md) distinguish all executions.
+No installer or Windows installed-acceptance claim follows from these checks.
+
+
+## Complete 0.51.0 consolidation acceptance
+
+The entire tracked native script passed with **119 checkpoints**, its completion
+marker and exit 0 in `/workspace/shared/desktop-smoke-051-consolidation-fourth`.
+This is fresh full-regression evidence beyond the earlier focused 0.51.0 runs.
+It includes all planning, reports, normal/error-screen recovery, accounts, card
+review/final approval, classification/history, spending/extraction, unified original
+PDF inspection, health, household, inactivity and password-change workflows.
+Score and 800px images were visually inspected; runtime/binary hashes stayed fixed
+and native driver ports closed before later Cargo commands.
+
+Three earlier attempts exposed old bank-queue/default-view assumptions after 9,
+13 and 105 checkpoints. Explicit legacy queue selection and unified-default
+navigation checks corrected the harness. Original financial/history/isolation
+assertions stayed in place, uncertain writes were not replayed, and each rerun
+used a fresh fictional workspace. A frontend acceptance-test guard wait changed
+during the final native run; no runtime/build input or accepted binary changed.
+See [the consolidated source/CI/recovery evidence](branch-0.51-review.md) for all
+outcomes and limits. No installer or Windows installed/offline claim follows.
+
+
+## Workflow integration audit acceptance (0.51.0)
+
+The entire script passed again with **119 checkpoints**, its completion marker
+and exit 0 in `/workspace/shared/desktop-smoke-workflow-audit-final`. The selected
+intake checkpoint now also checks the assessment directory: unrelated edits leave
+it current, selected changes flag it, and reverting selected values never removes
+the flag. Existing approval, calculation, plan/scenario/report, original PDF, card,
+household, lock/restart and both recovery paths stayed enabled. Intake and 800px
+Spending Analysis screenshots were visually inspected. All tracked non-documentation
+inputs and the binary stayed fixed; native driver ports closed afterward.
+
+An initial launch omitted the existing cloud-native runtime wrapper and failed
+before any workflow action. The fresh full run used `cloud-native-run.sh` with
+private D-Bus/display and the existing synthetic-test-only sandbox exception.
+No application safeguard or assertion was disabled and no uncertain financial
+write was replayed. See [the handoff matrix and evidence](workflow-integration-audit.md).
+No installer or Windows installed/offline acceptance claim follows.

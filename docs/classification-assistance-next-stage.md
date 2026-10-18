@@ -1,8 +1,9 @@
-# Next stage: bounded local transaction classification assistance
+# Local transaction classification assistance — implementation reference
 
 The initial bounded bank suggestion/draft workflow is implemented in 0.41.0; see
-[usage and limits](classification-assistance.md). Saved reusable rules remain
-future work, with [next-stage notes](classification-rules-next-stage.md).
+[usage and limits](classification-assistance.md). Saved reusable rules are implemented
+in 0.42.0; see [rule usage](local-category-rules.md) and the retained
+[design reference](classification-rules-next-stage.md).
 The original design notes follow. The
 original specification requests category suggestions, and Transactions already
 contains a planned Classification assistance page. Merchant normalization,

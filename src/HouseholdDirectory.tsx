@@ -1,0 +1,14 @@
+import {useEffect,useRef,useState,type FormEvent} from 'react';
+import {api} from './api';
+import Icon from './Icons';
+import type {HouseholdDirectoryItem} from './householdTypes';
+export function householdMonth(){return new Date().toLocaleDateString('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit'}).replace('/', '-');}
+export const currentMonth=()=>{const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'2-digit'}).formatToParts(new Date());return `${parts.find(p=>p.type==='year')?.value}-${parts.find(p=>p.type==='month')?.value}`;};
+export default function HouseholdDirectory({onOpen,createRequest=0}:{onOpen:(id:string,name:string)=>void;createRequest?:number}){
+ const alive=useRef(true);useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[]);
+ const[open,setOpen]=useState(false),[rows,setRows]=useState<HouseholdDirectoryItem[]>([]),[name,setName]=useState(''),[creating,setCreating]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{if(createRequest){setOpen(true);setCreating(true);}},[createRequest]);
+ useEffect(()=>{if(!open)return;let live=true;setBusy(true);setError('');api.listHouseholds().then(r=>{if(live)setRows(r)}).catch(e=>{if(live)setError(String(e))}).finally(()=>{if(live)setBusy(false)});return()=>{live=false}},[open]);
+ async function submit(e:FormEvent){e.preventDefault();if(busy)return;setError('');setBusy(true);try{const r=await api.createHousehold(name,currentMonth());if(!alive.current)return;setName('');setCreating(false);onOpen(r.id,r.data.name);}catch(e){setError(String(e))}finally{setBusy(false)}}
+ return <section className="panel household-directory"><div className="panel-heading"><button className="text-button" aria-expanded={open} onClick={()=>setOpen(v=>!v)}><Icon name="household"/>Households</button><button className="button secondary" onClick={()=>{setOpen(true);setCreating(true)}}>Create household</button></div>{open&&<>{error&&<p role="alert" className="alert error">{error}</p>}{creating&&<form onSubmit={submit} className="household-create"><label>Household name<input autoFocus required maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label><button className="button primary" disabled={busy}>Save household</button><button type="button" className="button secondary" onClick={()=>setCreating(false)}>Cancel</button></form>}{busy?<p role="status">Loading households…</p>:rows.length?<div className="household-directory-grid">{rows.map(r=><button className="household-directory-card" key={r.id} onClick={()=>onOpen(r.id,r.name)}><Icon name="household" size={26}/><strong>{r.name}</strong><span>{r.members} members · {r.archived?'Archived':'Shared planning'}</span></button>)}</div>:<p className="muted">Create a household, then link clients or add limited-information members. Financial information stays private until explicitly authorized.</p>}</>}</section>
+}

@@ -341,6 +341,7 @@ mod tests {
             input: imports::DocumentInput {
                 balance_order: None,
                 pdf_selection: None,
+                pdf: None,
                 account_id: Some("checking".into()),
                 account_label: "Synthetic checking".into(),
                 account_kind: "checking".into(),

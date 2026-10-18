@@ -21,7 +21,8 @@ the draft. Review again and acknowledge explicitly; the application does not
 retry a report write automatically. An unsaved intake cannot be included.
 
 Later changes to selected values permanently flag the report **Needs review**,
-including when those values are subsequently reverted. The original report and
+including when those values are subsequently reverted. The assessment directory
+and opened record use the same selected-field history check. The original report and
 its digest remain unchanged. An unselected address change or unrelated follow-up
 edit does not flag intake context. Other existing source/profile/model review
 rules continue to apply. Client agreements inherit supporting-report review flags.
@@ -42,6 +43,8 @@ serialization, preserving their original bytes/digests. Older applications do
 not understand format 5: do not reopen an updated workspace in an older build.
 There is no new installer for this source checkpoint.
 
-This remains an incomplete internal assessment workflow. Final report acceptance,
-organization logo/contact branding, remaining model/document requirements and
-commercial release verification remain separate work.
+Selected intake remains part of internal assessment context. The existing Final
+report checklist owns final approval, and firm branding has its own saved review.
+Installed Windows acceptance, remaining model/document requirements and commercial
+release verification remain separate work. The current cross-workflow behavior is
+recorded in the [integration audit](workflow-integration-audit.md).

@@ -52,9 +52,9 @@ pub struct RestoreResult {
     pub durability_warning: bool,
 }
 
-struct PrivateDirectory {
-    path: PathBuf,
-    keep: bool,
+pub(super) struct PrivateDirectory {
+    pub(super) path: PathBuf,
+    pub(super) keep: bool,
 }
 impl Drop for PrivateDirectory {
     fn drop(&mut self) {
@@ -92,12 +92,15 @@ fn private_directory(path: &Path) -> Result<(), String> {
         Err(_) => Err(RECOVERY_ERROR.into()),
     }
 }
-fn staging(root: &Path) -> Result<PrivateDirectory, String> {
+pub(super) fn staging(root: &Path) -> Result<PrivateDirectory, String> {
     private_directory(root)?;
     let parent = root.join("recovery-generations");
     private_directory(&parent)?;
     let path = parent.join(Uuid::new_v4().to_string());
+    #[cfg(unix)]
     let mut builder = fs::DirBuilder::new();
+    #[cfg(not(unix))]
+    let builder = fs::DirBuilder::new();
     #[cfg(unix)]
     {
         use std::os::unix::fs::DirBuilderExt;
@@ -183,7 +186,7 @@ pub(super) fn activation_lock(root: &Path) -> Result<File, String> {
     file.try_lock_exclusive().map_err(|_|"Another backup or recovery operation is running. Close other application instances and try again.".to_owned())?;
     Ok(file)
 }
-fn sync_directory(path: &Path) -> Result<(), String> {
+pub(super) fn sync_directory(path: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         File::open(path)
@@ -202,7 +205,7 @@ fn authentication(key: &[u8; 32]) -> Authentication {
     let derived = Zeroizing::new(<[u8; 32]>::from(derive.finalize().into_bytes()));
     Authentication::new_from_slice(&*derived).expect("fixed HMAC key")
 }
-fn info(connection: &Connection) -> Result<WorkspaceInfo, String> {
+pub(super) fn info(connection: &Connection) -> Result<WorkspaceInfo, String> {
     let result=connection.query_row("SELECT o.id,o.name,c.id,c.name FROM workspace_settings w JOIN organizations o ON o.id=w.organization_id JOIN counselors c ON c.id=w.counselor_id AND c.organization_id=o.id WHERE w.singleton=1",[],|r|Ok(WorkspaceInfo{organization_id:r.get(0)?,organization_name:r.get(1)?,counselor_id:r.get(2)?,counselor_name:r.get(3)?})).map_err(|_|VERIFY_ERROR.to_owned())?;
     required_text(&result.organization_name, "Organization name", 120)
         .map_err(|_| VERIFY_ERROR.to_owned())?;
@@ -210,7 +213,7 @@ fn info(connection: &Connection) -> Result<WorkspaceInfo, String> {
         .map_err(|_| VERIFY_ERROR.to_owned())?;
     Ok(result)
 }
-fn verify_database(connection: &Connection) -> Result<(), String> {
+pub(super) fn verify_database(connection: &Connection) -> Result<(), String> {
     let id: i32 = connection
         .query_row("PRAGMA application_id", [], |r| r.get(0))
         .map_err(|_| VERIFY_ERROR.to_owned())?;
@@ -231,7 +234,11 @@ fn verify_database(connection: &Connection) -> Result<(), String> {
     }
     Ok(())
 }
-fn export_snapshot(source: &Connection, path: &Path, key: &[u8; 32]) -> Result<(), String> {
+pub(super) fn export_snapshot(
+    source: &Connection,
+    path: &Path,
+    key: &[u8; 32],
+) -> Result<(), String> {
     drop(create_private_file(path)?);
     let mut encoded = Zeroizing::new(String::from("x'"));
     for b in key {
@@ -449,7 +456,7 @@ impl Workspace {
         password: String,
     ) -> Result<BackupResult, String> {
         self.session()?;
-        let _activation = activation_lock(&self.data_dir)?;
+        let _activation = self.activation_lock()?;
         let password = Zeroizing::new(password);
         validate_password(&password)?;
         let metadata = self.read_metadata()?;
@@ -523,7 +530,7 @@ impl Workspace {
         self.pending_restore = None;
         let password = Zeroizing::new(password);
         validate_password(&password)?;
-        let _activation = activation_lock(&self.data_dir)?;
+        let _activation = self.activation_lock()?;
         let parent_pointer = pointer_bytes(&self.data_dir)?;
         let source_directory =
             resolve_directory(&self.data_dir).unwrap_or_else(|_| self.data_dir.clone());
@@ -548,6 +555,9 @@ impl Workspace {
         if ids.len() > 1000 {
             return Err("This backup exceeds the current 1,000-client recovery limit. Your current workspace has not been changed.".into());
         }
+        households_store::validate_all(&connection, &workspace_info)?;
+        unified_review::validate_all(&connection, &workspace_info)?;
+        security_policy::read(&connection, &workspace_info)?;
         branding_store::read(&connection, &workspace_info)?;
         for id in &ids {
             scoped_client(&connection, &workspace_info, id)?;
@@ -621,7 +631,7 @@ impl Workspace {
                     .into(),
             );
         }
-        let _activation = activation_lock(&self.data_dir)?;
+        let _activation = self.activation_lock()?;
         if pointer_bytes(&self.data_dir)? != candidate.parent_pointer
             || file_stamps(&candidate.source_directory) != candidate.parent_files
         {
@@ -643,54 +653,57 @@ impl Workspace {
         transaction.commit().map_err(storage_error)?;
         integrity_check(connection)?;
         candidate.connection.take();
-        OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(candidate.directory.path.join(DATABASE_NAME))
-            .and_then(|f| f.sync_all())
-            .map_err(|_| RECOVERY_ERROR.to_owned())?;
-        sync_directory(&candidate.directory.path)?;
-        sync_directory(
-            candidate
-                .directory
-                .path
-                .parent()
-                .expect("generation parent"),
-        )?;
-        let temporary = self.data_dir.join(format!(".workspace-active-{token}.tmp"));
-        let p = Pointer {
-            version: 1,
-            generation: candidate
-                .directory
-                .path
-                .file_name()
-                .expect("generation name")
-                .to_string_lossy()
-                .into_owned(),
-        };
-        let mut owns_temporary = false;
-        let result = (|| {
-            let mut file = create_private_file(&temporary)?;
-            owns_temporary = true;
-            serde_json::to_writer(&mut file, &p).map_err(|_| RECOVERY_ERROR.to_owned())?;
-            file.sync_all().map_err(|_| RECOVERY_ERROR.to_owned())?;
-            drop(file);
-            sync_directory(&self.data_dir)?;
-            replace_pointer(&temporary, &self.data_dir.join(POINTER))
-        })();
-        if let Err(error) = result {
-            if owns_temporary {
-                let _ = fs::remove_file(&temporary);
-            }
-            return Err(error);
-        }
-        candidate.directory.keep = true;
+        let durability_warning =
+            activate_generation(&self.data_dir, &mut candidate.directory, &token)?;
         self.active_dir = candidate.directory.path.clone();
         Ok(RestoreResult {
             previous_workspace_preserved: candidate.review.current_workspace_present,
-            durability_warning: sync_directory(&self.data_dir).is_err(),
+            durability_warning,
         })
     }
+}
+
+pub(super) fn activate_generation(
+    root: &Path,
+    directory: &mut PrivateDirectory,
+    token: &str,
+) -> Result<bool, String> {
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(directory.path.join(DATABASE_NAME))
+        .and_then(|f| f.sync_all())
+        .map_err(|_| RECOVERY_ERROR.to_owned())?;
+    sync_directory(&directory.path)?;
+    sync_directory(directory.path.parent().expect("generation parent"))?;
+    let temporary = root.join(format!(".workspace-active-{token}.tmp"));
+    let p = Pointer {
+        version: 1,
+        generation: directory
+            .path
+            .file_name()
+            .expect("generation name")
+            .to_string_lossy()
+            .into_owned(),
+    };
+    let mut owns_temporary = false;
+    let result = (|| {
+        let mut file = create_private_file(&temporary)?;
+        owns_temporary = true;
+        serde_json::to_writer(&mut file, &p).map_err(|_| RECOVERY_ERROR.to_owned())?;
+        file.sync_all().map_err(|_| RECOVERY_ERROR.to_owned())?;
+        drop(file);
+        sync_directory(root)?;
+        replace_pointer(&temporary, &root.join(POINTER))
+    })();
+    if let Err(error) = result {
+        if owns_temporary {
+            let _ = fs::remove_file(&temporary);
+        }
+        return Err(error);
+    }
+    directory.keep = true;
+    Ok(sync_directory(root).is_err())
 }
 
 #[cfg(test)]
@@ -1044,12 +1057,48 @@ mod tests {
             .is_err());
     }
     #[test]
+    fn authenticated_container_with_corrupt_security_history_cannot_replace_workspace() {
+        let (root, mut w, _) = configured();
+        let target = tempdir().unwrap();
+        w.save_security_policy(security_policy::Input {
+            expected_revision: 0,
+            idle_minutes: "5".into(),
+        })
+        .unwrap();
+        let meta = w.read_metadata().unwrap();
+        let key = derive_key(PASSWORD, &meta.salt).unwrap();
+        let snapshot = target.path().join("security-corrupt.db");
+        export_snapshot(&w.session.as_ref().unwrap().connection, &snapshot, &key).unwrap();
+        let connection = open_encrypted(&snapshot, &key).unwrap();
+        connection.execute_batch("DROP TRIGGER workspace_security_no_update; UPDATE workspace_security_history SET saved_at='invalid';").unwrap();
+        drop(connection);
+        let header = Header {
+            version: 1,
+            metadata: meta,
+            created_at: timestamp(),
+            backup_id: Uuid::new_v4().to_string(),
+            schema_version: SCHEMA_VERSION,
+        };
+        let backup = target.path().join("security-corrupt.ebcbackup");
+        write_container(&backup, &header, &snapshot, &key).unwrap();
+        w.lock_workspace();
+        let original = fs::read(root.path().join(DATABASE_NAME)).unwrap();
+        assert!(w
+            .prepare_restore(backup.display().to_string(), PASSWORD.into())
+            .is_err());
+        assert!(w.pending_restore.is_none());
+        assert_eq!(fs::read(root.path().join(DATABASE_NAME)).unwrap(), original);
+        assert!(!root.path().join(POINTER).exists());
+        w.unlock_workspace(PASSWORD.into()).unwrap();
+        assert_eq!(w.get_security_policy().unwrap().idle_minutes, 5);
+    }
+    #[test]
     fn older_schema_snapshot_migrates_in_staging_and_failure_preserves_active_files() {
         let (root, mut w, _) = configured();
         let client = all_records(&mut w);
         let target = tempdir().unwrap();
         let connection = &w.session.as_ref().unwrap().connection;
-        connection.execute_batch("DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; CREATE TABLE audit_events_v6 (
+        connection.execute_batch("DROP TABLE IF EXISTS transaction_inspection_details; DROP TABLE IF EXISTS household_events; DROP TABLE IF EXISTS workspace_security_history; DROP TABLE IF EXISTS note_amendments; DROP INDEX IF EXISTS note_amendment_scope; DROP TABLE IF EXISTS category_rule_applications; DROP TABLE IF EXISTS category_rule_versions; DROP INDEX IF EXISTS review_history_rule_scope; DROP TABLE IF EXISTS card_facts_history; DROP TABLE IF EXISTS card_review_history; DROP TABLE IF EXISTS card_decisions; DROP TABLE IF EXISTS card_statements; DROP TABLE IF EXISTS final_report_approvals; DROP TABLE IF EXISTS coverage_review_history; DROP TABLE IF EXISTS firm_branding_history; DROP TABLE IF EXISTS statement_account_history; DROP TRIGGER IF EXISTS statement_accounts_no_update; DROP TRIGGER IF EXISTS statement_accounts_no_delete; DROP TABLE IF EXISTS document_collection_snapshots; DROP TABLE IF EXISTS client_care_snapshots; DROP TABLE IF EXISTS assessment_scenario_links; DROP TABLE IF EXISTS client_scenarios; DROP TABLE IF EXISTS client_action_plans; DROP TABLE IF EXISTS client_assessment_records; DROP TABLE IF EXISTS financial_fact_reviews; DROP TABLE IF EXISTS statement_balance_reviews; DROP TABLE recurring_review_invalidations; DROP TABLE recurring_review_history; DROP TABLE transaction_review_history; DROP TABLE transaction_choices; DROP TABLE import_records; DROP TABLE import_documents; DROP TABLE statement_accounts; DROP TABLE client_import_state; CREATE TABLE audit_events_v6 (
             id TEXT PRIMARY KEY NOT NULL,organization_id TEXT NOT NULL,counselor_id TEXT NOT NULL,
             event TEXT NOT NULL CHECK(event IN ('workspace_created','client_created','client_updated','note_added','budget_saved','debt_plan_saved','savings_plan_saved','cashflow_plan_saved')),
             entity_id TEXT,created_at TEXT NOT NULL,

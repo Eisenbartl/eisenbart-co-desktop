@@ -10,15 +10,15 @@ The application stores its database locally using SQLCipher. A counselor passwor
 
 The first setup creates one organization and counselor on the installation. Choose a long, unique password and retain it securely outside the application. No developer service can unlock the database for you.
 
-**There is no password reset or recovery mechanism in this milestone. Losing the password can permanently prevent access to every record in the database.** Password changes are not available yet. Encrypted backup and verified whole-workspace restore are available; they require the password used when the backup was created. Do not delete local files or reinstall in an attempt to recover a forgotten password.
+**There is no forgotten-password reset or service that can recover a lost workspace password. Losing it can permanently prevent access to the encrypted records.** Settings → Security now supports a reviewed current-password change using a verified new encrypted generation; see [password changes and retained copies](workspace-password-change.md). Encrypted backup and verified whole-workspace restore are available; they require the password used when the backup was created. Do not delete local files or reinstall in an attempt to recover a forgotten password.
 
-The local data directory contains `workspace.db` (the encrypted database) and `workspace.json` (non-secret version and Argon2 salt metadata needed for unlocking it). Preserve both files if investigating a failure. Check the Windows guide for the expected directory before making any manual copy. A manual copy of a live database can miss journal/WAL data; use the [backup and recovery controls](backup-recovery.md). After restore, `workspace-active.json` selects a complete database/metadata pair inside `recovery-generations`; prior files are retained. Preserve the whole data folder when investigating a failure.
+The local data directory contains `workspace.db` (the encrypted database) and `workspace.json` (non-secret version and Argon2 salt metadata needed for unlocking it). Preserve both files if investigating a failure. Check the Windows guide for the expected directory before making any manual copy. A manual copy of a live database can miss journal/WAL data; use the [backup and recovery controls](backup-recovery.md). After restore or password change, `workspace-active.json` selects a complete database/metadata pair inside `recovery-generations`; prior files are retained. Preserve the whole data folder when investigating a failure.
 
-The initial password must have at least 12 characters and at most 1,024 UTF-8 bytes. This minimum does not guarantee that a password is strong; a long, unique passphrase is preferable.
+The initial password must have at least 12 characters and at most 1,024 characters. This minimum does not guarantee that a password is strong; a long, unique passphrase is preferable.
 
 ## Sessions and access
 
-The interface provides a manual lock and locks after 15 minutes of inactivity. Locking removes the active database session from application state and requires the password again. The timeout is fixed in this milestone; user-configurable policies come later. Client-data commands and backup creation reject operations without an authenticated session and enforce organization ownership independently of the selected interface record. Restore verification is deliberately available while locked and authenticates the selected backup using its password; activation requires a verified, current review and explicit confirmation.
+The interface provides a manual lock and a saved 1–60 minute inactivity policy, defaulting to 15 minutes. See [inactivity locking](inactivity-locking.md) for enforcement, original-backup policy and retained history. Locking removes the active database session from application state and requires the password again. Automatic locking cannot be disabled. Timer/policy reads do not refresh activity, and invalid policy history locks access. Close older application versions before changing the policy. Client-data commands and backup creation reject operations without an authenticated session and enforce organization ownership independently of the selected interface record. Restore verification is deliberately available while locked and authenticates the selected backup using its password; activation requires a verified, current review and explicit confirmation.
 
 Initial accounts do not provide separate administrator, counselor, and read-only reviewer roles. Future multi-user work must add and test explicit permissions; organization identifiers alone are not a completed permissions product.
 
@@ -49,10 +49,10 @@ production requirement.
 ## Release-blocking security work
 
 - Complete clean Windows offline recovery and removable-drive/power-loss drills for the implemented authenticated backups and staged restore.
-- Define a password change/recovery policy without an undocumented bypass or master key.
+- Independently review the implemented generation-based password change and retained-copy/original-backup password policy; no reset bypass or master key exists.
 - Extend validated migration failure handling, corruption detection, and interrupted restore tests to installed Windows and future attachments.
 - Test client and organization isolation throughout future imports, calculations, exports, and reports.
-- Add role enforcement, configurable inactivity settings, safe archival/deletion, and data export.
+- Add role enforcement, safe archival/deletion, and data export; independently review and verify installed Windows behavior for the implemented inactivity policy.
 - Review key lifecycle, memory handling, dependency vulnerabilities and licenses, installer signing, and local file permissions.
 - Perform independent security and privacy review before using or selling a production release.
 

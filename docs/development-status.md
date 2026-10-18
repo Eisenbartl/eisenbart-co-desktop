@@ -1,6 +1,757 @@
 # Development status
 
-## Current stage — client history and reviewed note corrections (0.43.0, schema 27)
+## Financial planning subpages — 0.52.0 / schema 33, final acceptance in progress
+
+All six requested homes are implemented through the existing client engines,
+editors and stores. See [rules, independent examples and boundaries](financial-planning-subpages.md).
+The final UI suite passed **335 tests in 46 files**. One DOM worker avoids
+contention in long App workflows; assertions and per-test deadlines are unchanged.
+Production frontend, all six version inputs, formatting and all-target Clippy
+with warnings denied pass.
+
+A full Linux run passed **336 library tests and two actual PDF-worker integrations**.
+Final review then reproduced an event-driven savings missing-data edge case:
+an initial point or partial schedule could incorrectly imply horizon/deadline
+failure. The new regression failed before the correction and passes after it;
+all **21 affected Linux savings/integration tests**, the real-service linked
+scenario/report/PDF/restart/recovery regression and current Clippy pass afterward.
+Known complete projections and original unextended calculations stay unchanged.
+
+The first native attempt was intentionally interrupted after initial setup/budget
+checks to apply that correction. Only its identified synthetic runner was stopped;
+its private driver group/ports closed, and its evidence remains retained. A fresh
+corrected native run includes the missing-pool goal case and 800px scenario view.
+A second reproduced edge case now flags intermediate and opening reserve-floor
+breaches even when a later same-day deposit restores the closing balance. Its
+regression failed before the correction; all 18 affected cash-flow/integration
+tests and the linked scenario/report/recovery regression pass afterward. Money
+balances, v1 results and explicit save boundaries stay unchanged. The earlier
+native attempt was again stopped only in its synthetic workspace; corrected
+full native and current-head Windows acceptance remain required before marking
+this assignment complete. No merge or installer is authorized.
+
+## End-to-end workflow integration audit — verified source (0.51.0, schema 32)
+
+The [handoff matrix and acceptance record](workflow-integration-audit.md) trace
+intake, statement import, canonical approvals, spending/health, saved plans,
+scenarios and immutable assessments/reports. Reproduced and fixed an intake
+review-status gap in the assessment directory using the existing selected-field
+history check; opened records already had the correct safeguard. Unrelated edits
+do not invalidate selected intake, while changes and reversions stay flagged.
+
+Decision messages now request explicit counselor review/save for agreed planning
+changes, and obsolete card-report guidance points to existing card-inclusive
+completeness/approval. No calculator, store, schema or report format was added.
+A new real-service workflow regression checks exact live totals, corrections,
+reversals, unchanged plans, refreshed plan contexts, stale-save rejection, original
+PDF evidence, client isolation, restart and encrypted recovery. A new App regression
+checks the section handoffs and zero implicit plan/approval writes. Both focused
+Rust regressions and all 96 affected UI tests pass. The full automated suites
+passed: **323 UI tests in 44 files**, **318 Rust library tests plus two actual
+PDF-worker integrations**, version consistency, production frontend, formatting,
+warnings-denied all-target Clippy and the embedded debug no-bundle build. The
+complete native workflow passed **119 checkpoints**, its completion marker and
+exit 0 in `/workspace/shared/desktop-smoke-workflow-audit-final`. It verifies
+the new intake-directory flag alongside the opened report, actual approvals,
+reversals, classifications, exact analysis/health, existing planning/scenario/report
+flows, both recovery paths, original PDFs, 800px layout and client separation.
+All tracked non-documentation inputs and the binary stayed unchanged; driver
+ports closed. Intake and narrow spending screenshots were visually inspected.
+
+Evidence index: `/workspace/shared/workflow-integration-audit`. The initial native
+launch omitted the documented cloud runtime wrapper and failed before any workflow
+action. A fresh fictional workspace with the existing wrapper passed the entire
+script; no uncertain financial write was replayed.
+
+Next required action: human review of [PR #1](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1)
+with its [current-head Windows source checks](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1/checks) green.
+**No installer or merge.** Windows 11 installed/offline and other documented release
+acceptance remain separate. The earlier branch-consolidation outcome below is
+historical evidence for its own validated head.
+
+## Branch consolidation — 0.51.0 validated source, unmerged for review
+
+[PR #1](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1) prepares the
+original **37 commits ahead of main, none behind**, from 0.43.0/schema 27 through
+0.51.0/schema 32. History is preserved. Subsequent consolidation commits add CI
+version/format/lint/no-bundle gates, a populated schema-31 rollback/idempotence
+regression, native-harness navigation corrections, a Windows conditional-binding
+lint fix, an asynchronous acceptance-test readiness fix and reconciled documentation.
+The [review guide](branch-0.51-review.md) groups the changes and migration boundaries.
+
+Fresh locked setup, all six matching build version inputs, the production frontend
+and all **322 UI tests** passed. The complete Linux Rust matrix passed **317 library
+tests plus two actual supervised PDF-worker integrations**, with no failures or
+ignored cases. After the platform-conditional binding correction, all 11 backup
+and eight password-change cases, formatting, warnings-denied Clippy and the embedded
+no-bundle Linux build passed again. The final current-code matrix rerun is retained
+with the validation artifacts; no zero-test target is counted as worker validation.
+
+[Corrected Windows source CI](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/39059990292)
+passed on `e28d6e2`: **322 UI tests, 318 library tests and both PDF-worker integrations**,
+version consistency, formatting, all-target Clippy with warnings denied, frontend
+and embedded no-bundle application builds. The extra Windows library test covers
+memory-lock quota behavior. All five opt-in packaging steps were skipped and the
+run produced **zero installer artifacts**. The final documentation head is also
+subject to the current [PR checks](https://github.com/Eisenbartl/eisenbart-co-desktop/pull/1/checks).
+
+The complete final native regression passed **119 checkpoints**, its completion
+marker and exit 0 in `/workspace/shared/desktop-smoke-051-consolidation-fourth`.
+It exercised all earlier planning/report/recovery workflows plus transaction-focused
+PDF selection, default unified review and real original rendering, purpose changes,
+purchase amount/count shares, financial health and existing-plan previews, household
+planning, 800px layouts, real one-minute inactivity locking, password changes and
+old/new-password recovery. Score/narrow screenshots were visually inspected.
+Runtime/build inputs and the accepted binary stayed unchanged during the run; a
+separate test-only guard-readiness edit is recorded. Driver ports closed before
+later Cargo checks. Evidence index: `/workspace/shared/branch-051-validation`.
+
+Initial Windows CI exposed a Windows-only unnecessary mutable directory binding;
+conditional declarations retain Unix mode 0700 without suppressing lint. A rerun
+exposed a React-effect timing assertion; it now waits for the same dirty=false
+expectation plus busy=false and an enabled saved Type selector. Three initial native
+attempts stopped at legacy queue/default-view assumptions after 9, 13 and 105
+checkpoints. Explicit queue selection and unified-default assertions fixed the
+harness without weakening financial checks or replaying uncertain writes. The
+successful complete fourth run used a fresh fictional workspace.
+
+Current README, roadmap, map, user/dashboard/Windows guides and retained stage notes
+identify implemented functionality and distinguish current source from the historical
+0.47.0/schema-29 installer. The schema is still 32; no new financial engine/store,
+household linking, business feature or installer was added by consolidation.
+
+Next required action: human review of PR #1 while its current-head checks are green.
+**Do not merge as part of this task.** No installer without an explicit request.
+Windows 11 installed/offline acceptance, independent security/accessibility review,
+unsupported adapters/OCR and advanced financial terms remain separate release work.
+The health score remains a counseling policy, not a validated credit rating.
+
+The milestone sections below preserve historical outcomes and original follow-up
+notes. Their old pending checks and “next” priorities are superseded by this current
+consolidation record and later milestones, rather than claims about the latest build.
+
+## Current stage — financial health assessment and behavioral insights (0.51.0, schema 32)
+
+Preceding transaction-review source/binary hashes and native acceptance were
+verified before development. The [reuse map, scoring policy, workflow and acceptance checklist](financial-health-assessment.md)
+record the integration. The scoped health projection, score gates, evidence,
+behavioral observations and existing-planner reduction previews are implemented.
+The existing Financial dashboard hosts the interface; classification edits reuse
+Spending Analysis with the assessment months carried into its filters.
+
+**Completed and verified for the currently supported bank/card ledgers.** All 322
+UI tests, all 316 Rust library tests and both actual supervised PDF-worker
+integration tests passed. Clippy with warnings denied, the production frontend
+and embedded standalone no-bundle debug build passed. After two descriptive scope
+messages changed, all 91 affected UI tests and the embedded build passed again.
+A final fixture-clock reliability change was confined to tests; all 11 affected
+health tests and Clippy passed afterward. The runtime source and accepted native
+binary remained byte-identical; the full Rust matrix preceded that test-only change.
+
+The current unified-review native workflow passed all three checkpoints before
+the final descriptive copy. Final health native acceptance passed with exit 0 and
+all three checkpoints on the final app binary: withheld missing score then 95/100,
+refund-adjusted $50/month/$600/year existing-planner preview without baseline writes,
+classification editing and renewed coverage yielding 85/100, source traceability,
+800px layout, lock, full restart, encrypted recovery and client isolation. Screenshots
+were visually inspected. Evidence:
+`/workspace/shared/financial-health-validation/completed.json`; final run:
+`/workspace/shared/desktop-smoke-financial-health-final`. The historical complete
+117-checkpoint native regression was not repeated. Initial native attempts exposed
+CSV-fixture numbering and status-wait errors; fresh isolated reruns corrected the
+harness without retrying uncertain financial writes. Full details and logs are in
+[the acceptance record](financial-health-assessment.md).
+
+Remaining limits: the explainable index is a counseling policy, not a validated
+credit rating; missing essential evidence withholds a score. Existing unsupported
+OCR/institution/loan adapters and unknown planner terms remain unavailable. Old
+reports and saved plans are preserved. Linux checks do not establish Windows
+installation or commercial readiness. No installer, household linking, business
+counseling, duplicate transaction store or new schema was introduced.
+
+Next required action: counselor review of the completed workflow and thresholds
+with fictional records. Broader adapters and Windows acceptance remain separately
+scoped priorities. Do not create an installer without an explicit request.
+
+## Previous stage — unified transaction review (0.50.0, schema 32)
+
+Implemented [the supplied brief](unified-transaction-review-specification.md) for
+currently supported bank/card transaction ledgers. The [baseline checklist](unified-transaction-review-checklist.md)
+records existing systems, improvements and adapter dependencies. [Workflow,
+calculation basis and limits](unified-transaction-review.md).
+
+### Supplemental viewing and purchase-frequency refinements
+
+Within the same 0.50.0 assignment, opening **Review & reconciliation** now defaults
+to **All transactions**; the existing bank Review queue remains selectable. The
+optional action reads **View Source Document**. The same payment-method panel and
+preceding-period table now show separate purchase-dollar and purchase-count shares,
+with existing averages, eligibility, unknown methods and exclusions preserved.
+There is no new ledger, component, navigation section, schema or installer.
+
+Completed checks: all 313 UI tests passed; all 14 final affected Rust tests passed;
+Clippy with warnings denied, production frontend and embedded standalone no-bundle
+debug builds passed. The full 305-test Rust library matrix passed 304 tests; the
+process-exit fixture could not launch its executable after concurrent Cargo
+recompilation replaced it. Its sequential rerun passed all four interruption
+points. Both actual supervised PDF-worker integration tests also passed. The
+final standalone build followed all Cargo checks; no Cargo command ran during
+native acceptance. This is full-matrix coverage plus targeted reruns, not a claim
+of a single all-pass 305-test run.
+
+Initial focused UI failures clicked subtabs before the new default finished
+loading; readiness waits corrected those tests. One additional count expectation
+was corrected to honor the existing source-discrepancy gate: rejecting a purchase
+can exclude its whole unreconciled statement, leaving the matched card source
+at 100% of eligible count. Restoring approval reinstates the eligible denominator.
+No approval or reconciliation safeguard was changed. Failed attempts are retained
+in their separate logs.
+
+Updated focused native acceptance passed with exit 0 and its completion marker:
+`/workspace/shared/desktop-smoke-unified-refinements`. It exercised default combined
+chronology, existing filters, the View Source Document action and immediate panel
+closing, actual local PDF pages/zoom, dollar/count shares with unknowns, rejection
+and reapproval, existing bank/card purpose edits and Spending Analysis, 800px
+layout, client isolation, full restart and encrypted recovery. Desktop method
+shares and narrow source layout were visually inspected. Source/binary hashes
+remained unchanged during the run; the native processes and driver ports closed.
+Evidence: `/workspace/shared/unified-review-refinements-validation/completed.json`.
+The earlier complete 117-checkpoint regression was not repeated for these focused
+refinements; its historical result and timing remain below. No installer or new
+household/business functionality was added. Windows installed acceptance remains
+unverified for this refinement.
+
+Next priority is user review of this refined workflow; the previously documented
+broader institution/loan adapters remain unsupported. Earlier 0.50.0 acceptance
+below remains historical.
+
+**Review & reconciliation → All transactions** now provides one current row per
+source record across accounts, chronological/date-basis sorting, combined literal
+search/filters, stable 25-row pages, immutable evidence/history and optional original
+PDF inspection. Existing bank/card forms own financial corrections, approvals,
+rejections, reversals and atomic necessary/discretionary purposes. Source-bound
+method/posting details and explicitly reviewed institution/masked identifiers use
+an encrypted append-only journal. Confirmed rejected duplicates remain distinct
+from suspicion and become inactive on a new financial decision.
+
+The optional bundled PDF.js canvas uses real authorized retained originals,
+recorded pages, page/zoom controls, local fonts/CMaps and rendering bounds. It
+creates no plaintext PDF temp file and activates no PDF scripts/attachments/form
+or link UI. Unknown locations/originals remain explicit. Purchase-method analysis
+uses exact Rust cents and eligible reconciled sources, with $100/$100/$50 credit,
+debit and unknown coverage independently verified as 40%/40%/20%. Repayments,
+transfers, refunds, fees, interest and duplicates do not inflate purchases.
+
+Source validation passed: all 312 UI tests in 43 files; all 13 new Rust tests;
+Clippy all targets with warnings denied; production frontend and embedded standalone
+debug builds. Rust library coverage includes the full 303-test matrix
+(302 passed), the corrected legacy-comparison test’s passing rerun, and all 13 final affected tests
+including one additional case. There are now 304 library tests; the complete run
+preceded the final localized channel correction described below.
+The two actual supervised PDF-worker integration tests passed separately. The
+main-binary unit target has zero tests and is not counted as worker validation.
+
+Earlier full-run failures were legacy schema fixtures retaining the newly added
+table. They now remove it when simulating an older schema. The final comparison
+also permits the introduced table while checking it starts empty and retaining
+exact comparisons of all older records. Original source/report preservation and
+rollback assertions remain. Failed attempts are retained separately.
+
+Focused native acceptance passed with exit 0 and the final completion marker:
+`/workspace/shared/desktop-smoke-unified-focused-second`. It exercised actual PDF
+canvas rendering/page/zoom, current bank/card chronology and combined filters,
+exact method shares, both existing financial decision forms, source-bound history,
+confirmed/reversed duplicates, automatic Spending Analysis updates, 800px layout,
+lock, full restart and encrypted recovery with the original displayed again.
+The first attempt's driver navigated to the separate card page before its embedded
+form loaded; a scoped field wait fixed the harness without an app change or any
+retry of a financial write.
+
+The complete native regression passed with exit 0, its completion marker and all
+117 checkpoints before the final localized channel correction. It retained all
+prior planning, import/review, source/history, PDF/CSV, household, recovery,
+real idle-timeout and password-generation workflows.
+
+The final correction permits ACH/check/direct-deposit channels on appropriate
+financial movements/refunds, keeps external transfers unpaired movements, and
+allows reversals to retain refund treatment. Interest observations use reviewed
+financial kind/direction. Independent tests preserve $2,000 income, $5 costs,
+$25 refunds and $2,370 cash movement despite channel changes and loan proceeds.
+
+Final focused native acceptance passed on the corrected binary with exit 0 and
+its completion marker: `/workspace/shared/desktop-smoke-unified-focused-channel-final`.
+It exercised nine current rows including loan proceeds/payments, refund and fee;
+ACH/external/reversal labels preserved the underlying movements/refund and the
+$250 purchase mix. Original rendering, both financial forms, histories, narrow
+layout, lock, restart and encrypted recovery passed again. The preceding refined
+attempt hit a PDF reload/scroll timing issue in the driver. Waiting for canvas
+paint and observed control hit targets before one click fixed the harness; no
+application change or financial-write retry was needed.
+Artifacts: `/workspace/shared/desktop-smoke-unified-complete-final`.
+
+Both native builds retained their recorded source/binary hashes throughout their
+respective runs, and driver ports closed after cleanup. No Cargo command ran
+while either native application/driver was active. Desktop, original-document
+and narrow screenshots were visually inspected. Source/binary manifests and logs are retained under
+`/workspace/shared/unified-review-validation`. Application checkpoints are
+`68fd122`, `3eb462a`, `f0f0b2a`, `5773520` and `d2bfdcc` on
+`client-workspace-redesign-0.46`; `c56d014` records the original reuse assessment.
+
+Next priority is counselor evaluation with fictional statements, followed by
+explicitly scoped loan/credit-line/mortgage adapters or broader parser/OCR work.
+Those ledgers are unavailable, and debt plans/balances are not invented transaction
+sources. Money-market deposit labels reuse actual savings transactions. Originals
+must have been retained to display PDFs; precise coordinates are unavailable.
+Statement arithmetic does not establish complete account/period coverage; existing
+completeness tools retain that responsibility.
+
+No installer was created or provided. Another installer requires an explicit user
+request. This remains a development build; installed Windows acceptance and
+commercial readiness remain separate.
+
+## Previous stage — household management (0.49.0, schema 31)
+
+Implemented the supplied household brief and ten-section workspace using the
+reference's navy rail, white panels, slate text, muted gold accents, overview
+cards, category donut, member contribution bars and compact tables. Household
+and individual tabs remain independent. [Workflow and limits](household-management.md);
+[original brief](household-management-specification.md).
+
+Working features include exact effective-date allocations and hybrid splits,
+member linking/recorded consent, shared expenses/category rules, separate payments
+and settlements, approved-source matching and purpose history, controlled
+individual budget/cash-flow reconciliation, shared goals, non-writing scenario
+previews, explicit proposal acceptance, immutable report snapshots and offline
+PDF exports. Saved data is encrypted and recovery-validated. Switching tabs
+retains household drafts/sections; lock removes private state.
+
+Source validation passed: production frontend build, all 299 UI tests (41 files),
+the full 288-library-test Rust run plus both PDF-worker tests, and Clippy all
+targets with warnings denied. After the final refinements, all 27 household tests
+passed, covering three added regressions beyond the full run: full household-ID
+plan bindings, duplicate source links across households during recovery, and
+numerically equivalent zero allocation weights. The current library has 291 tests;
+the final targeted run covers the changed household/restore paths. Final Clippy
+and the standalone debug build with embedded frontend assets passed again.
+The desktop build used `--no-bundle`.
+
+Focused native acceptance passed with exit 0 and its completion marker:
+`/workspace/shared/desktop-smoke-household-focused-final`. It exercised member
+permissions, $600/$900/$900 shares of $2,400 rent, actual full payer contributions
+and internal settlements, exact shared goal contributions, non-writing proposals,
+controlled individual budgets, retained sections/drafts, no-overwrite offline PDF,
+800px layout, lock privacy, full restart and encrypted recovery.
+
+The complete native regression passed with exit 0, its final completion
+marker and all 114 checkpoints. Its final run also checks
+$500/$950/$950 fixed-plus-equal allocation preview with a `0.0` weight and the
+overview's necessary/discretionary obligations. It retains the existing planning,
+statement extraction/review, source classifications, card, PDF/CSV, immutable
+history, recovery, real idle-timeout and password-generation workflows.
+Artifacts: `/workspace/shared/desktop-smoke-household-complete-final`.
+
+Earlier failed attempts remain separately retained. A drawer covering global tabs
+was corrected with a nonmodal measured editor; an appended test input was fixed
+with real keyboard replacement and exact-value observations. The first complete
+run exposed incorrect native WebKit hit regions for end-aligned flex children
+in a sticky horizontally scrolling tab strip. The sticky header now contains a
+separate flex-start scrolling row. A native probe with eight clients and a
+household passed actual clicks including offscreen targets:
+`/workspace/shared/household-tab-probe-final`. The driver waits for the observed
+hit target before one click and never retries financial writes.
+
+Synthetic legacy migration fixtures remove the new household table when
+constructing old schemas while retaining rollback and source-preservation
+assertions. Source/binary manifests and source-test logs are retained under
+`/workspace/shared/household-validation`. The final source and binary hashes
+remained unchanged; driver ports were closed after cleanup. Desktop and 800px
+screenshots were visually inspected. No Cargo command ran while native acceptance
+was active.
+
+Application milestones are committed on `client-workspace-redesign-0.46`:
+`bb519a2`, `2fb1e1f`, `aa68c93`, `729c725`, `0e20d20` and `cc1b6d4`.
+The final documentation checkpoint records completed acceptance separately.
+
+Next priority is counselor evaluation of household agreements, permissions and
+reconciliation with fictional records; broader statement formats remain future
+parser work. Due-date agreements do not imply daily proration, unknown private
+income/accounts are not inferred, and personal debt models remain individual.
+See the workflow's explicit coverage and operational bounds.
+
+No installer was created or provided. The user prohibited another installer
+until explicitly requested. Linux development-build acceptance does not establish
+Windows installed operation or commercial readiness.
+
+## Previous stage — transaction-focused statement extraction and review (0.48.0, schema 30)
+
+Implemented offline transaction candidate detection for checking/savings and card
+PDF statements, filtered fine print/pages/balances, editable confident preselection,
+exact server-side draft totals and minimal immutable replayable evidence. Source
+and purpose decisions can save atomically as Necessary or Discretionary through
+Review & reconciliation. Current spending figures consume the existing bank/card
+facts stores. [Workflow, downstream behavior, formats and limits](pdf-import-review.md).
+Card import and card review now have separate client sections/subtabs.
+
+Source checks passed: production frontend build, all 288 UI tests (39 files),
+261 Rust library tests plus both PDF-worker tests, and Clippy all targets with
+warnings denied. After final date/period/filter refinements, all 6 detector,
+4 extraction-storage and 3 disposition tests passed, including the three added
+edge-case tests beyond the full-suite count. All 4 card-facts and 5 Spending
+Analysis tests passed again after the stale-card-purpose fix. The final desktop
+debug build embeds frontend assets and used `--no-bundle`. Acceptance ran on
+2026-10-16 (America/Chicago); outcomes and artifacts are recorded below.
+
+The focused native workflow passed with exit 0 and the final completion marker:
+`/workspace/shared/desktop-smoke-extraction-focused-final`. It verified structural
+filtering across three PDF pages, exact editable selection totals, only checked
+imports, separate bank/card review, necessary/discretionary propagation, original
+history, restart, encrypted recovery, client isolation and an 800px layout. Its
+candidate/spending screenshots were visually inspected. Earlier failed attempts
+remain separate: one assumed printed PDF line numbers, and two exposed the last
+review action touching the native horizontal scrollbar. Transaction-text locators
+and padded review cells fixed those failures without replaying writes. The old
+raw-text scroll box is overridden explicitly and source-page counts are labeled.
+
+A new regression first reproduced stale card purposes blocking a discussion on
+another row. The helper now excludes inactive bindings from the next review while
+preserving their historical snapshots; it never revives them on newer approvals.
+All affected Rust checks and the final embedded debug build passed.
+
+The complete native regression also passed with exit 0 and its final completion
+marker: `/workspace/shared/desktop-smoke-extraction-complete`. It retained all
+prior planning, PDF/CSV, card, report, classification, source approval, immutable
+history, lock/restart, encrypted/error-screen recovery, actual idle timeout and
+password-generation checks, then passed the new extraction/disposition workflow
+again in that full application context. The binary SHA-256 stayed unchanged.
+No Cargo command ran while native acceptance was active.
+
+Final frontend verification passed all 288 tests. One pre-existing navigation test
+was made to await the asynchronously loaded profile editor; its required control
+and validation assertions are unchanged. Application work is committed as
+`1a146f4` and `7969196` on `client-workspace-redesign-0.46`; the final documentation/
+test-only checkpoint records this outcome. Logs and the source/binary manifest
+are retained under `/workspace/shared/extraction-validation`.
+
+Remaining limits: selectable-text PDFs and documented layouts only; scanned/OCR,
+month-name dates and broader institution formats remain future parser work.
+Selections do not prove complete statements. Windows 0.48.0 installed acceptance
+has not been performed; this stage creates no installer.
+
+The user explicitly prohibited creating/providing another installer until asked.
+No packaging or installer workflow is part of this stage.
+
+
+## Previous stage — client Spending Analysis (0.47.0, schema 29 unchanged)
+
+Implemented the user-requested approved/categorized spending workspace with exact
+Rust totals, category charts, evidence-based opportunities, source-bound purpose
+edits, retained original data and existing immutable history. See
+[usage, calculation basis and limits](spending-analysis.md). The client rail now
+has thirteen sections. Schema 29 and historical report formats are unchanged.
+
+Executed source checks on 2026-10-16 (America/Chicago): production frontend build,
+all 281 UI tests (38 files), all 251 Rust library + 2 PDF-worker tests and Clippy
+all targets with warnings denied passed. Final focused UI and Rust tests also
+passed after the native fixes. The standalone debug build embeds frontend assets.
+
+The focused native workflow passed with exit 0 and its final completion marker.
+It verified original pending exclusion, source approvals, a real saved budget and
+confirmed subscription, exact gross/refund/net amounts, all three opportunity
+areas, discussion-bound edits and affected shares/bars/flags, original/history
+preservation, explicit Cancel/discard guards, table scope, thirteen client sections,
+desktop/800px layouts, lock privacy, full process restart, encrypted recovery and
+client isolation. Desktop and narrow screenshots were visually inspected.
+Artifacts: `/workspace/shared/desktop-smoke-spending-focused-final`.
+
+Two earlier native attempts are retained separately and are not passes. The first
+driver tried to click the separate-review link inside a closed details panel; it
+now opens the panel. The second exposed a WebKit native dropdown retaining an
+unsaved visible selection after Cancel. Remounting the native select on draft/
+saved-type transitions fixes cancellation and a second edit; unit/native checks
+assert the restored saved value. Checkbox sizing and heading scroll offsets were
+also corrected from actual rendered views. Repeated card edits retain only the
+latest annotation in the current conclusion, with all earlier snapshots unchanged.
+Fees/interest are excluded from the frequent-small-purchase count.
+
+The complete native regression also passed with durable exit 0 and its final
+completion marker, including all prior planning, statement/PDF, card, report,
+classification, immutable history, source approval, lock/restart, encrypted/error-
+screen recovery, real idle timeout and password-generation checks. The new
+Spending Analysis workflow passed again inside this complete run. Artifacts:
+`/workspace/shared/desktop-smoke-spending-complete`. Its history screenshot was
+visually inspected; the unchanged embedded binary SHA-256 and closed driver ports
+were verified. No Cargo command ran while either successful native run was active.
+
+Application source is committed/pushed as
+`25e9dafd6f16523ef4832f424ae8d1ff6f8dbd80` on
+`client-workspace-redesign-0.46`. Validation logs and the source/binary manifest
+are retained under `/workspace/shared/spending-validation`.
+
+Windows run [`38974473672`](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38974473672)
+completed successfully for that exact source: production frontend build, all 281
+UI tests, all 252 Windows library + 2 PDF-worker tests, NSIS build, silent install,
+responsive installed x64 native window, uninstall and artifact upload passed.
+The log explicitly limits the installed check to a responsive window; no setup/
+client workflow was entered and offline installation was not tested.
+
+The [verified 0.47.0 Windows x64 download](windows.md) is a 213.4 MiB ZIP containing
+the unsigned installer, current source/version instructions and SHA256SUMS.txt.
+Artifact `12078199826` expires 2026-10-30 22:38 UTC. The downloaded EXE's versioned
+filename, source commit, feature instructions and SHA-256 were reverified:
+`e2d28f7a5265bf47f0028c8ddf312abcc42b46ff1a74b88e08d036ddae2d7da4`.
+The Windows installation log, complete job log, artifact metadata and checksum
+verification are retained under `/workspace/shared/spending-validation`.
+Final documentation changes do not alter the packaged application source.
+
+Next bounded acceptance priority: the installed Windows 11 counselor workflow,
+including actual native Type cancellation/re-editing, source/analysis separation,
+offline installation, upgrade, lock, history and encrypted recovery. Retain the
+existing development-build status and documented financial/source safety bounds.
+
+
+## Previous stage — client workspace redesign (0.46.0, schema 29 unchanged)
+
+The user requested a visual pivot to the supplied client directory/workspace
+mockup, followed by an installer. The actual app now has three global pages,
+a directory-only Clients screen, stable-ID in-app client tabs, a twelve-section
+local rail, separate review subtabs and a scoped read-only saved-plan overview.
+Existing forms, financial engines, imports, immutable history and security controls
+are reused. [Design, workflow mapping and boundaries](client-workspace-redesign.md).
+
+Executed validation on 2026-10-16 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Frontend | Production build and all 271 UI tests passed |
+| Backend | 246 library + 2 PDF-worker tests passed; Clippy all targets with warnings denied |
+| New read-only overview | Exact independent synthetic figures, mismatch/reconciliation, unknown versus explicit zero, scoped reads and no audit writes passed |
+| Standalone native build | Passed debug build with embedded assets, no bundles |
+| Focused redesign / visual | Passed exit 0 and final completion marker: twelve sections, exact amounts/mismatch, ID deduplication, cancel/discard, isolation, MRU close, 800px layout, privacy and full restart; desktop/narrow images visually inspected |
+| Complete native regression | Passed exit 0, durable zero status and final completion marker: all original planning, statements, report/history, bank/card, approval, lock/restart, recovery, real idle timeout and password-change checks through actual focused pages |
+| Windows installer | Final run [`38950497634`](https://github.com/Eisenbartl/eisenbart-co-desktop/actions/runs/38950497634) passed frontend build, all 271 UI + 247 Windows library + 2 worker tests, NSIS build, actual install/responsive x64 launch/uninstall and upload; downloaded EXE SHA-256 and version/source/README reverified |
+
+Native testing exposed an existing compatibility error: tauri-plugin-dialog 2.8.2
+replaces `window.confirm` with an async function. Synchronous guards treated its
+Promise as approval. The redesign now uses a real in-app confirmation host for
+root and internal discard paths, with explicit asynchronous fallback handling,
+focus containment, no duplicate request replay and cancellation on lock. Unit and
+native tests verify that cancellation preserves the draft and acceptance discards
+it only for the intended navigation. All existing UI regressions remain active.
+
+Initial native attempts are not passes. The focused driver expected a WebDriver
+JavaScript alert for the asynchronous native-plugin dialog. Complete-driver
+attempts exposed assumptions from the old all-in-one record: source inventory,
+review rows, intake/focus, report selection, period controls and identity headings
+now have focused pages. The driver uses actual rail/subtab controls, reselects
+its intended saved report IDs and periods through native dropdowns, and checks
+saved plans after finishing temporary scenario assertions, since previews reset
+on leaving. Native selects are centered before clicking to avoid sticky headers.
+Read-only visibility/privacy observations never navigate, and unexpected discard
+prompts fail instead of being auto-accepted. All original financial/source/report/
+privacy assertions remain. Deliberately interrupted integration attempts and
+failed attempts retain separate logs/screenshots and are not counted as passes,
+even if the outer D-Bus wrapper returned zero after an interrupt. A final marker
+and durable zero exit status are both required. Both the final focused run and
+final complete rerun passed.
+
+Application source is committed/pushed as `3cba5da`. Both final native runs use
+that standalone embedded-assets binary; `cc29e77` changes only the Windows bundled
+README generator. No Cargo command ran while native tests were active. The full
+run stopped its processes, removed its temporary synthetic workspace and closed
+its driver ports. Focused desktop/800px screenshots and complete-run budget/security
+screens were visually inspected. Evidence, original failed/interrupted attempts,
+logs and durable exit files are retained under `/workspace/shared/redesign-validation`;
+final full artifacts use
+`/workspace/shared/desktop-smoke-redesign-final-complete-workflow` and focused
+artifacts use `/workspace/shared/desktop-smoke-redesign-final-focused`.
+
+The [verified 0.46.0 Windows x64 download](windows.md) is a 213.4 MiB ZIP containing
+the unsigned NSIS installer, corrected current-version instructions and its
+SHA-256 checksum. Artifact `12069289452` expires 2026-10-30 19:20 UTC. Downloaded
+EXE hash: `c398a20641ba396466f7c13473f6c5df7d0b2935a9107c0954fc9f0ac22a922c`.
+Its recorded source is `cc29e7764b2a6bfd9ca6cad181438dbfc5deab49`; subsequent
+`2188428` changes only the native driver and documentation. The first packaging
+run `38945011333` also passed, but its README described an older UI. The final
+run repackaged the same application source with corrected instructions. The
+Windows log explicitly limits its installed check to a responsive x64 window;
+it does not claim an installed counseling workflow or an offline installation.
+Validation logs and final artifact metadata/checksum evidence are preserved under
+`/workspace/shared/redesign-validation`.
+
+No release or commercial-readiness claim is made. The original prototype's sample
+records were not imported into production workspaces. Essential operation remains
+offline and only synthetic test records are used. GitHub API access now succeeds;
+the previous network block is no longer current for this stage.
+
+## Configurable inactivity locking (0.45.0, schema 29)
+
+Settings → Security now saves an encrypted, versioned inactivity timeout from 1
+through 60 whole minutes. Automatic locking cannot be disabled; existing
+workspaces default to 15 minutes. Rust enforces the latest policy before workspace
+access and on the existing 15-second timer, without treating policy reads or
+background checks as activity. A corrupt policy locks the session. Other idle
+instances running this version honor shorter limits without resetting activity.
+Close older application versions before upgrading or changing the policy.
+
+Policy saves check the exact revision and atomically append immutable history and
+an audit event. The UI preserves uncertain drafts for explicit reload, coordinates
+busy/dirty state with password changes, and clears private state on locking.
+Backups retain their captured policy, and password rotation preserves it. Fixed
+15-minute preview/restore-review lifetimes remain independent. History retains at
+most 1,000 changes and displays the latest ten. See [behavior and limits](inactivity-locking.md).
+
+Validation on 2026-10-16 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Reused tested repository setup; dependency versions unchanged |
+| Production frontend / UI | Passed final follow-up build and all 260 tests in 34 files |
+| Focused backend | Passed seven security fixtures, including authenticated corrupt-backup rejection |
+| Complete Linux backend | Passed 244 library + 2 PDF-worker tests, exit 0 |
+| Formatting / Clippy | Passed formatting and all-target Clippy with warnings denied |
+| Standalone native build | Passed debug build with embedded assets, no bundles |
+| Focused native workflow / visual inspection | Passed core and final `5914512` follow-up with exit 0 and final markers: actual one-minute idle lock, private UI clearing, restart, encrypted policy recovery, unchanged notes and password rotation; final Security screen readable without horizontal overflow |
+| Complete native workflow | Passed exit 0, durable exit file `0` and final completion marker on core application source `ab29591`, with explicit driver subtab selection; all prior assertions plus real one-minute idle lock, restart, encrypted policy recovery and password rotation |
+| Windows source validation | Not run: proxy still rejects api.github.com with HTTP 403 |
+| Installer | Not created, per user instruction |
+
+The first complete backend attempt passed 243 tests and failed one legacy
+migration fixture. That fixture deliberately removed later security tables but
+then expected authenticated API access after failed migration. The corrected
+fixture directly verifies retained model bytes and additionally verifies that
+normal access locks when the security policy is missing. No production behavior
+or data-preservation assertion was weakened. Its focused rerun and the
+complete backend rerun passed.
+
+The first complete native attempt passed all existing workflows through client
+history, then stopped because the new inactivity check opened a client while its
+History & records subtab remained selected. It expected `.notes-history` without
+selecting Session notes. The driver now explicitly selects that section before
+checking original notes, including the later password workflow. Application code
+and note/privacy assertions are unchanged. The incomplete run is retained in
+`/workspace/shared/desktop-smoke-inactivity-interrupted` and is not counted as a
+pass. A subsequent rerun was deliberately stopped after the command service
+lost its process handle during a transport outage; its result could no longer be
+captured reliably. That attempt is also not counted as a pass and is retained in
+`/workspace/shared/desktop-smoke-inactivity-transport-interrupted`. The final
+complete rerun writes a durable exit-status file and uses the original artifacts
+path.
+
+An additional focused run starting from History & records timed out waiting for
+enabled inactivity controls. Its screenshot/log remain under
+`/workspace/shared/desktop-smoke-inactivity-password-focused`; it is not a pass.
+A diagnostic retry on the same application binary completed both inactivity and
+password workflows with exit 0 and the final marker, including all original
+assertions (`/workspace/shared/desktop-smoke-inactivity-diagnostic`). The timeout
+was not reproduced by the fast-read unit fixture. Final UI review nevertheless
+explicitly pairs synchronous parent busy assertions with completion releases in
+both security forms, covering fast promise settlement within a render batch.
+All 260 UI tests and the production build pass for that follow-up (`5914512`).
+A new standalone build and the final focused native workflow also passed exit 0,
+durable exit file `0` and both specific feature markers plus the final completion
+marker. It starts from History & records and verifies real idle locking, private
+UI clearing, restart, encrypted policy recovery, password rotation and both
+original-password backup generations. The complete run tests the core binary;
+this final focused run tests the busy-guard follow-up. No storage, key, timeout or
+financial implementation changed.
+
+A narrow environment network draft adding only `api.github.com` was saved for
+review; it does not apply until reviewed/saved and published in environment
+settings. Existing package-manager access and setup configuration were preserved.
+
+Feature source is committed as `ab29591`, with the UI/driver follow-up in
+`5914512`. All Cargo checks finished before the first standalone build; no Cargo
+commands ran during any native verification. The final rebuild ran only after the
+complete native process finished. Core focused artifacts use
+`/workspace/shared/desktop-smoke-inactivity-focused`; complete-run artifacts use
+`/workspace/shared/desktop-smoke-inactivity`; final follow-up artifacts use
+`/workspace/shared/desktop-smoke-inactivity-final`. Core/full/final Security images
+were visually inspected. Logs, durable exit files and independent focused helpers
+are preserved under `/workspace/shared/inactivity-validation`. Every native test
+process stopped, temporary synthetic application data was removed and all driver
+ports were closed. WebKit sandboxing stayed enabled. Only fictional data and
+generated test passwords were used.
+
+No source has been pushed. Installed Windows offline recovery, physical
+power-loss/full-disk/removable-drive drills, independent security review and
+commercial acceptance remain unverified. The last installer remains 0.23.0.
+
+After this stage and its outstanding acceptance checks, the next bounded priority
+is explicit retained-workspace recovery selection with original-password
+verification. Destructive pruning and scheduled backups remain separate work.
+
+## Workspace password change and recovery safeguards (0.44.0, schema 28)
+
+Settings → Security now requires the current password, a different confirmed new
+password and explicit acknowledgment of retained-copy passwords. Rust creates a
+new-key/new-salt encrypted generation, verifies its persisted metadata/database,
+adds an immutable audit event and atomically activates it through shared durable
+recovery activation. It never rekeys the active database in place. Success locks
+the workspace and clears private drafts, CSV previews and PDF receipts.
+
+Whole-command OS locking serializes managed IPC across cooperating app instances;
+stale sessions lock before their next command. Original client/source/history/
+report values remain unchanged. Older backups and retained copies keep their
+original passwords, and restoring an older backup restores that password. There
+is no forgotten-password reset. See [design and recovery policy](workspace-password-change.md).
+
+Validation on 2026-10-16 (America/Chicago):
+
+| Check | Result |
+|---|---|
+| Locked cloud setup | Reused the tested repository setup from this environment; Node 24 and stable Rust |
+| Production frontend / UI | Passed final build and all 254 tests, including lock notification before the response and ignoring a late response after unmount |
+| Focused backend | Passed all seven fixtures again after the notification follow-up: WAL values/source BLOBs/report digests, pending preview clearing, stale instances, old/new backup passwords, schema-27 rollback and actual subprocess exits |
+| Complete Linux backend | Passed 237 library + 2 PDF-worker tests, exit 0, for core feature source `4e29c96`; notification follow-up rechecked with the focused suite |
+| Formatting / Clippy | Passed; all targets with warnings denied |
+| Standalone native build | Passed debug build with embedded assets, no bundles |
+| Focused native / visual inspection | Passed exit 0 on both core and final notification source, with password-change and completion markers; real controls, private UI clearing, restart and both backup passwords. Final Security screen visually checked for readable disclosure/fields and no horizontal overflow |
+| Complete native workflow | Passed exit 0 on core source `4e29c96`, including all prior workflows and password rotation on the populated recovered workspace. Final notification follow-up separately verified by the focused native run |
+| Windows source validation | Not run: network proxy rejects CONNECT to api.github.com with HTTP 403; Git read access works |
+| Installer | Not created, per user instruction |
+
+The first complete backend attempt was not a pass: a concurrent test recompilation
+removed the running test executable before its interruption fixture could spawn
+itself. That attempt passed 235 tests and failed the subprocess launch with ENOENT.
+The final complete suite ran without concurrent Cargo commands and passed all
+237 library tests plus both worker tests. The interruption fixture retains all
+before/after activation assertions; no check was disabled.
+
+Tests inject snapshot/audit/metadata/activation failures and use real process exits.
+Physical full-disk/power-loss/removable-drive drills, independent security review,
+and clean installed Windows offline recovery are still unverified. Windows source
+CI is also pending for this stage; existing 0.43.0 Windows results do not validate
+0.44.0. No branch or source has been pushed to trigger external CI.
+
+Core source is committed as `4e29c96`. The complete native run retained every
+financial/source/report/history/recovery assertion and finished with the new
+password-change marker and final completion marker. It ran with WebKit sandboxing
+enabled. Its test processes stopped and its temporary synthetic data was removed.
+
+Final review added a credential-free backend lock event so private UI clears even
+when the command response is delayed/lost. The UI retains the committed success/
+durability notice and ignores late responses after unmount. This follow-up changes
+the command notification and UI handling; the storage/key-transition implementation
+from the complete regression run is unchanged. Final validation repeated the full
+254-test UI suite, all seven password backend fixtures, Clippy, standalone build
+and the focused native password/restart/old-and-new-backup workflow. No Cargo
+commands ran after either standalone build while native checks were running.
+
+Logs and the independent focused-run helper are preserved under
+`/workspace/shared/password-change-validation`. Complete native artifacts use
+`/workspace/shared/desktop-smoke-password-change`; initial focused artifacts use
+`/workspace/shared/desktop-smoke-password-focused`; final notification artifacts use
+`/workspace/shared/desktop-smoke-password-notification`. The final Security image
+was visually inspected. All driver ports were closed afterward. No real client
+data or credentials were used.
+
+Next bounded implementation priority after the outstanding acceptance checks:
+backend-owned configurable inactivity locking with validated limits and preserved
+lock privacy. Retained-copy selection/pruning, scheduled backups, multiple
+counselors, independent security/commercial review and clean installed Windows
+acceptance remain separate work. The last installer remains 0.23.0.
+
+## Client history and reviewed note corrections (0.43.0, schema 27)
 
 Clients → History & records now combines scoped dated notes/corrections, intake
 versions, imported source metadata, scenarios, assessments and client action plans
@@ -3052,3 +3803,4 @@ These stages differ greatly in size and will be split into smaller tested
 checkpoints. A stage count is not a percentage or a reliable calendar estimate.
 The complete specified application remains substantial work; the development
 installer is suitable for evaluating the implemented foundation.
+

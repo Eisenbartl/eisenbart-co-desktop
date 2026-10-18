@@ -68,23 +68,37 @@ text PDF transaction review; recurring-payment and running-balance review; appro
 data dashboards; saved scenarios; counselor and client-plan PDF reports.
 
 NEW IN THIS VERSION
-Documents -> Collection checklist now saves requests, missing/received status,
-explicit received dates and optional links to the client's imported sources.
-Archive/reactivate requests and inspect read-only version history. Receipt does
-not approve financial figures. Existing twelve-section navigation and other
-working tools remain available. Schema 18 workspaces need the newer application.
+Spending Analysis adds approved/categorized spending cards, a category donut,
+discretionary bars, transaction Type editing and evidence-based opportunities.
+Discuss necessary/discretionary purpose with the client, enter a reason and save;
+all current results refresh. Original imports and purpose history are retained.
+Import and approval remain separate. Card purpose changes require renewed card
+completeness review; this page does not silently renew final readiness.
+
+Clients is now a searchable directory. Open workspace creates an in-app client
+tab, with thirteen focused sections and separate review subtabs. Overview uses real
+saved planning figures with source labels, unknown amounts and debt/budget mismatch
+warnings. Existing calculations, statement approvals and historical reports remain
+available. Settings includes password changes and 1-60 minute inactivity locking.
+This version uses schema $schemaVersion; close older app versions before upgrading.
 
 TRY THIS
-1. Create a fictional client; open Intake and follow-ups to try the new controls.
-   Save optional intake and a dated task/appointment. Return to Dashboard, apply
-   follow-up filters and open the item; complete or cancel it in the client record.
-   Save normal income and necessary expenses in the separate budget.
-2. Save debt, savings and cash-flow models if you want those forecasts.
-3. Open Compare combined financial scenarios and reload the saved baseline.
-4. Model a temporary income reduction and review its monthly funding/recovery.
-5. Save the reviewed scenario, select it in an internal counselor assessment and
-   export a PDF to a private folder. Restart and check the saved records.
-6. Create an encrypted backup in Settings using your workspace password.
+1. Add a fictional client in Clients and open its workspace. Use Profile & intake
+   to save optional intake and dated follow-ups; try opening them from Dashboard.
+2. Save income/expenses in Monthly budget and models in Debt payoff, Savings &
+   sinking funds and Cash-flow calendar. Return to Overview to inspect saved results.
+3. Open another fictional client tab. Check that all data stays with its client.
+   Save edits before switching, or explicitly choose Keep editing/Discard changes.
+4. Use Scenario comparisons for temporary proposals and reviewed saved scenarios.
+   Temporary inputs reset when leaving; saved snapshots and live plans are separate.
+5. Import statements, then approve individual source facts in Review & reconciliation.
+   Financial dashboard shows approved period activity, separate from planning estimates.
+6. Open Spending Analysis, choose months/accounts and review approved spending.
+   Change an expense Type after discussion, save and inspect refreshed metrics and
+   History. Opportunity prompts use actual evidence and saved planning targets.
+7. Use Assessments & reports to record an assessment/action plan and export a PDF.
+8. Create an encrypted backup in Settings. Keep its original password even after
+   changing the current workspace password; backups keep the password from creation.
 
 This is an evaluation build. Use fictional records only. There is no forgotten-
 password reset; reinstalling cannot recover a lost password. Scanned PDF OCR,
@@ -109,7 +123,7 @@ In PowerShell in this extracted folder:
 Compare the displayed hash to SHA256SUMS.txt. This checks for download changes;
 it does not replace publisher signing or establish production readiness.
 
-Documentation: https://github.com/Eisenbartl/eisenbart-co-desktop/blob/main/docs/windows.md
+Documentation for this package: https://github.com/Eisenbartl/eisenbart-co-desktop/blob/$SourceCommit/docs/user-guide.md
 "@
 Set-Content -LiteralPath (Join-Path $bundle 'README.txt') -Value $readme -Encoding utf8NoBOM
 Set-Content -LiteralPath (Join-Path $bundle 'SHA256SUMS.txt') -Value "$checksum  $($installer.Name)" -Encoding utf8NoBOM

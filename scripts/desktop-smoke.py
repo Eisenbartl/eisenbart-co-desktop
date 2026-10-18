@@ -13,6 +13,7 @@ import datetime as dt
 import http.client
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import shutil
@@ -22,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from typing import Callable, TypeVar
 from zoneinfo import ZoneInfo
 import urllib.error
@@ -53,6 +55,11 @@ class WebDriver:
         self.transport = transport
         self.session_id: str | None = None
         self.protected_values = protected_values
+        self.last_client_id: str | None = None
+        self.assessment_periods: dict[str, tuple[str,str]] = {}
+        self.restoring_period = False
+        self.restoring_record = False
+        self.record_intents: dict[tuple[str,str],str] = {}
 
     def safe(self, value: str) -> str:
         for protected in self.protected_values:
@@ -133,7 +140,7 @@ class WebDriver:
     def scroll_element(self, element: str, block: str = "center") -> None:
         # Narrow viewport movement only: no arbitrary script, focus, typing,
         # clicks, application commands or financial writes can enter this retry.
-        if block not in ("center", "start"):
+        if block not in ("center", "start", "nearest"):
             raise ValueError("Unsupported viewport alignment")
         for attempt in range(2):
             try:
@@ -146,6 +153,7 @@ class WebDriver:
                 time.sleep(0.25)
 
     def scroll_to(self, selector: str, block: str = "center") -> None:
+        if selector=='.page-heading' and not self.visible(selector):selector='.client-workspace-header'
         self.scroll_element(self.element(selector), block)
 
     def find(self, selector: str, using: str = "css selector") -> str:
@@ -187,9 +195,12 @@ class WebDriver:
         raise SmokeFailure(f"Timed out waiting for {description}")
 
     def element(self, selector: str, using: str = "css selector") -> str:
+        if using=="css selector":self.workflow_for(selector)
         return self.wait(lambda: self.visible(selector, using), f"visible {selector}")
 
     def interactive(self, selector: str, using: str = "css selector") -> str:
+        if selector=='#workspace-client':selector='.workspace-app-tab.active [data-client-tab]'
+        if using=='css selector':self.workflow_for(selector)
         def enabled() -> str | None:
             element = self.visible(selector, using)
             if element and self.command("GET", f"/element/{element}/enabled"):
@@ -205,27 +216,197 @@ class WebDriver:
         return self.wait(enabled, f"enabled {selector}")
 
     def click(self, selector: str, using: str = "css selector") -> None:
+        match=re.fullmatch(r"nav\[aria-label='Main navigation'\] button\[aria-label='([^']+)'\]",selector)
+        if match and match.group(1) not in ['Dashboard','Clients','Settings']:
+            self.client_section(match.group(1));return
+        if selector=='.page-heading button' and not self.visible(selector):
+            self.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+        if selector=='.page-heading' and not self.visible(selector):selector='.client-workspace-header'
+        if self.visible('.workspace-app-tab.active [data-client-tab]'):
+            self.last_client_id=str(self.observe_script("return document.querySelector('.workspace-app-tab.active [data-client-tab]')?.dataset.clientTab"))
+            for control in ['#saved-assessment','#saved-action-plan']:
+                value=self.observe_script('return document.querySelector(arguments[0])?.value',[control])
+                if isinstance(value,str) and value:self.record_intents[(self.last_client_id,control)]=value
+        if using=='css selector':self.workflow_for(selector)
         element = self.interactive(selector, using)
-        # WebKit's automatic scrolling can leave a partially visible control
-        # at the viewport edge and click its old position. Center first; this
-        # changes only the viewport and never invokes application commands.
-        self.scroll_element(element)
+        # Sticky workspace tabs should not be vertically centered: WebKit can
+        # retain an obsolete sticky-layer hit region after that forced scroll.
+        # Observe the real hit target before one native click; never retry writes.
+        is_tab=self.command("GET",f"/element/{element}/attribute/role")=="tab"
+        if is_tab:
+            contained=self.observe_script("const e=arguments[0],r=e.getBoundingClientRect(),p=e.closest('.workspace-tabbar')?.getBoundingClientRect();return !!p&&r.left>=p.left&&r.right<=p.right&&r.top>=p.top&&r.bottom<=p.bottom;",[{ELEMENT_KEY:element}])
+            if not contained:self.scroll_element(element,"nearest")
+            self.command("POST","/execute/async",{"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));","args":[]})
+            self.wait(lambda:self.observe_script("const e=arguments[0],r=e.getBoundingClientRect(),h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return !!h&&(h===e||e.contains(h));",[{ELEMENT_KEY:element}]) is True,"painted and unobstructed workspace tab")
+        else:
+            self.scroll_element(element)
+            if self.observe_script("return !!arguments[0].closest('.unified-inspection');",[{ELEMENT_KEY:element}]):
+                self.command("POST","/execute/async",{"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));","args":[]})
+                self.wait(lambda:self.observe_script("const e=arguments[0],r=e.getBoundingClientRect(),h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return !!h&&(h===e||e.contains(h));",[{ELEMENT_KEY:element}]) is True,"painted and unobstructed inspection control")
         self.command("GET", f"/element/{element}/displayed")
         try:
             self.command("POST", f"/element/{element}/click", {})
         except DriverFailure as error:
-            # Add intent to diagnostics; never replay an uncertain click.
-            raise SmokeFailure(f"Native click failed for {selector}: {error}") from None
+            # Add read-only geometry diagnostics; never replay an uncertain click.
+            bounds=self.observe_script("const r=arguments[0].getBoundingClientRect();const h=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {x:r.x,y:r.y,width:r.width,height:r.height,disabled:arguments[0].matches(':disabled'),hit:h?.tagName,hitClass:h?.className};",[{ELEMENT_KEY:element}])
+            raise SmokeFailure(f"Native click failed for {selector}: {error}; geometry={json.dumps(bounds)}") from None
 
     def click_button(self, text: str) -> None:
+        locator=f"//button[normalize-space(.)={json.dumps(text)}]"
+        if text.startswith('Review card row ') and not self.visible(locator,'xpath'):
+            self.client_section('Review & reconciliation');self.click_button('Card transactions')
+        if text.startswith('Review payments for ') and not self.visible(locator,'xpath'):
+            self.client_section('Review & reconciliation');self.click_button('Recurring payments')
+        if text.startswith('Reverify prior classification for ') and not self.visible(locator,'xpath'):
+            self.element('.financial-facts-editor > summary')
+            node=self.find('.financial-facts-editor')
+            if not self.command('GET',f'/element/{node}/property/open'):self.click('.financial-facts-editor > summary')
+        if re.fullmatch(r'Review .+\.(csv|pdf) record \d+',text,re.IGNORECASE) and not self.visible(f"//button[normalize-space(.)={json.dumps(text)}]",'xpath'):self.client_section('Review & reconciliation');self.click_button('Review queue')
+        if text.startswith('Review balance source record ') and not self.visible(locator,'xpath'):
+            self.client_section('Review & reconciliation');self.click_button('Running balances')
+            choose_balance_statement(self)
+        local_areas={
+            'Session notes':'Session notes','History & records':'Session notes',
+            'Profile':'Profile & intake','Intake & follow-ups':'Profile & intake',
+            'Card transactions':'Review & reconciliation','Review queue':'Review & reconciliation','Verified figures':'Review & reconciliation',
+            'Running balances':'Review & reconciliation','Recurring payments':'Review & reconciliation',
+            'Transfer matching':'Review & reconciliation','Source checks':'Review & reconciliation',
+            'Classification assistance':'Review & reconciliation','Category rules':'Review & reconciliation',
+            'Activity history':'Review & reconciliation','Bank & card activity':'Review & reconciliation',
+            'Card completeness':'Review & reconciliation','Completeness & final validation':'Review & reconciliation',
+            'Final report checklist':'Assessments & reports','Print & presentation':'Assessments & reports',
+            'Assessments & action plans':'Assessments & reports',
+        }
+        if text in local_areas and not self.visible(locator,'xpath'):
+            self.client_section(local_areas[text])
+        if text=='Working tools':
+            current=self.observe_script("return document.querySelector('nav[aria-label=\"Client workspace sections\"] [aria-current=page]')?.getAttribute('aria-label')")
+            text={'Import statements':'Import & sources','Review & reconciliation':'Review queue','Financial dashboard':'Approved activity','Assessments & reports':'Assessments & action plans'}.get(str(current),text)
+        route={'Add income':'Monthly budget','Add debt':'Debt payoff','Add cash-flow account':'Cash-flow calendar','Add dated activity':'Cash-flow calendar','Add follow-up':'Profile & intake'}
+        if text in route and not self.visible(f"//button[normalize-space(.)={json.dumps(text)}]",'xpath'):self.client_section(route[text])
         self.click(f"//button[normalize-space(.)={json.dumps(text)}]", "xpath")
 
+    def client_section(self, label: str, force: bool = False) -> None:
+        """Navigate through actual client tabs/rail; never invoke application IPC.
+
+        Old regression fixtures describe logical workflows that used to share a
+        single record page. These page-object routes now open their focused view.
+        Read-only visible/text/observe assertions never route or mutate anything.
+        """
+        aliases = {'Documents':'Import statements','Transactions':'Review & reconciliation',
+                   'Financial Review':'Financial dashboard','Budget Planner':'Monthly budget',
+                   'Debt Planner':'Debt payoff','Savings Planner':'Savings & sinking funds',
+                   'Cash-Flow Calendar':'Cash-flow calendar','Financial Scenarios':'Scenario comparisons',
+                   'Reports':'Assessments & reports'}
+        label=aliases.get(label,label)
+        if not self.visible("nav[aria-label='Client workspace sections']"):
+            selector=(f"[role=tab][data-client-tab={json.dumps(self.last_client_id)}]" if self.last_client_id else '.workspace-app-tab:last-child [role=tab]')
+            if self.visible(selector):
+                self.click(selector)
+            elif self.last_client_id:
+                # Lock/restart intentionally clears every private in-app tab.
+                # Reopen the fixture's exact retained ID through the directory,
+                # rather than assuming an old global module selects a client.
+                self.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+                row=f"//table[contains(@class,'client-directory-table')]//tr[td[normalize-space(.)={json.dumps(self.last_client_id)}]]//button"
+                self.click(row,'xpath')
+            else:
+                raise SmokeFailure('A client must be explicitly opened before selecting '+label)
+            self.element("nav[aria-label='Client workspace sections']")
+        button=f"nav[aria-label='Client workspace sections'] button[aria-label={json.dumps(label)}]"
+        element=self.element(button)
+        current=self.command('GET',f'/element/{element}/attribute/aria-current')
+        if force or current!='page':self.click(button)
+        if self.visible('[role=alertdialog]'):raise SmokeFailure('Unsaved changes block routing to '+label+'; the fixture must choose Keep editing or Discard changes explicitly.')
+        self.last_client_id=str(self.observe_script("return document.querySelector('.workspace-app-tab.active [data-client-tab]')?.dataset.clientTab"))
+
+    def workflow_for(self, selector: str) -> None:
+        # An intended action/wait may choose its logical workflow once. Locator
+        # polling and negative/privacy observations remain strictly read-only.
+        if self.restoring_period or self.restoring_record or self.visible(selector):return
+        routes=[
+          (('#first-name','#last-name','#email','#phone','#household-size','#client-status','#goals','.editor-panel'),'Profile & intake','Profile'),
+          (('.client-care','#intake-','#follow-','.care-'),'Profile & intake','Intake & follow-ups'),
+          (('#new-note','.notes-history','.notes-panel','.session-note','.note-correction'),'Session notes','Session notes'),
+          (('.budget-','#budget-'),'Monthly budget',None),
+          (('.debt-panel','#debt-','.debt-results'),'Debt payoff',None),
+          (('.savings-panel','#savings-','.savings-results'),'Savings & sinking funds',None),
+          (('.cashflow-panel','#cashflow-','.cashflow-'),'Cash-flow calendar',None),
+          (('.combined-scenarios','#scenario-','.saved-scenario'),'Scenario comparisons',None),
+          (('#csv-','#statement-format','.pdf-line-selection'),'Import statements',None),
+          (('.financial-dashboard','#assessment-from','#assessment-through','.assessment-totals','.assessment-basis','.assessment-review','.classified-totals','.verified-balance-totals','.verified-ratios','.verified-fact-metrics'),'Financial dashboard',None),
+          (('#card-row-','.card-transaction-review','.card-review-history'),'Review & reconciliation','Card transactions'),
+          (('.financial-facts','#facts-','#fact-','.facts-classifications'),'Review & reconciliation','Verified figures'),
+          (('.statement-balance','#balance-','.balance-'),'Review & reconciliation','Running balances'),
+          (('.recurring-','#recurring-'),'Review & reconciliation','Recurring payments'),
+          (('.transfer-review','#transfer-'),'Review & reconciliation','Transfer matching'),
+          (('.imports-sources',),'Review & reconciliation','Source checks'),
+          (('.imports-table','.imports-totals','.imports-progress'),'Review & reconciliation','Review queue'),
+          (('.saved-assessment','#saved-assessment','#record-','.captured-','#assessment-pdf','.client-action','#action-','.saved-client-action','#saved-action-plan','#client-plan-pdf','.action-plan-status'),'Assessments & reports','Assessments & action plans'),
+        ]
+        for prefixes,label,area in routes:
+            if selector.startswith(prefixes):
+                self.client_section(label)
+                if area:
+                    if label in ['Profile & intake','Session notes']:
+                        selector=f"//nav[@aria-label='Client record sections']//button[normalize-space(.)={json.dumps(area)}]"
+                        tab=self.element(selector,'xpath')
+                        if self.command('GET',f'/element/{tab}/attribute/aria-current')!='page':self.click(selector,'xpath')
+                    else:self.click_button(area)
+                if label=='Financial dashboard' and self.last_client_id in self.assessment_periods:
+                    # A focused view remounts when returning. Re-select the
+                    # fixture's intended period through real controls, scoped
+                    # by stable client ID; do not assume product persistence.
+                    period=self.assessment_periods[self.last_client_id]
+                    self.wait(lambda:self.visible('#assessment-from'),'financial period controls')
+                    self.restoring_period=True
+                    try:view_financial_dashboard(self,*period)
+                    finally:self.restoring_period=False
+                needs_record=selector.startswith(('#record-','.saved-assessment-view','.saved-assessment-status','.captured-','#assessment-pdf','.client-action-plans','#saved-action-plan','#action-','.saved-client-action','#client-plan-pdf','.action-plan-status'))
+                record=self.record_intents.get((self.last_client_id,'#saved-assessment'))
+                if label=='Assessments & reports' and needs_record and record:
+                    self.wait(lambda:self.visible('.saved-assessments > summary'),'saved report controls')
+                    node=self.find('.saved-assessments')
+                    if not self.command('GET',f'/element/{node}/property/open'):
+                        # Reopen the same immutable saved ID through actual
+                        # dropdown options after crossing focused sections.
+                        self.restoring_record=True
+                        try:
+                            self.click('.saved-assessments > summary')
+                            select=self.interactive('#saved-assessment')
+                            self.scroll_element(select)
+                            option=self.command('POST',f'/element/{select}/element',{'using':'xpath','value':f'./option[@value={json.dumps(record)}]'})
+                            self.command('POST',f"/element/{option[ELEMENT_KEY]}/click",{})
+                            self.wait(lambda:self.visible('.saved-assessment-view'),'selected saved report')
+                        finally:self.restoring_record=False
+                plan=self.record_intents.get((self.last_client_id,'#saved-action-plan'))
+                needs_plan=selector.startswith(('.saved-client-action','#client-plan-pdf','.action-plan-status'))
+                if label=='Assessments & reports' and needs_plan and plan and not self.visible('.saved-client-action-plan'):
+                    self.restoring_record=True
+                    try:
+                        self.wait(lambda:self.visible('.client-action-plans > summary'),'saved client plan controls')
+                        node=self.find('.client-action-plans')
+                        if not self.command('GET',f'/element/{node}/property/open'):self.click('.client-action-plans > summary')
+                        select=self.interactive('#saved-action-plan')
+                        self.scroll_element(select)
+                        option=self.command('POST',f'/element/{select}/element',{'using':'xpath','value':f'./option[@value={json.dumps(plan)}]'})
+                        self.command('POST',f"/element/{option[ELEMENT_KEY]}/click",{})
+                        self.wait(lambda:self.visible('.saved-client-action-plan'),'selected saved client plan')
+                    finally:self.restoring_record=False
+                if selector.startswith(('#facts-','#fact-','.facts-classifications')):
+                    self.wait(lambda:self.visible('.financial-facts-editor > summary'),'verified figure controls')
+                    node=self.find('.financial-facts-editor')
+                    if not self.command('GET',f'/element/{node}/property/open'):self.click('.financial-facts-editor > summary')
+                return
+
     def open_client(self, name: str) -> None:
-        self.click("nav[aria-label='Main navigation'] button:nth-child(2)")
-        self.click("//button[contains(concat(' ', normalize-space(@class), ' '), ' client-row ')]"
-                   f"[.//strong[normalize-space(.)={json.dumps(name)}]]", "xpath")
+        self.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+        self.click(f"//button[@aria-label={json.dumps('Open workspace for '+name)}]",'xpath')
+        self.wait_text('.client-workspace-header h1',name,'scoped client workspace opened')
+        self.last_client_id=str(self.observe_script("return document.querySelector('.workspace-app-tab.active [data-client-tab]')?.dataset.clientTab"))
 
     def fill(self, selector: str, value: str) -> None:
+        self.workflow_for(selector)
         element = self.interactive(selector)
         # Native clear/focus can fail at a viewport edge after review panels
         # refresh. Move only the viewport, then recheck enabled state. Neither
@@ -282,8 +463,17 @@ class WebDriver:
         self.wait_value(selector, iso, "complete native date before saving")
 
     def select(self, selector: str, value: str, using: str = "css selector") -> None:
+        if selector=='#workspace-client':
+            label=self.observe_script("return document.querySelector('nav[aria-label=\"Client workspace sections\"] [aria-current=page]')?.getAttribute('aria-label')")
+            area=self.observe_script("return document.querySelector('.client-workspace-content .section-navigation [aria-current=page]')?.textContent")
+            self.open_client(value)
+            if label:self.client_section(str(label))
+            if area and self.visible(f"//button[normalize-space(.)={json.dumps(str(area))}]",'xpath'):self.click_button(str(area))
+            return
+        if using=='css selector':self.workflow_for(selector)
         # WebDriver clicks the HTML option rather than calling application code.
         select = self.interactive(selector, using)
+        self.scroll_element(select)
         try:
             option = self.command("POST", f"/element/{select}/element", {
                 "using": "xpath", "value": f"./option[normalize-space(.)={json.dumps(value, ensure_ascii=False)}]",
@@ -293,13 +483,17 @@ class WebDriver:
             raise SmokeFailure(f"Could not select {value!r} in {selector}; choices={available!r}: {error}") from None
         if not isinstance(option, dict) or ELEMENT_KEY not in option:
             raise SmokeFailure("Native driver did not return the requested workflow option")
-        self.command("POST", f"/element/{option[ELEMENT_KEY]}/click", {})
+        try:
+            self.command("POST", f"/element/{option[ELEMENT_KEY]}/click", {})
+        except DriverFailure as error:
+            raise SmokeFailure(f"Native selection failed for {selector} ({value!r}): {error}") from None
 
     def field_value(self, selector: str) -> str:
         element = self.find(selector)
         return str(self.command("GET", f"/element/{element}/property/value"))
 
     def wait_value(self, selector: str, value: str, description: str) -> None:
+        self.workflow_for(selector)
         self.wait(lambda: self.field_value(selector) == value, description)
 
     def text(self, selector: str = "body") -> str:
@@ -307,6 +501,16 @@ class WebDriver:
         return str(self.command("GET", f"/element/{element}/text"))
 
     def wait_text(self, selector: str, value: str, description: str) -> None:
+        if selector=='.financial-facts-editor':
+            self.element('.financial-facts-editor > summary')
+            node=self.find('.financial-facts-editor')
+            if not self.command('GET',f'/element/{node}/property/open'):self.click('.financial-facts-editor > summary')
+        if selector=='.imports-panel' and value=='No imported transactions yet':
+            # This legacy assertion targets the bank queue specifically. The
+            # combined current-history table is now the product default.
+            self.client_section('Review & reconciliation')
+            self.click_button('Review queue')
+        self.workflow_for(selector)
         self.wait(lambda: value in self.text(selector), description)
 
     def wait_content(self, selector: str, value: str, description: str) -> None:
@@ -481,10 +685,11 @@ def check_pdf_imports(driver: WebDriver, artifacts: Path, data_root: Path) -> No
     driver.wait_text(".imports-panel [role=alert]", "could not be extracted safely", "damaged PDF rejected without an import")
     driver.fill("#csv-path", str(path))
     driver.click_button("Inspect PDF")
-    driver.wait_text(".pdf-line-selection", "Fictional payroll 1000.01", "real PDF parser process returns selectable source text")
-    driver.wait_text(".pdf-line-selection", "Selected PDF lines: 0 / 500", "no automatic PDF line selection")
-    for date in ["2026-10-01", "2026-10-02"]:
-        driver.click(f"//label[contains(@class,'pdf-source-line')][contains(.,'{date}')]/input", "xpath")
+    driver.wait_text(".pdf-line-selection", "Fictional payroll", "real PDF parser process returns selectable source text")
+    driver.wait_text(".pdf-selected-summary", "Selected transactions: 2 / 500", "clear transaction candidates start selected")
+    for merchant in ['Fictional payroll','Fictional groceries']:
+        box=driver.find(f"//table[contains(@class,'pdf-candidates')]//tr[td//strong[normalize-space(.)={json.dumps(merchant)}]]//input[@type='checkbox']",'xpath')
+        if driver.command("GET",f"/element/{box}/property/checked") is not True:raise SmokeFailure("Clear PDF transaction was not prechecked")
     driver.fill("#csv-account-label", "Synthetic PDF checking")
     driver.fill("#csv-openingBalance", "0")
     driver.fill("#csv-closingBalance", "974.90")
@@ -657,7 +862,7 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.click("#review-ack")
     driver.click_button("Save transaction decision")
     driver.wait_text(".imports-totals","$199.99","one-cent corrected approved net")
-    driver.wait_text(".assessment-totals","Operating cash flow$199.99", "dashboard automatically recalculates corrected approval")
+    driver.wait_text(".assessment-totals","Operating cash flow$199.99", "dashboard recomputes corrected approval at the reselected period")
     driver.wait_text(".classified-totals","Unclassified approved spending$300.01","corrected source invalidates its classification")
     driver.wait_text(".financial-facts-editor","Needs re-verification: prior Necessary expense","stale source decision disclosed")
     driver.click_button("Reverify prior classification for Fictional rent (3)")
@@ -672,7 +877,7 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
     driver.fill("#review-reason","Withdraw corrected payment from approved movement")
     driver.click_button("Save transaction decision")
     driver.wait_text(".imports-totals","$500.00","rejected expense excluded from approved totals")
-    driver.wait_text(".assessment-totals","Operating cash flow$500.00", "dashboard automatically excludes reversed expense")
+    driver.wait_text(".assessment-totals","Operating cash flow$500.00", "dashboard excludes reversed expense at the reselected period")
     driver.wait_text(".classified-totals","Recorded necessary spending before refunds$0.00","rejected necessity excluded")
     driver.wait_text(".verified-fact-metrics","Classifications needing re-verification across this client: 1","rejection leaves old classification inactive")
     driver.wait_text(".verified-ratios","Accessible savings coverage — estimateUnavailable","zero necessary denominator never invents coverage")
@@ -695,7 +900,7 @@ def check_statement_balances(driver: WebDriver, artifacts: Path, data_root: Path
 
 
 def save_counselor_assessment(driver: WebDriver, title: str) -> None:
-    if driver.command("GET", f"/element/{driver.find('.saved-assessments')}/property/open") is not True:
+    if driver.command("GET", f"/element/{driver.element('.saved-assessments')}/property/open") is not True:
         driver.click(".saved-assessments > summary")
     driver.wait(lambda: driver.visible("#saved-assessment") is not None, "scoped assessment directory")
     driver.fill("#record-from","2026-09")
@@ -713,7 +918,7 @@ def save_counselor_assessment(driver: WebDriver, title: str) -> None:
 
 
 def open_original_counselor_assessment(driver: WebDriver) -> None:
-    if driver.command("GET", f"/element/{driver.find('.saved-assessments')}/property/open") is not True:
+    if driver.command("GET", f"/element/{driver.element('.saved-assessments')}/property/open") is not True:
         driver.click(".saved-assessments > summary")
     driver.select("#saved-assessment","Taylor original assessment — 2026-09-01 to 2026-09-30 — Needs review")
     driver.wait_text(".saved-assessment-view h3","Taylor original assessment","persisted original counselor assessment")
@@ -808,10 +1013,6 @@ def check_combined_scenarios(driver: WebDriver, artifacts: Path, label: str) -> 
     table=".combined-scenario-results table"
     for value in ["$3,250.00", "$3,466.67", "$35.35", "$23.01", "2027-02", "2027-11-30", "$3,300.00"]:
         driver.wait_text(table,value,"exact side-by-side combined financial outcome")
-    driver.wait_value("#budget-amount-0", "1500.00", "combined preview does not write saved income")
-    driver.wait_value("#debt-monthly-payment", "100.00", "combined preview does not write saved debt")
-    driver.wait_value("#savings-emergencyContribution", "200.00", "combined preview does not write saved savings")
-    driver.wait_value("#cashflow-date-0", "2026-11-03", "combined preview does not write saved dated schedules")
     driver.scroll_to(".combined-scenario-results table", "start")
     driver.screenshot(artifacts / f"native-combined-scenarios-{label}.png")
     if label == "initial":
@@ -826,6 +1027,17 @@ def check_combined_scenarios(driver: WebDriver, artifacts: Path, label: str) -> 
     driver.click_button("Reload saved scenario baseline")
     driver.wait_value("#scenario-debt", "100.00", "read-only reload restores original baseline")
     driver.click(".combined-scenarios > details > summary")
+    # Complete all ephemeral proposal checks before navigating to saved plans.
+    driver.wait_value("#budget-amount-0", "1500.00", "combined preview does not write saved income")
+    driver.wait_value("#debt-monthly-payment", "100.00", "combined preview does not write saved debt")
+    driver.wait_value("#savings-emergencyContribution", "200.00", "combined preview does not write saved savings")
+    driver.wait_value("#cashflow-date-0", "2026-11-03", "combined preview does not write saved dated schedules")
+    driver.wait_value("#savings-goal-monthlyContribution-0", "50.00", "goal proposal leaves the live contribution unchanged")
+    driver.wait_value("#debt-monthly-payment", "100.00", "extra payment never changes the live base payment")
+    driver.wait_value("#budget-amount-0", "1500.00", "new expense does not change the live budget")
+    driver.wait_value("#budget-amount-0", "1500.00", "temporary income never changes the saved normal income")
+    if driver.visible("#budget-amount-6"):
+        raise SmokeFailure("New proposal expense unexpectedly entered the live budget")
     status("combined exact what-if comparison, separate dated edits, unchanged saved models, rejected assumptions and temporary input reset")
 
 
@@ -840,8 +1052,6 @@ def check_scenario_commitment_controls(driver: WebDriver, artifacts: Path, label
     driver.click_button("Compare temporary proposal")
     for value in ["$833.34", "$12.20", "2026-12", "2026-12-31", "$500.00", "$3,300.00"]:
         driver.wait_text(".combined-scenario-results table", value, "exact extra-payment and savings-goal comparison")
-    driver.wait_value("#savings-goal-monthlyContribution-0", "50.00", "goal proposal leaves the live contribution unchanged")
-    driver.wait_value("#debt-monthly-payment", "100.00", "extra payment never changes the live base payment")
     driver.scroll_to(".combined-scenario-results table", "start")
     driver.screenshot(artifacts / f"native-scenario-controls-{label}.png")
     if label == "initial":
@@ -880,9 +1090,6 @@ def check_recurring_expense_controls(driver: WebDriver, artifacts: Path, label: 
     driver.click_button("Compare temporary proposal")
     for value in ["$758.34", "$3,225.00", "$12.20", "2026-12-31"]:
         driver.wait_text(".combined-scenario-results table", value, "explicit new expense bill and combined controls preserve exact independent outcomes")
-    driver.wait_value("#budget-amount-0", "1500.00", "new expense does not change the live budget")
-    if driver.visible("#budget-amount-6"):
-        raise SmokeFailure("New proposal expense unexpectedly entered the live budget")
     driver.scroll_to(".combined-scenario-results table", "start")
     driver.screenshot(artifacts / f"native-recurring-expenses-{label}.png")
     status(f"new recurring expense updates shared funding and only explicitly selected dated bills ({label})")
@@ -910,7 +1117,6 @@ def check_temporary_income_controls(driver: WebDriver, artifacts: Path, label: s
     driver.click_button("Compare temporary proposal")
     driver.wait_text(".combined-scenario-results table", "$1,825.00", "selected November receipts change by exactly 1400.00")
     driver.wait_text(".income-period-results", "-$975.00", "monthly funding deficit remains explicit")
-    driver.wait_value("#budget-amount-0", "1500.00", "temporary income never changes the saved normal income")
     driver.scroll_to(".income-period-results", "start")
     driver.screenshot(artifacts / f"native-temporary-income-{label}.png")
     status(f"temporary income periods, deficits, normal recovery and explicitly selected dated receipts preserve live plans ({label})")
@@ -956,7 +1162,6 @@ def assert_scenario_controls_restored(driver: WebDriver, artifacts: Path, label:
     driver.select("#saved-scenario", "Alex temporary income proposal — Needs review")
     driver.wait_text(".saved-scenario-history article", "$758.34", "original extended outcome survives recovery")
     driver.wait_text(".saved-scenario-history article", "2026-12-31", "original goal milestone survives recovery")
-    driver.wait_value("#savings-goal-monthlyContribution-0", "50.00", "reopened goal proposal never applies live changes")
     driver.click(".combined-scenarios > details > summary")
     driver.click(".saved-assessments > summary")
     driver.select("#saved-assessment", "Alex temporary income report — 2026-09-01 to 2026-10-31 — Needs review")
@@ -964,6 +1169,7 @@ def assert_scenario_controls_restored(driver: WebDriver, artifacts: Path, label:
     driver.wait_text(".selected-combined-scenario .income-period-results", "-$975.00", "original reduced-income deficit restored")
     export_scenario_controls_pdf(driver, artifacts, label)
     driver.click(".saved-assessments > summary")
+    driver.wait_value("#savings-goal-monthlyContribution-0", "50.00", "reopened goal proposal never applies live changes")
     status(f"temporary income scenario and report retain original monthly funding across recovery ({label})")
 
 
@@ -1009,7 +1215,6 @@ def assert_saved_combined_restored(driver: WebDriver, artifacts: Path, label: st
     driver.select("#saved-scenario", "Alex reviewed combined proposal — Needs review")
     driver.wait_text(".saved-scenario-status", "historical baseline", "later versions flag immutable saved comparison")
     driver.wait_text(".saved-scenario-history article", "$983.34", "original combined outcome after recovery")
-    driver.wait_value("#budget-amount-0", "1500.00", "reopened proposal never applies live income")
     driver.click(".combined-scenarios > details > summary")
     driver.click(".saved-assessments > summary")
     driver.select("#saved-assessment", "Alex selected combined report — 2026-09-01 to 2026-10-31 — Needs review")
@@ -1017,6 +1222,7 @@ def assert_saved_combined_restored(driver: WebDriver, artifacts: Path, label: st
     driver.wait_text(".saved-assessment-view .scenario-budget-totals", "Income$3,466.67", "original proposed model set retained")
     export_saved_combined_pdf(driver, artifacts, label)
     driver.click(".saved-assessments > summary")
+    driver.wait_value("#budget-amount-0", "1500.00", "reopened proposal never applies live income")
     assert_scenario_controls_restored(driver, artifacts, label)
     status(f"saved scenarios and report relationships persist without rewriting plans ({label})")
 
@@ -1225,23 +1431,27 @@ def save_captured_planning_assessment(driver: WebDriver, artifacts: Path) -> Non
     driver.wait_text(".client-care .success-message", "saved locally", "unselected care changes saved")
     driver.interactive("#record-title")
     driver.wait_text(".saved-assessment-status", "Recorded context matches", "unselected care changes do not invalidate report")
-    driver.click(".client-care > summary")
+    driver.wait(lambda: driver.observe_script("const option=document.querySelector('#saved-assessment option:checked');return Boolean(option && option.value && !option.textContent.includes('Needs review'));"), "assessment directory ignores unrelated intake edits")
     save_client_action_plan(driver, artifacts)
-    driver.click(".client-care > summary")
+    if driver.command("GET", f"/element/{driver.element('.client-care')}/property/open") is not True:
+        driver.click(".client-care > summary")
     driver.replace_text("#intake-employer", "Alex changed employer")
     driver.wait_value("#intake-employer", "Alex changed employer", "selected employer replacement")
     driver.click_button("Save intake and follow-ups")
     driver.wait_text(".saved-assessment-status", "Needs review", "selected intake change flags report")
+    driver.wait(lambda: driver.observe_script("return document.querySelector('#saved-assessment option:checked')?.textContent.includes('Needs review')"), "assessment directory also flags selected intake changes")
+    if driver.command("GET", f"/element/{driver.element('.client-care')}/property/open") is not True:
+        driver.click(".client-care > summary")
     driver.interactive("#intake-employer")
     driver.replace_text("#intake-employer", "Alex fictional employer")
     driver.wait_value("#intake-employer", "Alex fictional employer", "selected employer restored")
     driver.click_button("Save intake and follow-ups")
     driver.interactive("#record-title")
     driver.wait_text(".saved-assessment-status", "Needs review", "selected intake reversion never reactivates historical report")
+    driver.wait(lambda: driver.observe_script("return document.querySelector('#saved-assessment option:checked')?.textContent.includes('Needs review')"), "assessment directory retains review flag after selected intake reversion")
     driver.scroll_to(".saved-assessment-view .report-intake-context", "start")
     driver.command("POST", "/execute/async", {"script":"const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));", "args":[]})
     driver.screenshot(artifacts / "native-selected-report-intake.png")
-    driver.click(".client-care > summary")
     status("selected report intake: unselected address/outcome ignored; selected employer change and reversion permanently flagged")
     driver.fill("#budget-amount-0","1600")
     driver.click_button("Save budget and calculate")
@@ -1266,8 +1476,11 @@ def view_financial_dashboard(driver: WebDriver, start: str, end: str) -> None:
     driver.fill("#assessment-from", start)
     driver.fill("#assessment-through", end)
     driver.click_button("View financial dashboard")
+    driver.element('.health-bank-details > summary')
+    if not driver.observe_script("return document.querySelector('.health-bank-details').open"):driver.click('.health-bank-details > summary')
     driver.wait_text(".assessment-basis", f"{start}-01 through", "explicit approved assessment period")
     driver.wait_text(".assessment-basis", "Approved records only · Incomplete", "honest dashboard basis")
+    if driver.last_client_id:driver.assessment_periods[driver.last_client_id]=(start,end)
 
 
 def assert_alex_dashboard(driver: WebDriver) -> None:
@@ -1328,6 +1541,7 @@ def assert_statement_balances_restored(driver: WebDriver, artifacts: Path, label
     driver.wait_text(".balance-progress","Source: 3 matched · 0 differences. Approved: 1 matched · 1 differences.","persisted source and approved comparisons")
     driver.wait_text(".balance-check-table","Difference $300.02","persisted rejection discrepancy")
     driver.wait_text(".imports-totals","$500.00","persisted exact approved balance client net")
+    choose_balance_statement(driver)
     driver.click(".statement-balance-history > summary")
     driver.wait_text(".statement-balance-history","Statement balance setting history (2)","persisted balance setting history")
     driver.wait_text(".statement-balance-history","Verified original source is oldest first","persisted source-order review reason")
@@ -1389,7 +1603,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
         driver.fill("#household-size", "2")
         driver.fill("#goals", goal)
         driver.click_button("Create client")
-        driver.wait_text(".editor-panel h2", f"{given} {family}", "saved client profile")
+        driver.wait_text(".client-workspace-header h1", f"{given} {family}", "saved client profile")
 
     create_client(first_name, first_last, first_goal)
     driver.fill("#new-note", note)
@@ -1631,7 +1845,7 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     driver.wait_text(".imports-progress", "Approved 5 · Rejected 1", "persisted CSV decisions and paired transfers")
     driver.wait_text(".imports-totals", "$820.01", "persisted exact approved activity")
     driver.open_client("Robin Synthetic")
-    driver.wait_text(".editor-panel", "Robin Synthetic", "persisted second client")
+    driver.wait_text(".client-workspace-header h1", "Robin Synthetic", "persisted second client")
     driver.wait_text(".notes-history", "No session notes yet.", "persisted second client's empty note history")
     if note in driver.text(".notes-history"):
         raise SmokeFailure("Persisted notes crossed client boundaries after relaunch")
@@ -1822,6 +2036,641 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_category_assistance(driver, artifacts, data_root, password, binary, restart_driver)
     check_category_rules(driver, artifacts, data_root, password, binary, restart_driver)
     check_client_history(driver, artifacts, data_root, password, binary, restart_driver)
+    check_spending_analysis(driver, artifacts, data_root, password, binary, restart_driver)
+    check_statement_extraction(driver, artifacts, data_root, password, binary, restart_driver)
+    check_unified_review(driver, artifacts, data_root, password, binary, restart_driver)
+    check_financial_health(driver, artifacts, data_root, password, binary, restart_driver)
+    check_planning_subpages(driver, artifacts, data_root, password, binary, restart_driver)
+    check_households(driver, artifacts, data_root, password, binary, restart_driver)
+    check_inactivity_policy(driver, artifacts, data_root, password, binary, restart_driver)
+    check_password_change(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_planning_subpages(driver: WebDriver, artifacts: Path, data_root: Path,
+                            password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """Independent fictional client; all existing fixture assertions stay unchanged."""
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click_button('Add client');driver.fill('#first-name','Riley');driver.fill('#last-name','Planner');driver.click_button('Create client')
+    driver.wait_text('.client-workspace-header','Riley Planner','dedicated financial-planning client')
+    driver.client_section('Monthly budget')
+    for i,(label,kind,amount) in enumerate([('Riley wages','Take-home income','3000'),('Riley housing','Necessary expense','1000'),('Riley dining','Discretionary expense','200'),('Riley savings','Savings allocation','100'),('Riley debt','Debt payment allocation','200')]):
+        driver.click_button('Add income');driver.fill(f'#budget-label-{i}',label);driver.select(f'#budget-kind-{i}',kind);driver.fill(f'#budget-amount-{i}',amount);driver.select(f'#budget-frequency-{i}','Monthly')
+    driver.click_button('Save budget and calculate');driver.wait_text('.budget-panel .save-status','Budget saved and calculated.','planning priorities saved')
+    driver.client_section('Debt payoff');driver.click_button('Advanced debt terms');driver.replace_text('#debt-start-month','2026-11');driver.fill('#debt-monthly-payment','100');driver.click_button('Add debt');driver.fill('#debt-label-0','Riley daily loan');driver.select('#debt-type-0','Personal loan')
+    for key,value in [('balance','1000'),('apr','12'),('minimumPayment','10'),('monthlyFee','0')]:driver.fill(f'#debt-{key}-0',value)
+    driver.select('#debt-model-0','Daily interest — enter day basis below');driver.select('#debt-basis-0','Actual days / 365');driver.click('#debt-verified-0');driver.fill('#debt-note-0','Fictional actual/365 monthly payment terms checked')
+    driver.click_button('Save debt plan and compare');driver.wait_text('.debt-panel .save-status','Debt plan saved and compared.','advanced daily debt saved')
+    driver.wait_text('.debt-month-table','$9.86','independent November actual-day interest');driver.wait_text('.debt-month-table','$909.86','independent daily-interest closing debt')
+    status('planning subpages: explicit daily terms produce independent exact interest and retain normal strategy comparison')
+    driver.client_section('Savings & sinking funds');driver.click_button('Funding & drawdown');driver.replace_text('#savings-start-month','2026-11');driver.replace_text('#savings-target-months','1')
+    for key,value in [('liquidSavings','300'),('restrictedSavings','0'),('obligationsReserved','100'),('emergencyContribution','100')]:driver.fill(f'#savings-{key}',value)
+    driver.fill('#savings-priorities','Review explicit drawdown and reserve refill; preserve bill earmarks')
+    driver.click_button('Add dated savings movement');driver.fill('#savings-event-date-0','2026-11-10');driver.fill('#savings-event-amount-0','100');driver.fill('#savings-event-note-0','Discussed fictional emergency repair')
+    driver.click_button('Save savings plan and calculate');driver.wait_text('.savings-panel .save-status','Savings plan saved and calculated.','savings drawdown saved')
+    driver.wait_text("table[aria-label='Savings reserve movement results']",'$100.00','drawdown uses actual reserve once');driver.wait_text('.savings-results','2027-07-31','independent reserve recovery milestone')
+    driver.replace_text('#savings-liquidSavings','');driver.click_button('Add sinking fund')
+    for selector,value in [('#savings-goal-label-0','Temporary missing-pool check'),('#savings-goal-targetAmount-0','100'),('#savings-goal-reservedAmount-0','0'),('#savings-goal-monthlyContribution-0','25'),('#savings-goal-date-0','2027-01-31')]:driver.fill(selector,value)
+    driver.click_button('Save savings plan and calculate');driver.wait_text('.savings-panel .save-status','Savings plan saved and calculated.','explicit unknown savings pool saved')
+    driver.wait_text("table[aria-label='Sinking fund forecasts']",'Missing inputs — not projected','missing pool remains unavailable rather than a failed goal')
+    driver.fill('#savings-liquidSavings','300');driver.click("button[aria-label='Remove sinking fund 1']");driver.click_button('Save savings plan and calculate');driver.wait_text('.savings-panel .save-status','Savings plan saved and calculated.','known pool explicitly restored after missing-data test');driver.wait_text('.savings-results','2027-07-31','known reserve recovery milestone returns')
+    status('planning subpages: missing reserve inputs remain unavailable without inventing deadline failure; explicit corrected inputs recalculate')
+    status('planning subpages: dated drawdown refills the same reserve without duplicating bill reserves or expenses')
+    driver.client_section('Cash-flow calendar');driver.click_button('Transfer settlement');driver.replace_text('#cashflow-start','2026-11-01');driver.replace_text('#cashflow-end','2026-11-30')
+    for i,(name,amount) in enumerate([('Riley checking','500'),('Riley reserve','1000')]):
+        driver.click_button('Add cash-flow account');driver.fill(f'#cashflow-account-label-{i}',name);driver.fill(f'#cashflow-account-balance-{i}',amount)
+    driver.fill('#cashflow-account-reserve-0','400')
+    for i,(name,kind,amount,date,frequency) in enumerate([('Riley rent','Bill','1200','2026-11-03','One time / irregular'),('Riley pay','Paycheck','1500','2026-11-06','Every two weeks'),('Riley transfer','Transfer between modeled accounts','200','2026-11-07','One time / irregular')]):
+        driver.click_button('Add dated activity');driver.fill(f'#cashflow-label-{i}',name);driver.select(f'#cashflow-kind-{i}',kind);driver.fill(f'#cashflow-amount-{i}',amount);driver.fill(f'#cashflow-date-{i}',date);driver.select(f'#cashflow-frequency-{i}',frequency)
+    driver.select('#cashflow-destination-2','Riley reserve');driver.select('#cashflow-delayed-2','Separate receipt / unknown availability');driver.fill('#cashflow-receipt-2','2026-11-10')
+    driver.click_button('Save cash-flow plan and calculate');driver.wait_text('.cashflow-panel .success-message','Cash-flow plan saved and calculated.','delayed transfer plan saved');driver.click_button('Chronological ledger')
+    driver.wait_text('.cashflow-ledger','departure','separate departure');driver.wait_text('.cashflow-ledger','receipt','separate receipt');driver.wait_text('.cashflow-ledger','$1,600.00','no premature liquidity during settlement');driver.wait_text('.cashflow-results .budget-totals','$3,300.00','settled funds conserved at period close')
+    driver.scroll_to('.cashflow-ledger','center');driver.screenshot(artifacts/'native-planning-settlement.png')
+    driver.click_button('Add dated activity');driver.fill('#cashflow-label-3','Temporary reserve timing check');driver.select('#cashflow-kind-3','Bill');driver.fill('#cashflow-amount-3','500');driver.fill('#cashflow-date-3','2026-11-20');driver.click_button('Preview cash flow / refresh references');driver.wait_text('.cashflow-results','Draft cash-flow preview','reserve timing preview is not saved');driver.click_button('Chronological ledger');driver.wait_text('.cashflow-ledger','$100.00','independent positive cash below the 400 reserve');driver.wait_text('.cashflow-ledger','below the entered reserve','same-day paycheck cannot hide the earlier reserve breach')
+    driver.click("button[aria-label='Remove cash-flow activity 4']");driver.click_button('Preview cash flow / refresh references');driver.wait_text('.cashflow-results .budget-totals','$3,300.00','removing temporary activity restores the unchanged saved cash-flow baseline')
+    status('planning subpages: intermediate reserve shortfall remains visible when a later same-day paycheck restores closing cash; preview never writes activity')
+    driver.client_section('Monthly budget');driver.click_button('Paycheck allocation');driver.wait_text('.budget-panel','Riley housing','saved priorities allocated to actual paydays');driver.wait_text("table[aria-label='Budget earmarks for 2026-11-06']",'$500.00','exact housing earmark across two paychecks');driver.wait_text('.budget-panel','2026-11-20','actual next biweekly payday')
+    status('planning subpages: delayed transfer legs, reserve floors, conserved closing cash and real dated paycheck earmarks')
+    driver.client_section('Scenario comparisons');driver.click_button('New goals & funding sources');driver.click_button('Reload saved scenario baseline');driver.wait_value('#scenario-label','Temporary combined proposal','current extended baseline loaded');driver.replace_text('#scenario-label','Riley reviewed funding proposal')
+    driver.click("//summary[normalize-space(.)='New goals, targeted payments and funding sources']",'xpath');driver.click_button('Add proposed savings goal')
+    for selector,value in [('#scenario-new-goal-label-0','Riley repairs'),('#scenario-new-goal-target-0','300'),('#scenario-new-goal-date-0','2027-01-31'),('#scenario-new-goal-contribution-0','100')]:driver.fill(selector,value)
+    driver.click_button('Add account-targeted extra');driver.select('#scenario-target-account-0','Riley daily loan · account 1');driver.fill('#scenario-target-month-0','2026-11');driver.fill('#scenario-target-amount-0','50')
+    driver.click("//summary[normalize-space(.)='Funding sources and dated drawdowns']",'xpath');driver.click_button('Add separate funding source');driver.fill('#savings-source-name-0','Separate Riley gift');driver.fill('#savings-source-available-0','100');driver.click_button('Add dated savings movement');driver.select('#savings-event-kind-0','Fund from separate source');driver.select('#savings-event-source-0','Separate Riley gift');driver.select('#savings-event-bucket-0','Riley repairs');driver.fill('#savings-event-date-0','2026-11-15');driver.fill('#savings-event-amount-0','100');driver.fill('#savings-event-note-0','Separate fictional gift for repairs')
+    driver.click_button('Compare temporary proposal');driver.wait_text('.combined-scenario-results','Riley repairs','new goal in comparison');driver.wait_text("table[aria-label='Baseline and proposed outcomes']",'Not in saved baseline','new goal cannot rewrite baseline');driver.wait_text("table[aria-label='Baseline and proposed outcomes']",'$1,400.00','independent proposed monthly buffer');driver.wait_text("table[aria-label='Baseline and proposed outcomes']",'2026-12-31','new goal milestone includes explicitly funded gift')
+    driver.click_button('Save reviewed combined scenario');driver.wait_text("article[aria-label='Saved combined scenario']",'Riley reviewed funding proposal','immutable extended proposal recorded')
+    driver.scroll_to("article[aria-label='Saved combined scenario']",'start');driver.screenshot(artifacts/'native-planning-scenario.png')
+    driver.command('POST','/window/rect',{'width':800,'height':760})
+    driver.scroll_to("article[aria-label='Saved combined scenario']",'start')
+    if driver.observe_script('return document.documentElement.scrollWidth>window.innerWidth+2'):raise SmokeFailure('Extended planning scenario overflowed the 800px workspace')
+    driver.screenshot(artifacts/'native-planning-narrow.png')
+    driver.command('POST','/window/rect',{'width':1536,'height':1024})
+    status('planning subpages: saved extended comparison remains usable without page overflow at 800px')
+    driver.client_section('Savings & sinking funds');driver.wait_value('#savings-liquidSavings','300.00','scenario did not write live opening savings')
+    if driver.visible('#savings-goal-label-0'):raise SmokeFailure('Proposed new goal overwrote live savings')
+    driver.client_section('Debt payoff');driver.wait_value('#debt-monthly-payment','100.00','scenario did not write live debt payment')
+    status('planning subpages: new goal, named source and targeted debt proposal calculate through existing engines without live-plan writes')
+    driver.client_section('Financial dashboard');driver.click_button('Savings progress');driver.fill('#progress-from','2026-09');driver.fill('#progress-through','2026-11');driver.click_button('Show verified savings progress');driver.wait_text('.budget-panel','Missing history is not zero savings.','forecasts do not fabricate verified progress')
+    # Use the existing source-bound balance review on a dedicated imported transaction fixture.
+    driver.open_client('Morgan Health');driver.client_section('Financial dashboard');driver.click_button('Savings progress');driver.fill('#progress-from','2026-09');driver.fill('#progress-through','2026-09');driver.click_button('Show verified savings progress');driver.wait_text("table[aria-label='Verified savings progress chart']",'$5,000.00','real verified savings history');driver.wait_text("table[aria-label='Verified savings progress chart']",'Complete inventory declared','complete vs missing evidence remains explicit')
+    status('planning subpages: verified progress chart uses balance review evidence, preserves missing history and stays client-separated')
+    driver.open_client('Riley Planner');driver.client_section('Scenario comparisons');driver.click_button('New goals & funding sources')
+    if driver.visible('#scenario-new-goal-label-0'):
+        # Reloading the baseline explicitly discards temporary controls after saving the immutable proposal.
+        driver.click_button('Reload saved scenario baseline');driver.wait_value('#scenario-label','Temporary combined proposal','temporary controls discarded after review')
+    driver.click_button('Lock workspace');driver.fill('#password',password);driver.click_button('Unlock workspace')
+    driver.open_client('Riley Planner');driver.client_section('Debt payoff');driver.wait_text('.debt-month-table','$9.86','advanced inputs recompute after lock/unlock');driver.client_section('Savings & sinking funds');driver.wait_text('.savings-results','2027-07-31','funding path persists after unlock')
+    status('planning subpages: explicit saved assumptions survive lock/unlock and rederive exact forecasts')
+
+
+def check_unified_review(driver: WebDriver, artifacts: Path, data_root: Path,
+                         password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """One current ledger, real original PDF canvas, shared decisions and encrypted recovery."""
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click_button('Add client');driver.fill('#first-name','Taylor');driver.fill('#last-name','Review');driver.click_button('Create client')
+    driver.wait_text('.client-workspace-header','Taylor Review','dedicated unified review client')
+    bank=data_root/'unified-bank.pdf';bank.write_bytes(build_pdf([
+        ['Fictional unified financial institution','Questions? Please contact us'],
+        ['Statement period 2026-09-01 to 2026-09-30','Date Description Amount Balance','Opening balance 0.00',
+         '2026-09-01 Fictional unified payroll 1000.00 1000.00','2026-09-02 Fictional debit purchase -100.00 900.00',
+         '2026-09-03 Fictional unknown purchase -50.00 850.00','2026-09-06 Fictional loan proceeds 500.00 1350.00','2026-09-07 Fictional loan payment -500.00 850.00','2026-09-08 Fictional reversed purchase 25.00 875.00','2026-09-09 Fictional institution fee -25.00 850.00','Closing balance 850.00']]))
+    driver.client_section('Import statements');driver.select('#statement-format','Selectable-text PDF');driver.fill('#csv-path',str(bank));driver.click_button('Inspect PDF')
+    driver.wait_text('.pdf-selected-summary','Selected transactions: 7 / 500','seven financial rows selected')
+    for selector,value in [('#csv-account-label','Fictional unified checking'),('#csv-periodStart','2026-09-01'),('#csv-periodEnd','2026-09-30'),('#csv-openingBalance','0'),('#csv-closingBalance','850')]:driver.fill(selector,value)
+    driver.click("//label[contains(.,'Authorize retaining the complete original PDF')]/input",'xpath');driver.click_button('Import into review queue');driver.wait_text('.imports-panel > .success-message','Every PDF record needs individual verification.','bank source captured')
+    driver.client_section('Review & reconciliation');driver.click_button('Review queue')
+    for number,kind,category,purpose in [(1,'Income','Wages',''),(2,'Expense','Food','Necessary spending'),(3,'Expense','Shopping','Discretionary spending'),(4,'Balance movement / external transfer / principal payment','Debt',''),(5,'Balance movement / external transfer / principal payment','Debt',''),(6,'Refund','Food',''),(7,'Fee','Fees','Necessary spending')]:
+        driver.click_button(f'Review {bank.name} record {number}');driver.select('#review-kind',kind);driver.fill('#review-category',category);driver.select('#review-status','Approved')
+        if purpose:driver.select('#review-spending-role',purpose)
+        driver.fill('#review-reason','Verified original fictional source and discussed spending purpose');driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','bank row approved explicitly');driver.interactive('.imports-table tbody button')
+    card=data_root/'unified-card.pdf';card.write_bytes(build_pdf([['Billing period 09/01/2026 to 09/30/2026','Purchases','09/02 Fictional unified card purchase 100.00','Payments and credits','09/05 Fictional unified card payment 50.00 CR'],['Questions? Please contact us','Total purchases 100.00']]))
+    driver.client_section('Import statements');driver.click_button('Credit-card statements');driver.click('.card-import > summary');driver.select('#card-source-format','Selectable-text PDF');driver.fill('#card-csv-path',str(card));driver.click_button('Inspect card PDF')
+    driver.wait_text('.pdf-selected-summary','Selected transactions: 2 / 200','card source rows selected')
+    for selector,value in [('#card-account','Fictional unified credit'),('#card-period-start','2026-09-01'),('#card-period-end','2026-09-30'),('#card-opening','0'),('#card-closing','50')]:driver.fill(selector,value)
+    driver.click('#card-retain');driver.click_button('Save card statement for individual review');driver.wait_text('.card-progress','Needs Clarification 2','card source captured')
+    driver.client_section('Review & reconciliation');driver.click_button('Card transactions')
+    for row,kind,category,purpose in [(1,'purchase','Food','Necessary spending'),(2,'payment','Card payment','')]:
+        driver.click_button(f'Review card row {row}');driver.select('#card-row-kind',kind);driver.fill('#card-row-category',category);driver.select('#card-row-status','Approved')
+        if purpose:driver.select('#card-row-purpose',purpose);driver.interactive('#card-row-reason')
+        driver.fill('#card-row-reason','Verified fictional card source; payment is not another purchase');driver.click('#card-row-ack');driver.click_button('Save card transaction decision');driver.wait_text('.card-statements > .success-message','Card transaction decision saved','card decision saved')
+    def current() -> None:
+        driver.client_section('Review & reconciliation',True);driver.interactive('#unified-search');driver.wait_text('.section-navigation button[aria-current=page]','All transactions','unified history is default');driver.wait_text('.unified-pagination','of 9 transactions','one current row for each source record')
+    def inspect(description: str) -> None:
+        driver.click(f"//table[contains(@class,'unified-table')]//tr[td/strong[normalize-space(.)={json.dumps(description)}]]//button",'xpath');driver.wait_text('.unified-extracted',description,'selected transaction evidence');driver.interactive("//button[normalize-space(.)='Correct / approve transaction']",'xpath')
+    def save_details(reason: str) -> None:
+        driver.fill('#inspection-reason',reason);driver.click('#inspection-ack');driver.click_button('Save inspection details');driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','supplemental details saved and refreshed');driver.interactive('#unified-search')
+        # A refreshed retained PDF remounts asynchronously and can change scroll geometry.
+        # Observe finished canvas paint before the next single native click.
+        if driver.visible('.original-document'):canvas_ready()
+    def method_analysis() -> None:
+        if not driver.observe_script("return document.querySelector('.unified-method-analysis')?.open===true"):driver.click('.unified-method-analysis > summary')
+    def canvas_ready() -> None:
+        driver.wait(lambda:driver.observe_script("return (()=>{const c=document.querySelector('.original-document canvas');if(!c||c.hidden||c.width<100||document.querySelector('.original-document [role=alert]'))return false;const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i+3]>0&&d[i]<180&&d[i+1]<180&&d[i+2]<180)n++;return n>200;})()"),'actual nonblank original PDF page rendered',45)
+    current()
+    dates=driver.observe_script("return Array.from(document.querySelectorAll('.unified-table tbody tr')).map(r=>r.cells[0].firstChild.textContent)")
+    if dates!=['2026-09-09','2026-09-08','2026-09-07','2026-09-06','2026-09-05','2026-09-03','2026-09-02','2026-09-02','2026-09-01']:raise SmokeFailure('Current transactions did not sort chronologically across accounts')
+    driver.select('#unified-order','Oldest first');driver.click_button('Apply transaction filters');driver.interactive('#unified-search')
+    if driver.observe_script("return document.querySelector('.unified-table tbody tr').cells[0].firstChild.textContent")!='2026-09-01':raise SmokeFailure('Oldest-first sort was not applied')
+    driver.click('.unified-more-filters > summary');driver.select('#unified-accountType','Credit card');driver.select('#unified-kind','purchase');driver.click_button('Apply transaction filters');driver.wait_text('.unified-pagination','of 1 transactions','combined account/type filter')
+    driver.click_button('Reset transaction filters');driver.wait_text('.unified-pagination','of 9 transactions','reset restores combined table')
+    method_analysis();driver.wait_text('.unified-method-analysis > summary','$250.00','payment excluded from purchase total')
+    inspect('Fictional debit purchase');driver.click_button('View Source Document');canvas_ready();driver.wait_value('#original-pdf-page','2','known source page navigation')
+    driver.select('#original-pdf-zoom','75%');canvas_ready();driver.click_button('Previous PDF page');driver.wait_value('#original-pdf-page','1','PDF page control');canvas_ready();driver.click_button('Next PDF page');canvas_ready()
+    driver.command('POST','/window/rect',{'width':1600,'height':1100});driver.scroll_to('.unified-inspection','start');driver.screenshot(artifacts/'native-unified-original.png')
+    driver.click_button('Review account details');driver.fill('#inspection-institution','Fictional Unified Bank');driver.fill('#inspection-last-four','9876');save_details('Verified fictional institution and last four digits from original')
+    driver.click_button('Edit method & posting date');driver.select('#inspection-method','Debit-card purchase');driver.fill_native_date('#inspection-posting-date','2026-09-03');save_details('Verified checking-linked debit card method and separate posting date')
+    method_analysis();expected=['$100.00 · 40.00% of purchase dollars','$100.00 · 40.00% of purchase dollars','$50.00 · 20.00% of purchase dollars']
+    driver.wait(lambda:driver.observe_script("return Array.from(document.querySelectorAll('.unified-method strong')).slice(0,3).map(e=>e.textContent)")==expected,'exact credit/debit/unknown shares with unknown in denominator')
+    driver.wait(lambda:all('33.33% of purchase count' in s for s in driver.observe_script("return Array.from(document.querySelectorAll('.unified-method small')).slice(0,3).map(e=>e.textContent)")),'purchase counts differ from dollar shares and include unknowns')
+    driver.scroll_to('.unified-method-analysis','start');driver.screenshot(artifacts/'native-unified-payment-shares.png')
+    driver.click_button('Close document panel')
+    if driver.visible('.original-document') or driver.observe_script("return document.querySelector('.unified-inspection-panels').classList.contains('with-document')"):raise SmokeFailure('Closing source document did not restore the normal layout')
+    driver.interactive('.unified-table');driver.click_button('Close inspection')
+    for description,method,kind in [('Fictional loan proceeds','ACH credit','balanceMovement'),('Fictional loan proceeds','External transfer','balanceMovement'),('Fictional loan payment','ACH debit','balanceMovement'),('Fictional reversed purchase','Reversal','refund')]:
+        inspect(description);driver.click_button('Edit method & posting date');driver.select('#inspection-method',method);save_details('Verified channel without changing financial treatment of '+description);driver.wait_text('.unified-extracted',kind,'channel preserves the financial kind');driver.click_button('Close inspection')
+    method_analysis();driver.wait_text('.unified-method-analysis > summary','$250.00','movements and refund remain excluded from purchase totals')
+    inspect('Fictional debit purchase')
+    status('unified review: current chronological bank/card rows, compound filters, real local PDF pages/zoom, scoped account details and exact purchase-method coverage; ACH/external channels and reversal preserve economic treatment')
+    driver.click_button('Correct / approve transaction');driver.interactive('#review-status');driver.select('#review-spending-role','Discretionary spending');driver.fill('#review-reason','Discussed changed purpose; preserve original source and inactive inspection details');driver.click('#review-ack');driver.click_button('Save transaction decision')
+    driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','shared bank decision refreshed current table')
+    driver.wait_text('.unified-extracted','Unclassified method','earlier method binding made inactive after financial decision')
+    driver.click_button('Original values & history');driver.wait_text('.unified-extracted','Verified checking-linked debit card method','earlier method reason retained');driver.wait_text('.transaction-activity','Discussed changed purpose','existing financial history reused')
+    driver.click_button('Edit method & posting date');driver.select('#inspection-method','Debit-card purchase');driver.fill_native_date('#inspection-posting-date','2026-09-03');save_details('Reverified method after the new financial approval')
+    driver.click_button('Close inspection');inspect('Fictional unknown purchase');driver.click_button('Correct / approve transaction');driver.interactive('#review-status');driver.select('#review-status','Rejected');driver.fill('#review-reason','Synthetic duplicate concern pending clarification');driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','rejection uses existing bank workflow')
+    method_analysis();driver.wait_text('.unified-method:first-of-type small','100.00% of purchase count','rejected purchase and now-discrepant source excluded from count denominator')
+    driver.click_button('Edit method & posting date');driver.click('#inspection-duplicate');save_details('Confirmed rejected duplicate as a synthetic review case')
+    driver.click_button('Close inspection');driver.select('#unified-reconciliation','Confirmed duplicate (rejected)');driver.click_button('Apply transaction filters');driver.wait_text('.unified-pagination','of 1 transactions','confirmed duplicate distinguished from suspicion');driver.wait_text('.unified-table','Confirmed duplicate · excluded','confirmed exclusion remains visible')
+    driver.click_button('Reset transaction filters');driver.wait_text('.unified-pagination','of 9 transactions','source rows not deleted');inspect('Fictional unknown purchase');driver.click_button('Correct / approve transaction');driver.interactive('#review-status');driver.select('#review-status','Approved');driver.select('#review-spending-role','Discretionary spending');driver.fill('#review-reason','Clarified synthetic concern: this is a separate purchase; reverse duplicate rejection');driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','reapproval preserves duplicate history and restores eligible figures')
+    driver.click_button('Close inspection');inspect('Fictional unified card purchase');driver.click_button('Correct / approve transaction');driver.interactive('.unified-review-embedded #card-row-status');driver.select('#card-row-purpose','Discretionary spending');driver.interactive('#card-row-reason');driver.fill('#card-row-reason','Client discussed card purchase purpose; original card evidence unchanged');driver.click('#card-row-ack');driver.click_button('Save card transaction decision');driver.wait_text('.unified-transactions > .success-message','Current totals and evidence have refreshed','shared card purpose decision saved from unified inspection')
+    driver.click_button('Close inspection');driver.client_section('Spending Analysis');driver.interactive('#spending-search');driver.fill('#spending-from','2026-09');driver.fill('#spending-through','2026-09');driver.click_button('Update analysis');driver.interactive('#spending-search');driver.wait_text('.sa-metrics','$250.00','combined spending receives existing financial decisions');driver.wait_value("select[aria-label='Type for Fictional debit purchase on 2026-09-02']",'discretionary','bank purpose propagated');driver.wait_value("select[aria-label='Type for Fictional unified card purchase on 2026-09-02']",'discretionary','card purpose propagated')
+    current();method_analysis();driver.wait_text('.unified-method-analysis > summary','$250.00','repayments/refunds not doubled after amendments');driver.scroll_to('.unified-panel-heading','start');driver.screenshot(artifacts/'native-unified-transactions.png')
+    driver.command('POST','/window/rect',{'width':800,'height':700});inspect('Fictional debit purchase');driver.click_button('View Source Document');canvas_ready()
+    if driver.observe_script('return document.documentElement.scrollWidth>document.documentElement.clientWidth'):raise SmokeFailure('Unified inspection overflows an 800px workspace')
+    driver.scroll_to('.unified-inspection','start');driver.screenshot(artifacts/'native-unified-narrow.png');driver.command('POST','/window/rect',{'width':1200,'height':800});driver.click_button('Close inspection')
+    status('unified review: shared bank/card purpose decisions, stale-detail invalidation, original history, confirmed/reversed duplicate handling, downstream analysis and narrow source inspection')
+    folder=data_root/'unified-review-backups';folder.mkdir();firm=driver.text('.workspace-label strong')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','unified evidence and detail history backed up');backup=driver.text('.backup-file-path')
+    driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','unified workspace locked')
+    if driver.observe_script("return document.querySelector('.unified-transactions,.original-document')!==null"):raise SmokeFailure('Unified source data remained visible on lock')
+    restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Taylor Review');current();method_analysis();driver.wait_text('.unified-method-analysis > summary','$250.00','exact methods persist across restart')
+    driver.click('.lock-button');driver.wait_text('.auth-card','Welcome back','lock before unified recovery');driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review',firm,'unified metadata and source histories validated');driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','unified recovery activated');driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Taylor Review');current();inspect('Fictional debit purchase');driver.click_button('Original values & history');driver.wait_text('.unified-extracted','Reverified method after the new financial approval','supplemental history restored');driver.click_button('View Source Document');canvas_ready()
+    driver.click_button('Close inspection');driver.open_client('Robin Synthetic');driver.client_section('Review & reconciliation');driver.click_button('All transactions');driver.wait_text('.unified-transactions','No current transactions match these filters.','other client has no source rows')
+    if 'Fictional Unified Bank' in driver.text('.unified-transactions'):raise SmokeFailure('Unified account metadata crossed client scope')
+    driver.open_client('Alex Fictional');driver.client_section('Profile & intake')
+    status('unified review: actual original PDF and supplemental/financial history survive lock, full restart and encrypted recovery; client isolation preserved')
+
+
+def check_financial_health(driver: WebDriver, artifacts: Path, data_root: Path,
+                           password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """Actual financial-health UI over canonical approvals and existing plan engines."""
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click_button('Add client');driver.fill('#first-name','Morgan');driver.fill('#last-name','Health');driver.click_button('Create client')
+    driver.wait_text('.client-workspace-header','Morgan Health','dedicated health client')
+    source=data_root/'health-native.csv'
+    source.write_text('Date,Description,Amount,Category,Type\n2026-09-01,Health salary,3000,Wages,income\n2026-09-02,Health rent,-1500,Housing,expense\n2026-09-03,Health dining,-300,Dining,expense\n2026-09-04,Health institution charge,-20,Fees,fee\n2026-09-05,Health interest,-30,Interest,interest\n2026-09-06,Health returned purchase,50,Dining,refund\n2026-09-07,Health principal payment,-200,Debt,balanceMovement\n',encoding='utf-8')
+    driver.client_section('Import statements');driver.fill('#csv-path',str(source));driver.click_button('Inspect CSV');driver.wait_text('.csv-preview',source.name,'health source captured')
+    driver.fill('#csv-account-label','Health checking')
+    for key,heading in [('date','1: Date'),('description','2: Description'),('amount','3: Amount'),('category','4: Category'),('kind','5: Type')]:driver.select(f'#csv-map-{key}',heading)
+    for key,value in [('periodStart','2026-09-01'),('periodEnd','2026-09-30'),('openingBalance','1000'),('closingBalance','2000')]:driver.fill(f'#csv-{key}',value)
+    driver.click("//label[contains(.,'Authorize retaining the complete original CSV')]/input",'xpath');driver.click_button('Import into review queue');driver.wait_text('.imports-panel > .success-message','CSV imported','health import needs review')
+    driver.client_section('Review & reconciliation');driver.interactive('#unified-search');driver.click_button('Review queue')
+    for number,purpose in [(1,''),(2,'Necessary spending'),(3,'Discretionary spending'),(4,'Necessary spending'),(5,'Necessary spending'),(6,''),(7,'')]:
+        driver.click_button(f'Review {source.name} record {number+1}');driver.select('#review-status','Approved')
+        if purpose:driver.select('#review-spending-role',purpose)
+        driver.fill('#review-reason','Individually verified the synthetic source and discussed financial purpose');driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','health source approved through existing workflow');driver.interactive('.imports-table tbody button')
+    def health(expected: str) -> None:
+        driver.client_section('Financial dashboard');driver.interactive('#assessment-from');driver.replace_text('#assessment-from','2026-09');driver.replace_text('#assessment-through','2026-09')
+        earlier=driver.visible('.health-score-value');driver.click_button('View financial dashboard')
+        if earlier:driver.wait(lambda:driver.find('.health-score-value') not in (None,earlier),'new health view after assessment refresh')
+        driver.wait_text('.health-score-value',expected,'current health score and evidence gates');driver.interactive('.health-heading > button')
+    coverage_version=0
+    def coverage() -> None:
+        nonlocal coverage_version
+        coverage_version+=1
+        driver.client_section('Review & reconciliation')
+        if driver.observe_script("return document.querySelector('.section-navigation button[aria-current=page]')?.textContent")=='All transactions':driver.interactive('#unified-search')
+        driver.click_button('Completeness & final validation');driver.click('.saved-coverage-reviews > summary');driver.interactive('#coverage-review-from')
+        driver.replace_text('#coverage-review-from','2026-09');driver.replace_text('#coverage-review-through','2026-09');driver.replace_text('#coverage-start-0','2026-09-01');driver.replace_text('#coverage-end-0','2026-09-30')
+        unchecked=driver.observe_script("return Array.from(document.querySelectorAll('.saved-coverage-reviews input[aria-label^=\"Use \"]')).filter(e=>!e.checked).map(e=>e.getAttribute('aria-label'))")
+        for label in unchecked:driver.click(f'input[aria-label={json.dumps(label)}]')
+        driver.replace_text('#coverage-inventory-notes','All synthetic client financial accounts, income, liabilities and absence of credit cards verified. One checking statement supplies complete September coverage.')
+        driver.replace_text('#coverage-conclusion',f'Current approvals, full period, original evidence and the complete financial inventory discussed with the synthetic client. Reaffirmation {coverage_version}.')
+        if driver.observe_script("return document.querySelector('#coverage-inventory-reviewed').checked"):driver.click('#coverage-inventory-reviewed')
+        driver.click('#coverage-inventory-reviewed')
+        driver.click_button('Save completeness review');driver.wait_text('.saved-coverage-reviews > p[role=status]',f'Completeness review saved as version {coverage_version}.','current financial inventory saved');driver.interactive('#coverage-review-from')
+    health('Score unavailable');driver.wait_text('.health-gates','Needs information','missing figures are not a poor score')
+    driver.click_button('Review verified figures');driver.click('.financial-facts-editor > summary');driver.interactive('#facts-as-of');set_fact_classification(driver,'Health salary','Verified take-home pay');driver.fill('#facts-as-of','2026-09-30')
+    for i,(label,kind,amount,payment) in enumerate([('Verified checking','Cash / checking','2000',None),('Verified available reserve','Accessible, unreserved savings','5000',None),('Verified loan','Debt owed','1000','200')]):
+        driver.click_button('Add verified balance');driver.fill(f'#fact-balance-label-{i}',label);driver.select(f'#fact-balance-kind-{i}',kind);driver.fill(f'#fact-balance-amount-{i}',amount)
+        if payment:driver.fill(f'#fact-balance-payment-{i}',payment)
+        driver.fill(f'#fact-balance-evidence-{i}','Original synthetic financial evidence and full account/obligation inventory verified at September 30; no restricted or earmarked funds included')
+    driver.click('#facts-inventory');save_financial_facts(driver,'Confirmed source classifications, required loan payments and complete dated financial inventory')
+    coverage();health('95 / 100');driver.wait_text("[data-health-measure=netSpending]",'$1,800.00','refund subtracted once, principal not a purchase');driver.wait_text("[data-health-measure=necessary]",'51.66%','necessary spending share of income')
+    driver.click('.health-balance-evidence > summary');driver.wait_text('.health-balance-evidence','Verified available reserve','traceable verified balance basis');driver.click('.health-balance-evidence > summary')
+    driver.scroll_to('.health-heading','start');driver.screenshot(artifacts/'native-financial-health-score.png')
+    status('financial health: withheld missing score becomes independently verified 95/100; exact income shares, gross/net/refund boundaries, cost observations and original balance evidence')
+    # Build existing saved plans using their normal UI, without changing actual records.
+    driver.client_section('Monthly budget');driver.click_button('Add income')
+    lines=[('Take-home income','Take-home','3000'),('Necessary expense','Necessary','1550'),('Discretionary expense','Dining','300'),('Debt payment allocation','Debt','200'),('Savings allocation','Emergency','200')]
+    for i,(kind,label,amount) in enumerate(lines):
+        if i in (1,2):driver.click_button('Add expense')
+        elif i in (3,4):driver.click_button('Add allocation')
+        driver.fill(f'#budget-label-{i}',label);driver.select(f'#budget-kind-{i}',kind);driver.fill(f'#budget-amount-{i}',amount);driver.select(f'#budget-frequency-{i}','Monthly')
+    driver.click_button('Save budget and calculate');driver.wait_text('.budget-panel .save-status','Budget saved and calculated.','health saved planning budget')
+    driver.client_section('Debt payoff');driver.replace_text('#debt-start-month','2026-10');driver.fill('#debt-monthly-payment','200');driver.click_button('Add debt');driver.fill('#debt-label-0','Verified zero-interest loan');driver.select('#debt-type-0','Personal loan')
+    for key,value in [('balance','1000'),('apr','0'),('minimumPayment','200'),('monthlyFee','0')]:driver.fill(f'#debt-{key}-0',value)
+    driver.select('#debt-model-0','Fixed monthly APR estimate');driver.click('#debt-verified-0');driver.fill('#debt-note-0','Explicit fictional zero-interest terms and required minimum verified');driver.click_button('Save debt plan and compare');driver.wait_text('.debt-panel .save-status','Debt plan saved and compared.','health existing debt baseline')
+    driver.client_section('Savings & sinking funds');driver.replace_text('#savings-start-month','2026-10');driver.replace_text('#savings-target-months','6')
+    for key,value in [('liquidSavings','5000'),('restrictedSavings','0'),('obligationsReserved','0'),('emergencyContribution','200')]:driver.fill(f'#savings-{key}',value)
+    driver.fill('#savings-priorities','Synthetic reserve and loan goals discussed; no automatic transaction allocation');driver.click_button('Save savings plan and calculate');driver.wait_text('.savings-panel .save-status','Savings plan saved and calculated.','health existing savings baseline')
+    driver.client_section('Cash-flow calendar');driver.replace_text('#cashflow-start','2026-10-01');driver.replace_text('#cashflow-end','2026-12-31');driver.click_button('Add cash-flow account');driver.fill('#cashflow-account-label-0','Planning checking');driver.fill('#cashflow-account-balance-0','2000');driver.click_button('Add dated activity');driver.fill('#cashflow-label-0','Dining dates');driver.select('#cashflow-kind-0','Bill');driver.fill('#cashflow-amount-0','300');driver.fill('#cashflow-date-0','2026-10-02');driver.select('#cashflow-frequency-0','Monthly');driver.click_button('Save cash-flow plan and calculate');driver.wait_text('.cashflow-panel .success-message','Cash-flow plan saved and calculated.','health existing calendar baseline')
+    health('95 / 100');driver.click('.health-reduction > summary');driver.select('#health-category','Dining · $250.00 net / period');driver.click('#health-reduction-ack');driver.click_button('Preview discussed reduction');driver.wait_text('.health-preview','$50.00','net-category monthly reduction');driver.wait_text('.health-preview','$600.00','independent annual reduction');driver.click('.health-reduction form details > summary');driver.select('#health-expense-line','Dining · $300.00');driver.select('#health-destination','Increase the saved debt-payment assumption');driver.select('#health-allocation-line','Debt · $200.00');driver.select('#health-calendar-line','Dining dates · $300.00');driver.click('#health-reduction-ack');driver.click_button('Preview discussed reduction')
+    driver.wait_text('.health-preview .combined-scenario-results','Discussed reduction: Dining','existing combined scenario view reused');driver.wait_text('.health-preview table[aria-label="Baseline and proposed outcomes"]','2027-01','zero-interest debt payoff accelerated from February to January');driver.wait_text('.health-preview table[aria-label="Baseline and proposed outcomes"]','$1,250.00','mapped existing dated cash-flow engine output')
+    driver.scroll_to('.health-preview','start');driver.screenshot(artifacts/'native-financial-health-reduction.png');driver.click_button('Clear temporary choices');driver.click_button('Discard changes');driver.wait_value('#health-category','','temporary assumptions explicitly discarded')
+    driver.client_section('Debt payoff');driver.wait_value('#debt-monthly-payment','200.00','preview did not change saved debt baseline');driver.client_section('Monthly budget');driver.wait_value('#budget-amount-2','300.00','preview did not change saved expense')
+    health('95 / 100');driver.click_button('Discuss and edit expense classifications');driver.interactive('#spending-search');driver.wait_value('#spending-from','2026-09','assessment month carried into existing classification filters');driver.wait_value('#spending-through','2026-09','assessment end month carried into existing classification filters');driver.select("select[aria-label='Type for Health dining on 2026-09-03']",'Necessary');driver.fill('#spending-reason','Counselor and synthetic client confirmed this meal was necessary; preserve the original imported transaction');driver.click('#spending-ack');driver.click_button('Save spending type');driver.wait_text('.spending-analysis > .success-message','Spending type saved.','existing counselor classification workflow')
+    health('Score unavailable');driver.wait_text("[data-health-measure=necessary]",'$1,850.00','necessary spending recalculated immediately');coverage();health('85 / 100');driver.wait_text('.health-component:last-child','2.70 months','reserve coverage recalculated after purpose change')
+    driver.command('POST','/window/rect',{'width':800,'height':760})
+    driver.wait(lambda:driver.observe_script("return window.innerWidth===800 && getComputedStyle(document.querySelector('.health-score-grid')).gridTemplateColumns.trim().split(' ').filter(Boolean).length===1"),'one-column health components at narrow width')
+    driver.scroll_to('.health-score-value','center')
+    driver.wait(lambda:driver.observe_script("return (()=>{const r=document.querySelector('.health-score-value').getBoundingClientRect();return r.top>120&&r.bottom<innerHeight-20;})()"),'health score is visibly framed below sticky tabs')
+    driver.screenshot(artifacts/'native-financial-health-narrow.png')
+    if driver.observe_script('return document.documentElement.scrollWidth>window.innerWidth+2'):raise SmokeFailure('Financial health page overflowed at 800px')
+    driver.command('POST','/window/rect',{'width':1600,'height':1100})
+    status('financial health: refund-adjusted $50/month and $600/year discussion, reused budget/debt/savings/calendar scenario, non-writing preview, existing purpose history and renewed score 85/100; narrow layout')
+    folder=data_root/'health-backups';folder.mkdir();firm=driver.text('.workspace-label strong');driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','health backup completed');backup=driver.text('.backup-file-path')
+    driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','health workspace locked')
+    if driver.observe_script("return document.querySelector('.financial-health')!==null"):raise SmokeFailure('Health evidence remained in DOM after lock')
+    restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Morgan Health');health('85 / 100')
+    driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','lock before health restore');driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review',firm,'health encrypted recovery verified');driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored.','health encrypted recovery activated');driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Morgan Health');health('85 / 100')
+    driver.open_client('Robin Synthetic');health('Score unavailable')
+    private_text=driver.observe_script("return document.querySelector('.financial-health').textContent")
+    if 'Health dining' in private_text or 'Verified available reserve' in private_text:raise SmokeFailure('Health transaction or balance evidence crossed client scope')
+    driver.open_client('Morgan Health');health('85 / 100');driver.scroll_to('.health-heading','start');driver.screenshot(artifacts/'native-financial-health-restored.png')
+    status('financial health: actual approved observations, original evidence, reclassification and score recompute across lock, full restart, encrypted recovery and strict client isolation')
+
+
+def check_households(driver: WebDriver, artifacts: Path, data_root: Path,
+                     password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """Native three-person allocations, payments, controlled handoff, tabs and encrypted recovery."""
+    active = '[data-household-active="true"]'
+    drawer = active + ' .household-drawer'
+    def ready() -> None:
+        driver.wait(lambda:driver.observe_script("return document.querySelector(arguments[0])?.getAttribute('aria-busy')",[active]) == 'false', 'household calculations ready')
+    def section(label: str) -> None:
+        driver.click(f"//*[@data-household-active='true']//nav[@aria-label='Household sections']//button[normalize-space(.)={json.dumps(label)}]", 'xpath')
+        ready()
+    def save_member(name: str, linked: bool, planning: bool = False) -> None:
+        driver.click_button('Add member')
+        if linked:
+            label=driver.observe_script("return Array.from(document.querySelector(arguments[0]).options).find(o=>o.textContent.startsWith(arguments[1]+' ·'))?.textContent",[drawer+' select[data-field="linked-client"]',name])
+            if not isinstance(label,str):raise SmokeFailure('Dedicated synthetic client is missing from member selector')
+            driver.select(drawer+' select[data-field="linked-client"]',label)
+        else:driver.fill(drawer+' input[data-field="member-name"]',name)
+        if planning:
+            driver.click(drawer+' input[data-consent="planning"]')
+            driver.fill(drawer+' textarea','Synthetic household budget authorization only. No income, balances or private statements shared.')
+        driver.click_button('Save member & permissions')
+        driver.wait(lambda:not driver.visible(drawer),'member editor closed after successful save');ready()
+        driver.wait_text(active+' .household-content',name,'saved household member')
+    driver.command('POST','/window/rect',{'width':1536,'height':1024})
+    for first in ['Jordan','Nora']:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+        driver.click_button('Add client');driver.fill('#first-name',first);driver.fill('#last-name','Household');driver.click_button('Create client')
+        driver.wait_text('.client-workspace-header h1',first+' Household','dedicated synthetic household client')
+    driver.click('button[aria-label="Create a household workspace"]')
+    driver.fill('.household-create input','Oak Native Household');driver.click_button('Save household')
+    driver.wait_text(active+' .household-identity h2','Oak Native Household','household opened in top tab');ready()
+    tab=driver.observe_script("return document.querySelector('.household-app-tab.active [role=tab]')?.dataset.clientTab")
+    if not isinstance(tab,str):raise SmokeFailure('Household tab has no stable identifier')
+    section('Members & Permissions');save_member('Jordan Household',True,True);save_member('Nora Household',True);save_member('Michael Demo',False)
+    status('household: two stable client links, limited member and explicit permissions')
+    section('Shared Expenses');driver.click_button('Add expense')
+    driver.fill(drawer+' input[data-field="expense-name"]','Rent');driver.fill(drawer+' input[data-field="amount"]','2400.00')
+    driver.replace_text(drawer+' input[aria-label="Fixed dollars for Jordan Household"]','500.00');driver.replace_text(drawer+' input[aria-label="Remainder weight for Jordan Household"]','0.0');driver.wait_text(drawer+' .household-preview','$500.00','decimal zero excludes the fixed-only participant');driver.wait_text(drawer+' .household-preview','$950.00','exact equal remainder for the other members');driver.replace_text(drawer+' input[aria-label="Fixed dollars for Jordan Household"]','0.00');driver.replace_text(drawer+' input[aria-label="Remainder weight for Jordan Household"]','1')
+    driver.select(drawer+' select[data-field="allocation-method"]','Custom percentage remainder')
+    for person,percent in [('Jordan Household','25'),('Nora Household','37.5'),('Michael Demo','37.5')]:
+        driver.replace_text(drawer+f' input[aria-label="Remainder weight for {person}"]',percent)
+    driver.wait_text(drawer+' .household-preview','$600.00','exact Jordan responsibility preview')
+    driver.wait_text(drawer+' .household-preview','$900.00','exact remaining member shares')
+    driver.click_button('Save expense agreement');driver.wait(lambda:not driver.visible(drawer),'agreement saved');ready()
+    section('Payments & Settlements');driver.click_button('Record payment')
+    driver.select(drawer+' select[data-field="payment-expense"]','Rent');driver.fill(drawer+' input[data-field="amount"]','2400.00');driver.select(drawer+' select[data-field="payment-state"]','Confirmed by counselor / source');driver.click_button('Save payment record');driver.wait(lambda:not driver.visible(drawer),'external payment saved');ready()
+    driver.wait_text(active+' .household-content','$900.00','outstanding reimbursement suggestions')
+    section('Overview');driver.wait_text(active+' .household-stats','$2,400.00','fronted payment is not duplicated spending');driver.wait_text(active+' .household-stats','Necessary $2,400.00 · Discretionary $0.00','overview necessary/discretionary plan breakdown')
+    if '$4,200.00' in driver.text(active):raise SmokeFailure('Household double-counted the external payment and reimbursements')
+    driver.scroll_to(active+' .household-page-heading','start');driver.screenshot(artifacts/'native-household-overview.png')
+    section('Payments & Settlements');driver.click_button('Record payment')
+    driver.select(drawer+' select[data-field="movement-kind"]','settlement');driver.select(drawer+' select[data-field="paying-member"]','Nora Household');driver.select(drawer+' select[data-field="receiving-member"]','Jordan Household');driver.fill(drawer+' input[data-field="amount"]','900.00');driver.select(drawer+' select[data-field="payment-state"]','Confirmed by counselor / source');driver.click_button('Save payment record');driver.wait(lambda:not driver.visible(drawer),'settlement saved');ready()
+    section('Overview');driver.wait_text(active+' .household-stats','$2,400.00','internal settlement does not add spending')
+    status('household: exact $600/$900/$900 agreement, fronted bill and confirmed internal settlement')
+    section('Household Budget');driver.select(active+' .household-toolbar select','Jordan Household');driver.click_button('Preview budget reconciliation');driver.wait_text(active+' .household-content','Household shares to add','controlled budget preview');driver.wait_text(active+' .household-content','$600.00','only member share proposed')
+    driver.click(active+' input[data-field="budget-ack"]');driver.click_button('Save reconciled individual budget');ready();driver.wait_text(active+' .household-notice','Individual budget saved','explicit budget revision')
+    section('Goals & Scenarios');driver.click_button('Add shared goal');driver.fill(drawer+' input[data-field="goal-name"]','Shared emergency reserve');driver.fill(drawer+' input[data-field="goal-target"]','1200.00');driver.fill(drawer+' input[data-field="goal-monthly"]','100.00');driver.click_button('Save shared goal');driver.wait(lambda:not driver.visible(drawer),'shared savings goal saved');ready();driver.wait_text(active+' .household-content','$33.33','shared savings contribution cents');driver.wait_text(active+' .household-content','$33.34','deterministic leftover cent in shared savings')
+    section('Shared Expenses');driver.click_button('Create revision');driver.replace_text(drawer+' input[data-field="amount"]','2600.00');driver.wait_text(drawer+' .household-preview','$650.00','hypothetical revised rent share');driver.click(drawer+' details > summary');driver.fill(drawer+' input[data-field="scenario-name"]','Future rent option');driver.click_button('Save expense scenario');driver.wait(lambda:not driver.visible(drawer),'hypothetical scenario saved');ready();section('Goals & Scenarios');driver.click_button('Preview impact');driver.wait_text(active+' .household-preview','$650.00','saved hypothetical impact preview');section('Overview');driver.wait_text(active+' .household-stats','$2,400.00','hypothetical proposal does not change active spending');driver.wait_text(active+' .household-content','Shared emergency reserve','goal visible on household overview');section('Household Budget')
+    status('household: exact shared goal contributions and non-writing rent scenario preview')
+    jordan="[role=tab][aria-label='Jordan Household']";driver.click(jordan);driver.client_section('Monthly budget');driver.wait_text('.budget-panel','$600.00','individual receives only agreed household share')
+    driver.click(f'[role=tab][data-client-tab={json.dumps(tab)}]');ready();driver.wait_text(active+' h1','Household Budget','household last section remembered')
+    section('Members & Permissions');driver.click_button('Add member');driver.fill(drawer+' input[data-field="member-name"]','Private retained household draft')
+    driver.click(jordan);driver.wait_text('.budget-panel','$600.00','individual tab kept its working section')
+    driver.click(f'[role=tab][data-client-tab={json.dumps(tab)}]');driver.wait_value(drawer+' input[data-field="member-name"]','Private retained household draft','household draft retained between tabs')
+    driver.click(drawer+' button[aria-label="Close household editor"]');driver.click_button('Keep editing');driver.wait_value(drawer+' input[data-field="member-name"]','Private retained household draft','explicit keep draft')
+    driver.click(drawer+' button[aria-label="Close household editor"]');driver.click_button('Discard changes');driver.wait(lambda:not driver.visible(drawer),'explicit draft discard')
+    section('Reports & History');driver.click_button('Record report snapshot');ready();driver.wait_text(active+' .household-notice','snapshot recorded','immutable historical report')
+    report_option=driver.observe_script("return Array.from(document.querySelector(arguments[0]).options).find(o=>o.value)?.textContent",[active+' .household-panel select'])
+    driver.select(active+' .household-panel select',str(report_option));driver.element(active+' .household-report')
+    pdf=artifacts/'household-native.pdf';driver.fill(active+' input[data-field="household-pdf-path"]',str(pdf));driver.click_button('Export saved household PDF');driver.wait_text(active+' .household-notice','Household PDF saved','offline household PDF export')
+    content=pdf.read_bytes()
+    if not content.startswith(b'%PDF-'):raise SmokeFailure('Household report is not a PDF')
+    text=subprocess.run(['pdftotext',str(pdf),'-'],check=True,capture_output=True,text=True).stdout
+    if '600.00' not in text or '2400.00' not in text or 'Shared emergency reserve' not in text:raise SmokeFailure('Household PDF lacks independently expected amounts or shared goal')
+    driver.click_button('Export saved household PDF');driver.wait_text(active+' [role=alert]','already exists','household export refuses overwriting')
+    if pdf.read_bytes()!=content:raise SmokeFailure('Household PDF bytes changed after refused overwrite')
+    status('household: controlled budget handoff, tab sections/drafts and immutable no-overwrite PDF')
+    driver.command('POST','/window/rect',{'width':800,'height':960});driver.scroll_to(active+' h1','start');driver.screenshot(artifacts/'native-household-narrow.png')
+    if driver.observe_script('return document.documentElement.scrollWidth>document.documentElement.clientWidth'):raise SmokeFailure('Household screen overflows the native window')
+    driver.command('POST','/window/rect',{'width':1536,'height':1024})
+    driver.click_button('Lock workspace');driver.element('#password')
+    if driver.visible(active):raise SmokeFailure('Household data remained visible after locking')
+    restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace')
+    def reopen() -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']");driver.click_button('Households')
+        driver.click("//button[contains(@class,'household-directory-card')][strong[normalize-space(.)='Oak Native Household']]",'xpath');ready()
+        driver.wait_text(active+' .household-stats','$2,400.00','persisted household expenses')
+        driver.wait_text(active+' .household-content','$600.00','persisted allocation shares')
+    reopen();folder=data_root/'household-backup';folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','household journal backed up');backup=driver.text('.backup-file-path')
+    driver.click_button('Lock workspace');driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review','Verified backup','household history verified before recovery');driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored.','household backup activated');driver.fill('#password',password);driver.click_button('Unlock workspace');reopen()
+    status('household: narrow layout, lock privacy, complete restart and encrypted recovery')
+    driver.open_client('Alex Fictional')
+
+
+def check_statement_extraction(driver: WebDriver, artifacts: Path, data_root: Path,
+                               password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """Actual PDF worker, visible selection/review, exact source-bound purposes and recovery."""
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click_button('Add client');driver.fill('#first-name','Morgan');driver.fill('#last-name','Extraction');driver.click_button('Create client')
+    driver.wait_text('.client-workspace-header','Morgan Extraction','separate statement extraction client')
+    path=data_root/'extracted.pdf'
+    path.write_bytes(build_pdf([
+      ['Fictional institution welcome','Questions? Please contact us','Your purchases may be subject to a fee of $25.00'],
+      ['Statement period 2026-09-01 to 2026-09-30','Date Description Amount Balance','Opening balance 0.00',
+       '2026-09-01 Fictional payroll 1000.01 1000.01','2026-09-02 Fictional groceries -25.11 974.90','2026-09-03 Fictional coffee -3.02 971.88','Ending balance 971.88'],
+      ['Member FDIC','Questions? Please contact us','Total withdrawals 28.13']]))
+    driver.client_section('Import statements');driver.select('#statement-format','Selectable-text PDF');driver.fill('#csv-path',str(path));driver.click_button('Inspect PDF')
+    driver.wait_text('.pdf-selected-summary','Selected transactions: 3 / 500','only actual transaction rows start checked')
+    driver.wait_text('.pdf-transaction-inspection','across 1 of 3 source pages','nonfinancial pages excluded from checklist')
+    if driver.observe_script("return document.querySelectorAll('.pdf-candidates tbody tr').length")!=3:raise SmokeFailure('Fine print became a transaction candidate')
+    if 'Questions?' in driver.text('.pdf-candidates'):raise SmokeFailure('Institution fine print entered transaction checklist')
+    driver.wait_text('.pdf-selected-summary','Withdrawals / debits$28.13','running balances excluded from exact selected spending')
+    toggle="//table[contains(@class,'pdf-candidates')]//tr[td//strong[normalize-space(.)='Fictional coffee']]//input[@type='checkbox']"
+    if driver.command('GET',f'/element/{driver.find(toggle,"xpath")}/property/checked') is not True:raise SmokeFailure('Clear coffee transaction was not checked')
+    driver.click(toggle,'xpath');driver.wait_text('.pdf-selected-summary','Selected transactions: 2 / 500','manual uncheck changes selection count')
+    driver.wait_text('.pdf-selected-summary','Withdrawals / debits$25.11','manual uncheck changes exact debit total')
+    driver.wait_text('.pdf-selected-summary','Net selected movement$974.90','manual uncheck updates net')
+    if driver.observe_script("return getComputedStyle(document.querySelector('.pdf-transaction-inspection')).maxHeight")!='none':raise SmokeFailure('Transaction inspector is still clipped by the old raw-line scroll box')
+    driver.command('POST','/window/rect',{'width':1600,'height':1100})
+    driver.scroll_to('.pdf-selected-summary','start');driver.command('POST','/execute/async',{'script':'const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));','args':[]});driver.screenshot(artifacts/'native-extracted-candidates.png')
+    driver.command('POST','/window/rect',{'width':800,'height':700})
+    if driver.observe_script('return document.documentElement.scrollWidth>document.documentElement.clientWidth'):raise SmokeFailure('PDF inspector overflows the narrow workspace')
+    driver.command('POST','/window/rect',{'width':1200,'height':800})
+    driver.fill('#csv-account-label','Fictional extracted savings');driver.select('#csv-account-kind','Savings')
+    driver.fill('#csv-openingBalance','0');driver.fill('#csv-closingBalance','971.88')
+    driver.click("//label[contains(.,'Authorize retaining the complete original PDF')]/input",'xpath')
+    driver.click_button('Import into review queue');driver.wait_text('.imports-panel > .success-message','Every PDF record needs individual verification.','PDF capture remains separate from approval')
+    driver.client_section('Review & reconciliation');driver.wait_text('.imports-progress','Needs Clarification 2','only checked transactions imported')
+    if driver.observe_script("return document.querySelectorAll('.imports-table tbody tr').length")!=2:raise SmokeFailure('Unchecked transaction imported')
+    def bank_decide(number:int,kind:str,category:str,purpose:str,reason:str)->None:
+        driver.client_section('Review & reconciliation');driver.click_button('Review queue')
+        driver.interactive(f"//button[normalize-space(.)={json.dumps(f'Review {path.name} record {number}')} ]",'xpath');driver.click_button(f'Review {path.name} record {number}');driver.select('#review-kind',kind);driver.fill('#review-category',category);driver.select('#review-status','Approved')
+        if purpose:driver.select('#review-spending-role',purpose)
+        driver.fill('#review-reason',reason);driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','source and purpose committed');driver.interactive('.imports-table tbody button')
+    bank_decide(1,'Income','Wages','','Verified original fictional payroll; not a spending purchase')
+    bank_decide(2,'Expense','Food','Necessary spending','Discussed necessary groceries with fictional client')
+    driver.wait_text('.imports-totals','Net spending$25.11','approved-only source totals update')
+    def analysis()->None:
+        driver.client_section('Spending Analysis');driver.interactive('#spending-search');driver.fill('#spending-from','2026-09');driver.fill('#spending-through','2026-09');driver.click_button('Update analysis');driver.interactive('#spending-search')
+    analysis();driver.wait_text('.sa-metrics','$25.11','review purpose automatically appears in Spending Analysis')
+    driver.wait_value("select[aria-label='Type for Fictional groceries on 2026-09-02']",'necessary','necessary purpose source binding')
+    driver.client_section('Review & reconciliation');bank_decide(2,'Expense','Food','Discretionary spending','Client discussed discretionary purpose amendment; preserve original import')
+    analysis();driver.wait_value("select[aria-label='Type for Fictional groceries on 2026-09-02']",'discretionary','review amendment automatically recalculates analysis')
+    driver.wait_text('.sa-metrics','100.00%','exact discretionary percentage updated')
+    card=data_root/'extracted-card.pdf';card.write_bytes(build_pdf([
+      ['Billing period 09/01/2026 to 09/30/2026','Purchases','09/05 Fictional card grocery 40.02','Payments and credits','09/06 Fictional card payment 20.01 CR','Minimum payment due 10.00'],
+      ['Questions? Please contact us','Total purchases 40.02','Member FDIC']]))
+    driver.client_section('Import statements');driver.click_button('Credit-card statements');driver.click('.card-import > summary');driver.select('#card-source-format','Selectable-text PDF');driver.fill('#card-csv-path',str(card));driver.click_button('Inspect card PDF')
+    driver.wait_text('.pdf-selected-summary','Selected transactions: 2 / 200','card transactions preselected without fine print')
+    driver.wait_text('.pdf-selected-summary','Charges / debt increases$40.02','purchase signs recognized')
+    driver.wait_text('.pdf-selected-summary','Payments / debt reductions$20.01','credit marker reduces card debt')
+    for selector,value in [('#card-account','Fictional extracted card'),('#card-period-start','2026-09-01'),('#card-period-end','2026-09-30'),('#card-opening','100'),('#card-closing','120.01')]:driver.fill(selector,value)
+    driver.click('#card-retain');driver.interactive("//button[normalize-space(.)='Save card statement for individual review']",'xpath');driver.click_button('Save card statement for individual review')
+    driver.wait_text('.card-progress','Needs Clarification 2','card PDF does not approve records')
+    if driver.visible("//button[normalize-space(.)='Review card row 1']",'xpath'):raise SmokeFailure('Review decisions leaked into statement import page')
+    driver.client_section('Review & reconciliation');driver.click_button('Card transactions')
+    if driver.visible('.card-import'):raise SmokeFailure('Import controls leaked into card review page')
+    def card_decide(row:int,kind:str,category:str,purpose:str)->None:
+        driver.click_button(f'Review card row {row}');driver.select('#card-row-kind',kind);driver.fill('#card-row-category',category);driver.select('#card-row-status','Approved')
+        if purpose:
+            driver.select('#card-row-purpose',purpose);driver.interactive('#card-row-reason')
+        driver.fill('#card-row-reason','Discussed fictional card source, spending purpose and payment treatment with client');driver.click('#card-row-ack');driver.click_button('Save card transaction decision');driver.wait_text('.card-statements > .success-message','Card transaction decision saved','card decision and purpose saved')
+    card_decide(1,'purchase','Food','Necessary spending');card_decide(2,'payment','Card payment','')
+    driver.wait_text('.card-totals','Net card spendingUSD 40.02','card payment excluded from spending')
+    driver.wait_text('.card-reconciliation','Available statement arithmetic reconciles','selected card source and approved movement reconcile')
+    analysis();driver.wait_text('.sa-metrics','$65.13','bank and card approved spending combined exactly')
+    driver.wait_value("select[aria-label='Type for Fictional card grocery on 2026-09-05']",'necessary','card purpose automatically available in analysis')
+    driver.click("button[aria-label='Classification history for Fictional groceries on 2026-09-02']");driver.wait_text('.sa-history','Discussed necessary groceries','original review-purpose history retained');driver.wait_text('.sa-history','discretionary purpose amendment','amended review-purpose history retained');driver.click_button('Close classification history')
+    driver.command('POST','/execute/async',{'script':'const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));','args':[]})
+    driver.command('POST','/window/rect',{'width':1600,'height':1100});driver.scroll_to('.sa-heading','start');driver.command('POST','/execute/async',{'script':'const done=arguments[arguments.length-1];requestAnimationFrame(()=>requestAnimationFrame(()=>done(true)));','args':[]});driver.screenshot(artifacts/'native-extracted-spending.png');driver.command('POST','/window/rect',{'width':1200,'height':800})
+    folder=data_root/'extraction-backups';folder.mkdir();firm=driver.text('.workspace-label strong')
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','selected evidence and classifications backed up');backup=driver.text('.backup-file-path')
+    driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','extraction workspace locked');restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Morgan Extraction');analysis();driver.wait_text('.sa-metrics','$65.13','automatic classifications persist across process restart')
+    driver.click('.lock-button');driver.wait_text('.auth-card','Welcome back','lock before extraction recovery');driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review',firm,'extraction backup validated');driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','extraction recovery complete');driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Morgan Extraction');analysis();driver.wait_text('.sa-metrics','$65.13','exact bank/card classifications recovered')
+    driver.open_client('Robin Synthetic');driver.client_section('Spending Analysis');driver.interactive('#spending-search')
+    if 'Fictional card grocery' in driver.text('.spending-analysis'):raise SmokeFailure('Extracted financial source crossed client boundary')
+    driver.open_client('Alex Fictional');driver.client_section('Profile & intake')
+    status('transaction-focused bank/card PDFs: excluded fine print/pages/balances, editable preselection and exact draft totals, only selected imports, explicit atomic necessary/discretionary review, automatic combined analysis, unchanged source/history, separate pages, restart, encrypted recovery and client isolation')
+
+
+def check_spending_analysis(driver: WebDriver, artifacts: Path, data_root: Path,
+                            password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """Visible native controls only; independent figures and actual encrypted recovery."""
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click_button('Add client');driver.fill('#first-name','Quinn');driver.fill('#last-name','Analysis')
+    driver.click_button('Create client');driver.wait_text('.client-workspace-header','Quinn Analysis','separate spending fixture client')
+    driver.client_section('Monthly budget');driver.click_button('Add expense');driver.fill('#budget-label-0','Reviewed monthly discretionary target');driver.fill('#budget-amount-0','100');driver.select('#budget-kind-0','Discretionary expense');driver.click_button('Save budget and calculate');driver.wait_text('.budget-panel','Budget saved and calculated.','real saved discretionary target')
+    path=data_root/'spending-fictional.csv'
+    path.write_text('Date,Description,Amount,Category,Type\n2026-07-09,Native subscription,-10,Memberships,expense\n2026-08-09,Native subscription,-10,Memberships,expense\n2026-09-01,Native rent,-1000,Housing,expense\n2026-09-02,Native dining,-100,Dining,expense\n'+''.join(f'2026-09-0{i+2},Native coffee {i},-10,Coffee,expense\n' for i in range(1,6))+'2026-09-09,Native subscription,-10,Memberships,expense\n2026-09-10,Native refund,20,Dining,refund\n2026-09-11,Native pending,-999,Dining,expense\n',encoding='utf-8')
+    driver.client_section('Import statements');driver.fill('#csv-path',str(path));driver.click_button('Inspect CSV');driver.wait_text('.csv-preview',path.name,'synthetic spending source inspected')
+    driver.fill('#csv-account-label','Native analysis checking')
+    for key,heading in [('date','1: Date'),('description','2: Description'),('amount','3: Amount'),('category','4: Category'),('kind','5: Type')]:driver.select(f'#csv-map-{key}',heading)
+    driver.click_button('Import into review queue');driver.wait_text('.imports-panel > .success-message','CSV imported into the review queue','source stays separate from analysis')
+    driver.client_section('Spending Analysis')
+    if driver.observe_script("return document.querySelectorAll('nav[aria-label=\"Client workspace sections\"] button').length")!=13:raise SmokeFailure('Expected thirteen client-local sections')
+    def ready():driver.interactive('#spending-search')
+    def period():
+        driver.fill('#spending-from','');driver.fill('#spending-from','2026-09');driver.fill('#spending-through','');driver.fill('#spending-through','2026-09');driver.click_button('Update analysis');ready()
+    ready();period();driver.wait_text('.sa-metrics','$0.00','pending sources never enter analysis')
+    driver.click('.sa-boundaries > summary');driver.click_button('Open separate review & reconciliation');driver.interactive('.imports-table tbody button')
+    for number in range(2,13):
+        driver.click_button(f'Review {path.name} record {number}');driver.select('#review-status','Approved');driver.fill('#review-reason','Fictional source and category individually verified for spending analysis');driver.click('#review-ack');driver.click_button('Save transaction decision');driver.wait_text('.imports-panel > .success-message','Transaction decision saved','explicit approved categorized fact');driver.interactive('.imports-table tbody button')
+    driver.click_button('Recurring payments');driver.click_button('Review payments for Native subscription');driver.fill('#recurring-label','Verified fictional service');driver.select('#recurring-frequency','Monthly');driver.click('#recurring-subscription');driver.fill('#recurring-reason','Client confirmed these three fictional monthly payments are an active subscription');driver.click_button('Save payment pattern decision');driver.wait_text('.recurring-review','Counselor-classified subscription','subscription evidence confirmed separately')
+    status('spending fixture: explicit source approvals and confirmed subscription saved')
+    driver.client_section('Spending Analysis');ready();period();driver.wait_text('.sa-metrics','$1,160.00','approved spending excludes pending and refund');driver.wait_text('.sa-reconciliation','Unclassified spending purpose $1,160.00','categories never infer spending purpose');driver.wait_text('.sa-reconciliation','Net spending after refunds $1,140.00','exact refund reconciliation')
+    def change(merchant,date,role,reason):
+        driver.select(f"select[aria-label='Type for {merchant} on {date}']",role);driver.interactive('#spending-reason');driver.fill('#spending-reason',reason);driver.click('#spending-ack');driver.click_button('Save spending type');driver.wait_text('.spending-analysis > .success-message','Spending type saved.','purpose save explicitly confirmed');ready()
+    change('Native rent','2026-09-01','Necessary','Client verified rent is necessary housing')
+    change('Native dining','2026-09-02','Discretionary','Initial discussion classified the meal as discretionary')
+    for i in range(1,6):change(f'Native coffee {i}',f'2026-09-0{i+2}','Discretionary','Client verified this fictional coffee purchase was discretionary')
+    change('Native subscription','2026-09-09','Discretionary','Client verified this service is discretionary')
+    driver.wait_text('.sa-metrics','$160.00','all discretionary purposes saved');driver.wait_text('.sa-reconciliation','Unclassified spending purpose $0.00','all eligible expense purposes explicit')
+    driver.wait_text('.sa-opportunities','Frequent small purchases','six small discretionary purchases flagged');driver.wait_text('.sa-opportunities','$60.00 · 6 transactions','independent exact small-purchase total');driver.wait_text('.sa-opportunities','Reviewed discretionary subscriptions','confirmed subscription enters opportunity panel');driver.wait_text('.sa-opportunities','$10.00 · 1 transaction','period subscription charge only');driver.wait_text('.sa-opportunities','Discretionary spending above saved budget','actual spending above real target')
+    status('spending fixture: exact classified totals and all three opportunity areas verified')
+    driver.command('POST','/window/rect',{'width':1536,'height':1024});driver.scroll_to('.sa-heading','start');driver.screenshot(artifacts/'native-spending-desktop.png')
+    if driver.observe_script('return document.documentElement.scrollWidth>document.documentElement.clientWidth'):raise SmokeFailure('Spending desktop has horizontal page overflow')
+    # Draft is guarded, and cancellation retains discussion without persisting it.
+    driver.select("select[aria-label='Type for Native dining on 2026-09-02']",'Necessary');driver.fill('#spending-reason','Unsaved private discussion');driver.click("nav[aria-label='Client workspace sections'] button[aria-label='Import statements']");driver.wait_text('[role=alertdialog]','Discard unsaved changes?','purpose navigation guard');driver.click_button('Keep editing');driver.wait_value('#spending-reason','Unsaved private discussion','guard cancellation preserves unsaved reason');driver.click_button('Cancel type change');driver.wait_value("select[aria-label='Type for Native dining on 2026-09-02']",'discretionary','cancel restores saved type in the native widget')
+    change('Native dining','2026-09-02','Necessary','After discussing essential travel, client verified this meal was necessary')
+    driver.wait_text('.sa-metrics','$1,100.00','necessary amount recalculated');driver.wait_text('.sa-metrics','$60.00','discretionary amount recalculated');driver.wait_text('.sa-metrics','94.83%','necessary share recalculated');driver.wait_text('.sa-metrics','5.17%','discretionary share recalculated')
+    if 'Dining' in driver.text('.sa-bars') or 'Discretionary spending above saved budget' in driver.text('.sa-opportunities'):raise SmokeFailure('Stale discretionary chart or budget opportunity remained')
+    driver.wait_text('.sa-metrics','$1,160.00','purpose change preserves gross spending');driver.wait_text('.sa-reconciliation','$1,140.00','purpose change preserves net spending')
+    driver.click("button[aria-label='Classification history for Native dining on 2026-09-02']");driver.wait_text('.sa-history','-100','original imported sign and value retained');driver.wait_text('.sa-history','Initial discussion classified the meal as discretionary','initial purpose retained');driver.wait_text('.sa-history','After discussing essential travel','amended purpose retained');driver.wait_text('.sa-history','America/Chicago','history date zone explicit');driver.scroll_to('.sa-history h3','start');driver.screenshot(artifacts/'native-spending-history.png');driver.click_button('Close classification history')
+    driver.fill('#spending-search','Native coffee 1');driver.click_button('Filter transactions');ready();driver.wait_text('.sa-pagination','1–1 of 1','table-only search')
+    driver.wait_text('.sa-metrics','$1,160.00','table search does not narrow snapshot');driver.click_button('Clear table filters');ready()
+    driver.command('POST','/window/rect',{'width':800,'height':700});driver.scroll_to('.sa-heading','start');driver.screenshot(artifacts/'native-spending-narrow.png')
+    if driver.observe_script('return document.documentElement.scrollWidth>document.documentElement.clientWidth'):raise SmokeFailure('Spending 800px layout has horizontal page overflow')
+    driver.command('POST','/window/rect',{'width':1200,'height':800})
+    status('spending fixture: type amendment, updated metrics/charts, original history, guard, table scope and responsive layout verified')
+    firm=driver.text('.workspace-label strong');folder=data_root/'spending-backups';folder.mkdir()
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']");driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password);driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','purpose history included in encrypted backup');backup=driver.text('.backup-file-path')
+    driver.click_button('Lock workspace');driver.wait_text('.auth-card','Welcome back','spending workspace locked')
+    if driver.observe_script("return document.querySelector('.spending-analysis,.sa-history')!==null"):raise SmokeFailure('Private spending analysis remained on lock')
+    restart_driver();driver.open(binary);driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Quinn Analysis');driver.client_section('Spending Analysis');ready();period();driver.wait_text('.sa-metrics','$1,100.00','purpose saved across complete process restart')
+    driver.click('.lock-button');driver.wait_text('.auth-card','Welcome back','restart result locked before recovery');driver.click('.restore-panel > summary');driver.fill('#restore-file',backup);driver.fill('#restore-password',password);driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review',firm,'spending backup verified');driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace');driver.wait_text('.auth-card','Workspace restored. Unlock it','spending backup activated');driver.fill('#password',password);driver.click_button('Unlock workspace');driver.open_client('Quinn Analysis');driver.client_section('Spending Analysis');ready();period();driver.wait_text('.sa-metrics','$1,100.00','purpose restored from encrypted backup');driver.wait_text('.sa-metrics','$60.00','discretionary totals restored exactly');driver.click("button[aria-label='Classification history for Native dining on 2026-09-02']");driver.wait_text('.sa-history','Initial discussion classified the meal as discretionary','original purpose history restored');driver.wait_text('.sa-history','After discussing essential travel','amendment reason restored');driver.click_button('Close classification history')
+    driver.open_client('Robin Synthetic');driver.client_section('Spending Analysis');ready()
+    if 'Native dining' in driver.text('.spending-analysis') or 'Native analysis checking' in driver.text('.spending-analysis'):raise SmokeFailure('Spending evidence crossed client boundary')
+    driver.open_client('Alex Fictional');driver.client_section('Profile & intake')
+    status('Spending Analysis: approved-only exact totals, real budget/subscription/small-purchase opportunities, discussion-bound purpose edits, all affected metrics and charts refreshed, guard cancellation, immutable original/history, table scope, desktop/800px layout, lock privacy, full restart, encrypted recovery and client isolation')
+
+
+def check_inactivity_policy(driver: WebDriver, artifacts: Path, data_root: Path,
+                            password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    def security() -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
+        driver.click_button('Security')
+        driver.interactive('#inactivity-minutes')
+    def save(minutes: str) -> None:
+        driver.fill('#inactivity-minutes',minutes)
+        driver.click_button('Save inactivity timeout')
+        driver.wait_text('.inactivity-settings [role=status]','Inactivity timeout saved.','explicit timeout save')
+    security()
+    driver.wait_value('#inactivity-minutes','15','legacy fifteen-minute default')
+    save('1')
+    driver.click('.inactivity-history > summary')
+    driver.wait_text('.inactivity-history','Revision 1: 1 minutes','immutable policy version')
+    driver.scroll_to('.inactivity-settings','start')
+    driver.screenshot(artifacts/'native-inactivity-policy.png')
+    if driver.observe_script('return document.documentElement.scrollWidth > document.documentElement.clientWidth'):
+        raise SmokeFailure('Security policy screen overflows horizontally')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note')
+    driver.wait_text('.notes-history','Synthetic private note for Alex only.','private client visible before inactivity')
+    started=time.monotonic()
+    # Read-only WebDriver DOM observations neither invoke app commands nor send
+    # keyboard/pointer activity. Exercise the actual Rust timer, without a clock
+    # override or shortened product timeout.
+    driver.wait(lambda:driver.visible('#password'),'real one-minute inactivity lock',seconds=95)
+    if time.monotonic()-started<45:
+        raise SmokeFailure('Workspace locked before a real one-minute idle interval')
+    if driver.visible('.notes-history') or driver.visible('#inactivity-minutes'):
+        raise SmokeFailure('Private UI remained after inactivity locking')
+    driver.fill('#password',password);driver.click_button('Unlock workspace')
+    security();driver.wait_value('#inactivity-minutes','1','saved policy after unlock')
+    restart_driver();driver.open(binary)
+    driver.fill('#password',password);driver.click_button('Unlock workspace')
+    security();driver.wait_value('#inactivity-minutes','1','saved policy after full restart')
+    folder=data_root/'inactivity-policy-backup';folder.mkdir()
+    driver.click_button('Backup & recovery');driver.fill('#backup-folder',str(folder));driver.fill('#backup-password',password)
+    driver.click_button('Create encrypted backup');driver.wait_text('.backup-success','Encrypted backup saved.','custom policy backed up')
+    backups=list(folder.glob('*.ebcbackup'))
+    if len(backups)!=1:raise SmokeFailure('Expected one custom-policy backup')
+    security();save('15')
+    driver.click('.lock-button');driver.click('.restore-panel > summary')
+    driver.fill('#restore-file',str(backups[0]));driver.fill('#restore-password',password)
+    driver.click_button('Verify backup for recovery');driver.wait_text('.restore-review','Verified backup','policy backup review')
+    driver.fill('#restore-confirmation','RESTORE');driver.click_button('Restore verified workspace')
+    driver.wait_text('.auth-card','Workspace restored.','policy backup restored')
+    driver.fill('#password',password);driver.click_button('Unlock workspace')
+    security();driver.wait_value('#inactivity-minutes','1','backup retains original policy rather than later fifteen-minute setting')
+    save('15')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note');driver.wait_text('.notes-history','Synthetic private note for Alex only.','policy restore preserves original notes')
+    status('configurable inactivity policy, default and version history, real one-minute Rust timer lock and private UI clearing, full restart, encrypted policy recovery and unchanged client notes')
+
+
+def check_password_change(driver: WebDriver, artifacts: Path, data_root: Path,
+                          password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    new_password = "Changed-" + secrets.token_urlsafe(24)
+    wrong_password = "Wrong-" + secrets.token_urlsafe(24)
+    driver.protected_values.extend([new_password, wrong_password])
+    folder = data_root / 'password-change-backups'
+    folder.mkdir()
+    def settings(tab: str) -> None:
+        driver.click("nav[aria-label='Main navigation'] button[aria-label='Settings']")
+        driver.click_button(tab)
+    def backup(secret: str) -> Path:
+        settings('Backup & recovery')
+        before = set(folder.glob('*.ebcbackup'))
+        driver.fill('#backup-folder', str(folder)); driver.fill('#backup-password', secret)
+        driver.click_button('Create encrypted backup')
+        driver.wait_text('.backup-success', 'Encrypted backup saved.', 'password-stage backup completed')
+        added = set(folder.glob('*.ebcbackup')) - before
+        if len(added) != 1: raise SmokeFailure('Expected one new password-stage encrypted backup')
+        return added.pop()
+    old_backup = backup(password)
+    old_bytes = old_backup.read_bytes()
+    settings('Security')
+    driver.wait_text('.password-change', 'original passwords', 'old-copy password disclosure')
+    driver.scroll_to('.password-change', 'start')
+    driver.screenshot(artifacts / 'native-workspace-password-safeguards.png')
+    if driver.observe_script('return document.documentElement.scrollWidth > document.documentElement.clientWidth'):
+        raise SmokeFailure('Password-change screen overflows horizontally')
+    driver.fill('#password-change-current', wrong_password)
+    driver.fill('#password-change-new', new_password)
+    driver.fill('#password-change-confirmation', new_password)
+    driver.click('#password-change-acknowledge')
+    driver.click_button('Change password and lock')
+    driver.wait_text('.password-change [role=alert]', 'current password is incorrect', 'wrong current password rejected')
+    for field in ['current', 'new', 'confirmation']:
+        driver.wait_value('#password-change-' + field, '', 'submitted password cleared')
+    driver.fill('#password-change-current', password)
+    driver.fill('#password-change-new', new_password)
+    driver.fill('#password-change-confirmation', new_password)
+    driver.click('#password-change-acknowledge')
+    driver.click_button('Change password and lock')
+    driver.wait_text('.auth-card', 'Workspace password changed.', 'successful password change locks and clears workspace')
+    if driver.visible('.app-shell') or driver.visible('.password-change'):
+        raise SmokeFailure('Private workspace remained visible after password change')
+    driver.fill('#password', password); driver.click_button('Unlock workspace')
+    driver.wait_text('.auth-card [role=alert]', 'password is incorrect', 'old password rejected by active generation')
+    driver.fill('#password', new_password); driver.click_button('Unlock workspace')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note')
+    driver.wait_text('.notes-history', 'Synthetic private note for Alex only.', 'original notes survive rotation')
+    restart_driver(); driver.open(binary)
+    driver.fill('#password', new_password); driver.click_button('Unlock workspace')
+    driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note')
+    driver.wait_text('.notes-history', 'Synthetic private note for Alex only.', 'new password and notes survive complete restart')
+    new_backup = backup(new_password)
+    for path, secret, wrong in [(old_backup, password, new_password), (new_backup, new_password, password)]:
+        driver.click('.lock-button'); driver.click('.restore-panel > summary')
+        driver.fill('#restore-file', str(path)); driver.fill('#restore-password', wrong)
+        driver.click_button('Verify backup for recovery')
+        driver.wait_text('.restore-panel [role=alert]', 'could not be verified', 'backup rejects other-generation password')
+        driver.fill('#restore-password', secret); driver.click_button('Verify backup for recovery')
+        driver.wait_text('.restore-review', 'Verified backup', 'backup accepts its original password')
+        driver.fill('#restore-confirmation', 'RESTORE'); driver.click_button('Restore verified workspace')
+        driver.wait_text('.auth-card', 'Workspace restored.', 'original-password backup activated')
+        driver.fill('#password', secret); driver.click_button('Unlock workspace')
+        driver.open_client('Alex Fictional');driver.click_button('Session notes');driver.interactive('#new-note')
+        driver.wait_text('.notes-history', 'Synthetic private note for Alex only.', 'records retained through password-generation backup recovery')
+    if old_backup.read_bytes() != old_bytes:
+        raise SmokeFailure('Password change or restore rewrote the older encrypted backup')
+    status('workspace password change, wrong-password rejection, empty submitted secrets, locked private UI, new-password restart, unchanged older backup, and old/new original-password encrypted recovery')
 
 
 def check_report_presentation(driver: WebDriver, artifacts: Path, data_root: Path,
@@ -2190,10 +3039,10 @@ def check_card_final_approval(driver: WebDriver, artifacts: Path, data_root: Pat
         # navigation is permitted. Wait for its actual controls, not just the
         # always-visible tab button; never replay a possibly ignored click.
         current=driver.observe_script("return document.querySelector('.section-navigation button[aria-current=page]')?.textContent")
-        control={'Working tools':'#assessment-from','Card completeness':'#card-facts-from','Bank & card activity':'#card-link-action'}.get(current)
+        control={'Approved activity':'#assessment-from','Working tools':'#assessment-from','Card completeness':'#card-facts-from','Bank & card activity':'#card-link-action'}.get(current)
         if control:driver.interactive(control)
         driver.click_button(area)
-        driver.wait(lambda:driver.observe_script("return document.querySelector('.section-navigation button[aria-current=page]')?.textContent") == area,'selected financial review section')
+        driver.wait(lambda:driver.observe_script("return document.querySelector('.section-navigation button[aria-current=page]')?.textContent") == ('Approved activity' if area=='Working tools' else area),'selected financial review section')
     financial('Working tools',True)
     driver.click('.financial-facts-editor > summary');driver.interactive('#facts-as-of')
     index=driver.observe_script("return Array.from(document.querySelectorAll('input[id^=fact-balance-label-]')).findIndex(e=>e.value==='Fictional mapped card debt')")
@@ -2418,7 +3267,7 @@ def check_integrated_card_review(driver: WebDriver, artifacts: Path, data_root: 
     def card_page() -> None:
         driver.click("nav[aria-label='Main navigation'] button[aria-label='Documents']")
         driver.select('#workspace-client','Jamie Complete')
-        driver.click_button('Credit-card statements')
+        driver.client_section('Review & reconciliation');driver.click_button('Card transactions')
         driver.interactive("//button[normalize-space(.)='Review card row 2']",'xpath')
     def review_page() -> None:
         driver.click("nav[aria-label='Main navigation'] button[aria-label='Financial Review']")
@@ -2719,7 +3568,7 @@ def check_final_report_approval(driver: WebDriver, artifacts: Path, data_root: P
     driver.fill('#household-size','1')
     driver.fill('#goals','Fictional historical completed-period assessment only; no scenario recommendation requested.')
     driver.click_button('Create client')
-    driver.wait_text('.editor-panel h2','Jamie Complete','separate fictional final-report client')
+    driver.wait_text('.client-workspace-header h1','Jamie Complete','separate fictional final-report client')
     source=data_root / 'complete-final.csv'
     source.write_text(f'Date,Description,Amount,Category,Type\n{period_start},Complete fictional wages,2000.01,Wages,income\n{period_start+dt.timedelta(days=1)},Complete fictional rent,-1200.02,Housing,expense\n',encoding='utf-8')
     driver.fill('#csv-path',str(source))
@@ -3257,12 +4106,18 @@ def check_statement_accounts(driver: WebDriver, artifacts: Path, label: str, ini
 
 def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:
     count = driver.observe_script("return document.querySelectorAll('nav[aria-label=\"Main navigation\"] button').length")
-    if count != 12:
-        raise SmokeFailure("The original twelve workspace sections are not all reachable")
-    for page, heading in [("Financial Review", "Client financial review"), ("Transactions", "Transaction review queue"), ("Documents", "Documents and statement accounts")]:
+    if count != 3:
+        raise SmokeFailure("Expected Dashboard, Clients and Settings at the application level")
+    for page, heading in [("Financial Review", "Approved financial activity"), ("Transactions", "All transactions"), ("Documents", "Documents and statement accounts")]:
         driver.click(f"nav[aria-label='Main navigation'] button[aria-label='{page}']")
-        driver.wait_text("#imports-title", heading, f"focused {page} page")
-        driver.element(".imports-totals" if page != "Documents" else "#csv-path")
+        if page == "Transactions":
+            driver.interactive("#unified-search")
+            driver.wait_text(".unified-transactions h2", heading, "focused unified Transactions page")
+            driver.wait_text(".section-navigation button[aria-current=page]", "All transactions", "default unified review tab")
+            driver.element(".unified-table")
+        else:
+            driver.wait_text("#imports-title", heading, f"focused {page} page")
+            driver.element(".financial-dashboard" if page=="Financial Review" else "#csv-path")
         if page != "Documents" and driver.visible("#csv-path"):
             raise SmokeFailure(f"Document import controls leaked into {page}")
     driver.click(".imports-sources > summary")
@@ -3298,7 +4153,7 @@ def check_workspace_pages(driver: WebDriver, artifacts: Path) -> None:
     driver.wait_text(".firm-branding", "No branding changes yet", "branding page is a working saved form")
     driver.open_client("Alex Fictional")
     driver.interactive("#first-name")
-    status("all twelve main pages, saved planner data, isolated client context, future areas and report/admin separation")
+    status("three main pages and thirteen client sections, saved planner data, isolated client context, future areas and report/admin separation")
 
 
 def check_client_care(driver: WebDriver, artifacts: Path, label: str, initial: bool = False) -> None:
@@ -3466,8 +4321,18 @@ def main() -> int:
                         raise SmokeFailure("The native driver exited unexpectedly before the restart checkpoint")
                     stop_driver(process)
                     driver.session_id = None
-                    ensure_available(options.port)
-                    ensure_available(options.native_port)
+                    # stop_driver verified there are no live group members.
+                    # WebKit's closed TCP sockets can still occupy a port in
+                    # TIME_WAIT. Wait only on availability; never replay a UI
+                    # action or weaken the full-process-restart assertion.
+                    def ports_released() -> bool:
+                        try:
+                            ensure_available(options.port)
+                            ensure_available(options.native_port)
+                            return True
+                        except SmokeFailure:
+                            return False
+                    driver.wait(ports_released, "closed native driver ports released", seconds=75)
                     launch_driver()
                     driver.wait(ready, "fresh native WebDriver readiness", seconds=25)
 
@@ -3507,6 +4372,7 @@ def main() -> int:
         print(f"PASS native desktop smoke complete. Artifacts: {artifacts}", flush=True)
         return 0
     except (SmokeFailure, OSError, ValueError) as error:
+        print(driver.safe("".join(traceback.format_tb(error.__traceback__))), file=sys.stderr, flush=True)
         print(f"FAIL {driver.safe(str(error))}", file=sys.stderr, flush=True)
         print(f"Diagnostics: {artifacts}", file=sys.stderr, flush=True)
         return 1

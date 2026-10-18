@@ -1,6 +1,6 @@
 {
   "name": "eisenbart-counseling-suite",
-  "version": "0.43.0",
+  "version": "0.52.0",
   "private": true,
   "description": "Offline financial counseling desktop foundation",
   "type": "module",
@@ -13,10 +13,12 @@
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
-    "check:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked"
+    "check:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
+    "check:version": "node scripts/check-version.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.3",
+    "pdfjs-dist": "6.4.299",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

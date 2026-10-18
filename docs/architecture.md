@@ -24,10 +24,10 @@ flowchart LR
     IPC --> Core[Rust application core]
     Core --> Auth[Local authentication and session]
     Core --> DB[Encrypted SQLCipher database]
-    Core -. Future milestones .-> Calc[Decimal financial engine]
+    Core --> Calc[Existing exact-money planning engines]
     Core --> Docs[Local CSV and selectable-text PDF review]
-    Core -. Future milestones .-> PDF[OCR, advanced review and reports]
-    Core -. Future milestones .-> Reports[Reports and immutable snapshots]
+    Core -. Future milestones .-> PDF[Scanned PDF OCR and additional adapters]
+    Core --> Reports[Reports and immutable snapshots]
 ```
 
 There is no required cloud service, spreadsheet integration, or shared network database. Each installation owns its local data directory. Development dependency downloads and Windows installer build downloads are separate from the installed application's essential offline workflow.
@@ -72,7 +72,7 @@ under the existing workspace mutex. No temporary PDF, schema migration, shell
 plugin, financial write or print-success claim is introduced. See
 [workflow and Windows acceptance](windows-pdf-print-workflow.md).
 
-The Windows workflow builds an NSIS installer with Tauri's `offlineInstaller` WebView2 mode. This is intended to include the WebView2 runtime installer so the resulting package can install without fetching that component during installation. Building it requires network access to obtain dependencies and the runtime redistributable.
+The Windows workflow validates source and an embedded debug executable without packaging. Only an explicitly requested manual run with `package_installer=true` builds an NSIS installer with Tauri's `offlineInstaller` WebView2 mode. This is intended to include the WebView2 runtime installer so the resulting package can install without fetching that component during installation. Building it requires network access to obtain dependencies and the runtime redistributable.
 
 The packaging configuration must be exercised on Windows. Merely committing the workflow does not produce an executable, verify the NSIS installer, demonstrate offline installation, or provide a signing certificate. Follow [windows.md](windows.md) for the build and release checks.
 
@@ -91,15 +91,20 @@ preserves formats 1–4 bytes/digests; schema 17 is unchanged. Internal PDF expo
 prints counselor context separately from financial facts. The client-plan PDF
 renderer excludes it. See [report-intake-context.md](report-intake-context.md).
 
-`workspaceNavigation.ts` defines the twelve specification sections. `App` retains
-an authenticated in-memory client context across focused pages, ignores late
-selection responses and guards persistent drafts/busy operations. Page/area
-changes focus the heading. `ClientEditor` remounts the relevant existing workflow;
-`ImportsEditor` presents document/transaction/review/report views over the same
-scoped Rust data. Complete record remains available. `AdministrationPages` and
-`PlannedWorkspaceAreas` distinguish working tools from named future sections;
-[prototype-development-map.md](prototype-development-map.md) records implementation
-entry points and acceptance criteria. Schema 17 and report formats are unchanged.
+`workspaceNavigation.ts` defines three global pages and thirteen client-local
+sections. `App` retains stable-ID client tabs and per-client section/subtab metadata
+only while unlocked. The selected section mounts its existing scoped editor;
+late responses are ignored and dirty/busy guards precede navigation or tab closing.
+`ConfirmationDialog` waits for explicit in-app choices and cancels on lock.
+`ImportsEditor` mounts only the selected import/review/dashboard/report workflow.
+The old all-forms Complete record view has been removed. `ClientOverview` renders
+exact saved-plan results from the authenticated read-only `client_workspace` command;
+unknown amounts remain unknown and planning figures stay distinct from approved
+statement activity. `AdministrationPages` and `PlannedWorkspaceAreas` identify
+working and planned features. See [redesign details](client-workspace-redesign.md)
+and [prototype-development-map.md](prototype-development-map.md) for entry points
+and acceptance criteria. This presentation stage leaves schema 29 and existing
+financial/report formats unchanged.
 
 `document_collection.rs` validates workflow-only request metadata, status, dates
 and bounds; `storage::document_collection_store` assigns IDs and captures scoped
@@ -273,3 +278,131 @@ sections; `NoteCorrection` and `ClientNotes` hold dirty/busy/client/session guar
 Timeline reads do not append audit or financial records. Profile entries are
 explicitly creation/latest-update metadata, not fabricated past profile versions.
 See [usage and limitations](client-history.md).
+
+`storage::password_change` implements a verified new-key SQLCipher export and
+metadata generation, schema-28 atomic audit, persisted-key reopen and shared
+recovery activation. `lib::access` serializes complete managed IPC commands with
+the OS operation lock before rechecking session generation, preventing stale
+cooperating writes after activation. `PasswordChange` clears submitted secrets,
+requires explicit retained-copy password acknowledgment and returns to locked
+UI after success. A separate credential-free lock event communicates committed
+password changes even before the IPC response arrives. No in-place rekey, new KDF, reset service or financial mutation
+is introduced. See [password-change design](workspace-password-change.md).
+
+`storage::security_policy` validates encrypted schema-29 immutable inactivity
+history and atomically saves revision-checked 1–60 minute settings with audit.
+Existing workspaces default to 15 minutes. Session expiry reads the latest policy
+without activity refresh and locks on invalid/unreadable data. Unlock/recovery
+validate the policy; password generation changes preserve it. `InactivitySettings`
+and shared Settings draft/busy aggregation protect concurrent forms. The normal
+15-second timer and existing keyboard/pointer heartbeat remain, while pending
+review/inspection lifetimes remain fixed at 15 minutes. See
+[inactivity policy design and limits](inactivity-locking.md).
+
+`spending_analysis.rs` reads scoped approved bank/card rows and current approval-
+bound purposes in one authenticated SQLite snapshot. It calculates checked integer
+cent totals, exact category allocations, prior-period comparisons and evidence-
+based opportunities in Rust. Changes reuse existing audited bank financial-facts
+and card-completeness writes, with full-context receipts and source approvals.
+Card edits require renewed completeness review. Imported source bytes and captured
+reports remain immutable. `SpendingAnalysis` renders local accessible charts,
+filters and a discussion-bound Type editor, clears private state on client/lock
+changes and never retries writes. [Rules and limits](spending-analysis.md). No new
+schema, application dependency, report format or remote service is introduced.
+
+
+## Transaction-focused extraction and atomic dispositions (0.48.0)
+
+The bounded PDF worker still owns text decoding; `statement_pdf.rs` identifies
+transaction candidates and returns read-only suggested selections and exact draft
+sums. The shared React inspector presents those results and sends manual locator
+overrides. Import reparses the captured capability-owned pages, binds the current
+declared statement period, and stores minimal canonical v2 evidence; store reads
+and backup validation replay it. Schema 30 gates older writers without rewriting
+v1/CSV sources or historical report payloads. Card PDF sources use format 2.
+
+Source review plus an optional necessary/discretionary disposition uses one
+immediate SQLite transaction. The exact new approval ID binds the appended bank
+financial-facts or card-facts version, and audit failure rolls back both writes.
+Card saves validate source, facts and profile revisions and clear inventory review.
+Live analysis consumes existing authoritative facts; no parallel financial ledger
+or frontend money arithmetic is introduced. Import and approval remain distinct.
+
+### Household workspaces (schema 31)
+
+`households.rs` owns exact allocations, due-date agreement selection, responsibilities
+and settlement suggestions. `households_store.rs` replays a counselor/organization
+scoped append-only event journal, validates canonical payloads/digest chaining,
+enforces consent and source identity, and composes the existing budget, cash-flow,
+savings and spending-analysis services. Approved-source links retain original
+client/account/document ownership; live invalidations never rewrite prior events.
+Controlled individual plan handoffs commit their new revision and retained
+before/after journal/audit data atomically. Backup recovery validates household
+journals before activation. PDFs reuse `assessment_pdf`'s offline renderer/writer.
+
+React household components retain drafts/section/filter state in mounted inactive
+tabs, hide inactive views, and unmount all private state on workspace lock.
+`HouseholdWorkspace` collects inputs and renders authoritative Rust amounts/scales;
+it does not implement a second financial engine. See `household-management.md`
+for allocation rounding, consent, timing, report semantics and operational limits.
+
+`storage::unified_review` adds the schema-32 supplemental inspection journal and a
+single current bank/card transaction projection. Existing source/review ledgers
+remain the financial authority; the projection never sums historical decision
+events. It reuses Spending Analysis eligibility, statement arithmetic, existing
+account identity and exact approved fields. Supplemental methods/posting dates
+bind to an exact decision; account institution/masked identifiers are explicit
+review metadata. Revision checks, atomic audit, append-only digest chains and
+recovery validation protect those details without changing source/report bytes.
+The original bank/card forms can mount in a focused inspection context while
+calling their unchanged decision/purpose APIs.
+
+`OriginalDocumentViewer` lazy-loads pinned locally bundled PDF.js canvas/worker
+assets. A scoped Rust read returns only authorized retained original bytes after
+hash verification; no plaintext PDF temp file or external document service is
+introduced. Renderer scripting, annotation/link/form UI and XFA are not enabled.
+Local allowlisted fonts/CMaps, image/canvas/time bounds and destroyed-on-close
+state constrain inspection. Reliable page locators are used without invented
+coordinates. CSP changes allow local asset fetches and bundled workers; remote
+PDF viewers remain unavailable. See [workflow and limits](unified-transaction-review.md).
+
+
+## Financial health projection (0.51.0)
+
+`storage::financial_health` runs scoped, consistent read transactions over existing
+bank/card records, current unified eligibility, immutable role/fact histories and
+saved coverage reviews. It reuses Spending Analysis totals/opportunities, dashboard
+and coverage diagnostics, card reconciliation/completeness, financial-facts ratios
+and shared savings-target arithmetic. A versioned counseling score is withheld
+when essential evidence is incomplete; no merchant or payment preference supplies
+a moral classification or a score penalty. Exact source/approval/balance-review
+bindings remain visible. See [policy and workflow](financial-health-assessment.md).
+
+Reduction previews bind the source and plan context, use refund-adjusted category
+amounts, and delegate explicit saved-line changes to `scenarios::compare` and its
+existing budget/debt/savings/cashflow engines. They do not write ledgers, plans,
+audit events or historical reports. No migration or duplicate transaction store is
+needed. `FinancialHealth` sits inside `FinancialDashboard`, reuses
+`CombinedScenarioView`, and routes classification edits to existing Spending
+Analysis for the selected months. Root draft/busy guards and generation checks
+prevent stale replies from crossing clients or surviving lock/navigation.
+
+## Financial planning extensions (0.52.0 / schema 33)
+
+The existing debt engine adds exact daily intervals, known month-level APR changes
+and fees, periodic payments and account-targeted extras. The existing savings
+schedule uses optional bounded `savings_funding.rs` state for source depletion,
+reserve movements and refill milestones. `cashflow.rs` expands explicit delayed
+transfers into departure/receipt legs and checks account reserve floors.
+`paycheck.rs` derives exact equal earmarks from canonical saved budget monthly
+amounts and entered calendar paydays. `savings_progress.rs` reads verified fact
+history in a scoped snapshot, independently from projections.
+
+Extended planning/scenario captures use v2 calculator identifiers; absent optional
+fields retain v1 outputs, warnings and canonical bytes. Existing immutable saved
+scenario/report storage and recovery recompute the captured version/baseline.
+Schema 33 gates older writers without adding a second financial store. Existing
+plan saves retain revision, audit and ownership checks. Read-only proposals do not
+adopt plans. Dated funding/targeted proposals need a separately reviewed monthly
+agreement before a single recurring client allocation can be issued. See
+[assumptions, examples and acceptance](financial-planning-subpages.md).

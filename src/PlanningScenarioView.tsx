@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {usd} from './BudgetEditor';
+import PlanningExtensions from './PlanningExtensions';
 import type {CapturedPlanning} from './types';
 const amount=(v:string|null)=>v===null?'Unknown / unavailable':usd(v);
 const words=(v:string)=>{const text=v.replace(/([a-z])([A-Z])/g,'$1 $2').toLowerCase();return text.charAt(0).toUpperCase()+text.slice(1);};
@@ -15,7 +16,7 @@ export default function PlanningScenarioView({value:s,preview=false}:{value:Capt
   <p className="assessment-note">Assumptions: {s.assumptions||'None recorded.'}</p>
   <p className="field-help">Saved budget {date(b.updatedAt)}, debt {date(d.updatedAt)}, savings {date(v.updatedAt)}, dated cash flow {date(c.updatedAt)} (America/Chicago).</p>
   <p className="field-help">Baseline plan versions: budget {s.revisions.budget}, debt {s.revisions.debt}, savings {s.revisions.savings}, cash flow {s.revisions.cashflow}. {preview?'Review these saved versions before recording.':'Later plan changes do not rewrite this captured scenario.'}</p>
-  <h4>Entered monthly budget</h4><dl className="budget-totals scenario-budget-totals">{([['Income',b.summary.monthlyIncome],['Necessary spending',b.summary.necessaryExpenses],['Discretionary spending',b.summary.discretionaryExpenses],['Proposed savings',b.summary.proposedSavings],['Planned debt payments',b.summary.plannedDebtPayments],['Unallocated',b.summary.unallocated]]).map(([label,val])=><div key={label}><dt>{label}</dt><dd>{usd(val)}</dd></div>)}</dl>
+  <PlanningExtensions plans={s.plans}/><h4>Entered monthly budget</h4><dl className="budget-totals scenario-budget-totals">{([['Income',b.summary.monthlyIncome],['Necessary spending',b.summary.necessaryExpenses],['Discretionary spending',b.summary.discretionaryExpenses],['Proposed savings',b.summary.proposedSavings],['Planned debt payments',b.summary.plannedDebtPayments],['Unallocated',b.summary.unallocated]]).map(([label,val])=><div key={label}><dt>{label}</dt><dd>{usd(val)}</dd></div>)}</dl>
   {b.revision===0&&<p className="alert warning">No saved budget. Save a nonempty budget before including this scenario.</p>}
   <ul className="budget-warnings">{b.summary.warnings.map((w,i)=><li key={i}>{w}</li>)}</ul>
   <div className="budget-table-wrap"><table aria-label="Captured budget assumptions"><thead><tr><th>Line / purpose</th><th>Entered amount / frequency</th><th>Monthly amount / basis</th></tr></thead><tbody>{b.lines.map((line,i)=><tr key={i}><td>{line.label} · {words(line.kind)}</td><td>{amount(line.amount)} · {words(line.frequency)}</td><td>{amount(b.summary.monthlyAmounts[i]??null)} · {line.estimated?'Estimated':line.amount===null?'Missing':'Entered'}</td></tr>)}</tbody></table></div>

@@ -16,7 +16,15 @@ pub struct BudgetChange {
 }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SettlementChange {
+    pub delayed: bool,
+    pub first_available_date: Option<String>,
+}
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CashChange {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_change: Option<SettlementChange>,
     pub index: usize,
     pub amount: Option<String>,
     pub first_date: String,
@@ -46,6 +54,15 @@ pub struct RecurringExpense {
 }
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NewGoal {
+    pub id: String,
+    pub label: String,
+    pub target_amount: Option<String>,
+    pub target_date: Option<String>,
+    pub monthly_contribution: Option<String>,
+}
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Input {
     pub expected_revisions: planning::Revisions,
     pub label: String,
@@ -65,6 +82,12 @@ pub struct Input {
     pub recurring_expenses: Vec<RecurringExpense>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub income_reductions: Vec<crate::income_periods::Reduction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub new_goals: Vec<NewGoal>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targeted_extras: Vec<debt::TargetExtra>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub savings_funding: Option<savings::funding::Plan>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -101,6 +124,9 @@ fn outcome(plans: planning::Plans, strategy: planning::Strategy) -> Outcome {
     }
 }
 pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, String> {
+    if input.new_goals.len() > 20 || input.targeted_extras.len() > 24 {
+        return Err("Use at most 20 proposed goals and 24 targeted payments.".into());
+    }
     if input.budget_changes.len() > 100 || input.cash_changes.len() > 100 {
         return Err(
             "A comparison supports at most 100 budget and 100 dated schedule changes.".into(),
@@ -190,12 +216,30 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
             .extras
             .extend(input.debt_extras.iter().cloned());
     }
+    if !input.targeted_extras.is_empty() {
+        proposed
+            .debt
+            .data
+            .as_mut()
+            .ok_or("Save a debt plan before selecting an account-targeted extra.")?
+            .targeted_extras
+            .extend(input.targeted_extras.iter().cloned());
+    }
     proposed.debt.budget_context = planning::debt_context(&proposed.budget);
     if let Some(data) = proposed.debt.data.take() {
         let (data, mut cmp) = debt::calculate(data)?;
         debt::apply_budget_context(&data, &mut cmp, &proposed.debt.budget_context)?;
         if let Some(change) = &mut input.debt_payment {
             change.amount = data.monthly_payment.clone();
+        }
+        for extra in &mut input.targeted_extras {
+            extra.amount = data
+                .targeted_extras
+                .iter()
+                .find(|e| e.month == extra.month && e.account_index == extra.account_index)
+                .ok_or("Targeted extra was not retained.")?
+                .amount
+                .clone();
         }
         for extra in &mut input.debt_extras {
             extra.amount = data
@@ -235,6 +279,44 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
             .ok_or("The changed savings goal is outside the saved baseline.")?
             .monthly_contribution = change.amount.clone();
     }
+    if !input.new_goals.is_empty() || input.savings_funding.is_some() {
+        let data = proposed
+            .savings
+            .data
+            .as_mut()
+            .ok_or("Save a savings plan before proposing goals or reserve movements.")?;
+        let mut ids = HashSet::new();
+        for g in &input.new_goals {
+            if g.id.is_empty()
+                || g.id.len() > 64
+                || !g.id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                || !ids.insert(g.id.clone())
+            {
+                return Err("New proposed goals need unique valid IDs.".into());
+            }
+            // Zero initial reserve: funding must be explicit, never duplicated out of opening savings.
+            data.goals.push(savings::Goal {
+                label: g.label.clone(),
+                target_amount: g.target_amount.clone(),
+                target_date: g.target_date.clone(),
+                reserved_amount: Some("0.00".into()),
+                monthly_contribution: g.monthly_contribution.clone(),
+            });
+        }
+        if let Some(funding) = &mut input.savings_funding {
+            savings::funding::normalize(
+                funding,
+                data.goals.len(),
+                debt::month_number(&data.start_month)?,
+            )?;
+            let current = data.funding.get_or_insert(savings::funding::Plan {
+                sources: vec![],
+                events: vec![],
+            });
+            current.sources.extend(funding.sources.iter().cloned());
+            current.events.extend(funding.events.iter().cloned());
+        }
+    }
     proposed.savings.context = planning::savings_context(&proposed.budget, &proposed.debt);
     if let Some(data) = proposed.savings.data.take() {
         let (data, summary) = savings::calculate(data, &proposed.savings.context)?;
@@ -243,6 +325,14 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         }
         for change in &mut input.goal_contributions {
             change.amount = data.goals[change.index].monthly_contribution.clone();
+        }
+        let original_goals = baseline.savings.data.as_ref().map_or(0, |d| d.goals.len());
+        for (i, new) in input.new_goals.iter_mut().enumerate() {
+            let g = &data.goals[original_goals + i];
+            new.label = g.label.clone();
+            new.target_amount = g.target_amount.clone();
+            new.target_date = g.target_date.clone();
+            new.monthly_contribution = g.monthly_contribution.clone();
         }
         proposed.savings.data = Some(data);
         proposed.savings.summary = Some(summary);
@@ -260,6 +350,20 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
             .schedules
             .get_mut(change.index)
             .ok_or("The changed schedule is outside the saved baseline.")?;
+        if let Some(settlement) = &change.settlement_change {
+            if row.kind != cashflow::Kind::Transfer
+                || (!settlement.delayed && settlement.first_available_date.is_some())
+            {
+                return Err("Explicit settlement changes belong to internal transfers; immediate settlement cannot have a future availability date.".into());
+            }
+            row.settlement = if settlement.delayed {
+                Some(cashflow::Settlement {
+                    first_available_date: settlement.first_available_date.clone(),
+                })
+            } else {
+                None
+            };
+        }
         row.amount = change.amount.clone();
         row.first_date = change.first_date.clone();
         row.certainty = cashflow::Certainty::Estimated;
@@ -280,6 +384,7 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
                 .ok_or("Save a cash-flow plan before adding an explicitly dated expense.")?
                 .schedules
                 .push(cashflow::Schedule {
+                    settlement: None,
                     label: expense.label.clone(),
                     account_id: dates.account_id.clone(),
                     destination_id: None,
@@ -355,6 +460,12 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         };
         warnings.push(format!("{prefix}{ending}"));
     }
+    if !input.new_goals.is_empty()
+        || !input.targeted_extras.is_empty()
+        || input.savings_funding.is_some()
+    {
+        warnings.push("New goals start with zero reserve and keep explicit proposal IDs. One-time funding sources and reserve movements apply only to the proposed savings model. Targeted extras identify an account in the captured debt revision and reserve the entire commitment even if the target repays early; unused targeted money is not reassigned. Do not duplicate recurring income or opening reserves as external funding. Review monthly affordability and dated bank availability separately; no live plan, approved fact, scenario baseline or report is overwritten.".into());
+    }
     if !input.recurring_expenses.is_empty() {
         warnings.push("New recurring expenses are estimated additions, not replacements for existing bills. Monthly budget normalization applies throughout the model; first/last payment dates limit only the explicitly selected dated forecast, not the budget, debt capacity or emergency target. Check for duplicate obligations. Annual amounts are budget-only. Missing amounts stay unknown; dated payments use the same entered amount/frequency and only counselor-selected accounts/dates. No live plan or approved transaction is created.".into());
         if expense_without_occurrence {
@@ -374,7 +485,17 @@ pub fn compare(plans: planning::Plans, mut input: Input) -> Result<Comparison, S
         }
     }
     Ok(Comparison {
-        calculator: "combined-preview-v1".into(),
+        calculator: if planning::calculator(&baseline) == "entered-plans-v2"
+            || planning::calculator(&proposed) == "entered-plans-v2"
+            || !input.new_goals.is_empty()
+            || !input.targeted_extras.is_empty()
+            || input.savings_funding.is_some()
+        {
+            "combined-preview-v2"
+        } else {
+            "combined-preview-v1"
+        }
+        .into(),
         client_id: baseline.client_id.clone(),
         created_at: chrono::Utc::now().to_rfc3339(),
         revisions: baseline.revisions(),
