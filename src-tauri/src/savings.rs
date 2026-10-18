@@ -519,32 +519,53 @@ pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Sum
             goal_targets: &goal_targets,
         },
     )?;
+    let projection_available = funding_result.as_ref().is_none_or(|result| {
+        funding::projection_available(
+            data.funding
+                .as_ref()
+                .expect("funding result requires input"),
+            result,
+            &rows,
+        )
+    });
     if let Some(funding) = &funding_result {
-        emergency = funding::forecast_from_points(emergency, target, None, &funding.points, start);
+        emergency = if projection_available {
+            funding::forecast_from_points(emergency, target, None, &funding.points, start)
+        } else {
+            funding::unavailable_forecast(emergency)
+        };
         for (i, result) in results.iter_mut().enumerate() {
             let original = forecast(terms[i].remaining, terms[i].contribution, start);
-            result.forecast = funding::forecast_from_points(
-                original,
-                goal_targets[i],
-                Some(i),
-                &funding.points,
-                start,
-            );
+            result.forecast = if projection_available {
+                funding::forecast_from_points(
+                    original,
+                    goal_targets[i],
+                    Some(i),
+                    &funding.points,
+                    start,
+                )
+            } else {
+                funding::unavailable_forecast(original)
+            };
             result.suggested_contribution = None;
-            result.on_track = data.goals[i]
-                .target_date
-                .as_ref()
-                .and_then(|deadline| funding.points.iter().rev().find(|p| &p.date <= deadline))
-                .and_then(|p| p.goals[i].as_deref())
-                .map(crate::budget::parse_total)
-                .transpose()?
-                .zip(goal_targets[i])
-                .map(|(v, t)| v >= t);
+            result.on_track = if projection_available {
+                data.goals[i]
+                    .target_date
+                    .as_ref()
+                    .and_then(|deadline| funding.points.iter().rev().find(|p| &p.date <= deadline))
+                    .and_then(|p| p.goals[i].as_deref())
+                    .map(crate::budget::parse_total)
+                    .transpose()?
+                    .zip(goal_targets[i])
+                    .map(|(v, t)| v >= t)
+            } else {
+                None
+            };
             result.warnings.push("Funding/drawdown events change the reserve path. Review the dated projection; the constant-contribution suggestion is unavailable.".into());
         }
         warnings.extend(funding.warnings.iter().cloned());
-        if funding.points.is_empty() {
-            warnings.push("Funding projection is unavailable because savings amounts, targets or contributions are incomplete.".into());
+        if !projection_available {
+            warnings.push("The funding projection is unavailable because required savings inputs or a later movement are unknown. A known starting balance or partial schedule does not establish failed goals, completion dates or deadline performance.".into());
         }
     }
     let mut requested = contribution;
@@ -571,7 +592,8 @@ pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Sum
     {
         warnings.push("Savings and reserved debt payments exceed the saved budget's surplus in one or more projected months. Reduce allocations or confirm additional funding.".to_owned());
     }
-    if context.monthly_surplus.is_none()
+    if !projection_available
+        || context.monthly_surplus.is_none()
         || rows.is_empty()
         || rows.iter().any(|r| r.debt_reserved.is_none())
     {
@@ -595,14 +617,26 @@ pub fn calculate(mut data: PlanData, context: &Context) -> Result<(PlanData, Sum
             },
         )?;
         let alternative_forecast = forecast(remaining, Some(cents), start);
-        let alternative_forecast = if let Some(f) = alternative_funding {
+        let alternative_available = alternative_funding.as_ref().is_none_or(|f| {
+            funding::projection_available(
+                data.funding
+                    .as_ref()
+                    .expect("alternative funding requires input"),
+                f,
+                &alternative_rows,
+            )
+        });
+        let alternative_forecast = if !alternative_available {
+            funding::unavailable_forecast(alternative_forecast)
+        } else if let Some(f) = alternative_funding {
             funding::forecast_from_points(alternative_forecast, target, None, &f.points, start)
         } else {
             alternative_forecast
         };
         alternatives.push(Scenario {
             forecast: alternative_forecast,
-            allocation_warning: if alternative_rows.is_empty()
+            allocation_warning: if !alternative_available
+                || alternative_rows.is_empty()
                 || alternative_rows.iter().any(|r| r.unallocated.is_none())
             {
                 None
@@ -1026,5 +1060,34 @@ mod funding_tests {
         let (mut d, c) = fixture();
         d.funding.as_mut().unwrap().events[0].bucket = Some(1);
         assert!(calculate(d, &c).is_err());
+    }
+    #[test]
+    fn missing_pool_and_later_unknown_funding_remain_unavailable_instead_of_failed_goals() {
+        let (mut data, context) = fixture();
+        data.liquid_savings = None;
+        let result = calculate(data, &context).unwrap().1;
+        assert_eq!(result.goals[0].forecast.status, ForecastStatus::Unknown);
+        assert!(result.goals[0].forecast.completion_date.is_none());
+        assert_eq!(result.goals[0].on_track, None);
+        let (mut data, context) = fixture();
+        data.funding.as_mut().unwrap().events = vec![event(
+            "2026-12-15",
+            funding::Kind::Fund,
+            Some(0),
+            None,
+            Some("separate-gift"),
+            "100",
+        )];
+        data.funding.as_mut().unwrap().sources[0].available = None;
+        let result = calculate(data, &context).unwrap().1;
+        assert_eq!(result.schedule.len(), 1);
+        assert_eq!(result.emergency.status, ForecastStatus::Unknown);
+        assert!(result.emergency.completion_date.is_none());
+        assert_eq!(result.goals[0].on_track, None);
+        assert_eq!(
+            result.alternatives[0].forecast.status,
+            ForecastStatus::Unknown
+        );
+        assert_eq!(result.alternatives[0].allocation_warning, None);
     }
 }

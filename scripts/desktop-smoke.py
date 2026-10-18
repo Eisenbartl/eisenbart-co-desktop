@@ -2068,6 +2068,12 @@ def check_planning_subpages(driver: WebDriver, artifacts: Path, data_root: Path,
     driver.click_button('Add dated savings movement');driver.fill('#savings-event-date-0','2026-11-10');driver.fill('#savings-event-amount-0','100');driver.fill('#savings-event-note-0','Discussed fictional emergency repair')
     driver.click_button('Save savings plan and calculate');driver.wait_text('.savings-panel .save-status','Savings plan saved and calculated.','savings drawdown saved')
     driver.wait_text("table[aria-label='Savings reserve movement results']",'$100.00','drawdown uses actual reserve once');driver.wait_text('.savings-results','2027-07-31','independent reserve recovery milestone')
+    driver.replace_text('#savings-liquidSavings','');driver.click_button('Add sinking fund')
+    for selector,value in [('#savings-goal-label-0','Temporary missing-pool check'),('#savings-goal-targetAmount-0','100'),('#savings-goal-reservedAmount-0','0'),('#savings-goal-monthlyContribution-0','25'),('#savings-goal-date-0','2027-01-31')]:driver.fill(selector,value)
+    driver.click_button('Save savings plan and calculate');driver.wait_text('.savings-panel .save-status','Savings plan saved and calculated.','explicit unknown savings pool saved')
+    driver.wait_text("table[aria-label='Sinking fund forecasts']",'Missing inputs — not projected','missing pool remains unavailable rather than a failed goal')
+    driver.fill('#savings-liquidSavings','300');driver.click("button[aria-label='Remove sinking fund 1']");driver.click_button('Save savings plan and calculate');driver.wait_text('.savings-panel .save-status','Savings plan saved and calculated.','known pool explicitly restored after missing-data test');driver.wait_text('.savings-results','2027-07-31','known reserve recovery milestone returns')
+    status('planning subpages: missing reserve inputs remain unavailable without inventing deadline failure; explicit corrected inputs recalculate')
     status('planning subpages: dated drawdown refills the same reserve without duplicating bill reserves or expenses')
     driver.client_section('Cash-flow calendar');driver.click_button('Transfer settlement');driver.replace_text('#cashflow-start','2026-11-01');driver.replace_text('#cashflow-end','2026-11-30')
     for i,(name,amount) in enumerate([('Riley checking','500'),('Riley reserve','1000')]):

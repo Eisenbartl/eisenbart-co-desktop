@@ -323,3 +323,20 @@ pub fn forecast_from_points(
         }
     }
 }
+
+/// An initial point or a valid prefix does not establish a complete projection.
+/// Missing pool/target/contribution data and unknown later movements must remain
+/// unavailable, rather than looking like unfavorable goal performance.
+pub(super) fn projection_available(plan: &Plan, result: &Result, rows: &[super::Month]) -> bool {
+    !rows.is_empty()
+        && result.events.len() == plan.events.len()
+        && result.events.iter().all(|e| e.applied.is_some())
+}
+pub(super) fn unavailable_forecast(original: Forecast) -> Forecast {
+    Forecast {
+        status: ForecastStatus::Unknown,
+        months_needed: None,
+        completion_date: None,
+        ..original
+    }
+}

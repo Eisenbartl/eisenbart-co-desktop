@@ -1,23 +1,28 @@
 # Development status
 
-## Financial planning subpages — 0.52.0 / schema 33, in progress
+## Financial planning subpages — 0.52.0 / schema 33, final acceptance in progress
 
-The user requested completion of the six documented planning subpages. The first
-source milestone extends existing engines with exact paycheck earmarks, delayed
-transfer settlement/reserve floors, advanced debt terms, savings funding and
-drawdowns, and verified savings progress. See [model rules and examples](financial-planning-subpages.md).
-The engine milestone passed 329 initial library regressions (before the final v2
-scenario additions), focused calculation cases, and the extended real-service
-scenario/report/PDF/encrypted-recovery test. Current all-target Clippy with
-warnings denied and frontend production build pass. All six interface homes are wired through the existing editors and services.
-The full UI suite passed **333 tests in 46 files**, using one DOM worker. Earlier
-combined runs hit whole-test deadlines in existing long App workflows under load;
-the default DOM worker count is now one for the same bounded behavior in CI.
-All assertions and per-test deadlines remain unchanged. Subsequent target-account
-selection guards passed all 29 affected UI tests; a final 335-test UI rerun and
-the full 336-library-test 0.52.0 Rust run are in progress. Native acceptance, final documentation and Windows CI remain
-required. Do not treat this stage as complete or build an installer.
+All six requested homes are implemented through the existing client engines,
+editors and stores. See [rules, independent examples and boundaries](financial-planning-subpages.md).
+The final UI suite passed **335 tests in 46 files**. One DOM worker avoids
+contention in long App workflows; assertions and per-test deadlines are unchanged.
+Production frontend, all six version inputs, formatting and all-target Clippy
+with warnings denied pass.
 
+A full Linux run passed **336 library tests and two actual PDF-worker integrations**.
+Final review then reproduced an event-driven savings missing-data edge case:
+an initial point or partial schedule could incorrectly imply horizon/deadline
+failure. The new regression failed before the correction and passes after it;
+all **21 affected Linux savings/integration tests**, the real-service linked
+scenario/report/PDF/restart/recovery regression and current Clippy pass afterward.
+Known complete projections and original unextended calculations stay unchanged.
+
+The first native attempt was intentionally interrupted after initial setup/budget
+checks to apply that correction. Only its identified synthetic runner was stopped;
+its private driver group/ports closed, and its evidence remains retained. A fresh
+corrected native run includes the missing-pool goal case and 800px scenario view.
+Current-head full Windows CI and final native acceptance remain required before
+marking this assignment complete. No merge or installer is authorized.
 
 ## End-to-end workflow integration audit — verified source (0.51.0, schema 32)
 

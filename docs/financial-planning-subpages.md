@@ -132,8 +132,9 @@ are omitted when absent so historical inputs/results and report/scenario digests
 remain reproducible. Existing authenticated scope, optimistic revisions, atomic
 audit, stale-reference checks and encrypted recovery remain authoritative.
 
-The source milestone is in progress. Focused backend tests pass for settlement,
-paycheck cents, advanced debt and savings source/depletion/refill/unknowns; legacy
-calculation tests remain in place. Full source/native verification, expanded
-scenario controls and final review evidence will be recorded in development
-status before marking this assignment complete. No installer is authorized.
+All six source areas are implemented. Final acceptance is in progress: the full
+335-test UI suite passed, and a 336-library/two-worker Linux run passed before
+a final missing-projection label correction. Its new regression and all 21
+affected Linux tests pass; current-head full Windows and corrected native
+acceptance remain required. See development status for final results and the
+remaining platform/model limits. No installer is authorized.
