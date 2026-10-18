@@ -13,8 +13,9 @@ warnings denied and frontend production build pass. All six interface homes are 
 The full UI suite passed **333 tests in 46 files**, using one DOM worker. Earlier
 combined runs hit whole-test deadlines in existing long App workflows under load;
 the default DOM worker count is now one for the same bounded behavior in CI.
-All assertions and per-test deadlines remain unchanged. Final full 0.52.0 Rust
-tests are running. Native acceptance, final documentation and Windows CI remain
+All assertions and per-test deadlines remain unchanged. Subsequent target-account
+selection guards passed all 29 affected UI tests; a final 335-test UI rerun and
+the full 336-library-test 0.52.0 Rust run are in progress. Native acceptance, final documentation and Windows CI remain
 required. Do not treat this stage as complete or build an installer.
 
 

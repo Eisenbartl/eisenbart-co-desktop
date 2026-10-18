@@ -44,6 +44,7 @@ export default function DebtEditor({client, onDirty, onBusy, otherSaving,focusAd
   function addAccount() {edit({accounts:[...data.accounts,{label:'',debtType:'custom',balance:null,apr:null,minimumPayment:null,monthlyFee:null,interestModel:'unknown',verified:false,termsNote:''}]});}
   async function save(event:FormEvent) {
     event.preventDefault(); if(!saved || saving || otherSaving)return;
+    if(data.targetedExtras?.some(e=>e.accountIndex<0||e.accountIndex>=data.accounts.length)){setError('Choose an existing debt account for each targeted extra payment.');return;}
     setSaving(true);onBusy(true);setError('');setNotice('');
     try {
       const result = await api.saveClientDebtPlan(client.id,{expectedRevision:saved.revision,data});
