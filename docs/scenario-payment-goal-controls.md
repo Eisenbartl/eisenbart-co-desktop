@@ -1,3 +1,7 @@
+> Current 0.52.0 extensions: [financial planning subpages](financial-planning-subpages.md).
+> The milestone below describes the original unextended model and retained historical behavior.
+> Explicit optional funding, advanced debt, targeted payment and settlement assumptions use the existing engines with v2 capture.
+
 # Extra debt payments and savings-goal contribution proposals
 
 Version 0.21.0 extends the combined scenario workflow with two explicit controls:

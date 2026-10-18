@@ -386,3 +386,23 @@ needed. `FinancialHealth` sits inside `FinancialDashboard`, reuses
 `CombinedScenarioView`, and routes classification edits to existing Spending
 Analysis for the selected months. Root draft/busy guards and generation checks
 prevent stale replies from crossing clients or surviving lock/navigation.
+
+## Financial planning extensions (0.52.0 / schema 33)
+
+The existing debt engine adds exact daily intervals, known month-level APR changes
+and fees, periodic payments and account-targeted extras. The existing savings
+schedule uses optional bounded `savings_funding.rs` state for source depletion,
+reserve movements and refill milestones. `cashflow.rs` expands explicit delayed
+transfers into departure/receipt legs and checks account reserve floors.
+`paycheck.rs` derives exact equal earmarks from canonical saved budget monthly
+amounts and entered calendar paydays. `savings_progress.rs` reads verified fact
+history in a scoped snapshot, independently from projections.
+
+Extended planning/scenario captures use v2 calculator identifiers; absent optional
+fields retain v1 outputs, warnings and canonical bytes. Existing immutable saved
+scenario/report storage and recovery recompute the captured version/baseline.
+Schema 33 gates older writers without adding a second financial store. Existing
+plan saves retain revision, audit and ownership checks. Read-only proposals do not
+adopt plans. Dated funding/targeted proposals need a separately reviewed monthly
+agreement before a single recurring client allocation can be issued. See
+[assumptions, examples and acceptance](financial-planning-subpages.md).

@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   getClientDashboard:vi.fn(),getFinancialHealth:vi.fn(),previewFinancialHealthReduction:vi.fn(),
   queryUnifiedTransactions:vi.fn(),getTransactionInspection:vi.fn(),saveTransactionInspection:vi.fn(),
   getHousehold:vi.fn(),listHouseholds:vi.fn(),createHousehold:vi.fn(),saveHousehold:vi.fn(),previewHousehold:vi.fn(),
-  getSpendingAnalysis:vi.fn(),changeSpendingClassification:vi.fn(),getSpendingClassificationHistory:vi.fn(),getClientWorkspaceOverview:vi.fn(),getSecurityPolicy:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
+  getSpendingAnalysis:vi.fn(),changeSpendingClassification:vi.fn(),getSpendingClassificationHistory:vi.fn(),getClientWorkspaceOverview:vi.fn(),getSecurityPolicy:vi.fn(),getPaycheckAllocation:vi.fn(),saveSecurityPolicy:vi.fn(),changeWorkspacePassword:vi.fn(),getClientHistory:vi.fn(),getNoteHistory:vi.fn(),correctClientNote:vi.fn(),
   getReportPresentation:vi.fn(),chooseReportPresentationPdf:vi.fn(),exportReportPresentation:vi.fn(),
   getCategoryRules:vi.fn(),saveCategoryRule:vi.fn(),reviewRuleCategory:vi.fn(),queryCategorySuggestions:vi.fn(),prepareCategoryDraft:vi.fn(),queryTransactionActivity:vi.fn(),
   desktop: true,
@@ -57,6 +57,7 @@ function deferred<T>() {
 beforeEach(() => {mocks.getHousehold.mockImplementation(async(id:string,month:string)=>householdFixture(id,month));mocks.listHouseholds.mockResolvedValue([]);mocks.createHousehold.mockResolvedValue(householdFixture('household-a',currentMonth()));mocks.getSpendingAnalysis.mockImplementation(async(clientId:string)=>spendingFixture(clientId));mocks.getClientWorkspaceOverview.mockImplementation(async(clientId:string)=>({clientId,monthlyIncome:null,necessaryExpenses:null,unallocated:null,enteredDebt:null,debtMonthlyPayment:null,budgetDebtPayment:null,emergencyTarget:null,accessibleSavings:null,restrictedSavings:null,payoffMonth:null,warnings:[]}));mocks.getSecurityPolicy.mockResolvedValue({revision:0,idleMinutes:15,totalChanges:0,history:[]});mocks.getClientHistory.mockImplementation(async(clientId:string)=>({clientId,snapshot:'history-snapshot',offset:0,total:0,events:[]}));mocks.getCategoryRules.mockImplementation(async(clientId:string)=>({clientId,fingerprint:'rule-fingerprint',accounts:[],rules:[],applications:[],applicationCount:0}));mocks.getFirmBranding.mockResolvedValue({organizationId:workspace.organizationId,revision:0,updatedAt:null,data:{name:workspace.organizationName,address:'',email:'',phone:'',website:'',disclosure:'',logoPng:null},history:[]});
   mocks.getStatementAccounts.mockImplementation(async(clientId:string)=>({clientId,importRevision:0,accounts:[]}));
   vi.clearAllMocks();
+  mocks.getPaycheckAllocation.mockImplementation(async(clientId:string)=>({clientId,revisions:{budget:0,debt:0,savings:0,cashflow:0},labels:[],rows:[],warnings:[]}));
   mocks.queryUnifiedTransactions.mockImplementation(async(clientId,input)=>({...unifiedPage,clientId,query:input}));
   mocks.getFollowUpOverview.mockImplementation(async(input)=>({organizationId:workspace.organizationId,counselorId:workspace.counselorId,reviewDate:'2026-10-15',timeZone:'America/Chicago',input,overdue:0,dueToday:0,upcoming:0,closed:0,total:0,pageSize:25,items:[]}));
   mocks.getDocumentCollection.mockImplementation(async(clientId:string)=>({clientId,revision:0,latestRevision:0,updatedAt:null,reviewDate:'2026-10-14',items:[],history:[],accounts:[],sources:[],missing:0,received:0,archived:0}));
@@ -421,7 +422,7 @@ it('guards page, future-area and client changes, then discards explicitly withou
  go('Import statements');expect(screen.getByLabelText('Category or source')).toHaveValue('Private prototype draft');
  fireEvent.click(screen.getByRole('button',{name:/Paycheck allocation/}));expect(screen.getByLabelText('Category or source')).toHaveValue('Private prototype draft');
  await switchClient('Bob Baker');expect(screen.getByRole('tab',{name:'Alice Able'})).toHaveAttribute('aria-selected','true');expect(mocks.getClient).toHaveBeenCalledTimes(1);
- vi.mocked(window.confirm).mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:/Paycheck allocation/}));expect(screen.getByRole('region',{name:'Paycheck allocation planned feature'})).toHaveTextContent('does not create records');expect(screen.queryByDisplayValue('Private prototype draft')).not.toBeInTheDocument();expect(mocks.saveClientBudget).not.toHaveBeenCalled();
+ vi.mocked(window.confirm).mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:/Paycheck allocation/}));await screen.findByText('No dated paychecks available.');expect(screen.getByRole('button',{name:'Refresh paycheck allocations'})).toBeInTheDocument();expect(mocks.getPaycheckAllocation).toHaveBeenCalledWith(alice.id);expect(screen.queryByDisplayValue('Private prototype draft')).not.toBeInTheDocument();expect(mocks.saveClientBudget).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole('button',{name:'Working tools'}));go('Monthly budget');await screen.findByText('No saved budget yet');expect(screen.queryByDisplayValue('Private prototype draft')).not.toBeInTheDocument();
  await act(async()=>mocks.lockHandler?.());expect(screen.queryByLabelText('Client for Budget Planner')).not.toBeInTheDocument();expect(document.documentElement.outerHTML).not.toContain('Private prototype draft');
 });
@@ -640,6 +641,7 @@ it('refreshes downstream client sections after a classification save without sav
  go('Scenario comparisons');fireEvent.click(await screen.findByText('Compare combined financial scenarios'));
  fireEvent.click(screen.getByRole('button',{name:'Reload saved scenario baseline'}));await screen.findByLabelText('Proposal label');
  expect(mocks.getAssessmentPlanning).toHaveBeenCalledWith(alice.id);
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Reload saved scenario baseline'})).toBeEnabled());
  go('Assessments & reports');fireEvent.click(await screen.findByText('Saved counselor assessments'));
  expect(await screen.findByRole('option',{name:/Original reviewed report.*Needs review/})).toBeInTheDocument();
  for(const save of [mocks.saveClientBudget,mocks.saveClientDebtPlan,mocks.saveClientSavingsPlan,mocks.saveClientCashflowPlan,mocks.approveFinalReport])expect(save).not.toHaveBeenCalled();

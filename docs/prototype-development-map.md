@@ -1,4 +1,4 @@
-# Prototype structure and development map — 0.51.0 source (schema 32)
+# Prototype structure and development map — 0.52.0 development source (schema 33)
 
 The user requested the [client workspace redesign](client-workspace-redesign.md)
 using a supplied layout reference. The global sidebar now contains Dashboard,
@@ -103,12 +103,12 @@ atomic audit and encrypted recovery. Add migrations only when the data needs the
 | Transactions → Classification assistance — suggestions and rule CRUD working through 0.42.0 | `classification.rs`, `classification_store.rs`, `ClassificationAssistance.tsx`, existing `ImportsEditor.tsx` review | Scoped 25-record pages, exact current approvals, unresolved conflicts/unknowns, fingerprint-bound unsaved category drafts, explicit audited decisions, reversal, restart/recovery and client isolation. Scoped rule create/edit/archive/reactivate, exact original-version application, conflict/stale/rollback/recovery checks and no automatic approval. [Rules](local-category-rules.md) and [suggestions](classification-assistance.md) |
 | Transactions → Activity history — working in 0.38.0 | `activity_store.rs`, `TransactionActivity.tsx`; existing schema 25 | Scoped 25-event pages, literal/date/account/source/status filters, original/corrected decision evidence, both transfer legs, exact current/obsolete repayment locators, stale-token rejection, ownership, read-only failure and recovery. [Limits](transaction-activity-history.md) |
 | Financial Review → Completeness & final validation — working review/history | `completeness.rs`, `coverage_review.rs`, `coverage_review_store.rs`, `SavedCoverageReviews.tsx` | Declared coverage plus scoped schema-21 expected inventory, dates, source choices, missing information and exceptions; stale/audit/recovery controls and immutable format-7 capture. [Review history and constraints](saved-completeness-reviews.md) |
-| Financial Review → Savings progress | Dated verified balance facts and `FactMetricsView.tsx` | Real approved/verified sources, explicit period, unknown data, independent expected points and no estimates masquerading as facts |
-| Budget Planner → Paycheck allocation | Reuse `budget.rs` and `cashflow.rs`; define period allocations first | Exact frequency/rounding examples, unknown dates, insufficient funding and no automatic double-counted schedules |
-| Debt Planner → Advanced debt terms | Extend Rust debt models/versioned capture, not React math | Independent daily/variable/promotional/fee schedules, payment-order assumptions, unknown terms, comparable strategies and legacy payload compatibility |
-| Savings Planner → Funding & drawdown | Extend `savings.rs` and shared `planning.rs` contexts | No duplicate reserves or invented funds, bounded drawdown dates, independently checked deficits/recovery and transfers excluded from expenses |
-| Cash-Flow Calendar → Transfer settlement | Extend per-account `cashflow.rs` events and persisted assumptions | Outgoing/incoming dates, both account shortfalls, reserves, same-day order, no premature combined liquidity or invented settlement dates |
-| Financial Scenarios → New goals & funding sources | `scenarios.rs` / `scenarios_store` and control components | Explicit new goal/funding/account IDs, baseline remains unchanged, exact affordability/milestones, immutable linked report/recovery validation |
+| Financial Review → Savings progress — implemented in 0.52.0 | `savings_progress.rs`, existing verified fact history and `SavingsProgress.tsx` | Real approved/verified sources, explicit period, unknown data, independent expected points and no estimates masquerading as facts |
+| Budget Planner → Paycheck allocation — implemented in 0.52.0 | `paycheck.rs` derives saved budget earmarks from existing calendar occurrences | Exact frequency/rounding examples, unknown dates, insufficient funding and no automatic double-counted schedules |
+| Debt Planner → Advanced debt terms — implemented in 0.52.0 | Extended `debt.rs` and versioned v2 planning capture; shared debt editor | Independent daily/variable/promotional/fee schedules, payment-order assumptions, unknown terms, comparable strategies and legacy payload compatibility |
+| Savings Planner → Funding & drawdown — implemented in 0.52.0 | Existing `savings.rs` schedule with bounded `savings_funding.rs` state and shared contexts | No duplicate reserves or invented funds, bounded drawdown dates, independently checked deficits/recovery and transfers excluded from expenses |
+| Cash-Flow Calendar → Transfer settlement — implemented in 0.52.0 | Existing per-account `cashflow.rs` schedules with departure/receipt events and reserve floors | Outgoing/incoming dates, both account shortfalls, reserves, same-day order, no premature combined liquidity or invented settlement dates |
+| Financial Scenarios → New goals & funding sources — implemented in 0.52.0 | Existing `scenarios.rs` / `scenarios_store`, shared funding/targeted payment controls | Explicit new goal/funding/account IDs, baseline remains unchanged, exact affordability/milestones, immutable linked report/recovery validation |
 | Reports → Final report checklist — approval working | `final_reports.rs`, `final_reports_store.rs`, `FinalReportApproval.tsx`, report PDF | Schema-22 scoped immutable counselor approval, current evidence gates, account/scenario decisions, exact parent binding, atomic audit, final PDF and restart/recovery. [Policy limits and future work](final-report-approval.md) |
 | Reports → Print & presentation — PDF layouts / Windows viewer handoff working in 0.40.0 | `ReportPresentation.tsx`, `report_presentation.rs`, `report_presentation_store.rs`, `assessment_pdf.rs`; schema 25 unchanged | Summary-first page, complete evidence appendix, original detailed option, distinct internal/v1/v2 bases, exact figures/unknowns, stale/scoped/no-overwrite export, restart/recovery. Explicit unchanged-file Windows viewer handoff with consent/expiry/session checks; choose Print in that viewer. In-app job submission and installed Windows viewer/printer acceptance remain open. [Usage](windows-pdf-print-workflow.md) |
 | Clients → History & records — working in 0.43.0 | `ClientHistory.tsx`, `NoteCorrection.tsx`, `client_history_store.rs`, schema 27; original note/report formats unchanged | Scoped 25-event pages, literal/type/Chicago-date filters, source-section navigation, explicit correction reasons/history, stale/audit/recovery controls, original report bytes retained and current-head report selection. [Usage and limits](client-history.md) |
@@ -128,13 +128,20 @@ structure does not complete these requirements.
 
 ## Current priority and retained implementation history
 
+Complete and validate the user-requested [financial planning subpages](financial-planning-subpages.md).
+All six subpages are now connected to their existing homes and engines, including
+new goals, named sources, targeted extras and explicit scenario settlement changes.
+Final full/native/CI acceptance is in progress. The previous audit
+review remains historical context; no merge or installer is authorized.
+
+
 The [end-to-end workflow integration audit](workflow-integration-audit.md) now
-verifies the consolidated 0.51.0 source. Next is human review with current-head
-checks green, followed by counselor evaluation with fictional records.
+verifies the consolidated 0.51.0 source. Its review remains open; the newly requested 0.52.0 planning completion is now the
+active task, followed by human review and counselor evaluation with fictional records.
 Unified review (0.50.0) and financial
 health (0.51.0) are implemented; their current validation belongs in development
 status. Do not restart them as future projects. Broader adapters/OCR, retained-copy
-selection, advanced planning terms and installed Windows acceptance remain separate
+selection, lender-specific financial terms and installed Windows acceptance remain separate
 priorities requiring explicit scope. No new installer without a request.
 
 Existing password changes/inactivity policy, client history, category-rule CRUD,

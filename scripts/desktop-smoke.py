@@ -2040,9 +2040,70 @@ def run_checks(driver: WebDriver, binary: Path, password: str,
     check_statement_extraction(driver, artifacts, data_root, password, binary, restart_driver)
     check_unified_review(driver, artifacts, data_root, password, binary, restart_driver)
     check_financial_health(driver, artifacts, data_root, password, binary, restart_driver)
+    check_planning_subpages(driver, artifacts, data_root, password, binary, restart_driver)
     check_households(driver, artifacts, data_root, password, binary, restart_driver)
     check_inactivity_policy(driver, artifacts, data_root, password, binary, restart_driver)
     check_password_change(driver, artifacts, data_root, password, binary, restart_driver)
+
+
+def check_planning_subpages(driver: WebDriver, artifacts: Path, data_root: Path,
+                            password: str, binary: Path, restart_driver: Callable[[], None]) -> None:
+    """Independent fictional client; all existing fixture assertions stay unchanged."""
+    driver.click("nav[aria-label='Main navigation'] button[aria-label='Clients']")
+    driver.click_button('Add client');driver.fill('#first-name','Riley');driver.fill('#last-name','Planner');driver.click_button('Create client')
+    driver.wait_text('.client-workspace-header','Riley Planner','dedicated financial-planning client')
+    driver.client_section('Monthly budget')
+    for i,(label,kind,amount) in enumerate([('Riley wages','Take-home income','3000'),('Riley housing','Necessary expense','1000'),('Riley dining','Discretionary expense','200'),('Riley savings','Savings allocation','100'),('Riley debt','Debt payment allocation','200')]):
+        driver.click_button('Add income');driver.fill(f'#budget-label-{i}',label);driver.select(f'#budget-kind-{i}',kind);driver.fill(f'#budget-amount-{i}',amount);driver.select(f'#budget-frequency-{i}','Monthly')
+    driver.click_button('Save budget and calculate');driver.wait_text('.budget-panel .save-status','Budget saved and calculated.','planning priorities saved')
+    driver.client_section('Debt payoff');driver.click_button('Advanced debt terms');driver.replace_text('#debt-start-month','2026-11');driver.fill('#debt-monthly-payment','100');driver.click_button('Add debt');driver.fill('#debt-label-0','Riley daily loan');driver.select('#debt-type-0','Personal loan')
+    for key,value in [('balance','1000'),('apr','12'),('minimumPayment','10'),('monthlyFee','0')]:driver.fill(f'#debt-{key}-0',value)
+    driver.select('#debt-model-0','Daily interest — enter day basis below');driver.select('#debt-basis-0','Actual days / 365');driver.click('#debt-verified-0');driver.fill('#debt-note-0','Fictional actual/365 monthly payment terms checked')
+    driver.click_button('Save debt plan and compare');driver.wait_text('.debt-panel .save-status','Debt plan saved and compared.','advanced daily debt saved')
+    driver.wait_text('.debt-month-table','$9.86','independent November actual-day interest');driver.wait_text('.debt-month-table','$909.86','independent daily-interest closing debt')
+    status('planning subpages: explicit daily terms produce independent exact interest and retain normal strategy comparison')
+    driver.client_section('Savings & sinking funds');driver.click_button('Funding & drawdown');driver.replace_text('#savings-start-month','2026-11');driver.replace_text('#savings-target-months','1')
+    for key,value in [('liquidSavings','300'),('restrictedSavings','0'),('obligationsReserved','100'),('emergencyContribution','100')]:driver.fill(f'#savings-{key}',value)
+    driver.fill('#savings-priorities','Review explicit drawdown and reserve refill; preserve bill earmarks')
+    driver.click_button('Add dated savings movement');driver.fill('#savings-event-date-0','2026-11-10');driver.fill('#savings-event-amount-0','100');driver.fill('#savings-event-note-0','Discussed fictional emergency repair')
+    driver.click_button('Save savings plan and calculate');driver.wait_text('.savings-panel .save-status','Savings plan saved and calculated.','savings drawdown saved')
+    driver.wait_text("table[aria-label='Savings reserve movement results']",'$100.00','drawdown uses actual reserve once');driver.wait_text('.savings-results','2027-07-31','independent reserve recovery milestone')
+    status('planning subpages: dated drawdown refills the same reserve without duplicating bill reserves or expenses')
+    driver.client_section('Cash-flow calendar');driver.click_button('Transfer settlement');driver.replace_text('#cashflow-start','2026-11-01');driver.replace_text('#cashflow-end','2026-11-30')
+    for i,(name,amount) in enumerate([('Riley checking','500'),('Riley reserve','1000')]):
+        driver.click_button('Add cash-flow account');driver.fill(f'#cashflow-account-label-{i}',name);driver.fill(f'#cashflow-account-balance-{i}',amount)
+    driver.fill('#cashflow-account-reserve-0','400')
+    for i,(name,kind,amount,date,frequency) in enumerate([('Riley rent','Bill','1200','2026-11-03','One time / irregular'),('Riley pay','Paycheck','1500','2026-11-06','Every two weeks'),('Riley transfer','Transfer between modeled accounts','200','2026-11-07','One time / irregular')]):
+        driver.click_button('Add dated activity');driver.fill(f'#cashflow-label-{i}',name);driver.select(f'#cashflow-kind-{i}',kind);driver.fill(f'#cashflow-amount-{i}',amount);driver.fill(f'#cashflow-date-{i}',date);driver.select(f'#cashflow-frequency-{i}',frequency)
+    driver.select('#cashflow-destination-2','Riley reserve');driver.select('#cashflow-delayed-2','Separate receipt / unknown availability');driver.fill('#cashflow-receipt-2','2026-11-10')
+    driver.click_button('Save cash-flow plan and calculate');driver.wait_text('.cashflow-panel .success-message','Cash-flow plan saved and calculated.','delayed transfer plan saved');driver.click_button('Chronological ledger')
+    driver.wait_text('.cashflow-ledger','departure','separate departure');driver.wait_text('.cashflow-ledger','receipt','separate receipt');driver.wait_text('.cashflow-ledger','$1,600.00','no premature liquidity during settlement');driver.wait_text('.cashflow-results .budget-totals','$3,300.00','settled funds conserved at period close')
+    driver.scroll_to('.cashflow-ledger','center');driver.screenshot(artifacts/'native-planning-settlement.png')
+    driver.client_section('Monthly budget');driver.click_button('Paycheck allocation');driver.wait_text('.budget-panel','Riley housing','saved priorities allocated to actual paydays');driver.wait_text("table[aria-label='Budget earmarks for 2026-11-06']",'$500.00','exact housing earmark across two paychecks');driver.wait_text('.budget-panel','2026-11-20','actual next biweekly payday')
+    status('planning subpages: delayed transfer legs, reserve floors, conserved closing cash and real dated paycheck earmarks')
+    driver.client_section('Scenario comparisons');driver.click_button('New goals & funding sources');driver.click_button('Reload saved scenario baseline');driver.wait_value('#scenario-label','Temporary combined proposal','current extended baseline loaded');driver.replace_text('#scenario-label','Riley reviewed funding proposal')
+    driver.click("//summary[normalize-space(.)='New goals, targeted payments and funding sources']",'xpath');driver.click_button('Add proposed savings goal')
+    for selector,value in [('#scenario-new-goal-label-0','Riley repairs'),('#scenario-new-goal-target-0','300'),('#scenario-new-goal-date-0','2027-01-31'),('#scenario-new-goal-contribution-0','100')]:driver.fill(selector,value)
+    driver.click_button('Add account-targeted extra');driver.select('#scenario-target-account-0','Riley daily loan · account 1');driver.fill('#scenario-target-month-0','2026-11');driver.fill('#scenario-target-amount-0','50')
+    driver.click("//summary[normalize-space(.)='Funding sources and dated drawdowns']",'xpath');driver.click_button('Add separate funding source');driver.fill('#savings-source-name-0','Separate Riley gift');driver.fill('#savings-source-available-0','100');driver.click_button('Add dated savings movement');driver.select('#savings-event-kind-0','Fund from separate source');driver.select('#savings-event-source-0','Separate Riley gift');driver.select('#savings-event-bucket-0','Riley repairs');driver.fill('#savings-event-date-0','2026-11-15');driver.fill('#savings-event-amount-0','100');driver.fill('#savings-event-note-0','Separate fictional gift for repairs')
+    driver.click_button('Compare temporary proposal');driver.wait_text('.combined-scenario-results','Riley repairs','new goal in comparison');driver.wait_text("table[aria-label='Baseline and proposed outcomes']",'Not in saved baseline','new goal cannot rewrite baseline');driver.wait_text("table[aria-label='Baseline and proposed outcomes']",'$1,400.00','independent proposed monthly buffer');driver.wait_text("table[aria-label='Baseline and proposed outcomes']",'2026-12-31','new goal milestone includes explicitly funded gift')
+    driver.click_button('Save reviewed combined scenario');driver.wait_text("article[aria-label='Saved combined scenario']",'Riley reviewed funding proposal','immutable extended proposal recorded')
+    driver.scroll_to("article[aria-label='Saved combined scenario']",'start');driver.screenshot(artifacts/'native-planning-scenario.png')
+    driver.client_section('Savings & sinking funds');driver.wait_value('#savings-liquidSavings','300.00','scenario did not write live opening savings')
+    if driver.visible('#savings-goal-label-0'):raise SmokeFailure('Proposed new goal overwrote live savings')
+    driver.client_section('Debt payoff');driver.wait_value('#debt-monthly-payment','100.00','scenario did not write live debt payment')
+    status('planning subpages: new goal, named source and targeted debt proposal calculate through existing engines without live-plan writes')
+    driver.client_section('Financial dashboard');driver.click_button('Savings progress');driver.fill('#progress-from','2026-09');driver.fill('#progress-through','2026-11');driver.click_button('Show verified savings progress');driver.wait_text('.budget-panel','Missing history is not zero savings.','forecasts do not fabricate verified progress')
+    # Use the existing source-bound balance review on a dedicated imported transaction fixture.
+    driver.open_client('Morgan Health');driver.client_section('Financial dashboard');driver.click_button('Savings progress');driver.fill('#progress-from','2026-09');driver.fill('#progress-through','2026-09');driver.click_button('Show verified savings progress');driver.wait_text("table[aria-label='Verified savings progress chart']",'$5,000.00','real verified savings history');driver.wait_text("table[aria-label='Verified savings progress chart']",'Complete inventory declared','complete vs missing evidence remains explicit')
+    status('planning subpages: verified progress chart uses balance review evidence, preserves missing history and stays client-separated')
+    driver.open_client('Riley Planner');driver.client_section('Scenario comparisons');driver.click_button('New goals & funding sources')
+    if driver.visible('#scenario-new-goal-label-0'):
+        # Reloading the baseline explicitly discards temporary controls after saving the immutable proposal.
+        driver.click_button('Reload saved scenario baseline');driver.wait_value('#scenario-label','Temporary combined proposal','temporary controls discarded after review')
+    driver.click_button('Lock workspace');driver.fill('#password',password);driver.click_button('Unlock workspace')
+    driver.open_client('Riley Planner');driver.client_section('Debt payoff');driver.wait_text('.debt-month-table','$9.86','advanced inputs recompute after lock/unlock');driver.client_section('Savings & sinking funds');driver.wait_text('.savings-results','2027-07-31','funding path persists after unlock')
+    status('planning subpages: explicit saved assumptions survive lock/unlock and rederive exact forecasts')
 
 
 def check_unified_review(driver: WebDriver, artifacts: Path, data_root: Path,

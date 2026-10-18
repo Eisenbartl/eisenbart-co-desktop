@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {api} from './api';
+import SavingsFundingControls from './SavingsFundingControls';
 import {usd} from './BudgetEditor';
 import type {Client,ClientSavingsPlan,SavingsForecast,SavingsGoal,SavingsPlanData,SavingsSummary} from './types';
 
@@ -7,7 +8,7 @@ const cash=(value:string|null)=>value===null?'Unknown':usd(value);
 const forecastText=(forecast:SavingsForecast)=>({funded:'Already funded from entered reserves',projected:'Projected with entered contributions',noContribution:'No positive contribution',unknown:'Missing inputs — not projected',horizonReached:'Not reached within 600 months'}[forecast.status]);
 function emptyPlan():SavingsPlanData {const now=new Date();return{startMonth:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`,targetMonths:3,liquidSavings:null,restrictedSavings:null,obligationsReserved:null,emergencyContribution:null,alternativeContributions:[],goals:[],prioritiesNote:''};}
 function message(error:unknown){return error instanceof Error?error.message:String(error);}
-export default function SavingsEditor({client,onDirty,onBusy,otherSaving}:{client:Client;onDirty:(value:boolean)=>void;onBusy:(value:boolean)=>void;otherSaving:boolean}) {
+export default function SavingsEditor({client,onDirty,onBusy,otherSaving,focusFunding=false}:{focusFunding?:boolean;client:Client;onDirty:(value:boolean)=>void;onBusy:(value:boolean)=>void;otherSaving:boolean}) {
   const [saved,setSaved]=useState<ClientSavingsPlan|null>(null);
   const [data,setData]=useState<SavingsPlanData>(emptyPlan);
   const [baseline,setBaseline]=useState<SavingsPlanData>(data);
@@ -76,7 +77,7 @@ export default function SavingsEditor({client,onDirty,onBusy,otherSaving}:{clien
         <h3 className="savings-section-title">Sinking funds</h3>
         {!data.goals.length && <p className="empty-note">No sinking funds yet. Add a goal for insurance, repairs, medical costs, or other planned needs.</p>}
         {data.goals.map((g,index)=><div className="budget-line" key={index}>
-          <div className="budget-line-heading"><span>Sinking fund {index+1}</span><button type="button" className="text-button" aria-label={`Remove sinking fund ${index+1}`} onClick={()=>edit({goals:data.goals.filter((_,i)=>i!==index)})}>Remove</button></div>
+          <div className="budget-line-heading"><span>Sinking fund {index+1}</span><button type="button" className="text-button" aria-label={`Remove sinking fund ${index+1}`} disabled={data.funding?.events.some(e=>e.bucket===index||e.destination===index)} onClick={()=>edit({goals:data.goals.filter((_,i)=>i!==index),...(data.funding?{funding:{...data.funding,events:data.funding.events.map(e=>({...e,bucket:e.bucket!==null&&e.bucket>index?e.bucket-1:e.bucket,destination:e.destination!==null&&e.destination>index?e.destination-1:e.destination}))}}:{})})}>Remove</button></div>
           <div className="form-grid"><label htmlFor={`savings-goal-label-${index}`}>Goal name<input id={`savings-goal-label-${index}`} value={g.label} maxLength={120} onChange={e=>goal(index,{label:e.target.value})}/></label>
           <label htmlFor={`savings-goal-date-${index}`}>Target date (YYYY-MM-DD)<input id={`savings-goal-date-${index}`} value={g.targetDate??''} maxLength={10} placeholder="Unknown" onChange={e=>goal(index,{targetDate:e.target.value===''?null:e.target.value})}/></label>
           {([['targetAmount','Goal target (USD)'],['reservedAmount','Already reserved in accessible savings (USD)'],['monthlyContribution','Monthly goal contribution (USD)']] as const).map(([key,label])=><label key={key} htmlFor={`savings-goal-${key}-${index}`}>{label}<input id={`savings-goal-${key}-${index}`} inputMode="decimal" value={g[key]??''} maxLength={16} placeholder="Unknown" onChange={e=>goal(index,{[key]:e.target.value===''?null:e.target.value})}/></label>)}</div>
@@ -88,6 +89,7 @@ export default function SavingsEditor({client,onDirty,onBusy,otherSaving}:{clien
         </details>
         <label htmlFor="savings-priorities">Funding priorities and notes<textarea id="savings-priorities" value={data.prioritiesNote} rows={3} maxLength={1000} onChange={e=>edit({prioritiesNote:e.target.value})}/></label>
         <p className="field-help">Set the contributions and priorities with your client. Reserve debt commitments first; the review uses the higher of the saved budget debt allocation and the debt plan's payment, including future changes and extras. Reconcile annual bills already included in budget expenses so the same need is not counted twice.</p>
+        <SavingsFundingControls open={focusFunding||undefined} value={data.funding} goalLabels={data.goals.map(g=>g.label)} onChange={funding=>edit({funding})}/>
         {error && <div className="error-message" role="alert">{error}</div>}
         <div className="form-actions"><span className="save-status" role="status">{notice||(dirty?'Unsaved savings plan changes':saved?.revision?'Saved savings plan':'No saved savings plan yet')}</span><button className="button primary" type="submit">{saving?'Calculating savings…':'Save savings plan and calculate'}</button></div>
       </fieldset></form>
@@ -100,6 +102,7 @@ function SavingsResults({plan,summary}:{plan:ClientSavingsPlan;summary:SavingsSu
   const [month,setMonth]=useState(0);
   const row=summary.schedule[month];
   return <div className="savings-results">
+    {summary.funding&&<section aria-label="Savings funding and drawdown results"><h3>Dated funding and drawdowns</h3><div className="budget-table-wrap"><table aria-label="Savings reserve movement results"><thead><tr><th>Date / purpose</th><th>Requested</th><th>Available applied</th><th>Unfunded shortfall</th></tr></thead><tbody>{summary.funding.events.map(e=><tr key={e.index}><th>{e.date} · {plan.data?.funding?.events[e.index]?.note}</th><td>{cash(e.requested)}</td><td>{cash(e.applied)}</td><td>{cash(e.shortfall)}</td></tr>)}</tbody></table></div><ul>{summary.funding.remainingSources.map((v,i)=><li key={i}>{plan.data?.funding?.sources[i]?.label} remaining: {cash(v)}</li>)}</ul><details><summary>Projected reserve balances after events and month-end contributions</summary><div className="budget-table-wrap"><table aria-label="Projected savings reserve balances"><thead><tr><th>Date</th><th>Emergency</th>{plan.data?.goals.map((g,i)=><th key={i}>{g.label}</th>)}<th>Liquid including bill reserves</th></tr></thead><tbody>{summary.funding.points.slice(0,150).map((p,i)=><tr key={i}><th>{p.date}</th><td>{cash(p.emergency)}</td>{p.goals.map((g,j)=><td key={j}>{cash(g)}</td>)}<td>{cash(p.liquid)}</td></tr>)}</tbody></table></div><p className="field-help">First 150 dated points; milestones and affordability use the complete horizon. These are estimates, not verified balance history.</p></details></section>}
     <h3>Emergency savings summary</h3>
     <dl className="budget-totals">{([
       ['Available emergency savings',cash(summary.accessibleEmergency)],['Reserved for bills',cash(summary.obligationsReserved)],['Reserved in sinking funds',cash(summary.sinkingFundsReserved)],['Restricted savings — excluded',cash(summary.restrictedSavings)],

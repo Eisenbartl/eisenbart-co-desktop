@@ -93,3 +93,13 @@ describe('client debt editor',()=>{
     expect(document.documentElement.outerHTML).not.toContain('Robin private debt');
   });
 });
+it('collects known advanced terms and dates without changing monthly payment meaning',async()=>{
+ mocks.getClientDebtPlan.mockResolvedValue(saved);open();await screen.findByText('Saved debt plan');fireEvent.click(screen.getByText('Advanced interest terms and payment frequency'));
+ fireEvent.change(screen.getByLabelText('Interest model'),{target:{value:'promotional'}});fireEvent.change(screen.getByLabelText('Debt 1 day-count basis'),{target:{value:'365'}});fireEvent.click(screen.getByRole('button',{name:'Add debt 1 known APR change'}));
+ fireEvent.change(screen.getByLabelText('Debt 1 rate 1 month'),{target:{value:'2027-01'}});fireEvent.change(screen.getByLabelText('Debt 1 rate 1 APR (%)'),{target:{value:'24.1250'}});
+ fireEvent.change(screen.getByLabelText('Repayment schedule'),{target:{value:'biweekly'}});expect(screen.getByLabelText('First debt payment date')).toHaveValue('');fireEvent.change(screen.getByLabelText('First debt payment date'),{target:{value:'2026-11-06'}});
+ expect(mocks.saveClientDebtPlan).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'Save debt plan and compare'}));await waitFor(()=>expect(mocks.saveClientDebtPlan).toHaveBeenCalled());expect(mocks.saveClientDebtPlan.mock.calls[0][1].data).toMatchObject({monthlyPayment:'100.00',advanced:{accounts:[{accountIndex:0,dayBasis:365,rateChanges:[{month:'2027-01',apr:'24.1250'}],fees:[]}],payments:{firstDate:'2026-11-06',frequency:'biweekly',secondDay:null}}});
+});
+it('saves an explicitly targeted extra and protects its account from accidental reassignment',async()=>{
+ mocks.getClientDebtPlan.mockResolvedValue(saved);open();await screen.findByText('Saved debt plan');fireEvent.click(screen.getByText('Target an extra payment to a specific account'));fireEvent.click(screen.getByRole('button',{name:'Add account-targeted extra'}));fireEvent.change(screen.getByLabelText('Targeted extra 1 debt account'),{target:{value:'0'}});fireEvent.change(screen.getByLabelText('Targeted extra 1 month'),{target:{value:'2026-11'}});fireEvent.change(screen.getByLabelText('Targeted extra 1 amount (USD)'),{target:{value:'25.01'}});expect(screen.getByRole('button',{name:'Remove debt 1'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Save debt plan and compare'}));await waitFor(()=>expect(mocks.saveClientDebtPlan).toHaveBeenCalled());expect(mocks.saveClientDebtPlan.mock.calls[0][1].data.targetedExtras).toEqual([{accountIndex:0,month:'2026-11',amount:'25.01'}]);
+});

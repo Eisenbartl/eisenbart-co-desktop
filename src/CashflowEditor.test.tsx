@@ -79,3 +79,13 @@ describe('cash-flow editor',()=>{
     const calculation=deferred<ClientCashflowPlan>();mocks.previewClientCashflowPlan.mockReturnValueOnce(calculation.promise);fireEvent.click(screen.getByRole('button',{name:'Preview cash flow / refresh references'}));expect(screen.getByRole('button',{name:'Calculating cash flow…'})).toBeDisabled();fresh.unmount();await act(async()=>calculation.resolve(saved));expect(document.documentElement.outerHTML).not.toContain('Synthetic private priority');
   });
 });
+it('keeps delayed availability unknown until entered and only saves on explicit action',async()=>{
+ mocks.getClientCashflowPlan.mockResolvedValue(saved);open();await screen.findByText('Saved cash-flow forecast');
+ fireEvent.change(screen.getByLabelText('Activity type'),{target:{value:'transfer'}});fireEvent.change(screen.getByLabelText('Destination account'),{target:{value:'reserve'}});fireEvent.change(screen.getByLabelText('Transfer availability'),{target:{value:'delayed'}});
+ expect(screen.getByLabelText('First available in destination')).toHaveValue('');
+ fireEvent.change(screen.getByLabelText('First available in destination'),{target:{value:'2026-11-09'}});
+ fireEvent.change(screen.getAllByLabelText('Minimum reserve (USD, optional)')[0],{target:{value:'150.25'}});
+ expect(mocks.saveClientCashflowPlan).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Save cash-flow plan and calculate'}));await waitFor(()=>expect(mocks.saveClientCashflowPlan).toHaveBeenCalled());
+ expect(mocks.saveClientCashflowPlan.mock.calls[0][1].data).toMatchObject({accounts:[expect.objectContaining({reserve:'150.25'}),expect.anything()],schedules:[expect.objectContaining({settlement:{firstAvailableDate:'2026-11-09'}})]});
+});

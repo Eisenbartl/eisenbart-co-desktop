@@ -1,3 +1,7 @@
+> Current 0.52.0 extensions: [financial planning subpages](financial-planning-subpages.md).
+> The milestone below describes the original unextended model and retained historical behavior.
+> Explicit optional funding, advanced debt, targeted payment and settlement assumptions use the existing engines with v2 capture.
+
 # Savings planning — 0.4.0 source milestone
 
 The first savings milestone adds a persistent client plan for emergency reserves,

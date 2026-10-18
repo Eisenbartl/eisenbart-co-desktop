@@ -22,6 +22,8 @@ async function command<T>(name: string, args?: Record<string, unknown>): Promise
 }
 
 export const api = {
+  getSavingsProgress:(clientId:string,input:{fromMonth:string;throughMonth:string})=>command<import('./planningTypes').SavingsProgress>('get_savings_progress',{clientId,input}),
+  getPaycheckAllocation:(clientId:string)=>command<import('./planningTypes').PaycheckAllocation>('get_paycheck_allocation',{clientId}),
   chooseHouseholdReportPdf:(householdId:string,reportId:string)=>command<string|null>('choose_household_report_pdf',{householdId,reportId}),
   exportHouseholdReportPdf:(householdId:string,reportId:string,path:string)=>command<{path:string;pages:number;recordId:string}>('export_household_report_pdf',{householdId,reportId,path}),
   householdCashflowPreview:(householdId:string,memberId:string,month:string,accountId:string|null)=>command<import('./householdTypes').HouseholdCashflowPreview>('household_cashflow_preview',{householdId,memberId,month,accountId}),

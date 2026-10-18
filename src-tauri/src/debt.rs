@@ -1258,3 +1258,31 @@ mod targeted_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod changing_priority_tests {
+    use super::*;
+    #[test]
+    fn avalanche_uses_the_effective_rate_in_each_month_for_both_minima_and_extra_priority() {
+        let mut d = tests::fixture();
+        d.accounts[0].interest_model = InterestModel::Variable;
+        d.advanced = Some(Advanced {
+            accounts: vec![AdvancedAccount {
+                account_index: 0,
+                day_basis: None,
+                rate_changes: vec![RateChange {
+                    month: "2026-12".into(),
+                    apr: "60".into(),
+                }],
+                fees: vec![],
+            }],
+            payments: None,
+        });
+        let c = calculate(d).unwrap().1;
+        let p = c.avalanche.unwrap();
+        assert_eq!(p.schedule[0].payments, vec!["10.00", "90.00"]);
+        assert_eq!(p.schedule[1].interest, vec!["4.50", "8.40"]);
+        assert_eq!(p.schedule[1].payments, vec!["80.00", "20.00"]);
+        assert_eq!(p.schedule[1].balances, vec!["14.50", "408.40"]);
+    }
+}

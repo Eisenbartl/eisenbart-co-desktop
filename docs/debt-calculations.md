@@ -1,3 +1,7 @@
+> Current 0.52.0 extensions: [financial planning subpages](financial-planning-subpages.md).
+> The milestone below describes the original unextended model and retained historical behavior.
+> Explicit optional funding, advanced debt, targeted payment and settlement assumptions use the existing engines with v2 capture.
+
 # Debt repayment planning — 0.3.0 development milestone
 
 This second slice of specification Stage 3 saves a debt plan for each client and

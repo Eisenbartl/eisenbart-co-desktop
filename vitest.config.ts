@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  // Bound concurrent DOM workers on Windows CI; preserve per-test deadlines.
-  test: { maxWorkers: 2, environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
+  // Serialize DOM integration workers on constrained cloud/Windows hosts.
+  // Keep every assertion and per-test deadline; avoid CPU contention between full client workflows.
+  test: { maxWorkers: 1, environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
 });

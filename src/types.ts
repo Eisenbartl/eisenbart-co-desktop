@@ -137,6 +137,8 @@ export interface DatedAmount { month: string; amount: string }
 export interface DebtPlanData {
   startMonth: string; monthlyPayment: string | null; accounts: DebtAccount[];
   extras: DatedAmount[]; paymentChanges: DatedAmount[];
+  targetedExtras?:{accountIndex:number;month:string;amount:string}[];
+  advanced?:{accounts:{accountIndex:number;dayBasis:number|null;rateChanges:{month:string;apr:string}[];fees:DatedAmount[]}[];payments:{firstDate:string;frequency:CashflowFrequency;secondDay:number|null}|null};
 }
 export interface DebtPlanInput { expectedRevision: number; data: DebtPlanData }
 export interface DebtMonth {
@@ -148,6 +150,7 @@ export interface DebtProjection {
   payoffMonth: string | null; accountPayoffMonths: (string | null)[];
   totalInterest: string; totalFees: string; totalPaid: string; remainingBalance: string;
   negativeAmortizationAccounts: number[]; warnings: string[]; schedule: DebtMonth[];
+  datedPayments?:{date:string;payments:string[];interest:string[];fees:string[];balances:string[]}[];
 }
 export interface DebtComparison { warnings: string[]; snowball: DebtProjection | null; avalanche: DebtProjection | null }
 export interface DebtBudgetContext { revision: number; monthlyCapacity: string; plannedDebtPayments: string; warnings: string[] }
@@ -165,6 +168,7 @@ export interface SavingsPlanData {
   restrictedSavings: string | null; obligationsReserved: string | null;
   emergencyContribution: string | null; alternativeContributions: string[];
   goals: SavingsGoal[]; prioritiesNote: string;
+  funding?:import('./planningTypes').SavingsFunding;
 }
 export interface SavingsPlanInput { expectedRevision: number; data: SavingsPlanData }
 export interface SavingsContext {
@@ -192,19 +196,21 @@ export interface SavingsSummary {
   alternatives: { forecast: SavingsForecast; allocationWarning: boolean | null }[];
   goals: SavingsGoalResult[]; requestedMonthlySavings: string | null;
   warnings: string[]; schedule: SavingsMonth[];
+  funding?:import('./planningTypes').SavingsFundingResult;
 }
 export interface ClientSavingsPlan {
   clientId: string; revision: number; updatedAt: string | null; data: SavingsPlanData | null;
   summary: SavingsSummary | null; context: SavingsContext;
 }
 
-export interface CashflowAccount { id: string; label: string; openingBalance: string | null }
+export interface CashflowAccount { id: string; label: string; openingBalance: string | null; reserve?:string|null }
 export type CashflowKind = 'paycheck' | 'bill' | 'loan' | 'savings' | 'otherInflow' | 'otherOutflow' | 'transfer';
 export type CashflowFrequency = 'once' | 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 export interface CashflowSchedule {
   label: string; accountId: string; destinationId: string | null; kind: CashflowKind; amount: string | null;
   firstDate: string; frequency: CashflowFrequency; secondDay: number | null; untilDate: string | null;
   certainty: 'confirmed' | 'estimated';
+  settlement?:{firstAvailableDate:string|null};
 }
 export interface CashflowPlanData { startDate: string; endDate: string; accounts: CashflowAccount[]; schedules: CashflowSchedule[]; notes: string }
 export interface CashflowPlanInput { expectedRevision: number; data: CashflowPlanData }
@@ -216,10 +222,10 @@ export interface CashflowBalance { accountId: string; amount: string | null }
 export interface CashflowEntry {
   scheduleIndex: number; date: string; label: string; kind: CashflowKind; certainty: 'confirmed' | 'estimated';
   accountId: string; destinationId: string | null; amount: string | null; sourceBalance: string | null;
-  destinationBalance: string | null; combinedBalance: string | null; nextPaycheck: string | null; warnings: string[];
+  destinationBalance: string | null; combinedBalance: string | null; transferLeg?:string;inTransit?:string; nextPaycheck: string | null; warnings: string[];
 }
-export interface CashflowDay { date: string; balances: CashflowBalance[]; combinedBalance: string | null; entryIndices: number[]; warnings: string[] }
-export interface CashflowSummary { ledger: CashflowEntry[]; days: CashflowDay[]; closingBalances: CashflowBalance[]; combinedClosing: string | null; warnings: string[] }
+export interface CashflowDay { date: string; balances: CashflowBalance[]; combinedBalance: string | null; entryIndices: number[]; warnings: string[]; inTransit?:string }
+export interface CashflowSummary { ledger: CashflowEntry[]; days: CashflowDay[]; closingBalances: CashflowBalance[]; combinedClosing: string | null; warnings: string[]; inTransit?:string }
 export interface ClientCashflowPlan { clientId: string; revision: number; updatedAt: string | null; data: CashflowPlanData | null; summary: CashflowSummary | null; context: CashflowContext }
 
 export interface BackupResult { path: string; createdAt: string; auditRecorded: boolean; durabilityWarning: boolean }
@@ -317,7 +323,7 @@ export interface BudgetMethodComparison {clientId:string;revision:number;calcula
 
 export interface ScenarioAmountChange {amount:string|null}
 export interface ScenarioBudgetChange {index:number;amount:string|null}
-export interface ScenarioCashChange {index:number;amount:string|null;firstDate:string}
+export interface ScenarioCashChange {index:number;amount:string|null;firstDate:string;settlementChange?:{delayed:boolean;firstAvailableDate:string|null}}
 export interface ScenarioExpense {
  label:string;kind:'necessary'|'discretionary';amount:string|null;
  frequency:'weekly'|'biweekly'|'semimonthly'|'monthly'|'annual';
@@ -330,6 +336,9 @@ export interface ScenarioInput {
  emergencyContribution:ScenarioAmountChange|null;cashChanges:ScenarioCashChange[];
  debtExtras?:DatedAmount[];goalContributions?:ScenarioBudgetChange[];
  recurringExpenses?:ScenarioExpense[];
+ newGoals?:{id:string;label:string;targetAmount:string|null;targetDate:string|null;monthlyContribution:string|null}[];
+ targetedExtras?:{accountIndex:number;month:string;amount:string}[];
+ savingsFunding?:import('./planningTypes').SavingsFunding;
  incomeReductions?:{budgetIndex:number;fromMonth:string;throughMonth:string;amount:string|null;cashSchedule:number|null}[];
 }
 export interface ScenarioOutcome {strategy:PlanningDebtStrategy;firstMonthBuffer:string|null;plans:AssessmentPlans}

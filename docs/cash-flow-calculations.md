@@ -85,8 +85,9 @@ contributions in their source plans and enter their actual intended dates once.
 
 No overdraft fees, credit limits, interest, holds, bank synchronization, actual
 transaction reconciliation, business-day shifting, or probabilistic income models
-are implemented. Transfers settle immediately in this model; delayed transfers
-need a future settlement model. Bounds: 20 accounts, 100 schedules, 5,000 generated
+are implemented. Unextended transfers retain immediate settlement. In 0.52.0 optional explicit
+availability dates create separate departure/receipt legs and in-transit balances,
+with per-account reserve floors; see [current rules](financial-planning-subpages.md). Bounds: 20 accounts, 100 schedules, 5,000 generated
 entries, 1,000 note characters, and 64 KiB saved JSON. Forecasts are estimates.
 
 ## Independently checked fictional examples

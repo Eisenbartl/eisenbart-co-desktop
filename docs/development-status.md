@@ -9,11 +9,13 @@ drawdowns, and verified savings progress. See [model rules and examples](financi
 The engine milestone passed 329 initial library regressions (before the final v2
 scenario additions), focused calculation cases, and the extended real-service
 scenario/report/PDF/encrypted-recovery test. Current all-target Clippy with
-warnings denied and frontend production build pass. Interface wiring and native
-acceptance are in progress. A combined UI run exposed whole-test time limits in
-existing long App workflows under load; retain their assertions/deadlines and
-rerun with one DOM worker. Final full 0.52.0 tests, native acceptance, documentation
-and Windows CI remain required. Do not treat this stage as complete or build an installer.
+warnings denied and frontend production build pass. All six interface homes are wired through the existing editors and services.
+The full UI suite passed **333 tests in 46 files**, using one DOM worker. Earlier
+combined runs hit whole-test deadlines in existing long App workflows under load;
+the default DOM worker count is now one for the same bounded behavior in CI.
+All assertions and per-test deadlines remain unchanged. Final full 0.52.0 Rust
+tests are running. Native acceptance, final documentation and Windows CI remain
+required. Do not treat this stage as complete or build an installer.
 
 
 ## End-to-end workflow integration audit — verified source (0.51.0, schema 32)
