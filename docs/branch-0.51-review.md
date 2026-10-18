@@ -1,5 +1,10 @@
 # Version 0.51.0 development-branch review
 
+This is the retained 0.51.0 consolidation review. Current development also includes
+the user-requested [0.52.0 financial planning subpages](financial-planning-subpages.md).
+Use [development status](development-status.md) and current PR checks for current
+validation; the original 37 commits and this historical boundary remain preserved.
+
 ## Scope and branch policy
 
 Review branch: `client-workspace-redesign-0.46`, targeting `main`.
